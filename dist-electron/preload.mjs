@@ -17,6 +17,7 @@ electron.contextBridge.exposeInMainWorld("ipcRenderer", {
     const [channel, ...omit] = args;
     return electron.ipcRenderer.invoke(channel, ...omit);
   }
-  // You can expose other APTs you need here.
-  // ...
+});
+electron.contextBridge.exposeInMainWorld("api", {
+  login: (username, password) => electron.ipcRenderer.invoke("login-request", { username, password })
 });

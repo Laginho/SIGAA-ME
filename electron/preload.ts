@@ -18,7 +18,8 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
     const [channel, ...omit] = args
     return ipcRenderer.invoke(channel, ...omit)
   },
+})
 
-  // You can expose other APTs you need here.
-  // ...
+contextBridge.exposeInMainWorld('api', {
+  login: (username, password) => ipcRenderer.invoke('login-request', { username, password })
 })
