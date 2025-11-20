@@ -7,15 +7,25 @@ export class SigaaService {
 
     constructor() {
         this.sigaa = new Sigaa({
-            url: 'https://sigaa.ifsc.edu.br' // We might need to make this configurable later!
+            url: 'https://si3.ufc.br' // We might need to make this configurable later!
         });
     }
 
-    async login(username: string, password: string): Promise<{ success: boolean; message?: string }> {
+    async login(username: string, password: string): Promise<{ success: boolean; message?: string; account?: { name: string; photoUrl?: string } }> {
         try {
             const account = await this.sigaa.login(username, password);
             if (account) {
-                return { success: true };
+                // Get basic user info
+                const name = await account.getName();
+                const photoUrl = await account.getProfilePictureURL();
+
+                return {
+                    success: true,
+                    account: {
+                        name,
+                        photoUrl: photoUrl ? photoUrl.toString() : undefined
+                    }
+                };
             } else {
                 return { success: false, message: 'Authentication failed.' };
             }

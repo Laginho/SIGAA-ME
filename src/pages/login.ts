@@ -26,7 +26,11 @@ export function renderLoginPage(app: HTMLDivElement) {
   `;
 
     // Add event listener for the form
-    const form = document.getElementById('loginForm');
+    const form = document.getElementById('loginForm') as HTMLFormElement;
+    const usernameInput = document.getElementById('username') as HTMLInputElement;
+    const passwordInput = document.getElementById('password') as HTMLInputElement;
+    const submitButton = form.querySelector('button[type="submit"]') as HTMLButtonElement;
+
     form?.addEventListener('submit', async (e) => {
         e.preventDefault();
 
@@ -44,8 +48,12 @@ export function renderLoginPage(app: HTMLDivElement) {
 
             if (result.success) {
                 console.log('Login success!');
-                alert('Login realizado com sucesso! (Simulação)');
-                // TODO: Navigate to Dashboard
+                // We will redirect to dashboard here soon
+                if (result.account) {
+                    alert(`Bem-vindo, ${result.account.name}!`);
+                } else {
+                    alert('Login realizado com sucesso!');
+                }
             } else {
                 alert(`Erro ao entrar: ${result.message}`);
             }

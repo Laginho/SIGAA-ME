@@ -3,6 +3,6 @@
 interface Window {
     ipcRenderer: import('electron').IpcRenderer
     api: {
-        login: (username: string, password: string) => Promise<{ success: boolean; message?: string }>
+        login: (username: string, password: string) => Promise<{ success: boolean; message?: string; account?: { name: string; photoUrl?: string } }>
     }
 }
