@@ -19,5 +19,6 @@ electron.contextBridge.exposeInMainWorld("ipcRenderer", {
   }
 });
 electron.contextBridge.exposeInMainWorld("api", {
-  login: (username, password) => electron.ipcRenderer.invoke("login-request", { username, password })
+  login: (username, password) => electron.ipcRenderer.invoke("login-request", { username, password }),
+  getCourses: () => electron.ipcRenderer.invoke("get-courses")
 });

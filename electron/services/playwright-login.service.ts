@@ -6,6 +6,7 @@ import { chromium, Browser } from 'playwright';
  */
 export class PlaywrightLoginService {
     private browser: Browser | null = null;
+    private storedCookies: any[] = [];
 
     async login(username: string, password: string): Promise<{ success: boolean; cookies?: any[]; userName?: string; error?: string }> {
         try {
@@ -65,6 +66,9 @@ export class PlaywrightLoginService {
             const cookies = await context.cookies();
             console.log('Playwright: Found cookies:', cookies.map(c => c.name).join(', '));
 
+            // Store cookies for future use
+            this.storedCookies = cookies;
+
             await this.close();
 
             return {
@@ -75,6 +79,68 @@ export class PlaywrightLoginService {
 
         } catch (error: any) {
             console.error('Playwright: Error during login:', error);
+            await this.close();
+            return { success: false, error: error.message };
+        }
+    }
+
+    async getCourses(): Promise<{ success: boolean; courses?: any[]; error?: string }> {
+        try {
+            console.log('Playwright: Launching browser to fetch courses...');
+
+            // Check if we have stored cookies
+            if (!this.storedCookies || this.storedCookies.length === 0) {
+                return { success: false, error: 'No stored session - please login first' };
+            }
+
+            this.browser = await chromium.launch({
+                headless: false,
+                slowMo: 500
+            });
+
+            const context = await this.browser.newContext();
+
+            // Inject stored cookies
+            console.log('Playwright: Injecting stored session cookies...');
+            await context.addCookies(this.storedCookies);
+
+            const page = await context.newPage();
+
+            // Navigate to the student courses page
+            console.log('Playwright: Navigating to courses page...');
+            await page.goto('https://si3.ufc.br/sigaa/portais/discente/discente.jsf');
+            await page.waitForLoadState('networkidle');
+
+            // Check if we need to login (if cookies expired)
+            if (page.url().includes('verTelaLogin')) {
+                await this.close();
+                return { success: false, error: 'Session expired - please login again' };
+            }
+
+            // Extract courses from the page
+            console.log('Playwright: Extracting courses from page...');
+            const courses = await page.$$eval('table[class*="listing"] tr', (rows: any) => {
+                // Skip header row
+                return rows.slice(1).map((row: any) => {
+                    const cells = row.querySelectorAll('td');
+                    if (cells.length >= 3) {
+                        return {
+                            name: cells[0]?.textContent?.trim() || '',
+                            code: cells[1]?.textContent?.trim() || '',
+                            period: cells[2].textContent?.trim() || ''
+                        };
+                    }
+                    return null;
+                }).filter((course: any) => course !== null && course.name);
+            });
+
+            console.log('Playwright: Found courses:', courses.length);
+
+            await this.close();
+            return { success: true, courses };
+
+        } catch (error: any) {
+            console.error('Playwright: Error fetching courses:', error);
             await this.close();
             return { success: false, error: error.message };
         }

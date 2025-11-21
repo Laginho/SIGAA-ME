@@ -70,6 +70,10 @@ ipcMain.handle('login-request', async (_event, { username, password }) => {
   return await sigaaService.login(username, password)
 })
 
+ipcMain.handle('get-courses', async () => {
+  return await sigaaService.getCourses()
+})
+
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.

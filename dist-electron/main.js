@@ -10,6 +10,7 @@ import { chromium } from "playwright";
 class PlaywrightLoginService {
   constructor() {
     __publicField(this, "browser", null);
+    __publicField(this, "storedCookies", []);
   }
   async login(username, password) {
     try {
@@ -47,6 +48,7 @@ class PlaywrightLoginService {
       console.log("Playwright: Extracted user name:", userName);
       const cookies = await context.cookies();
       console.log("Playwright: Found cookies:", cookies.map((c) => c.name).join(", "));
+      this.storedCookies = cookies;
       await this.close();
       return {
         success: true,
@@ -55,6 +57,51 @@ class PlaywrightLoginService {
       };
     } catch (error) {
       console.error("Playwright: Error during login:", error);
+      await this.close();
+      return { success: false, error: error.message };
+    }
+  }
+  async getCourses() {
+    try {
+      console.log("Playwright: Launching browser to fetch courses...");
+      if (!this.storedCookies || this.storedCookies.length === 0) {
+        return { success: false, error: "No stored session - please login first" };
+      }
+      this.browser = await chromium.launch({
+        headless: false,
+        slowMo: 500
+      });
+      const context = await this.browser.newContext();
+      console.log("Playwright: Injecting stored session cookies...");
+      await context.addCookies(this.storedCookies);
+      const page = await context.newPage();
+      console.log("Playwright: Navigating to courses page...");
+      await page.goto("https://si3.ufc.br/sigaa/portais/discente/discente.jsf");
+      await page.waitForLoadState("networkidle");
+      if (page.url().includes("verTelaLogin")) {
+        await this.close();
+        return { success: false, error: "Session expired - please login again" };
+      }
+      console.log("Playwright: Extracting courses from page...");
+      const courses = await page.$$eval('table[class*="listing"] tr', (rows) => {
+        return rows.slice(1).map((row) => {
+          var _a, _b, _c, _d, _e;
+          const cells = row.querySelectorAll("td");
+          if (cells.length >= 3) {
+            return {
+              name: ((_b = (_a = cells[0]) == null ? void 0 : _a.textContent) == null ? void 0 : _b.trim()) || "",
+              code: ((_d = (_c = cells[1]) == null ? void 0 : _c.textContent) == null ? void 0 : _d.trim()) || "",
+              period: ((_e = cells[2].textContent) == null ? void 0 : _e.trim()) || ""
+            };
+          }
+          return null;
+        }).filter((course) => course !== null && course.name);
+      });
+      console.log("Playwright: Found courses:", courses.length);
+      await this.close();
+      return { success: true, courses };
+    } catch (error) {
+      console.error("Playwright: Error fetching courses:", error);
       await this.close();
       return { success: false, error: error.message };
     }
@@ -75,7 +122,7 @@ class SigaaService {
       url: "https://si3.ufc.br"
     });
     this.playwrightLogin = new PlaywrightLoginService();
-    console.log("SIGAA: Service initialized with Playwright login");
+    console.log("SIGAA: Service initialized with Playwright");
   }
   async login(username, password) {
     try {
@@ -96,6 +143,24 @@ class SigaaService {
     } catch (error) {
       console.error("Login error:", error);
       return { success: false, message: error.message || "Unknown error occurred." };
+    }
+  }
+  async getCourses() {
+    var _a;
+    try {
+      console.log("SIGAA: Fetching courses using Playwright...");
+      const result = await this.playwrightLogin.getCourses();
+      if (!result.success) {
+        return { success: false, message: result.error || "Failed to fetch courses" };
+      }
+      console.log("SIGAA: Found courses:", ((_a = result.courses) == null ? void 0 : _a.length) || 0);
+      return {
+        success: true,
+        courses: result.courses
+      };
+    } catch (error) {
+      console.error("SIGAA: Error fetching courses:", error);
+      return { success: false, message: error.message || "Failed to fetch courses" };
     }
   }
 }
@@ -133,6 +198,9 @@ function createWindow() {
 }
 ipcMain.handle("login-request", async (_event, { username, password }) => {
   return await sigaaService.login(username, password);
+});
+ipcMain.handle("get-courses", async () => {
+  return await sigaaService.getCourses();
 });
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {

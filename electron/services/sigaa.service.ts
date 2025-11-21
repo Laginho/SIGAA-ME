@@ -8,7 +8,7 @@ export class SigaaService {
     private playwrightLogin: PlaywrightLoginService;
 
     constructor() {
-        // Initialize Sigaa instance
+        // Initialize Sigaa instance (kept for potential future use)
         this.sigaa = new Sigaa({
             url: 'https://si3.ufc.br'
         });
@@ -16,7 +16,7 @@ export class SigaaService {
         // Initialize Playwright login service
         this.playwrightLogin = new PlaywrightLoginService();
 
-        console.log('SIGAA: Service initialized with Playwright login');
+        console.log('SIGAA: Service initialized with Playwright');
     }
 
     async login(username: string, password: string): Promise<{ success: boolean; message?: string; account?: { name: string; photoUrl?: string } }> {
@@ -42,6 +42,29 @@ export class SigaaService {
         } catch (error: any) {
             console.error('Login error:', error);
             return { success: false, message: error.message || 'Unknown error occurred.' };
+        }
+    }
+
+    async getCourses(): Promise<{ success: boolean; courses?: any[]; message?: string }> {
+        try {
+            console.log('SIGAA: Fetching courses using Playwright...');
+
+            // Use Playwright to scrape courses from the page
+            const result = await this.playwrightLogin.getCourses();
+
+            if (!result.success) {
+                return { success: false, message: result.error || 'Failed to fetch courses' };
+            }
+
+            console.log('SIGAA: Found courses:', result.courses?.length || 0);
+
+            return {
+                success: true,
+                courses: result.courses
+            };
+        } catch (error: any) {
+            console.error('SIGAA: Error fetching courses:', error);
+            return { success: false, message: error.message || 'Failed to fetch courses' };
         }
     }
 }
