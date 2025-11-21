@@ -203,9 +203,6 @@ export class PlaywrightLoginService {
             await context.addCookies(this.storedCookies);
             const page = await context.newPage();
 
-            // Enable console logs
-            page.on('console', msg => console.log('Playwright Browser Log:', msg.text()));
-
             // Go to portal
             await page.goto('https://si3.ufc.br/sigaa/verPortalDiscente.do');
             await page.waitForLoadState('networkidle');
@@ -213,7 +210,6 @@ export class PlaywrightLoginService {
             // Enter the course
             console.log(`Playwright: Entering course ${courseId}...`);
             const entered = await page.evaluate((id) => {
-                // Find the form/row with the matching idTurma
                 const inputs = Array.from(document.querySelectorAll('input[name="idTurma"]'));
                 const targetInput = inputs.find(input => (input as HTMLInputElement).value === id);
 
@@ -238,38 +234,46 @@ export class PlaywrightLoginService {
             await page.waitForLoadState('networkidle');
             console.log('Playwright: Successfully entered course!');
 
-            // Wait a bit for page to settle
-            await page.waitForTimeout(1000);
+            // Navigate to AVA
+            console.log('Playwright: Navigating to AVA...');
+            await page.goto('https://si3.ufc.br/sigaa/ava/index.jsf');
+            await page.waitForLoadState('networkidle');
+            await page.waitForTimeout(2000);
 
-            // DEBUG: Inspect page structure to find files
-            console.log('Playwright: Inspecting course page structure...');
-            const pageInfo = await page.evaluate(() => {
-                // Get all section headers
-                const headers = Array.from(document.querySelectorAll('h1, h2, h3, h4, .titulo')).map(h => h.textContent?.trim());
+            console.log('Playwright: Extracting files from AVA main page...');
 
-                // Get all links that might be relevant
-                const links = Array.from(document.querySelectorAll('a')).map(a => ({
-                    text: a.innerText.trim(),
-                    href: a.href,
-                    onclick: a.getAttribute('onclick'),
-                    id: a.id
-                })).filter(l => l.text.length > 0); // Only visible links
+            // Extract files directly from main page
+            const filesData = await page.evaluate(() => {
+                const files: any[] = [];
+                const links = Array.from(document.querySelectorAll('a'));
 
-                return { headers, links };
+                for (const link of links) {
+                    const text = link.innerText.trim();
+                    const href = link.href;
+
+                    // Files usually have .pdf, .doc, etc. extensions in the text or href
+                    if (text && (
+                        text.match(/\.(pdf|doc|docx|ppt|pptx|xls|xlsx|zip|rar|txt|png|jpg|jpeg)$/i) ||
+                        text.toLowerCase().includes('lista') ||
+                        text.toLowerCase().includes('exerc') ||
+                        href.includes('downloadArquivo') ||
+                        href.includes('visualizar')
+                    )) {
+                        files.push({
+                            name: text,
+                            url: href
+                        });
+                    }
+                }
+
+                return files;
             });
 
-            console.log('Playwright: Page Headers:', pageInfo.headers);
-            console.log('Playwright: All Links (first 20):', pageInfo.links.slice(0, 20));
-
-            // Check specifically for "Materiais" or "Arquivos"
-            const fileSection = pageInfo.links.filter(l =>
-                l.text.match(/Arquivo|Material|Texto|Download|Baixar/i) ||
-                (l.onclick && l.onclick.match(/Arquivo|Material/i))
-            );
-            console.log('Playwright: Potential File/Material Links:', fileSection);
+            console.log('Playwright: Found files:', filesData.length);
+            console.log('Playwright: Files:', filesData);
 
             await this.close();
-            return { success: true, files: [] }; // Still empty for now
+            return { success: true, files: filesData };
 
         } catch (error: any) {
             console.error('Playwright: Error fetching files:', error);

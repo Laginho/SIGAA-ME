@@ -143,7 +143,6 @@ class PlaywrightLoginService {
       const context = await this.browser.newContext();
       await context.addCookies(this.storedCookies);
       const page = await context.newPage();
-      page.on("console", (msg) => console.log("Playwright Browser Log:", msg.text()));
       await page.goto("https://si3.ufc.br/sigaa/verPortalDiscente.do");
       await page.waitForLoadState("networkidle");
       console.log(`Playwright: Entering course ${courseId}...`);
@@ -168,29 +167,30 @@ class PlaywrightLoginService {
       }
       await page.waitForLoadState("networkidle");
       console.log("Playwright: Successfully entered course!");
-      await page.waitForTimeout(1e3);
-      console.log("Playwright: Inspecting course page structure...");
-      const pageInfo = await page.evaluate(() => {
-        const headers = Array.from(document.querySelectorAll("h1, h2, h3, h4, .titulo")).map((h) => {
-          var _a;
-          return (_a = h.textContent) == null ? void 0 : _a.trim();
-        });
-        const links = Array.from(document.querySelectorAll("a")).map((a) => ({
-          text: a.innerText.trim(),
-          href: a.href,
-          onclick: a.getAttribute("onclick"),
-          id: a.id
-        })).filter((l) => l.text.length > 0);
-        return { headers, links };
+      console.log("Playwright: Navigating to AVA...");
+      await page.goto("https://si3.ufc.br/sigaa/ava/index.jsf");
+      await page.waitForLoadState("networkidle");
+      await page.waitForTimeout(2e3);
+      console.log("Playwright: Extracting files from AVA main page...");
+      const filesData = await page.evaluate(() => {
+        const files = [];
+        const links = Array.from(document.querySelectorAll("a"));
+        for (const link of links) {
+          const text = link.innerText.trim();
+          const href = link.href;
+          if (text && (text.match(/\.(pdf|doc|docx|ppt|pptx|xls|xlsx|zip|rar|txt|png|jpg|jpeg)$/i) || text.toLowerCase().includes("lista") || text.toLowerCase().includes("exerc") || href.includes("downloadArquivo") || href.includes("visualizar"))) {
+            files.push({
+              name: text,
+              url: href
+            });
+          }
+        }
+        return files;
       });
-      console.log("Playwright: Page Headers:", pageInfo.headers);
-      console.log("Playwright: All Links (first 20):", pageInfo.links.slice(0, 20));
-      const fileSection = pageInfo.links.filter(
-        (l) => l.text.match(/Arquivo|Material|Texto|Download|Baixar/i) || l.onclick && l.onclick.match(/Arquivo|Material/i)
-      );
-      console.log("Playwright: Potential File/Material Links:", fileSection);
+      console.log("Playwright: Found files:", filesData.length);
+      console.log("Playwright: Files:", filesData);
       await this.close();
-      return { success: true, files: [] };
+      return { success: true, files: filesData };
     } catch (error) {
       console.error("Playwright: Error fetching files:", error);
       await this.close();
