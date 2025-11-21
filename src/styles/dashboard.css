@@ -91,7 +91,6 @@
     text-align: center;
     padding: 2rem;
     color: #666;
-    font-style: italic;
 }
 
 .course-card {
@@ -132,6 +131,13 @@
     margin: 0.25rem 0;
 }
 
+.course-files-count {
+    font-size: 0.8rem;
+    color: #007bff;
+    margin: 0.5rem 0 0 0;
+    font-weight: 500;
+}
+
 .error-message {
     grid-column: 1 / -1;
     background: #fee;
@@ -147,4 +153,48 @@
     text-align: center;
     padding: 2rem;
     color: #666;
+}
+
+/* Loading spinner and progress bar */
+.loading-spinner {
+    width: 40px;
+    height: 40px;
+    margin: 0 auto 1rem;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #007bff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+.progress-bar {
+    width: 100%;
+    max-width: 400px;
+    height: 8px;
+    background: #e0e0e0;
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 1rem auto;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #007bff, #0056b3);
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+.progress-text {
+    font-size: 0.875rem;
+    color: #666;
+    margin: 0.5rem 0 0 0;
 }

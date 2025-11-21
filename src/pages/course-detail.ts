@@ -38,35 +38,48 @@ async function fetchCourseFiles(courseId: string) {
   if (!filesListElement || !courseTitleElement || !courseCodeElement) return
 
   try {
-    const result = await window.api.getCourseFiles(courseId)
+    // Read from cache instead of fetching
+    const cachedData = sessionStorage.getItem('coursesWithFiles')
 
-    if (result.success && result.files) {
-      // Update course info (we'll need to pass course data somehow)
-      // For now, just show the course ID
-      courseTitleElement.textContent = 'Disciplina'
-      courseCodeElement.textContent = `ID: ${courseId}`
-
-      if (result.files.length === 0) {
-        filesListElement.innerHTML = `
-          <div class="no-files">Nenhum material disponível nesta disciplina</div>
-        `
-      } else {
-        filesListElement.innerHTML = result.files.map(file => `
-          <div class="file-item">
-            <div class="file-icon">📄</div>
-            <div class="file-info">
-              <div class="file-name">${file.name}</div>
-              <div class="file-meta">Arquivo da disciplina</div>
-            </div>
-          </div>
-        `).join('')
-      }
-    } else {
+    if (!cachedData) {
       filesListElement.innerHTML = `
         <div class="error-message">
-          Erro ao carregar arquivos: ${result.message || 'Erro desconhecido'}
+          Dados não encontrados. Por favor, volte ao dashboard.
         </div>
       `
+      return
+    }
+
+    const coursesWithFiles = JSON.parse(cachedData)
+    const course = coursesWithFiles.find((c: any) => c.id === courseId)
+
+    if (!course) {
+      filesListElement.innerHTML = `
+        <div class="error-message">
+          Disciplina não encontrada.
+        </div>
+      `
+      return
+    }
+
+    // Update course info
+    courseTitleElement.textContent = course.name
+    courseCodeElement.textContent = course.code || `ID: ${courseId}`
+
+    if (!course.files || course.files.length === 0) {
+      filesListElement.innerHTML = `
+        <div class="no-files">Nenhum material disponível nesta disciplina</div>
+      `
+    } else {
+      filesListElement.innerHTML = course.files.map((file: any) => `
+        <div class="file-item">
+          <div class="file-icon">📄</div>
+          <div class="file-info">
+            <div class="file-name">${file.name}</div>
+            <div class="file-meta">Arquivo da disciplina</div>
+          </div>
+        </div>
+      `).join('')
     }
   } catch (error: any) {
     filesListElement.innerHTML = `
