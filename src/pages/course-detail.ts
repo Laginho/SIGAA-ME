@@ -38,8 +38,8 @@ async function fetchCourseFiles(courseId: string) {
   if (!filesListElement || !courseTitleElement || !courseCodeElement) return
 
   try {
-    // Read from cache instead of fetching
-    const cachedData = sessionStorage.getItem('coursesWithFiles')
+    // Read from localStorage (persistent cache)
+    const cachedData = localStorage.getItem('coursesWithFiles')
 
     if (!cachedData) {
       filesListElement.innerHTML = `
