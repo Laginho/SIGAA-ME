@@ -241,19 +241,35 @@ export class PlaywrightLoginService {
             // Wait a bit for page to settle
             await page.waitForTimeout(1000);
 
-            // DEBUG: Print links to find where files are
-            console.log('Playwright: Scanning for file links...');
-            const links = await page.evaluate(() => {
-                return Array.from(document.querySelectorAll('a')).map(a => ({
+            // DEBUG: Inspect page structure to find files
+            console.log('Playwright: Inspecting course page structure...');
+            const pageInfo = await page.evaluate(() => {
+                // Get all section headers
+                const headers = Array.from(document.querySelectorAll('h1, h2, h3, h4, .titulo')).map(h => h.textContent?.trim());
+
+                // Get all links that might be relevant
+                const links = Array.from(document.querySelectorAll('a')).map(a => ({
                     text: a.innerText.trim(),
                     href: a.href,
-                    onclick: a.getAttribute('onclick')
-                })).filter(l => l.text.includes('Arquivo') || l.text.includes('Material') || l.text.includes('Baixar'));
+                    onclick: a.getAttribute('onclick'),
+                    id: a.id
+                })).filter(l => l.text.length > 0); // Only visible links
+
+                return { headers, links };
             });
-            console.log('Playwright: Found potential file links:', links);
+
+            console.log('Playwright: Page Headers:', pageInfo.headers);
+            console.log('Playwright: All Links (first 20):', pageInfo.links.slice(0, 20));
+
+            // Check specifically for "Materiais" or "Arquivos"
+            const fileSection = pageInfo.links.filter(l =>
+                l.text.match(/Arquivo|Material|Texto|Download|Baixar/i) ||
+                (l.onclick && l.onclick.match(/Arquivo|Material/i))
+            );
+            console.log('Playwright: Potential File/Material Links:', fileSection);
 
             await this.close();
-            return { success: true, files: [] }; // Return empty for now until we know how to scrape
+            return { success: true, files: [] }; // Still empty for now
 
         } catch (error: any) {
             console.error('Playwright: Error fetching files:', error);

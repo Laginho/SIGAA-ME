@@ -169,15 +169,26 @@ class PlaywrightLoginService {
       await page.waitForLoadState("networkidle");
       console.log("Playwright: Successfully entered course!");
       await page.waitForTimeout(1e3);
-      console.log("Playwright: Scanning for file links...");
-      const links = await page.evaluate(() => {
-        return Array.from(document.querySelectorAll("a")).map((a) => ({
+      console.log("Playwright: Inspecting course page structure...");
+      const pageInfo = await page.evaluate(() => {
+        const headers = Array.from(document.querySelectorAll("h1, h2, h3, h4, .titulo")).map((h) => {
+          var _a;
+          return (_a = h.textContent) == null ? void 0 : _a.trim();
+        });
+        const links = Array.from(document.querySelectorAll("a")).map((a) => ({
           text: a.innerText.trim(),
           href: a.href,
-          onclick: a.getAttribute("onclick")
-        })).filter((l) => l.text.includes("Arquivo") || l.text.includes("Material") || l.text.includes("Baixar"));
+          onclick: a.getAttribute("onclick"),
+          id: a.id
+        })).filter((l) => l.text.length > 0);
+        return { headers, links };
       });
-      console.log("Playwright: Found potential file links:", links);
+      console.log("Playwright: Page Headers:", pageInfo.headers);
+      console.log("Playwright: All Links (first 20):", pageInfo.links.slice(0, 20));
+      const fileSection = pageInfo.links.filter(
+        (l) => l.text.match(/Arquivo|Material|Texto|Download|Baixar/i) || l.onclick && l.onclick.match(/Arquivo|Material/i)
+      );
+      console.log("Playwright: Potential File/Material Links:", fileSection);
       await this.close();
       return { success: true, files: [] };
     } catch (error) {

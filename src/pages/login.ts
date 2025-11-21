@@ -49,7 +49,7 @@ export function renderLoginPage(app: HTMLDivElement) {
     }
 
     try {
-      const result = await window.api.login(username, password);
+      const result = await window.api.login({ username, password });
 
       if (result.success && result.account) {
         console.log('Login success!');
