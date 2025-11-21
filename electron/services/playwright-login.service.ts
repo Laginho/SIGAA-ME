@@ -102,6 +102,9 @@ export class PlaywrightLoginService {
 
             const page = await context.newPage();
 
+            // Enable console logs from the browser to Node.js
+            page.on('console', msg => console.log('Playwright Browser Log:', msg.text()));
+
             // Start at home page
             console.log('Playwright: Navigating to home page...');
             await page.goto('https://si3.ufc.br/sigaa/paginaInicial.do');
@@ -116,8 +119,8 @@ export class PlaywrightLoginService {
             // Click on student portal link
             console.log('Playwright: Looking for "Menu Discente" link...');
             try {
-                // Click on "Menu Discente" link using exact href
-                const studentLink = page.locator('a[href="/sigaa/verPortalDiscente.do"]');
+                // Click on "Menu Discente" link using exact href - use .first() to avoid strict mode error
+                const studentLink = page.locator('a[href="/sigaa/verPortalDiscente.do"]').first();
                 await studentLink.click({ timeout: 5000 });
                 await page.waitForLoadState('networkidle');
                 console.log('Playwright: Clicked Menu Discente, current URL:', page.url());
@@ -128,51 +131,38 @@ export class PlaywrightLoginService {
                 console.log('Playwright: Trying direct navigation to verPortalDiscente.do...');
                 await page.goto('https://si3.ufc.br/sigaa/verPortalDiscente.do');
                 await page.waitForLoadState('networkidle');
-                console.log('Playwright: Direct navigation complete, URL:', page.url());
             }
 
             // Wait a bit for dynamic content
             await page.waitForTimeout(1000);
 
-            // Extract courses with better filtering
+            // Extract courses with robust selector-based logic
             console.log('Playwright: Extracting courses from page...');
             const courses = await page.evaluate(() => {
                 const results: any[] = [];
+                // Find all rows that might contain courses
+                const rows = document.querySelectorAll('tr');
 
-                // Course codes follow pattern: 2 letters + 4 digits (e.g., CB0699, CK0181)
-                const courseCodePattern = /^[A-Z]{2}\d{4}/;
+                for (const row of rows) {
+                    // Look for the hidden ID input and the course link
+                    const idInput = row.querySelector('input[name="idTurma"]') as HTMLInputElement;
+                    const nameLink = row.querySelector('a[id*="turmaVirtual"]');
+                    const periodCell = row.querySelector('td.info center'); // Period is often in a center tag
 
-                // Find all text nodes that might contain course codes
-                const walker = document.createTreeWalker(
-                    document.body,
-                    NodeFilter.SHOW_TEXT,
-                    null
-                );
+                    if (idInput && nameLink && nameLink.textContent) {
+                        const fullText = nameLink.textContent.trim();
+                        const id = idInput.value;
 
-                const textNodes: Text[] = [];
-                let node;
-                while (node = walker.nextNode() as Text) {
-                    if (node.textContent && node.textContent.trim()) {
-                        textNodes.push(node);
-                    }
-                }
-
-                // Look for course code pattern in text
-                for (const textNode of textNodes) {
-                    const text = textNode.textContent?.trim() || '';
-                    const match = text.match(courseCodePattern);
-
-                    if (match) {
-                        // Found a course code! Extract the full course info
-                        const fullText = text;
-
-                        // Try to split by " - " to get code and name
+                        // Course codes follow pattern: 2 letters + 4 digits (e.g., CB0699, CK0181)
+                        // Format usually: "CODE - NAME"
                         const parts = fullText.split(' - ');
+
                         if (parts.length >= 2) {
                             results.push({
+                                id: id,
                                 code: parts[0].trim(),
                                 name: parts.slice(1).join(' - ').trim(),
-                                period: '' // We can extract this later if needed
+                                period: periodCell ? periodCell.innerText.split('\n')[0] : '' // Try to get first line of period info
                             });
                         }
                     }
@@ -191,6 +181,82 @@ export class PlaywrightLoginService {
 
         } catch (error: any) {
             console.error('Playwright: Error fetching courses:', error);
+            await this.close();
+            return { success: false, error: error.message };
+        }
+    }
+
+    async getCourseFiles(courseId: string): Promise<{ success: boolean; files?: any[]; error?: string }> {
+        try {
+            console.log(`Playwright: Fetching files for course ${courseId}...`);
+
+            if (!this.storedCookies || this.storedCookies.length === 0) {
+                return { success: false, error: 'No stored session - please login first' };
+            }
+
+            this.browser = await chromium.launch({
+                headless: false,
+                slowMo: 500
+            });
+
+            const context = await this.browser.newContext();
+            await context.addCookies(this.storedCookies);
+            const page = await context.newPage();
+
+            // Enable console logs
+            page.on('console', msg => console.log('Playwright Browser Log:', msg.text()));
+
+            // Go to portal
+            await page.goto('https://si3.ufc.br/sigaa/verPortalDiscente.do');
+            await page.waitForLoadState('networkidle');
+
+            // Enter the course
+            console.log(`Playwright: Entering course ${courseId}...`);
+            const entered = await page.evaluate((id) => {
+                // Find the form/row with the matching idTurma
+                const inputs = Array.from(document.querySelectorAll('input[name="idTurma"]'));
+                const targetInput = inputs.find(input => (input as HTMLInputElement).value === id);
+
+                if (targetInput) {
+                    const row = targetInput.closest('tr');
+                    if (row) {
+                        const link = row.querySelector('a[id*="turmaVirtual"]') as HTMLElement;
+                        if (link) {
+                            link.click();
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            }, courseId);
+
+            if (!entered) {
+                await this.close();
+                return { success: false, error: 'Course not found' };
+            }
+
+            await page.waitForLoadState('networkidle');
+            console.log('Playwright: Successfully entered course!');
+
+            // Wait a bit for page to settle
+            await page.waitForTimeout(1000);
+
+            // DEBUG: Print links to find where files are
+            console.log('Playwright: Scanning for file links...');
+            const links = await page.evaluate(() => {
+                return Array.from(document.querySelectorAll('a')).map(a => ({
+                    text: a.innerText.trim(),
+                    href: a.href,
+                    onclick: a.getAttribute('onclick')
+                })).filter(l => l.text.includes('Arquivo') || l.text.includes('Material') || l.text.includes('Baixar'));
+            });
+            console.log('Playwright: Found potential file links:', links);
+
+            await this.close();
+            return { success: true, files: [] }; // Return empty for now until we know how to scrape
+
+        } catch (error: any) {
+            console.error('Playwright: Error fetching files:', error);
             await this.close();
             return { success: false, error: error.message };
         }

@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
 })
 
 contextBridge.exposeInMainWorld('api', {
-  login: (username: string, password: string) => ipcRenderer.invoke('login-request', { username, password }),
-  getCourses: () => ipcRenderer.invoke('get-courses')
+  login: (credentials: any) => ipcRenderer.invoke('login-request', credentials),
+  getCourses: () => ipcRenderer.invoke('get-courses'),
+  getCourseFiles: (courseId: string) => ipcRenderer.invoke('get-course-files', courseId)
 })

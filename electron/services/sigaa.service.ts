@@ -60,4 +60,20 @@ export class SigaaService {
             return { success: false, message: error.message || 'Failed to fetch courses' };
         }
     }
+
+    async getCourseFiles(courseId: string): Promise<{ success: boolean; files?: any[]; message?: string }> {
+        try {
+            console.log(`SIGAA: Fetching files for course ${courseId}...`);
+            const result = await this.playwrightLogin.getCourseFiles(courseId);
+
+            if (!result.success) {
+                return { success: false, message: result.error || 'Failed to fetch files' };
+            }
+
+            return { success: true, files: result.files };
+        } catch (error: any) {
+            console.error('SIGAA: Error fetching files:', error);
+            return { success: false, message: error.message || 'Failed to fetch files' };
+        }
+    }
 }

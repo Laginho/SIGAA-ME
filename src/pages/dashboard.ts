@@ -59,12 +59,24 @@ async function fetchCourses() {
                 `;
       } else {
         coursesListElement.innerHTML = result.courses.map(course => `
-                    <div class="course-card">
+                    <div class="course-card" onclick="window.fetchCourseFiles('${course.id}')">
                         <h3>${course.name}</h3>
                         <p class="course-code">${course.code || 'Sem código'}</p>
                         <p class="course-period">${course.period || 'Período não especificado'}</p>
                     </div>
                 `).join('');
+
+        // Add global handler for testing
+        (window as any).fetchCourseFiles = async (id: string) => {
+          console.log(`Requesting files for course ${id}...`);
+          const res = await window.api.getCourseFiles(id);
+          console.log('Files result:', res);
+          if (res.success) {
+            alert('Entered course successfully! Check console for file links.');
+          } else {
+            alert('Failed to enter course: ' + res.message);
+          }
+        };
       }
     } else {
       coursesListElement.innerHTML = `

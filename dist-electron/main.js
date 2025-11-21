@@ -71,6 +71,7 @@ class PlaywrightLoginService {
       console.log("Playwright: Injecting stored session cookies...");
       await context.addCookies(this.storedCookies);
       const page = await context.newPage();
+      page.on("console", (msg) => console.log("Playwright Browser Log:", msg.text()));
       console.log("Playwright: Navigating to home page...");
       await page.goto("https://si3.ufc.br/sigaa/paginaInicial.do");
       await page.waitForLoadState("networkidle");
@@ -80,7 +81,7 @@ class PlaywrightLoginService {
       }
       console.log('Playwright: Looking for "Menu Discente" link...');
       try {
-        const studentLink = page.locator('a[href="/sigaa/verPortalDiscente.do"]');
+        const studentLink = page.locator('a[href="/sigaa/verPortalDiscente.do"]').first();
         await studentLink.click({ timeout: 5e3 });
         await page.waitForLoadState("networkidle");
         console.log("Playwright: Clicked Menu Discente, current URL:", page.url());
@@ -90,38 +91,27 @@ class PlaywrightLoginService {
         console.log("Playwright: Trying direct navigation to verPortalDiscente.do...");
         await page.goto("https://si3.ufc.br/sigaa/verPortalDiscente.do");
         await page.waitForLoadState("networkidle");
-        console.log("Playwright: Direct navigation complete, URL:", page.url());
       }
       await page.waitForTimeout(1e3);
       console.log("Playwright: Extracting courses from page...");
       const courses = await page.evaluate(() => {
-        var _a;
         const results = [];
-        const courseCodePattern = /^[A-Z]{2}\d{4}/;
-        const walker = document.createTreeWalker(
-          document.body,
-          NodeFilter.SHOW_TEXT,
-          null
-        );
-        const textNodes = [];
-        let node;
-        while (node = walker.nextNode()) {
-          if (node.textContent && node.textContent.trim()) {
-            textNodes.push(node);
-          }
-        }
-        for (const textNode of textNodes) {
-          const text = ((_a = textNode.textContent) == null ? void 0 : _a.trim()) || "";
-          const match = text.match(courseCodePattern);
-          if (match) {
-            const fullText = text;
+        const rows = document.querySelectorAll("tr");
+        for (const row of rows) {
+          const idInput = row.querySelector('input[name="idTurma"]');
+          const nameLink = row.querySelector('a[id*="turmaVirtual"]');
+          const periodCell = row.querySelector("td.info center");
+          if (idInput && nameLink && nameLink.textContent) {
+            const fullText = nameLink.textContent.trim();
+            const id = idInput.value;
             const parts = fullText.split(" - ");
             if (parts.length >= 2) {
               results.push({
+                id,
                 code: parts[0].trim(),
                 name: parts.slice(1).join(" - ").trim(),
-                period: ""
-                // We can extract this later if needed
+                period: periodCell ? periodCell.innerText.split("\n")[0] : ""
+                // Try to get first line of period info
               });
             }
           }
@@ -136,6 +126,62 @@ class PlaywrightLoginService {
       return { success: true, courses };
     } catch (error) {
       console.error("Playwright: Error fetching courses:", error);
+      await this.close();
+      return { success: false, error: error.message };
+    }
+  }
+  async getCourseFiles(courseId) {
+    try {
+      console.log(`Playwright: Fetching files for course ${courseId}...`);
+      if (!this.storedCookies || this.storedCookies.length === 0) {
+        return { success: false, error: "No stored session - please login first" };
+      }
+      this.browser = await chromium.launch({
+        headless: false,
+        slowMo: 500
+      });
+      const context = await this.browser.newContext();
+      await context.addCookies(this.storedCookies);
+      const page = await context.newPage();
+      page.on("console", (msg) => console.log("Playwright Browser Log:", msg.text()));
+      await page.goto("https://si3.ufc.br/sigaa/verPortalDiscente.do");
+      await page.waitForLoadState("networkidle");
+      console.log(`Playwright: Entering course ${courseId}...`);
+      const entered = await page.evaluate((id) => {
+        const inputs = Array.from(document.querySelectorAll('input[name="idTurma"]'));
+        const targetInput = inputs.find((input) => input.value === id);
+        if (targetInput) {
+          const row = targetInput.closest("tr");
+          if (row) {
+            const link = row.querySelector('a[id*="turmaVirtual"]');
+            if (link) {
+              link.click();
+              return true;
+            }
+          }
+        }
+        return false;
+      }, courseId);
+      if (!entered) {
+        await this.close();
+        return { success: false, error: "Course not found" };
+      }
+      await page.waitForLoadState("networkidle");
+      console.log("Playwright: Successfully entered course!");
+      await page.waitForTimeout(1e3);
+      console.log("Playwright: Scanning for file links...");
+      const links = await page.evaluate(() => {
+        return Array.from(document.querySelectorAll("a")).map((a) => ({
+          text: a.innerText.trim(),
+          href: a.href,
+          onclick: a.getAttribute("onclick")
+        })).filter((l) => l.text.includes("Arquivo") || l.text.includes("Material") || l.text.includes("Baixar"));
+      });
+      console.log("Playwright: Found potential file links:", links);
+      await this.close();
+      return { success: true, files: [] };
+    } catch (error) {
+      console.error("Playwright: Error fetching files:", error);
       await this.close();
       return { success: false, error: error.message };
     }
@@ -193,6 +239,19 @@ class SigaaService {
       return { success: false, message: error.message || "Failed to fetch courses" };
     }
   }
+  async getCourseFiles(courseId) {
+    try {
+      console.log(`SIGAA: Fetching files for course ${courseId}...`);
+      const result = await this.playwrightLogin.getCourseFiles(courseId);
+      if (!result.success) {
+        return { success: false, message: result.error || "Failed to fetch files" };
+      }
+      return { success: true, files: result.files };
+    } catch (error) {
+      console.error("SIGAA: Error fetching files:", error);
+      return { success: false, message: error.message || "Failed to fetch files" };
+    }
+  }
 }
 const __dirname$1 = path.dirname(fileURLToPath(import.meta.url));
 process.env.APP_ROOT = path.join(__dirname$1, "..");
@@ -223,6 +282,9 @@ ipcMain.handle("login-request", async (_event, { username, password }) => {
 });
 ipcMain.handle("get-courses", async () => {
   return await sigaaService.getCourses();
+});
+ipcMain.handle("get-course-files", async (_, courseId) => {
+  return await sigaaService.getCourseFiles(courseId);
 });
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
