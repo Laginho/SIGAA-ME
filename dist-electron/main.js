@@ -6,6 +6,7 @@ import { ipcMain, app, BrowserWindow } from "electron";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { Sigaa } from "sigaa-api";
+import { URL } from "url";
 class SigaaLoginUFC {
   constructor(http, session) {
     this.http = http;
@@ -47,7 +48,14 @@ class SigaaLoginUFC {
     postValues["height"] = "1080";
     postValues["entrar"] = "Entrar";
     console.log("SIGAA: Attempting login to", actionUrl);
-    const resultPage = await this.http.post(actionUrl, postValues);
+    console.log("SIGAA: Form values:", JSON.stringify(postValues, null, 2));
+    const options = {
+      headers: {
+        "Referer": loginPage.url.href,
+        "Origin": new URL(loginPage.url.href).origin
+      }
+    };
+    const resultPage = await this.http.post(actionUrl, postValues, options);
     const finalPage = await this.http.followAllRedirect(resultPage);
     const body = finalPage.bodyDecoded;
     if (body.includes("Entrar no Sistema") || body.includes('name="loginForm"')) {
@@ -70,7 +78,13 @@ class SigaaService {
     });
     const http = this.sigaa.http;
     const session = this.sigaa.session;
-    this.sigaa.loginInstance = new SigaaLoginUFC(http, session);
+    const ufcLogin = new SigaaLoginUFC(http, session);
+    this.sigaa.login = async (username, password) => {
+      const page = await ufcLogin.login(username, password);
+      const accountFactory = this.sigaa.accountFactory;
+      return accountFactory.getAccount(page);
+    };
+    console.log("SIGAA: Overrode login method with UFC handler");
   }
   async login(username, password) {
     try {
