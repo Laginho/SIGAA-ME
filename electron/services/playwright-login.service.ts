@@ -40,7 +40,7 @@ export class PlaywrightLoginService {
 
             // If we're still on the login page, login failed
             if (currentUrl.includes('verTelaLogin') || currentUrl.includes('logar.do')) {
-                //Check for error message on page
+                // Check for error message on page
                 const errorElement = await page.$('.erro, .mensagemErro, .alert');
                 const errorMessage = errorElement ? await errorElement.textContent() : 'Unknown error';
 
@@ -55,9 +55,8 @@ export class PlaywrightLoginService {
             await page.goto('https://si3.ufc.br/sigaa/portais/discente/discente.jsf');
             await page.waitForLoadState('networkidle');
 
-            // Extract user name from the page
-            // Try multiple possible selectors for the user name
-            const nameElement = await page.$('.info-usuario .nome-usuario, .usuario-nome, #nome-usuario, .usuario');
+            // Extract user name from the page using the correct selector
+            const nameElement = await page.$('.nome_usuario');
             const userName = nameElement ? await nameElement.textContent() : null;
 
             console.log('Playwright: Extracted user name:', userName);

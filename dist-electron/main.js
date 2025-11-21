@@ -42,7 +42,7 @@ class PlaywrightLoginService {
       console.log("Playwright: Login successful! Extracting user data...");
       await page.goto("https://si3.ufc.br/sigaa/portais/discente/discente.jsf");
       await page.waitForLoadState("networkidle");
-      const nameElement = await page.$(".info-usuario .nome-usuario, .usuario-nome, #nome-usuario, .usuario");
+      const nameElement = await page.$(".nome_usuario");
       const userName = nameElement ? await nameElement.textContent() : null;
       console.log("Playwright: Extracted user name:", userName);
       const cookies = await context.cookies();
