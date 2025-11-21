@@ -218,27 +218,43 @@ export class PlaywrightLoginService {
                     if (row) {
                         const link = row.querySelector('a[id*="turmaVirtual"]') as HTMLElement;
                         if (link) {
+                            // Log which course we're clicking
+                            console.log('Clicking course:', link.innerText);
                             link.click();
-                            return true;
+                            return { success: true, courseName: link.innerText };
                         }
                     }
                 }
-                return false;
+                return { success: false, courseName: '' };
             }, courseId);
 
-            if (!entered) {
+            console.log('Playwright: Click result:', entered);
+
+            if (!entered.success) {
                 await this.close();
                 return { success: false, error: 'Course not found' };
             }
 
             await page.waitForLoadState('networkidle');
             console.log('Playwright: Successfully entered course!');
+            console.log('Playwright: Current URL after click:', page.url());
+
+            // Wait longer to ensure the course selection is registered
+            await page.waitForTimeout(2000);
 
             // Navigate to AVA
             console.log('Playwright: Navigating to AVA...');
             await page.goto('https://si3.ufc.br/sigaa/ava/index.jsf');
             await page.waitForLoadState('networkidle');
             await page.waitForTimeout(2000);
+
+            // Check which course we're actually viewing
+            const actualCourse = await page.evaluate(() => {
+                const header = document.querySelector('h2, h3, .titulo');
+                return header ? header.textContent?.trim() : 'Unknown';
+            });
+
+            console.log('Playwright: Currently viewing course:', actualCourse);
 
             console.log('Playwright: Extracting files from AVA main page...');
 
@@ -249,19 +265,35 @@ export class PlaywrightLoginService {
 
                 for (const link of links) {
                     const text = link.innerText.trim();
-                    const href = link.href;
+                    let href = link.href;
+                    const onclick = link.getAttribute('onclick');
 
-                    // Files usually have .pdf, .doc, etc. extensions in the text or href
+                    // Files usually have .pdf, .doc, etc. extensions in the text
                     if (text && (
                         text.match(/\.(pdf|doc|docx|ppt|pptx|xls|xlsx|zip|rar|txt|png|jpg|jpeg)$/i) ||
                         text.toLowerCase().includes('lista') ||
-                        text.toLowerCase().includes('exerc') ||
-                        href.includes('downloadArquivo') ||
-                        href.includes('visualizar')
+                        text.toLowerCase().includes('exerc')
                     )) {
+                        // If href is just '#', try to extract from onclick
+                        if (href.endsWith('#') || href.includes('index.jsf#')) {
+                            if (onclick) {
+                                // Extract URL from onclick
+                                const urlMatch = onclick.match(/['"]([^'"]*downloadArquivo[^'"]*)['"]/i) ||
+                                    onclick.match(/['"]([^'"]*visualizar[^'"]*)['"]/i) ||
+                                    onclick.match(/['"]([^'"]*\.(pdf|doc|docx)[^'"]*)['"]/i);
+                                if (urlMatch) {
+                                    href = urlMatch[1];
+                                    if (!href.startsWith('http')) {
+                                        href = 'https://si3.ufc.br' + (href.startsWith('/') ? href : '/sigaa/' + href);
+                                    }
+                                }
+                            }
+                        }
+
                         files.push({
                             name: text,
-                            url: href
+                            url: href,
+                            onclick: onclick // Keep for debugging
                         });
                     }
                 }

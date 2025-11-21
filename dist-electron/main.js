@@ -154,34 +154,58 @@ class PlaywrightLoginService {
           if (row) {
             const link = row.querySelector('a[id*="turmaVirtual"]');
             if (link) {
+              console.log("Clicking course:", link.innerText);
               link.click();
-              return true;
+              return { success: true, courseName: link.innerText };
             }
           }
         }
-        return false;
+        return { success: false, courseName: "" };
       }, courseId);
-      if (!entered) {
+      console.log("Playwright: Click result:", entered);
+      if (!entered.success) {
         await this.close();
         return { success: false, error: "Course not found" };
       }
       await page.waitForLoadState("networkidle");
       console.log("Playwright: Successfully entered course!");
+      console.log("Playwright: Current URL after click:", page.url());
+      await page.waitForTimeout(2e3);
       console.log("Playwright: Navigating to AVA...");
       await page.goto("https://si3.ufc.br/sigaa/ava/index.jsf");
       await page.waitForLoadState("networkidle");
       await page.waitForTimeout(2e3);
+      const actualCourse = await page.evaluate(() => {
+        var _a;
+        const header = document.querySelector("h2, h3, .titulo");
+        return header ? (_a = header.textContent) == null ? void 0 : _a.trim() : "Unknown";
+      });
+      console.log("Playwright: Currently viewing course:", actualCourse);
       console.log("Playwright: Extracting files from AVA main page...");
       const filesData = await page.evaluate(() => {
         const files = [];
         const links = Array.from(document.querySelectorAll("a"));
         for (const link of links) {
           const text = link.innerText.trim();
-          const href = link.href;
-          if (text && (text.match(/\.(pdf|doc|docx|ppt|pptx|xls|xlsx|zip|rar|txt|png|jpg|jpeg)$/i) || text.toLowerCase().includes("lista") || text.toLowerCase().includes("exerc") || href.includes("downloadArquivo") || href.includes("visualizar"))) {
+          let href = link.href;
+          const onclick = link.getAttribute("onclick");
+          if (text && (text.match(/\.(pdf|doc|docx|ppt|pptx|xls|xlsx|zip|rar|txt|png|jpg|jpeg)$/i) || text.toLowerCase().includes("lista") || text.toLowerCase().includes("exerc"))) {
+            if (href.endsWith("#") || href.includes("index.jsf#")) {
+              if (onclick) {
+                const urlMatch = onclick.match(/['"]([^'"]*downloadArquivo[^'"]*)['"]/i) || onclick.match(/['"]([^'"]*visualizar[^'"]*)['"]/i) || onclick.match(/['"]([^'"]*\.(pdf|doc|docx)[^'"]*)['"]/i);
+                if (urlMatch) {
+                  href = urlMatch[1];
+                  if (!href.startsWith("http")) {
+                    href = "https://si3.ufc.br" + (href.startsWith("/") ? href : "/sigaa/" + href);
+                  }
+                }
+              }
+            }
             files.push({
               name: text,
-              url: href
+              url: href,
+              onclick
+              // Keep for debugging
             });
           }
         }
