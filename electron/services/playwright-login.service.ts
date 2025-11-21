@@ -52,12 +52,8 @@ export class PlaywrightLoginService {
             // Login successful! Extract user data from the page
             console.log('Playwright: Login successful! Extracting user data...');
 
-            // Navigate to the student portal page
-            await page.goto('https://si3.ufc.br/sigaa/portais/discente/discente.jsf');
-            await page.waitForLoadState('networkidle');
-
-            // Extract user name from the page using the correct selector
-            const nameElement = await page.$('.nome_usuario');
+            // Stay on current page after login to extract user info
+            const nameElement = await page.$('.nome_usuario, .info-usuario .nome');
             const userName = nameElement ? await nameElement.textContent() : null;
 
             console.log('Playwright: Extracted user name:', userName);
@@ -106,35 +102,89 @@ export class PlaywrightLoginService {
 
             const page = await context.newPage();
 
-            // Navigate to the student courses page
-            console.log('Playwright: Navigating to courses page...');
-            await page.goto('https://si3.ufc.br/sigaa/portais/discente/discente.jsf');
+            // Start at home page
+            console.log('Playwright: Navigating to home page...');
+            await page.goto('https://si3.ufc.br/sigaa/paginaInicial.do');
             await page.waitForLoadState('networkidle');
 
-            // Check if we need to login (if cookies expired)
+            // Check if we got redirected to login (cookies expired)
             if (page.url().includes('verTelaLogin')) {
                 await this.close();
                 return { success: false, error: 'Session expired - please login again' };
             }
 
-            // Extract courses from the page
+            // Click on student portal link
+            console.log('Playwright: Looking for "Menu Discente" link...');
+            try {
+                // Click on "Menu Discente" link using exact href
+                const studentLink = page.locator('a[href="/sigaa/verPortalDiscente.do"]');
+                await studentLink.click({ timeout: 5000 });
+                await page.waitForLoadState('networkidle');
+                console.log('Playwright: Clicked Menu Discente, current URL:', page.url());
+            } catch (clickError) {
+                console.log('Playwright: Auto-click failed:', clickError);
+                console.log('Playwright: Current URL:', page.url());
+                // Try to navigate directly as fallback
+                console.log('Playwright: Trying direct navigation to verPortalDiscente.do...');
+                await page.goto('https://si3.ufc.br/sigaa/verPortalDiscente.do');
+                await page.waitForLoadState('networkidle');
+                console.log('Playwright: Direct navigation complete, URL:', page.url());
+            }
+
+            // Wait a bit for dynamic content
+            await page.waitForTimeout(1000);
+
+            // Extract courses with better filtering
             console.log('Playwright: Extracting courses from page...');
-            const courses = await page.$$eval('table[class*="listing"] tr', (rows: any) => {
-                // Skip header row
-                return rows.slice(1).map((row: any) => {
-                    const cells = row.querySelectorAll('td');
-                    if (cells.length >= 3) {
-                        return {
-                            name: cells[0]?.textContent?.trim() || '',
-                            code: cells[1]?.textContent?.trim() || '',
-                            period: cells[2].textContent?.trim() || ''
-                        };
+            const courses = await page.evaluate(() => {
+                const results: any[] = [];
+
+                // Course codes follow pattern: 2 letters + 4 digits (e.g., CB0699, CK0181)
+                const courseCodePattern = /^[A-Z]{2}\d{4}/;
+
+                // Find all text nodes that might contain course codes
+                const walker = document.createTreeWalker(
+                    document.body,
+                    NodeFilter.SHOW_TEXT,
+                    null
+                );
+
+                const textNodes: Text[] = [];
+                let node;
+                while (node = walker.nextNode() as Text) {
+                    if (node.textContent && node.textContent.trim()) {
+                        textNodes.push(node);
                     }
-                    return null;
-                }).filter((course: any) => course !== null && course.name);
+                }
+
+                // Look for course code pattern in text
+                for (const textNode of textNodes) {
+                    const text = textNode.textContent?.trim() || '';
+                    const match = text.match(courseCodePattern);
+
+                    if (match) {
+                        // Found a course code! Extract the full course info
+                        const fullText = text;
+
+                        // Try to split by " - " to get code and name
+                        const parts = fullText.split(' - ');
+                        if (parts.length >= 2) {
+                            results.push({
+                                code: parts[0].trim(),
+                                name: parts.slice(1).join(' - ').trim(),
+                                period: '' // We can extract this later if needed
+                            });
+                        }
+                    }
+                }
+
+                return results;
             });
 
             console.log('Playwright: Found courses:', courses.length);
+            if (courses.length > 0) {
+                console.log('Playwright: Sample courses:', courses.slice(0, 3));
+            }
 
             await this.close();
             return { success: true, courses };

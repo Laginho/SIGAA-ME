@@ -39,9 +39,7 @@ class PlaywrightLoginService {
         return { success: false, error: errorMessage || "Login failed - still on login page" };
       }
       console.log("Playwright: Login successful! Extracting user data...");
-      await page.goto("https://si3.ufc.br/sigaa/portais/discente/discente.jsf");
-      await page.waitForLoadState("networkidle");
-      const nameElement = await page.$(".nome_usuario");
+      const nameElement = await page.$(".nome_usuario, .info-usuario .nome");
       const userName = nameElement ? await nameElement.textContent() : null;
       console.log("Playwright: Extracted user name:", userName);
       const cookies = await context.cookies();
@@ -73,29 +71,67 @@ class PlaywrightLoginService {
       console.log("Playwright: Injecting stored session cookies...");
       await context.addCookies(this.storedCookies);
       const page = await context.newPage();
-      console.log("Playwright: Navigating to courses page...");
-      await page.goto("https://si3.ufc.br/sigaa/portais/discente/discente.jsf");
+      console.log("Playwright: Navigating to home page...");
+      await page.goto("https://si3.ufc.br/sigaa/paginaInicial.do");
       await page.waitForLoadState("networkidle");
       if (page.url().includes("verTelaLogin")) {
         await this.close();
         return { success: false, error: "Session expired - please login again" };
       }
+      console.log('Playwright: Looking for "Menu Discente" link...');
+      try {
+        const studentLink = page.locator('a[href="/sigaa/verPortalDiscente.do"]');
+        await studentLink.click({ timeout: 5e3 });
+        await page.waitForLoadState("networkidle");
+        console.log("Playwright: Clicked Menu Discente, current URL:", page.url());
+      } catch (clickError) {
+        console.log("Playwright: Auto-click failed:", clickError);
+        console.log("Playwright: Current URL:", page.url());
+        console.log("Playwright: Trying direct navigation to verPortalDiscente.do...");
+        await page.goto("https://si3.ufc.br/sigaa/verPortalDiscente.do");
+        await page.waitForLoadState("networkidle");
+        console.log("Playwright: Direct navigation complete, URL:", page.url());
+      }
+      await page.waitForTimeout(1e3);
       console.log("Playwright: Extracting courses from page...");
-      const courses = await page.$$eval('table[class*="listing"] tr', (rows) => {
-        return rows.slice(1).map((row) => {
-          var _a, _b, _c, _d, _e;
-          const cells = row.querySelectorAll("td");
-          if (cells.length >= 3) {
-            return {
-              name: ((_b = (_a = cells[0]) == null ? void 0 : _a.textContent) == null ? void 0 : _b.trim()) || "",
-              code: ((_d = (_c = cells[1]) == null ? void 0 : _c.textContent) == null ? void 0 : _d.trim()) || "",
-              period: ((_e = cells[2].textContent) == null ? void 0 : _e.trim()) || ""
-            };
+      const courses = await page.evaluate(() => {
+        var _a;
+        const results = [];
+        const courseCodePattern = /^[A-Z]{2}\d{4}/;
+        const walker = document.createTreeWalker(
+          document.body,
+          NodeFilter.SHOW_TEXT,
+          null
+        );
+        const textNodes = [];
+        let node;
+        while (node = walker.nextNode()) {
+          if (node.textContent && node.textContent.trim()) {
+            textNodes.push(node);
           }
-          return null;
-        }).filter((course) => course !== null && course.name);
+        }
+        for (const textNode of textNodes) {
+          const text = ((_a = textNode.textContent) == null ? void 0 : _a.trim()) || "";
+          const match = text.match(courseCodePattern);
+          if (match) {
+            const fullText = text;
+            const parts = fullText.split(" - ");
+            if (parts.length >= 2) {
+              results.push({
+                code: parts[0].trim(),
+                name: parts.slice(1).join(" - ").trim(),
+                period: ""
+                // We can extract this later if needed
+              });
+            }
+          }
+        }
+        return results;
       });
       console.log("Playwright: Found courses:", courses.length);
+      if (courses.length > 0) {
+        console.log("Playwright: Sample courses:", courses.slice(0, 3));
+      }
       await this.close();
       return { success: true, courses };
     } catch (error) {
