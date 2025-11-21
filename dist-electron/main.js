@@ -6,13 +6,71 @@ import { ipcMain, app, BrowserWindow } from "electron";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { Sigaa } from "sigaa-api";
+class SigaaLoginUFC {
+  constructor(http, session) {
+    this.http = http;
+    this.session = session;
+  }
+  async login(username, password) {
+    if (this.session.loginStatus === 1) {
+      throw new Error("SIGAA: This session already has a user logged in.");
+    }
+    const loginPage = await this.http.get("/sigaa/verTelaLogin.do");
+    const $ = loginPage.$;
+    const form = $('form[name="loginForm"]');
+    if (form.length === 0) {
+      console.warn("SIGAA: Login form not found in response, attempting hardcoded fallback.");
+    }
+    let actionUrl = "/sigaa/logar.do?dispatch=logOn";
+    const postValues = {};
+    if (form.length > 0) {
+      const parsedAction = form.attr("action");
+      if (parsedAction) {
+        actionUrl = parsedAction;
+      }
+      form.find("input").each((_, element) => {
+        const name = $(element).attr("name");
+        const value = $(element).val();
+        if (name) {
+          postValues[name] = value || "";
+        }
+      });
+    } else {
+      postValues["width"] = "0";
+      postValues["height"] = "0";
+      postValues["urlRedirect"] = "";
+      postValues["acao"] = "";
+    }
+    postValues["user.login"] = username;
+    postValues["user.senha"] = password;
+    postValues["width"] = "1920";
+    postValues["height"] = "1080";
+    postValues["entrar"] = "Entrar";
+    console.log("SIGAA: Attempting login to", actionUrl);
+    const resultPage = await this.http.post(actionUrl, postValues);
+    const finalPage = await this.http.followAllRedirect(resultPage);
+    const body = finalPage.bodyDecoded;
+    if (body.includes("Entrar no Sistema") || body.includes('name="loginForm"')) {
+      if (body.includes("Usuário e/ou senha inválidos") || body.includes("Dados inválidos")) {
+        throw new Error("SIGAA: Invalid credentials.");
+      }
+      const snippet = body.substring(body.indexOf("<body"), body.indexOf("<body") + 500).replace(/\s+/g, " ");
+      console.error("SIGAA: Login failed. Body snippet:", snippet);
+      throw new Error("SIGAA: Invalid response after login attempt (Still on login page).");
+    }
+    this.session.loginStatus = 1;
+    return finalPage;
+  }
+}
 class SigaaService {
   constructor() {
     __publicField(this, "sigaa");
     this.sigaa = new Sigaa({
       url: "https://si3.ufc.br"
-      // We might need to make this configurable later!
     });
+    const http = this.sigaa.http;
+    const session = this.sigaa.session;
+    this.sigaa.loginInstance = new SigaaLoginUFC(http, session);
   }
   async login(username, password) {
     try {

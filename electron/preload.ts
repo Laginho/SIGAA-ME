@@ -21,5 +21,5 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
 })
 
 contextBridge.exposeInMainWorld('api', {
-  login: (username, password) => ipcRenderer.invoke('login-request', { username, password })
+  login: (username: string, password: string) => ipcRenderer.invoke('login-request', { username, password })
 })
