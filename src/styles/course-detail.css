@@ -1,0 +1,115 @@
+.course-detail-page {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.course-header {
+    margin-bottom: 2rem;
+}
+
+.back-button {
+    background: transparent;
+    border: none;
+    color: #007bff;
+    font-size: 1rem;
+    cursor: pointer;
+    padding: 0.5rem 0;
+    margin-bottom: 1rem;
+    transition: color 0.2s;
+}
+
+.back-button:hover {
+    color: #0056b3;
+    text-decoration: underline;
+}
+
+.course-header h1 {
+    font-size: 2rem;
+    color: #333;
+    margin: 0.5rem 0;
+}
+
+.course-code-header {
+    color: #666;
+    font-size: 0.95rem;
+    margin: 0;
+}
+
+.course-content {
+    background: white;
+    border-radius: 8px;
+    padding: 2rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.files-section h2 {
+    font-size: 1.5rem;
+    color: #333;
+    margin: 0 0 1.5rem 0;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid #f0f0f0;
+}
+
+.files-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.file-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 6px;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+
+.file-item:hover {
+    background: #e9ecef;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.file-icon {
+    font-size: 2rem;
+    line-height: 1;
+}
+
+.file-info {
+    flex: 1;
+}
+
+.file-name {
+    font-weight: 500;
+    color: #333;
+    margin-bottom: 0.25rem;
+}
+
+.file-meta {
+    font-size: 0.875rem;
+    color: #666;
+}
+
+.loading,
+.no-files,
+.error-message {
+    text-align: center;
+    padding: 2rem;
+    color: #666;
+}
+
+.error-message {
+    color: #dc3545;
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+    border-radius: 6px;
+}
+
+.no-files {
+    color: #6c757d;
+    font-style: italic;
+}

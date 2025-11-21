@@ -58,8 +58,8 @@ async function fetchCourses() {
                     <div class="no-courses">Nenhuma disciplina ativa encontrada</div>
                 `;
       } else {
-        coursesListElement.innerHTML = result.courses.map(course => `
-                    <div class="course-card">
+        coursesListElement.innerHTML = result.courses.map((course: any) => `
+                    <div class="course-card" onclick="window.location.hash='#/course/${course.id}'">
                         <h3>${course.name}</h3>
                         <p class="course-code">${course.code || 'Sem código'}</p>
                         <p class="course-period">${course.period || 'Período não especificado'}</p>

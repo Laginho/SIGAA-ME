@@ -1,5 +1,4 @@
 import '../styles/login.css';
-import { renderDashboardPage } from './dashboard';
 
 export function renderLoginPage(app: HTMLDivElement) {
   app.innerHTML = `
@@ -53,7 +52,10 @@ export function renderLoginPage(app: HTMLDivElement) {
 
       if (result.success && result.account) {
         console.log('Login success!');
-        renderDashboardPage(app, result.account);
+        // Store account data in sessionStorage
+        sessionStorage.setItem('account', JSON.stringify(result.account));
+        // Navigate to dashboard using hash
+        window.location.hash = '#/dashboard';
       } else {
         alert(`Erro ao entrar: ${result.message}`);
       }
