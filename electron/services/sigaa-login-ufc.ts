@@ -1,5 +1,3 @@
-import { URL } from 'url';
-
 // Using 'any' for types that are not exported by sigaa-api
 export class SigaaLoginUFC {
     constructor(protected http: any, protected session: any) { }
@@ -55,30 +53,53 @@ export class SigaaLoginUFC {
         console.log('SIGAA: Attempting login to', actionUrl);
         console.log('SIGAA: Form values:', JSON.stringify(postValues, null, 2));
 
-        // 4. Submit Login
-        // Try to set Referer to mimic browser behavior
-        const options = {
-            headers: {
-                'Referer': loginPage.url.href,
-                'Origin': new URL(loginPage.url.href).origin
-            }
-        };
+        // 4. Submit Login WITHOUT custom headers - let the library handle everything
+        const resultPage = await this.http.post(actionUrl, postValues);
 
-        const resultPage = await this.http.post(actionUrl, postValues, options);
+        console.log('SIGAA: POST response status:', resultPage.statusCode);
+        console.log('SIGAA: POST response URL:', resultPage.url.href);
 
         // 5. Verify Result
         const finalPage = await this.http.followAllRedirect(resultPage);
         const body = finalPage.bodyDecoded;
 
+        console.log('SIGAA: Final URL after redirects:', finalPage.url.href);
+        console.log('SIGAA: Final status code:', finalPage.statusCode);
+
+        // Log the title tag content
+        const titleMatch = body.match(/<title[^>]*>(.*?)<\/title>/i);
+        if (titleMatch) {
+            console.log('SIGAA: Page title:', titleMatch[1]);
+        }
+
         // Check for login page indicators
         if (body.includes('Entrar no Sistema') || body.includes('name="loginForm"')) {
+            // Look for error messages in the page
+            const errorPatterns = [
+                /class="erro"[^>]*>(.*?)</i,
+                /class="mensagemErro"[^>]*>(.*?)</i,
+                /class="alert"[^>]*>(.*?)</i,
+                /Usuário e\/ou senha inválidos/i,
+                /Dados inválidos/i
+            ];
+
+            for (const pattern of errorPatterns) {
+                const match = body.match(pattern);
+                if (match) {
+                    console.error('SIGAA: Found error on page:', match[0]);
+                }
+            }
+
+            // Log a larger snippet that includes any form content
+            const formStart = body.indexOf('<form');
+            if (formStart !== -1) {
+                const snippet = body.substring(formStart, formStart + 1000).replace(/\s+/g, ' ');
+                console.error('SIGAA: Form area snippet:', snippet);
+            }
+
             if (body.includes('Usuário e/ou senha inválidos') || body.includes('Dados inválidos')) {
                 throw new Error('SIGAA: Invalid credentials.');
             }
-
-            // Log a snippet of the body for debugging
-            const snippet = body.substring(body.indexOf('<body'), body.indexOf('<body') + 500).replace(/\s+/g, ' ');
-            console.error('SIGAA: Login failed. Body snippet:', snippet);
 
             throw new Error('SIGAA: Invalid response after login attempt (Still on login page).');
         }

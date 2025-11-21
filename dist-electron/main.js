@@ -6,7 +6,6 @@ import { ipcMain, app, BrowserWindow } from "electron";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { Sigaa } from "sigaa-api";
-import { URL } from "url";
 class SigaaLoginUFC {
   constructor(http, session) {
     this.http = http;
@@ -49,42 +48,68 @@ class SigaaLoginUFC {
     postValues["entrar"] = "Entrar";
     console.log("SIGAA: Attempting login to", actionUrl);
     console.log("SIGAA: Form values:", JSON.stringify(postValues, null, 2));
-    const options = {
-      headers: {
-        "Referer": loginPage.url.href,
-        "Origin": new URL(loginPage.url.href).origin
-      }
-    };
-    const resultPage = await this.http.post(actionUrl, postValues, options);
+    const resultPage = await this.http.post(actionUrl, postValues);
+    console.log("SIGAA: POST response status:", resultPage.statusCode);
+    console.log("SIGAA: POST response URL:", resultPage.url.href);
     const finalPage = await this.http.followAllRedirect(resultPage);
     const body = finalPage.bodyDecoded;
+    console.log("SIGAA: Final URL after redirects:", finalPage.url.href);
+    console.log("SIGAA: Final status code:", finalPage.statusCode);
+    const titleMatch = body.match(/<title[^>]*>(.*?)<\/title>/i);
+    if (titleMatch) {
+      console.log("SIGAA: Page title:", titleMatch[1]);
+    }
     if (body.includes("Entrar no Sistema") || body.includes('name="loginForm"')) {
+      const errorPatterns = [
+        /class="erro"[^>]*>(.*?)</i,
+        /class="mensagemErro"[^>]*>(.*?)</i,
+        /class="alert"[^>]*>(.*?)</i,
+        /Usuário e\/ou senha inválidos/i,
+        /Dados inválidos/i
+      ];
+      for (const pattern of errorPatterns) {
+        const match = body.match(pattern);
+        if (match) {
+          console.error("SIGAA: Found error on page:", match[0]);
+        }
+      }
+      const formStart = body.indexOf("<form");
+      if (formStart !== -1) {
+        const snippet = body.substring(formStart, formStart + 1e3).replace(/\s+/g, " ");
+        console.error("SIGAA: Form area snippet:", snippet);
+      }
       if (body.includes("Usuário e/ou senha inválidos") || body.includes("Dados inválidos")) {
         throw new Error("SIGAA: Invalid credentials.");
       }
-      const snippet = body.substring(body.indexOf("<body"), body.indexOf("<body") + 500).replace(/\s+/g, " ");
-      console.error("SIGAA: Login failed. Body snippet:", snippet);
       throw new Error("SIGAA: Invalid response after login attempt (Still on login page).");
     }
     this.session.loginStatus = 1;
     return finalPage;
   }
 }
+class DummyLogin {
+  async login(_username, _password) {
+    throw new Error("DummyLogin should not be called directly.");
+  }
+}
 class SigaaService {
   constructor() {
     __publicField(this, "sigaa");
     this.sigaa = new Sigaa({
-      url: "https://si3.ufc.br"
+      url: "https://si3.ufc.br",
+      login: new DummyLogin()
+      // Cast to any to satisfy interface if needed
     });
     const http = this.sigaa.http;
     const session = this.sigaa.session;
     const ufcLogin = new SigaaLoginUFC(http, session);
     this.sigaa.login = async (username, password) => {
+      console.log("SIGAA: Starting custom UFC login flow...");
       const page = await ufcLogin.login(username, password);
       const accountFactory = this.sigaa.accountFactory;
       return accountFactory.getAccount(page);
     };
-    console.log("SIGAA: Overrode login method with UFC handler");
+    console.log("SIGAA: Service initialized with custom UFC login override.");
   }
   async login(username, password) {
     try {

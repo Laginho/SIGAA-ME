@@ -11,6 +11,7 @@
   "devDependencies": {
     "electron": "^30.0.1",
     "electron-builder": "^24.13.3",
+    "playwright": "^1.56.1",
     "typescript": "^5.2.2",
     "vite": "^5.1.6",
     "vite-plugin-electron": "^0.28.6",
