@@ -12,7 +12,7 @@ export default defineConfig({
         vite: {
           build: {
             rollupOptions: {
-              external: ['sigaa-api', 'iconv-lite', 'playwright']
+              external: ['playwright']
             }
           }
         }

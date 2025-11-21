@@ -17,9 +17,5 @@
     "vite-plugin-electron": "^0.28.6",
     "vite-plugin-electron-renderer": "^0.14.5"
   },
-  "main": "dist-electron/main.js",
-  "dependencies": {
-    "iconv-lite": "^0.7.0",
-    "sigaa-api": "^1.0.34"
-  }
+  "main": "dist-electron/main.js"
 }

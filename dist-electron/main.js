@@ -1,11 +1,9 @@
 var __defProp = Object.defineProperty;
 var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
-import { createRequire } from "node:module";
 import { ipcMain, app, BrowserWindow } from "electron";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { Sigaa } from "sigaa-api";
 import { chromium } from "playwright";
 class PlaywrightLoginService {
   constructor() {
@@ -116,11 +114,7 @@ class PlaywrightLoginService {
 }
 class SigaaService {
   constructor() {
-    __publicField(this, "sigaa");
     __publicField(this, "playwrightLogin");
-    this.sigaa = new Sigaa({
-      url: "https://si3.ufc.br"
-    });
     this.playwrightLogin = new PlaywrightLoginService();
     console.log("SIGAA: Service initialized with Playwright");
   }
@@ -164,14 +158,6 @@ class SigaaService {
     }
   }
 }
-const require$1 = createRequire(import.meta.url);
-let iconv;
-try {
-  iconv = require$1("sigaa-api/node_modules/iconv-lite");
-} catch (e) {
-  iconv = require$1("iconv-lite");
-}
-iconv.enableStreamingAPI(require$1("stream"));
 const __dirname$1 = path.dirname(fileURLToPath(import.meta.url));
 process.env.APP_ROOT = path.join(__dirname$1, "..");
 const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];

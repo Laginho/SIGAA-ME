@@ -1,18 +1,11 @@
-import { Sigaa } from 'sigaa-api';
 import { PlaywrightLoginService } from './playwright-login.service';
 
-// This class will handle all the logic for talking to SIGAA.
+// This class will handle all the logic for talking to SIGAA using Playwright.
 // We keep it here in the "Backend" (Electron Main Process) so it's secure.
 export class SigaaService {
-    private sigaa: Sigaa;
     private playwrightLogin: PlaywrightLoginService;
 
     constructor() {
-        // Initialize Sigaa instance (kept for potential future use)
-        this.sigaa = new Sigaa({
-            url: 'https://si3.ufc.br'
-        });
-
         // Initialize Playwright login service
         this.playwrightLogin = new PlaywrightLoginService();
 

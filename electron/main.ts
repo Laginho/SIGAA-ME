@@ -1,19 +1,3 @@
-// Fix for "iconv-lite Streaming API is not enabled" error
-// This MUST be done before importing sigaa-api
-import { createRequire } from 'node:module';
-const require = createRequire(import.meta.url);
-
-// Try to find the nested iconv-lite used by sigaa-api
-let iconv;
-try {
-  iconv = require('sigaa-api/node_modules/iconv-lite');
-} catch (e) {
-  // Fallback if flattened
-  iconv = require('iconv-lite');
-}
-iconv.enableStreamingAPI(require('stream'));
-
-
 import { app, BrowserWindow, ipcMain } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
