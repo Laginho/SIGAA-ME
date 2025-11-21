@@ -1,7 +1,8 @@
 import '../styles/login.css';
+import { renderDashboardPage } from './dashboard';
 
 export function renderLoginPage(app: HTMLDivElement) {
-    app.innerHTML = `
+  app.innerHTML = `
     <div class="login-container">
       <div class="login-card">
         <img src="/ufc-logo.png" alt="UFC Logo" class="login-logo" style="background: transparent;">
@@ -25,44 +26,45 @@ export function renderLoginPage(app: HTMLDivElement) {
     </div>
   `;
 
-    // Add event listener for the form
-    const form = document.getElementById('loginForm') as HTMLFormElement;
-    const usernameInput = document.getElementById('username') as HTMLInputElement;
-    const passwordInput = document.getElementById('password') as HTMLInputElement;
-    const submitButton = form.querySelector('button[type="submit"]') as HTMLButtonElement;
+  // Add event listener for the form
+  const form = document.getElementById('loginForm') as HTMLFormElement;
+  if (!form) return;
 
-    form?.addEventListener('submit', async (e) => {
-        e.preventDefault();
+  const usernameInput = document.getElementById('username') as HTMLInputElement;
+  const passwordInput = document.getElementById('password') as HTMLInputElement;
+  const submitButton = form.querySelector('button[type="submit"]') as HTMLButtonElement;
 
-        const username = usernameInput.value;
-        const password = passwordInput.value;
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
 
-        if (!username || !password) return;
+    const username = usernameInput.value;
+    const password = passwordInput.value;
 
-        // Disable button and show loading state
-        submitButton.disabled = true;
-        submitButton.textContent = 'Entrando...';
+    if (!username || !password) return;
 
-        try {
-            const result = await window.api.login(username, password);
+    // Disable button and show loading state
+    if (submitButton) {
+      submitButton.disabled = true;
+      submitButton.textContent = 'Entrando...';
+    }
 
-            if (result.success) {
-                console.log('Login success!');
-                // We will redirect to dashboard here soon
-                if (result.account) {
-                    alert(`Bem-vindo, ${result.account.name}!`);
-                } else {
-                    alert('Login realizado com sucesso!');
-                }
-            } else {
-                alert(`Erro ao entrar: ${result.message}`);
-            }
-        } catch (error) {
-            console.error(error);
-            alert('Erro inesperado ao tentar entrar.');
-        } finally {
-            submitButton.disabled = false;
-            submitButton.textContent = 'Entrar';
-        }
-    });
+    try {
+      const result = await window.api.login(username, password);
+
+      if (result.success && result.account) {
+        console.log('Login success!');
+        renderDashboardPage(app, result.account);
+      } else {
+        alert(`Erro ao entrar: ${result.message}`);
+      }
+    } catch (error) {
+      console.error(error);
+      alert('Erro inesperado ao tentar entrar.');
+    } finally {
+      if (submitButton) {
+        submitButton.disabled = false;
+        submitButton.textContent = 'Entrar';
+      }
+    }
+  });
 }

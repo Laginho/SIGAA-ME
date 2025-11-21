@@ -18,6 +18,7 @@
   },
   "main": "dist-electron/main.js",
   "dependencies": {
+    "iconv-lite": "^0.7.0",
     "sigaa-api": "^1.0.34"
   }
 }
