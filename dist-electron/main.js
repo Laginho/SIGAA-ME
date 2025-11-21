@@ -14,10 +14,7 @@ class PlaywrightLoginService {
     try {
       console.log("Playwright: Launching browser...");
       this.browser = await chromium.launch({
-        headless: false,
-        // Set to true later for production
-        slowMo: 500
-        // Slow down actions so you can see what's happening
+        headless: true
       });
       const context = await this.browser.newContext();
       const page = await context.newPage();
@@ -64,8 +61,7 @@ class PlaywrightLoginService {
         return { success: false, error: "No stored session - please login first" };
       }
       this.browser = await chromium.launch({
-        headless: false,
-        slowMo: 500
+        headless: true
       });
       const context = await this.browser.newContext();
       console.log("Playwright: Injecting stored session cookies...");
@@ -137,8 +133,7 @@ class PlaywrightLoginService {
         return { success: false, error: "No stored session - please login first" };
       }
       this.browser = await chromium.launch({
-        headless: false,
-        slowMo: 500
+        headless: true
       });
       const context = await this.browser.newContext();
       await context.addCookies(this.storedCookies);
@@ -162,26 +157,16 @@ class PlaywrightLoginService {
         }
         return { success: false, courseName: "" };
       }, courseId);
-      console.log("Playwright: Click result:", entered);
       if (!entered.success) {
         await this.close();
         return { success: false, error: "Course not found" };
       }
       await page.waitForLoadState("networkidle");
-      console.log("Playwright: Successfully entered course!");
-      console.log("Playwright: Current URL after click:", page.url());
       await page.waitForTimeout(2e3);
-      console.log("Playwright: Navigating to AVA...");
       await page.goto("https://si3.ufc.br/sigaa/ava/index.jsf");
       await page.waitForLoadState("networkidle");
-      await page.waitForTimeout(2e3);
-      const actualCourse = await page.evaluate(() => {
-        var _a;
-        const header = document.querySelector("h2, h3, .titulo");
-        return header ? (_a = header.textContent) == null ? void 0 : _a.trim() : "Unknown";
-      });
-      console.log("Playwright: Currently viewing course:", actualCourse);
-      console.log("Playwright: Extracting files from AVA main page...");
+      await page.waitForTimeout(1e3);
+      console.log("Playwright: Extracting files...");
       const filesData = await page.evaluate(() => {
         const files = [];
         const links = Array.from(document.querySelectorAll("a"));
@@ -203,16 +188,13 @@ class PlaywrightLoginService {
             }
             files.push({
               name: text,
-              url: href,
-              onclick
-              // Keep for debugging
+              url: href
             });
           }
         }
         return files;
       });
-      console.log("Playwright: Found files:", filesData.length);
-      console.log("Playwright: Files:", filesData);
+      console.log("Playwright: Found", filesData.length, "files");
       await this.close();
       return { success: true, files: filesData };
     } catch (error) {

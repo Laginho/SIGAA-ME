@@ -12,10 +12,8 @@ export class PlaywrightLoginService {
         try {
             console.log('Playwright: Launching browser...');
 
-            // Launch browser in visible mode for debugging
             this.browser = await chromium.launch({
-                headless: false, // Set to true later for production
-                slowMo: 500 // Slow down actions so you can see what's happening
+                headless: true
             });
 
             const context = await this.browser.newContext();
@@ -90,8 +88,7 @@ export class PlaywrightLoginService {
             }
 
             this.browser = await chromium.launch({
-                headless: false,
-                slowMo: 500
+                headless: true
             });
 
             const context = await this.browser.newContext();
@@ -195,8 +192,7 @@ export class PlaywrightLoginService {
             }
 
             this.browser = await chromium.launch({
-                headless: false,
-                slowMo: 500
+                headless: true
             });
 
             const context = await this.browser.newContext();
@@ -228,35 +224,21 @@ export class PlaywrightLoginService {
                 return { success: false, courseName: '' };
             }, courseId);
 
-            console.log('Playwright: Click result:', entered);
-
             if (!entered.success) {
                 await this.close();
                 return { success: false, error: 'Course not found' };
             }
 
             await page.waitForLoadState('networkidle');
-            console.log('Playwright: Successfully entered course!');
-            console.log('Playwright: Current URL after click:', page.url());
-
-            // Wait longer to ensure the course selection is registered
+            // Wait for course selection to register
             await page.waitForTimeout(2000);
 
             // Navigate to AVA
-            console.log('Playwright: Navigating to AVA...');
             await page.goto('https://si3.ufc.br/sigaa/ava/index.jsf');
             await page.waitForLoadState('networkidle');
-            await page.waitForTimeout(2000);
+            await page.waitForTimeout(1000);
 
-            // Check which course we're actually viewing
-            const actualCourse = await page.evaluate(() => {
-                const header = document.querySelector('h2, h3, .titulo');
-                return header ? header.textContent?.trim() : 'Unknown';
-            });
-
-            console.log('Playwright: Currently viewing course:', actualCourse);
-
-            console.log('Playwright: Extracting files from AVA main page...');
+            console.log('Playwright: Extracting files...');
 
             // Extract files directly from main page
             const filesData = await page.evaluate(() => {
@@ -292,8 +274,7 @@ export class PlaywrightLoginService {
 
                         files.push({
                             name: text,
-                            url: href,
-                            onclick: onclick // Keep for debugging
+                            url: href
                         });
                     }
                 }
@@ -301,8 +282,7 @@ export class PlaywrightLoginService {
                 return files;
             });
 
-            console.log('Playwright: Found files:', filesData.length);
-            console.log('Playwright: Files:', filesData);
+            console.log('Playwright: Found', filesData.length, 'files');
 
             await this.close();
             return { success: true, files: filesData };
