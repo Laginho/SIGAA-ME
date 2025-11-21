@@ -1,4 +1,4 @@
-import { chromium, Browser, Page } from 'playwright';
+import { chromium, Browser } from 'playwright';
 
 /**
  * Uses Playwright to automate a real browser for UFC SIGAA login.
@@ -7,7 +7,7 @@ import { chromium, Browser, Page } from 'playwright';
 export class PlaywrightLoginService {
     private browser: Browser | null = null;
 
-    async login(username: string, password: string): Promise<{ success: boolean; cookies?: any[]; error?: string }> {
+    async login(username: string, password: string): Promise<{ success: boolean; cookies?: any[]; userName?: string; error?: string }> {
         try {
             console.log('Playwright: Launching browser...');
 
@@ -40,7 +40,7 @@ export class PlaywrightLoginService {
 
             // If we're still on the login page, login failed
             if (currentUrl.includes('verTelaLogin') || currentUrl.includes('logar.do')) {
-                // Check for error message on page
+                //Check for error message on page
                 const errorElement = await page.$('.erro, .mensagemErro, .alert');
                 const errorMessage = errorElement ? await errorElement.textContent() : 'Unknown error';
 
@@ -48,14 +48,31 @@ export class PlaywrightLoginService {
                 return { success: false, error: errorMessage || 'Login failed - still on login page' };
             }
 
-            // Login successful! Extract cookies
-            console.log('Playwright: Login successful! Extracting cookies...');
-            const cookies = await context.cookies();
+            // Login successful! Extract user data from the page
+            console.log('Playwright: Login successful! Extracting user data...');
 
+            // Navigate to the student portal page
+            await page.goto('https://si3.ufc.br/sigaa/portais/discente/discente.jsf');
+            await page.waitForLoadState('networkidle');
+
+            // Extract user name from the page
+            // Try multiple possible selectors for the user name
+            const nameElement = await page.$('.info-usuario .nome-usuario, .usuario-nome, #nome-usuario, .usuario');
+            const userName = nameElement ? await nameElement.textContent() : null;
+
+            console.log('Playwright: Extracted user name:', userName);
+
+            // Extract cookies
+            const cookies = await context.cookies();
             console.log('Playwright: Found cookies:', cookies.map(c => c.name).join(', '));
 
             await this.close();
-            return { success: true, cookies };
+
+            return {
+                success: true,
+                cookies,
+                userName: userName?.trim() || 'User'
+            };
 
         } catch (error: any) {
             console.error('Playwright: Error during login:', error);

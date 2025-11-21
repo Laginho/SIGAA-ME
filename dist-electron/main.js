@@ -6,127 +6,93 @@ import { ipcMain, app, BrowserWindow } from "electron";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { Sigaa } from "sigaa-api";
-class SigaaLoginUFC {
-  constructor(http, session) {
-    this.http = http;
-    this.session = session;
+import { chromium } from "playwright";
+class PlaywrightLoginService {
+  constructor() {
+    __publicField(this, "browser", null);
   }
   async login(username, password) {
-    if (this.session.loginStatus === 1) {
-      throw new Error("SIGAA: This session already has a user logged in.");
-    }
-    const loginPage = await this.http.get("/sigaa/verTelaLogin.do");
-    const $ = loginPage.$;
-    const form = $('form[name="loginForm"]');
-    if (form.length === 0) {
-      console.warn("SIGAA: Login form not found in response, attempting hardcoded fallback.");
-    }
-    let actionUrl = "/sigaa/logar.do?dispatch=logOn";
-    const postValues = {};
-    if (form.length > 0) {
-      const parsedAction = form.attr("action");
-      if (parsedAction) {
-        actionUrl = parsedAction;
-      }
-      form.find("input").each((_, element) => {
-        const name = $(element).attr("name");
-        const value = $(element).val();
-        if (name) {
-          postValues[name] = value || "";
-        }
+    try {
+      console.log("Playwright: Launching browser...");
+      this.browser = await chromium.launch({
+        headless: false,
+        // Set to true later for production
+        slowMo: 500
+        // Slow down actions so you can see what's happening
       });
-    } else {
-      postValues["width"] = "0";
-      postValues["height"] = "0";
-      postValues["urlRedirect"] = "";
-      postValues["acao"] = "";
-    }
-    postValues["user.login"] = username;
-    postValues["user.senha"] = password;
-    postValues["width"] = "1920";
-    postValues["height"] = "1080";
-    postValues["entrar"] = "Entrar";
-    console.log("SIGAA: Attempting login to", actionUrl);
-    console.log("SIGAA: Form values:", JSON.stringify(postValues, null, 2));
-    const resultPage = await this.http.post(actionUrl, postValues);
-    console.log("SIGAA: POST response status:", resultPage.statusCode);
-    console.log("SIGAA: POST response URL:", resultPage.url.href);
-    const finalPage = await this.http.followAllRedirect(resultPage);
-    const body = finalPage.bodyDecoded;
-    console.log("SIGAA: Final URL after redirects:", finalPage.url.href);
-    console.log("SIGAA: Final status code:", finalPage.statusCode);
-    const titleMatch = body.match(/<title[^>]*>(.*?)<\/title>/i);
-    if (titleMatch) {
-      console.log("SIGAA: Page title:", titleMatch[1]);
-    }
-    if (body.includes("Entrar no Sistema") || body.includes('name="loginForm"')) {
-      const errorPatterns = [
-        /class="erro"[^>]*>(.*?)</i,
-        /class="mensagemErro"[^>]*>(.*?)</i,
-        /class="alert"[^>]*>(.*?)</i,
-        /Usuário e\/ou senha inválidos/i,
-        /Dados inválidos/i
-      ];
-      for (const pattern of errorPatterns) {
-        const match = body.match(pattern);
-        if (match) {
-          console.error("SIGAA: Found error on page:", match[0]);
-        }
+      const context = await this.browser.newContext();
+      const page = await context.newPage();
+      console.log("Playwright: Navigating to login page...");
+      await page.goto("https://si3.ufc.br/sigaa/verTelaLogin.do");
+      console.log("Playwright: Filling in credentials...");
+      await page.fill('input[name="user.login"]', username);
+      await page.fill('input[name="user.senha"]', password);
+      console.log("Playwright: Clicking login button...");
+      await page.click('input[name="entrar"]');
+      console.log("Playwright: Waiting for navigation...");
+      await page.waitForLoadState("networkidle");
+      const currentUrl = page.url();
+      console.log("Playwright: Current URL after login:", currentUrl);
+      if (currentUrl.includes("verTelaLogin") || currentUrl.includes("logar.do")) {
+        const errorElement = await page.$(".erro, .mensagemErro, .alert");
+        const errorMessage = errorElement ? await errorElement.textContent() : "Unknown error";
+        await this.close();
+        return { success: false, error: errorMessage || "Login failed - still on login page" };
       }
-      const formStart = body.indexOf("<form");
-      if (formStart !== -1) {
-        const snippet = body.substring(formStart, formStart + 1e3).replace(/\s+/g, " ");
-        console.error("SIGAA: Form area snippet:", snippet);
-      }
-      if (body.includes("Usuário e/ou senha inválidos") || body.includes("Dados inválidos")) {
-        throw new Error("SIGAA: Invalid credentials.");
-      }
-      throw new Error("SIGAA: Invalid response after login attempt (Still on login page).");
+      console.log("Playwright: Login successful! Extracting user data...");
+      await page.goto("https://si3.ufc.br/sigaa/portais/discente/discente.jsf");
+      await page.waitForLoadState("networkidle");
+      const nameElement = await page.$(".info-usuario .nome-usuario, .usuario-nome, #nome-usuario, .usuario");
+      const userName = nameElement ? await nameElement.textContent() : null;
+      console.log("Playwright: Extracted user name:", userName);
+      const cookies = await context.cookies();
+      console.log("Playwright: Found cookies:", cookies.map((c) => c.name).join(", "));
+      await this.close();
+      return {
+        success: true,
+        cookies,
+        userName: (userName == null ? void 0 : userName.trim()) || "User"
+      };
+    } catch (error) {
+      console.error("Playwright: Error during login:", error);
+      await this.close();
+      return { success: false, error: error.message };
     }
-    this.session.loginStatus = 1;
-    return finalPage;
   }
-}
-class DummyLogin {
-  async login(_username, _password) {
-    throw new Error("DummyLogin should not be called directly.");
+  async close() {
+    if (this.browser) {
+      console.log("Playwright: Closing browser...");
+      await this.browser.close();
+      this.browser = null;
+    }
   }
 }
 class SigaaService {
   constructor() {
     __publicField(this, "sigaa");
+    __publicField(this, "playwrightLogin");
     this.sigaa = new Sigaa({
-      url: "https://si3.ufc.br",
-      login: new DummyLogin()
-      // Cast to any to satisfy interface if needed
+      url: "https://si3.ufc.br"
     });
-    const http = this.sigaa.http;
-    const session = this.sigaa.session;
-    const ufcLogin = new SigaaLoginUFC(http, session);
-    this.sigaa.login = async (username, password) => {
-      console.log("SIGAA: Starting custom UFC login flow...");
-      const page = await ufcLogin.login(username, password);
-      const accountFactory = this.sigaa.accountFactory;
-      return accountFactory.getAccount(page);
-    };
-    console.log("SIGAA: Service initialized with custom UFC login override.");
+    this.playwrightLogin = new PlaywrightLoginService();
+    console.log("SIGAA: Service initialized with Playwright login");
   }
   async login(username, password) {
     try {
-      const account = await this.sigaa.login(username, password);
-      if (account) {
-        const name = await account.getName();
-        const photoUrl = await account.getProfilePictureURL();
-        return {
-          success: true,
-          account: {
-            name,
-            photoUrl: photoUrl ? photoUrl.toString() : void 0
-          }
-        };
-      } else {
-        return { success: false, message: "Authentication failed." };
+      console.log("SIGAA: Starting Playwright login...");
+      const result = await this.playwrightLogin.login(username, password);
+      if (!result.success) {
+        return { success: false, message: result.error || "Login failed" };
       }
+      console.log("SIGAA: Login successful!");
+      return {
+        success: true,
+        account: {
+          name: result.userName || "User",
+          photoUrl: void 0
+          // We can extract this later if needed
+        }
+      };
     } catch (error) {
       console.error("Login error:", error);
       return { success: false, message: error.message || "Unknown error occurred." };
