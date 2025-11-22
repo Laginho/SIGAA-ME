@@ -126,18 +126,8 @@ class PlaywrightLoginService {
       return { success: false, error: error.message };
     }
   }
-  async getCourseFiles(courseId) {
+  async navigateToCourse(page, courseId) {
     try {
-      console.log(`Playwright: Fetching files for course ${courseId}...`);
-      if (!this.storedCookies || this.storedCookies.length === 0) {
-        return { success: false, error: "No stored session - please login first" };
-      }
-      this.browser = await chromium.launch({
-        headless: true
-      });
-      const context = await this.browser.newContext();
-      await context.addCookies(this.storedCookies);
-      const page = await context.newPage();
       await page.goto("https://si3.ufc.br/sigaa/verPortalDiscente.do");
       await page.waitForLoadState("networkidle");
       console.log(`Playwright: Entering course ${courseId}...`);
@@ -151,21 +141,44 @@ class PlaywrightLoginService {
             if (link) {
               console.log("Clicking course:", link.innerText);
               link.click();
-              return { success: true, courseName: link.innerText };
+              return { success: true };
             }
           }
         }
-        return { success: false, courseName: "" };
+        return { success: false };
       }, courseId);
       if (!entered.success) {
-        await this.close();
-        return { success: false, error: "Course not found" };
+        console.error("Playwright: Course not found in portal");
+        return false;
       }
       await page.waitForLoadState("networkidle");
       await page.waitForTimeout(2e3);
       await page.goto("https://si3.ufc.br/sigaa/ava/index.jsf");
       await page.waitForLoadState("networkidle");
       await page.waitForTimeout(1e3);
+      return true;
+    } catch (error) {
+      console.error("Playwright: Navigation error:", error);
+      return false;
+    }
+  }
+  async getCourseFiles(courseId) {
+    try {
+      console.log(`Playwright: Fetching files for course ${courseId}...`);
+      if (!this.storedCookies || this.storedCookies.length === 0) {
+        return { success: false, error: "No stored session - please login first" };
+      }
+      this.browser = await chromium.launch({
+        headless: true
+      });
+      const context = await this.browser.newContext();
+      await context.addCookies(this.storedCookies);
+      const page = await context.newPage();
+      const navigated = await this.navigateToCourse(page, courseId);
+      if (!navigated) {
+        await this.close();
+        return { success: false, error: "Failed to navigate to course page" };
+      }
       console.log("Playwright: Extracting files...");
       const filesData = await page.evaluate(() => {
         const files = [];
@@ -205,7 +218,7 @@ class PlaywrightLoginService {
   }
   async downloadFile(courseId, courseName, fileName, fileUrl, basePath, downloadedFiles) {
     try {
-      const { DownloadService } = await import("./download.service-dMMmjXyE.js");
+      const { DownloadService } = await import("./download.service-D5RlZPlv.js");
       const downloadService = new DownloadService(this.browser);
       if (!this.browser) {
         this.browser = await chromium.launch({ headless: true });
@@ -215,6 +228,11 @@ class PlaywrightLoginService {
         await context.addCookies(this.storedCookies);
       }
       const page = await context.newPage();
+      const navigated = await this.navigateToCourse(page, courseId);
+      if (!navigated) {
+        await this.close();
+        return { success: false, error: "Failed to navigate to course page" };
+      }
       const result = await downloadService.downloadFile(
         page,
         fileUrl,
@@ -232,7 +250,7 @@ class PlaywrightLoginService {
   }
   async downloadAllFiles(courseId, courseName, files, basePath, downloadedFiles) {
     try {
-      const { DownloadService } = await import("./download.service-dMMmjXyE.js");
+      const { DownloadService } = await import("./download.service-D5RlZPlv.js");
       const downloadService = new DownloadService(this.browser);
       if (!this.browser) {
         this.browser = await chromium.launch({ headless: true });
@@ -242,6 +260,11 @@ class PlaywrightLoginService {
         await context.addCookies(this.storedCookies);
       }
       const page = await context.newPage();
+      const navigated = await this.navigateToCourse(page, courseId);
+      if (!navigated) {
+        await this.close();
+        return { downloaded: 0, skipped: 0, failed: files.length, results: [] };
+      }
       const result = await downloadService.downloadCourseFiles(
         page,
         courseId,

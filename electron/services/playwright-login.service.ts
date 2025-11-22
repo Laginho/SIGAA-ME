@@ -183,6 +183,53 @@ export class PlaywrightLoginService {
         }
     }
 
+    private async navigateToCourse(page: any, courseId: string): Promise<boolean> {
+        try {
+            // Go to portal
+            await page.goto('https://si3.ufc.br/sigaa/verPortalDiscente.do');
+            await page.waitForLoadState('networkidle');
+
+            // Enter the course
+            console.log(`Playwright: Entering course ${courseId}...`);
+            const entered = await page.evaluate((id: string) => {
+                const inputs = Array.from(document.querySelectorAll('input[name="idTurma"]'));
+                const targetInput = inputs.find(input => (input as HTMLInputElement).value === id);
+
+                if (targetInput) {
+                    const row = targetInput.closest('tr');
+                    if (row) {
+                        const link = row.querySelector('a[id*="turmaVirtual"]') as HTMLElement;
+                        if (link) {
+                            console.log('Clicking course:', link.innerText);
+                            link.click();
+                            return { success: true };
+                        }
+                    }
+                }
+                return { success: false };
+            }, courseId);
+
+            if (!entered.success) {
+                console.error('Playwright: Course not found in portal');
+                return false;
+            }
+
+            await page.waitForLoadState('networkidle');
+            // Wait for course selection to register
+            await page.waitForTimeout(2000);
+
+            // Navigate to AVA
+            await page.goto('https://si3.ufc.br/sigaa/ava/index.jsf');
+            await page.waitForLoadState('networkidle');
+            await page.waitForTimeout(1000);
+
+            return true;
+        } catch (error) {
+            console.error('Playwright: Navigation error:', error);
+            return false;
+        }
+    }
+
     async getCourseFiles(courseId: string): Promise<{ success: boolean; files?: any[]; error?: string }> {
         try {
             console.log(`Playwright: Fetching files for course ${courseId}...`);
@@ -199,44 +246,12 @@ export class PlaywrightLoginService {
             await context.addCookies(this.storedCookies);
             const page = await context.newPage();
 
-            // Go to portal
-            await page.goto('https://si3.ufc.br/sigaa/verPortalDiscente.do');
-            await page.waitForLoadState('networkidle');
-
-            // Enter the course
-            console.log(`Playwright: Entering course ${courseId}...`);
-            const entered = await page.evaluate((id) => {
-                const inputs = Array.from(document.querySelectorAll('input[name="idTurma"]'));
-                const targetInput = inputs.find(input => (input as HTMLInputElement).value === id);
-
-                if (targetInput) {
-                    const row = targetInput.closest('tr');
-                    if (row) {
-                        const link = row.querySelector('a[id*="turmaVirtual"]') as HTMLElement;
-                        if (link) {
-                            // Log which course we're clicking
-                            console.log('Clicking course:', link.innerText);
-                            link.click();
-                            return { success: true, courseName: link.innerText };
-                        }
-                    }
-                }
-                return { success: false, courseName: '' };
-            }, courseId);
-
-            if (!entered.success) {
+            // Use shared navigation logic
+            const navigated = await this.navigateToCourse(page, courseId);
+            if (!navigated) {
                 await this.close();
-                return { success: false, error: 'Course not found' };
+                return { success: false, error: 'Failed to navigate to course page' };
             }
-
-            await page.waitForLoadState('networkidle');
-            // Wait for course selection to register
-            await page.waitForTimeout(2000);
-
-            // Navigate to AVA
-            await page.goto('https://si3.ufc.br/sigaa/ava/index.jsf');
-            await page.waitForLoadState('networkidle');
-            await page.waitForTimeout(1000);
 
             console.log('Playwright: Extracting files...');
 
@@ -319,6 +334,13 @@ export class PlaywrightLoginService {
 
             const page = await context.newPage();
 
+            // Navigate to course page first
+            const navigated = await this.navigateToCourse(page, courseId);
+            if (!navigated) {
+                await this.close();
+                return { success: false, error: 'Failed to navigate to course page' };
+            }
+
             const result = await downloadService.downloadFile(
                 page,
                 fileUrl,
@@ -364,6 +386,13 @@ export class PlaywrightLoginService {
             }
 
             const page = await context.newPage();
+
+            // Navigate to course page first
+            const navigated = await this.navigateToCourse(page, courseId);
+            if (!navigated) {
+                await this.close();
+                return { downloaded: 0, skipped: 0, failed: files.length, results: [] };
+            }
 
             const result = await downloadService.downloadCourseFiles(
                 page,

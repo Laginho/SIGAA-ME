@@ -31,34 +31,83 @@ export class DownloadService {
                 return { success: true, filePath };
             }
 
-            // Set up download handler BEFORE triggering
-            const downloadPromise = page.waitForEvent('download', { timeout: 60000 });
-
-            // Trigger download - SIGAA files use JavaScript onclick handlers
-            if (fileUrl.includes('javascript:')) {
-                // Extract and execute the JavaScript code
-                const jsCode = fileUrl.replace('javascript:', '');
-                console.log(`Executing JS: ${jsCode.substring(0, 50)}...`);
-                await page.evaluate((code) => {
-                    eval(code);
-                }, jsCode);
-            } else if (fileUrl.startsWith('http')) {
-                // Direct URL navigation
-                await page.goto(fileUrl, { waitUntil: 'networkidle', timeout: 30000 });
-            } else {
-                console.warn(`Unexpected URL format: ${fileUrl}`);
-                return { success: false, error: 'Invalid file URL format' };
+            // Ensure we are on the page (sometimes downloads trigger reload)
+            if (page.url() === 'about:blank') {
+                throw new Error('Page lost context (about:blank)');
             }
 
-            // Wait for download to start
-            console.log(`Waiting for download of ${fileName}...`);
-            const download = await downloadPromise;
+            console.log(`Looking for file link with text: "${fileName}"`);
 
-            // Save to our chosen location
-            await download.saveAs(filePath);
+            // Try to find the link by text content
+            const link = page.getByText(fileName, { exact: false }).first();
 
-            console.log(`Downloaded: ${filePath}`);
-            return { success: true, filePath };
+            if (await link.isVisible()) {
+                console.log(`Found link for ${fileName}, clicking...`);
+
+                // Race between download and popup (some files open in new tab)
+                const downloadPromise = page.waitForEvent('download', { timeout: 60000 });
+                const popupPromise = page.waitForEvent('popup', { timeout: 60000 });
+
+                await link.click();
+
+                // Wait for either download or popup
+                const result = await Promise.race([
+                    downloadPromise.then(d => ({ type: 'download', data: d })),
+                    popupPromise.then(p => ({ type: 'popup', data: p })),
+                    new Promise(resolve => setTimeout(() => resolve({ type: 'timeout' }), 65000))
+                ]) as { type: string, data: any };
+
+                if (result.type === 'download') {
+                    const download = result.data;
+                    await download.saveAs(filePath);
+                    console.log(`Downloaded: ${filePath}`);
+                    return { success: true, filePath };
+                } else if (result.type === 'popup') {
+                    const popup = result.data;
+                    await popup.waitForLoadState();
+                    const popupUrl = popup.url();
+                    console.log(`File opened in popup: ${popupUrl}`);
+
+                    // If it's a PDF or file, we might be able to download it via HTTP
+                    // or print to PDF if it's a viewer
+                    if (popupUrl.endsWith('.pdf') || popupUrl.includes('visualizar')) {
+                        // Try to download the URL directly using the cookies from the main page
+                        const context = page.context();
+                        const response = await context.request.get(popupUrl);
+                        const buffer = await response.body();
+                        fs.writeFileSync(filePath, buffer);
+                        await popup.close();
+                        console.log(`Saved popup content to: ${filePath}`);
+                        return { success: true, filePath };
+                    }
+
+                    await popup.close();
+                    return { success: false, error: 'Opened in popup but could not save' };
+                } else {
+                    throw new Error('Timeout waiting for download or popup');
+                }
+
+            } else {
+                // Fallback: try to find by href/onclick if available
+                console.log('Link not found by text, trying URL match...');
+                if (fileUrl.includes('javascript:')) {
+                    const onclickPart = fileUrl.replace('javascript:', '');
+                    const element = await page.$(`a[onclick*="${onclickPart}"]`);
+                    if (element) {
+                        const downloadPromise = page.waitForEvent('download', { timeout: 30000 });
+                        await element.click();
+                        const download = await downloadPromise;
+                        await download.saveAs(filePath);
+                        return { success: true, filePath };
+                    } else {
+                        throw new Error(`Could not find link for file: ${fileName}`);
+                    }
+                } else {
+                    // Direct URL navigation
+                    await page.goto(fileUrl, { waitUntil: 'networkidle', timeout: 30000 });
+                    return { success: true, filePath };
+                }
+            }
         } catch (error: any) {
             console.error(`Download failed for ${fileName}:`, error);
             return { success: false, error: error.message };
@@ -115,12 +164,10 @@ export class DownloadService {
     }
 
     private sanitizeFileName(fileName: string): string {
-        // Remove invalid file name characters
         return fileName.replace(/[<>:"/\\|?*]/g, '_');
     }
 
     private sanitizeFolderName(folderName: string): string {
-        // Remove invalid folder name characters and limit length
         return folderName.replace(/[<>:"/\\|?*]/g, '_').substring(0, 100);
     }
 }
