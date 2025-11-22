@@ -38,17 +38,37 @@ export class DownloadService {
 
             console.log(`Looking for file link with text: "${fileName}"`);
 
-            // Try to find the link by text content
-            const link = page.getByText(fileName, { exact: false }).first();
+            // Try to find the specific anchor tag containing the text
+            const link = page.locator(`a:has-text("${fileName}")`).first();
 
             if (await link.isVisible()) {
                 console.log(`Found link for ${fileName}, clicking...`);
+
+                // Setup response listener BEFORE clicking to avoid race conditions
+                // We want to catch any PDF response that happens after the click
+                let pdfResponse: any = null;
+                const responseHandler = async (response: any) => {
+                    try {
+                        const contentType = response.headers()['content-type'];
+                        if (contentType && (
+                            contentType.includes('application/pdf') ||
+                            contentType.includes('application/octet-stream') ||
+                            contentType.includes('application/zip')
+                        )) {
+                            console.log(`Captured PDF response: ${response.url()} (${contentType})`);
+                            pdfResponse = response;
+                        }
+                    } catch (e) { /* ignore */ }
+                };
+
+                page.context().on('response', responseHandler);
 
                 // Race between download and popup (some files open in new tab)
                 const downloadPromise = page.waitForEvent('download', { timeout: 60000 });
                 const popupPromise = page.waitForEvent('popup', { timeout: 60000 });
 
-                await link.click();
+                // Use force click to bypass potential overlays
+                await link.click({ force: true });
 
                 // Wait for either download or popup
                 const result = await Promise.race([
@@ -57,6 +77,9 @@ export class DownloadService {
                     new Promise(resolve => setTimeout(() => resolve({ type: 'timeout' }), 65000))
                 ]) as { type: string, data: any };
 
+                // Clean up listener
+                page.context().off('response', responseHandler);
+
                 if (result.type === 'download') {
                     const download = result.data;
                     await download.saveAs(filePath);
@@ -64,25 +87,53 @@ export class DownloadService {
                     return { success: true, filePath };
                 } else if (result.type === 'popup') {
                     const popup = result.data;
-                    await popup.waitForLoadState();
-                    const popupUrl = popup.url();
-                    console.log(`File opened in popup: ${popupUrl}`);
 
-                    // If it's a PDF or file, we might be able to download it via HTTP
-                    // or print to PDF if it's a viewer
-                    if (popupUrl.endsWith('.pdf') || popupUrl.includes('visualizar')) {
-                        // Try to download the URL directly using the cookies from the main page
-                        const context = page.context();
-                        const response = await context.request.get(popupUrl);
-                        const buffer = await response.body();
+                    // If we already captured a PDF response during the click/popup open
+                    if (pdfResponse) {
+                        console.log('Using captured PDF response from context...');
+                        const buffer = await pdfResponse.body();
                         fs.writeFileSync(filePath, buffer);
                         await popup.close();
                         console.log(`Saved popup content to: ${filePath}`);
                         return { success: true, filePath };
                     }
 
+                    // If not, maybe it's still loading?
+                    console.log('Popup opened but no PDF response yet. Waiting...');
+                    try {
+                        // Now we can wait on the popup specifically if it hasn't finished
+                        const response = await popup.waitForResponse((response: any) => {
+                            const contentType = response.headers()['content-type'];
+                            return contentType && (
+                                contentType.includes('application/pdf') ||
+                                contentType.includes('application/octet-stream')
+                            );
+                        }, { timeout: 10000 });
+
+                        const buffer = await response.body();
+                        fs.writeFileSync(filePath, buffer);
+                        await popup.close();
+                        console.log(`Saved popup content to: ${filePath}`);
+                        return { success: true, filePath };
+                    } catch (e) {
+                        console.log('No PDF response found in popup.');
+                    }
+
+                    // Fallback to URL check
+                    const popupUrl = popup.url();
+                    console.log(`Popup URL: ${popupUrl}`);
+
+                    if (popupUrl.endsWith('.pdf') || popupUrl.includes('visualizar')) {
+                        const context = page.context();
+                        const response = await context.request.get(popupUrl);
+                        const buffer = await response.body();
+                        fs.writeFileSync(filePath, buffer);
+                        await popup.close();
+                        return { success: true, filePath };
+                    }
+
                     await popup.close();
-                    return { success: false, error: 'Opened in popup but could not save' };
+                    return { success: false, error: `Could not capture file from popup. URL: ${popupUrl}` };
                 } else {
                     throw new Error('Timeout waiting for download or popup');
                 }

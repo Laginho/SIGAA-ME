@@ -218,10 +218,10 @@ class PlaywrightLoginService {
   }
   async downloadFile(courseId, courseName, fileName, fileUrl, basePath, downloadedFiles) {
     try {
-      const { DownloadService } = await import("./download.service-D5RlZPlv.js");
+      const { DownloadService } = await import("./download.service-fuzbvDR4.js");
       const downloadService = new DownloadService(this.browser);
       if (!this.browser) {
-        this.browser = await chromium.launch({ headless: true });
+        this.browser = await chromium.launch({ headless: false });
       }
       const context = await this.browser.newContext();
       if (this.storedCookies.length > 0) {
@@ -250,10 +250,10 @@ class PlaywrightLoginService {
   }
   async downloadAllFiles(courseId, courseName, files, basePath, downloadedFiles) {
     try {
-      const { DownloadService } = await import("./download.service-D5RlZPlv.js");
+      const { DownloadService } = await import("./download.service-fuzbvDR4.js");
       const downloadService = new DownloadService(this.browser);
       if (!this.browser) {
-        this.browser = await chromium.launch({ headless: true });
+        this.browser = await chromium.launch({ headless: false });
       }
       const context = await this.browser.newContext();
       if (this.storedCookies.length > 0) {
