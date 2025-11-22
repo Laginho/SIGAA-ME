@@ -26,7 +26,6 @@ export class DownloadService {
             const filePath = path.join(courseFolder, this.sanitizeFileName(fileName));
 
             // Check if file already exists (checking both with and without extension if possible)
-            // But since we might append extension later, we check exact match first
             if (fs.existsSync(filePath)) {
                 console.log(`File already exists: ${filePath}`);
                 return { success: true, filePath };
@@ -112,6 +111,10 @@ export class DownloadService {
 
                         const buffer = await response.body();
                         console.log(`Buffer size: ${buffer.length} bytes`);
+
+                        if (buffer.length < 1000) {
+                            console.log(`Small buffer content: ${buffer.toString('utf-8')}`);
+                        }
 
                         if (buffer.length === 0) {
                             throw new Error('Response body is empty');
