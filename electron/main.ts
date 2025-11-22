@@ -62,6 +62,57 @@ ipcMain.handle('get-course-files', async (_, courseId: string) => {
   return await sigaaService.getCourseFiles(courseId);
 })
 
+// Download folder selection
+ipcMain.handle('select-download-folder', async () => {
+  const { dialog } = require('electron');
+  const result = await dialog.showOpenDialog(win!, {
+    properties: ['openDirectory', 'createDirectory'],
+    title: 'Selecione a pasta para downloads'
+  });
+
+  if (result.canceled) {
+    return { success: false };
+  }
+
+  return { success: true, folderPath: result.filePaths[0] };
+})
+
+// Download single file
+ipcMain.handle('download-file', async (_, data: {
+  courseId: string;
+  courseName: string;
+  fileName: string;
+  fileUrl: string;
+  basePath: string;
+  downloadedFiles: Record<string, any>;
+}) => {
+  return await sigaaService.downloadFile(
+    data.courseId,
+    data.courseName,
+    data.fileName,
+    data.fileUrl,
+    data.basePath,
+    data.downloadedFiles
+  );
+})
+
+// Download all files for a course
+ipcMain.handle('download-all-files', async (_, data: {
+  courseId: string;
+  courseName: string;
+  files: Array<{ name: string; url: string }>;
+  basePath: string;
+  downloadedFiles: Record<string, any>;
+}) => {
+  return await sigaaService.downloadAllFiles(
+    data.courseId,
+    data.courseName,
+    data.files,
+    data.basePath,
+    data.downloadedFiles
+  );
+})
+
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.

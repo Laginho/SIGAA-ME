@@ -203,6 +203,61 @@ class PlaywrightLoginService {
       return { success: false, error: error.message };
     }
   }
+  async downloadFile(courseId, courseName, fileName, fileUrl, basePath, downloadedFiles) {
+    try {
+      const { DownloadService } = await import("./download.service-A-fOaLB3.js");
+      const downloadService = new DownloadService(this.browser);
+      if (!this.browser) {
+        this.browser = await chromium.launch({ headless: true });
+      }
+      const context = await this.browser.newContext();
+      if (this.storedCookies.length > 0) {
+        await context.addCookies(this.storedCookies);
+      }
+      const page = await context.newPage();
+      const result = await downloadService.downloadFile(
+        page,
+        fileUrl,
+        fileName,
+        courseName,
+        basePath
+      );
+      await this.close();
+      return result;
+    } catch (error) {
+      console.error("Playwright: Download error:", error);
+      await this.close();
+      return { success: false, error: error.message };
+    }
+  }
+  async downloadAllFiles(courseId, courseName, files, basePath, downloadedFiles) {
+    try {
+      const { DownloadService } = await import("./download.service-A-fOaLB3.js");
+      const downloadService = new DownloadService(this.browser);
+      if (!this.browser) {
+        this.browser = await chromium.launch({ headless: true });
+      }
+      const context = await this.browser.newContext();
+      if (this.storedCookies.length > 0) {
+        await context.addCookies(this.storedCookies);
+      }
+      const page = await context.newPage();
+      const result = await downloadService.downloadCourseFiles(
+        page,
+        courseId,
+        courseName,
+        files,
+        basePath,
+        downloadedFiles
+      );
+      await this.close();
+      return result;
+    } catch (error) {
+      console.error("Playwright: Download all error:", error);
+      await this.close();
+      return { downloaded: 0, skipped: 0, failed: files.length, results: [] };
+    }
+  }
   async close() {
     if (this.browser) {
       console.log("Playwright: Closing browser...");
@@ -269,6 +324,48 @@ class SigaaService {
       return { success: false, message: error.message || "Failed to fetch files" };
     }
   }
+  async downloadFile(courseId, courseName, fileName, fileUrl, basePath, downloadedFiles) {
+    try {
+      console.log(`SIGAA: Downloading file ${fileName}...`);
+      const result = await this.playwrightLogin.downloadFile(
+        courseId,
+        courseName,
+        fileName,
+        fileUrl,
+        basePath,
+        downloadedFiles
+      );
+      if (!result.success) {
+        return { success: false, message: result.error || "Download failed" };
+      }
+      return { success: true, filePath: result.filePath };
+    } catch (error) {
+      console.error("SIGAA: Error downloading file:", error);
+      return { success: false, message: error.message || "Download failed" };
+    }
+  }
+  async downloadAllFiles(courseId, courseName, files, basePath, downloadedFiles) {
+    try {
+      console.log(`SIGAA: Downloading all files for course ${courseName}...`);
+      const result = await this.playwrightLogin.downloadAllFiles(
+        courseId,
+        courseName,
+        files,
+        basePath,
+        downloadedFiles
+      );
+      return {
+        success: true,
+        downloaded: result.downloaded,
+        skipped: result.skipped,
+        failed: result.failed,
+        results: result.results
+      };
+    } catch (error) {
+      console.error("SIGAA: Error downloading files:", error);
+      return { success: false, message: error.message || "Download failed" };
+    }
+  }
 }
 const __dirname$1 = path.dirname(fileURLToPath(import.meta.url));
 process.env.APP_ROOT = path.join(__dirname$1, "..");
@@ -302,6 +399,36 @@ ipcMain.handle("get-courses", async () => {
 });
 ipcMain.handle("get-course-files", async (_, courseId) => {
   return await sigaaService.getCourseFiles(courseId);
+});
+ipcMain.handle("select-download-folder", async () => {
+  const { dialog } = require("electron");
+  const result = await dialog.showOpenDialog(win, {
+    properties: ["openDirectory", "createDirectory"],
+    title: "Selecione a pasta para downloads"
+  });
+  if (result.canceled) {
+    return { success: false };
+  }
+  return { success: true, folderPath: result.filePaths[0] };
+});
+ipcMain.handle("download-file", async (_, data) => {
+  return await sigaaService.downloadFile(
+    data.courseId,
+    data.courseName,
+    data.fileName,
+    data.fileUrl,
+    data.basePath,
+    data.downloadedFiles
+  );
+});
+ipcMain.handle("download-all-files", async (_, data) => {
+  return await sigaaService.downloadAllFiles(
+    data.courseId,
+    data.courseName,
+    data.files,
+    data.basePath,
+    data.downloadedFiles
+  );
 });
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {

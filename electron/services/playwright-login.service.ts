@@ -294,6 +294,95 @@ export class PlaywrightLoginService {
         }
     }
 
+    async downloadFile(
+        courseId: string,
+        courseName: string,
+        fileName: string,
+        fileUrl: string,
+        basePath: string,
+        downloadedFiles: Record<string, any>
+    ): Promise<{ success: boolean; filePath?: string; error?: string }> {
+        try {
+            const { DownloadService } = await import('./download.service');
+            const downloadService = new DownloadService(this.browser);
+
+            // Reinitialize browser for download
+            if (!this.browser) {
+                this.browser = await chromium.launch({ headless: true });
+            }
+
+            const context = await this.browser.newContext();
+            // Inject stored cookies
+            if (this.storedCookies.length > 0) {
+                await context.addCookies(this.storedCookies);
+            }
+
+            const page = await context.newPage();
+
+            const result = await downloadService.downloadFile(
+                page,
+                fileUrl,
+                fileName,
+                courseName,
+                basePath
+            );
+
+            await this.close();
+            return result;
+        } catch (error: any) {
+            console.error('Playwright: Download error:', error);
+            await this.close();
+            return { success: false, error: error.message };
+        }
+    }
+
+    async downloadAllFiles(
+        courseId: string,
+        courseName: string,
+        files: Array<{ name: string; url: string }>,
+        basePath: string,
+        downloadedFiles: Record<string, any>
+    ): Promise<{
+        downloaded: number;
+        skipped: number;
+        failed: number;
+        results: any[];
+    }> {
+        try {
+            const { DownloadService } = await import('./download.service');
+            const downloadService = new DownloadService(this.browser);
+
+            // Reinitialize browser for download
+            if (!this.browser) {
+                this.browser = await chromium.launch({ headless: true });
+            }
+
+            const context = await this.browser.newContext();
+            // Inject stored cookies
+            if (this.storedCookies.length > 0) {
+                await context.addCookies(this.storedCookies);
+            }
+
+            const page = await context.newPage();
+
+            const result = await downloadService.downloadCourseFiles(
+                page,
+                courseId,
+                courseName,
+                files,
+                basePath,
+                downloadedFiles
+            );
+
+            await this.close();
+            return result;
+        } catch (error: any) {
+            console.error('Playwright: Download all error:', error);
+            await this.close();
+            return { downloaded: 0, skipped: 0, failed: files.length, results: [] };
+        }
+    }
+
     async close() {
         if (this.browser) {
             console.log('Playwright: Closing browser...');

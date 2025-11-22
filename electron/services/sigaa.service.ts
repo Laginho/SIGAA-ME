@@ -76,4 +76,64 @@ export class SigaaService {
             return { success: false, message: error.message || 'Failed to fetch files' };
         }
     }
+
+    async downloadFile(
+        courseId: string,
+        courseName: string,
+        fileName: string,
+        fileUrl: string,
+        basePath: string,
+        downloadedFiles: Record<string, any>
+    ): Promise<{ success: boolean; filePath?: string; message?: string }> {
+        try {
+            console.log(`SIGAA: Downloading file ${fileName}...`);
+            const result = await this.playwrightLogin.downloadFile(
+                courseId,
+                courseName,
+                fileName,
+                fileUrl,
+                basePath,
+                downloadedFiles
+            );
+
+            if (!result.success) {
+                return { success: false, message: result.error || 'Download failed' };
+            }
+
+            return { success: true, filePath: result.filePath };
+        } catch (error: any) {
+            console.error('SIGAA: Error downloading file:', error);
+            return { success: false, message: error.message || 'Download failed' };
+        }
+    }
+
+    async downloadAllFiles(
+        courseId: string,
+        courseName: string,
+        files: Array<{ name: string; url: string }>,
+        basePath: string,
+        downloadedFiles: Record<string, any>
+    ): Promise<{ success: boolean; downloaded?: number; skipped?: number; failed?: number; results?: any[]; message?: string }> {
+        try {
+            console.log(`SIGAA: Downloading all files for course ${courseName}...`);
+            const result = await this.playwrightLogin.downloadAllFiles(
+                courseId,
+                courseName,
+                files,
+                basePath,
+                downloadedFiles
+            );
+
+            return {
+                success: true,
+                downloaded: result.downloaded,
+                skipped: result.skipped,
+                failed: result.failed,
+                results: result.results
+            };
+        } catch (error: any) {
+            console.error('SIGAA: Error downloading files:', error);
+            return { success: false, message: error.message || 'Download failed' };
+        }
+    }
 }

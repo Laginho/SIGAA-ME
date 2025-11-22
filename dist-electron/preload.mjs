@@ -21,5 +21,8 @@ electron.contextBridge.exposeInMainWorld("ipcRenderer", {
 electron.contextBridge.exposeInMainWorld("api", {
   login: (credentials) => electron.ipcRenderer.invoke("login-request", credentials),
   getCourses: () => electron.ipcRenderer.invoke("get-courses"),
-  getCourseFiles: (courseId) => electron.ipcRenderer.invoke("get-course-files", courseId)
+  getCourseFiles: (courseId) => electron.ipcRenderer.invoke("get-course-files", courseId),
+  selectDownloadFolder: () => electron.ipcRenderer.invoke("select-download-folder"),
+  downloadFile: (data) => electron.ipcRenderer.invoke("download-file", data),
+  downloadAllFiles: (data) => electron.ipcRenderer.invoke("download-all-files", data)
 });
