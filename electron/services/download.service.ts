@@ -25,10 +25,15 @@ export class DownloadService {
 
             const filePath = path.join(courseFolder, this.sanitizeFileName(fileName));
 
-            // Check if file already exists
+            // Check if file already exists (checking both with and without extension if possible)
+            // But since we might append extension later, we check exact match first
             if (fs.existsSync(filePath)) {
                 console.log(`File already exists: ${filePath}`);
                 return { success: true, filePath };
+            }
+            if (fs.existsSync(filePath + '.pdf')) {
+                console.log(`File already exists: ${filePath}.pdf`);
+                return { success: true, filePath: filePath + '.pdf' };
             }
 
             // Ensure we are on the page (sometimes downloads trigger reload)
@@ -45,7 +50,6 @@ export class DownloadService {
                 console.log(`Found link for ${fileName}, clicking...`);
 
                 // Setup response listener BEFORE clicking to avoid race conditions
-                // We want to catch any PDF response that happens after the click
                 let pdfResponse: any = null;
                 const responseHandler = async (response: any) => {
                     try {
@@ -88,14 +92,47 @@ export class DownloadService {
                 } else if (result.type === 'popup') {
                     const popup = result.data;
 
+                    // Helper to save response body
+                    const saveResponse = async (response: any, initialPath: string) => {
+                        const status = response.status();
+                        console.log(`Response status: ${status}`);
+
+                        if (status >= 400) {
+                            throw new Error(`Response failed with status ${status}`);
+                        }
+
+                        let finalPath = initialPath;
+                        const contentType = response.headers()['content-type'];
+
+                        // Append extension if missing
+                        if (contentType && contentType.includes('application/pdf') && !finalPath.toLowerCase().endsWith('.pdf')) {
+                            finalPath += '.pdf';
+                            console.log(`Appended .pdf extension: ${finalPath}`);
+                        }
+
+                        const buffer = await response.body();
+                        console.log(`Buffer size: ${buffer.length} bytes`);
+
+                        if (buffer.length === 0) {
+                            throw new Error('Response body is empty');
+                        }
+
+                        fs.writeFileSync(finalPath, buffer);
+                        console.log(`Saved popup content to: ${finalPath}`);
+                        return finalPath;
+                    };
+
                     // If we already captured a PDF response during the click/popup open
                     if (pdfResponse) {
                         console.log('Using captured PDF response from context...');
-                        const buffer = await pdfResponse.body();
-                        fs.writeFileSync(filePath, buffer);
-                        await popup.close();
-                        console.log(`Saved popup content to: ${filePath}`);
-                        return { success: true, filePath };
+                        try {
+                            const savedPath = await saveResponse(pdfResponse, filePath);
+                            await popup.close();
+                            return { success: true, filePath: savedPath };
+                        } catch (e: any) {
+                            console.error('Failed to save captured response:', e);
+                            // Fallthrough to try waiting again?
+                        }
                     }
 
                     // If not, maybe it's still loading?
@@ -108,15 +145,13 @@ export class DownloadService {
                                 contentType.includes('application/pdf') ||
                                 contentType.includes('application/octet-stream')
                             );
-                        }, { timeout: 10000 });
+                        }, { timeout: 15000 });
 
-                        const buffer = await response.body();
-                        fs.writeFileSync(filePath, buffer);
+                        const savedPath = await saveResponse(response, filePath);
                         await popup.close();
-                        console.log(`Saved popup content to: ${filePath}`);
-                        return { success: true, filePath };
+                        return { success: true, filePath: savedPath };
                     } catch (e) {
-                        console.log('No PDF response found in popup.');
+                        console.log('No PDF response found in popup or save failed.');
                     }
 
                     // Fallback to URL check
@@ -127,9 +162,15 @@ export class DownloadService {
                         const context = page.context();
                         const response = await context.request.get(popupUrl);
                         const buffer = await response.body();
-                        fs.writeFileSync(filePath, buffer);
+
+                        let finalPath = filePath;
+                        if (!finalPath.toLowerCase().endsWith('.pdf')) {
+                            finalPath += '.pdf';
+                        }
+
+                        fs.writeFileSync(finalPath, buffer);
                         await popup.close();
-                        return { success: true, filePath };
+                        return { success: true, filePath: finalPath };
                     }
 
                     await popup.close();
@@ -192,6 +233,13 @@ export class DownloadService {
                     console.log(`Skipping duplicate: ${file.name}`);
                     skipped++;
                     results.push({ fileName: file.name, status: 'skipped', filePath: existingPath });
+                    continue;
+                }
+                // Also check with .pdf extension
+                if (fs.existsSync(existingPath + '.pdf')) {
+                    console.log(`Skipping duplicate: ${file.name}.pdf`);
+                    skipped++;
+                    results.push({ fileName: file.name, status: 'skipped', filePath: existingPath + '.pdf' });
                     continue;
                 }
             }
