@@ -28,24 +28,30 @@ export class DownloadService {
             // Check if file already exists
             if (fs.existsSync(filePath)) {
                 console.log(`File already exists: ${filePath}`);
-                return { success: true, filePath }; // Consider existing file as success
+                return { success: true, filePath };
             }
 
-            // Set up download handler
-            const downloadPromise = page.waitForEvent('download', { timeout: 30000 });
+            // Set up download handler BEFORE triggering
+            const downloadPromise = page.waitForEvent('download', { timeout: 60000 });
 
-            // Trigger download by evaluating the onclick
-            // The fileUrl might be a javascript function call
-            if (fileUrl.startsWith('javascript:')) {
-                await page.evaluate((url) => {
-                    eval(url.replace('javascript:', ''));
-                }, fileUrl);
+            // Trigger download - SIGAA files use JavaScript onclick handlers
+            if (fileUrl.includes('javascript:')) {
+                // Extract and execute the JavaScript code
+                const jsCode = fileUrl.replace('javascript:', '');
+                console.log(`Executing JS: ${jsCode.substring(0, 50)}...`);
+                await page.evaluate((code) => {
+                    eval(code);
+                }, jsCode);
+            } else if (fileUrl.startsWith('http')) {
+                // Direct URL navigation
+                await page.goto(fileUrl, { waitUntil: 'networkidle', timeout: 30000 });
             } else {
-                // Direct URL - just navigate
-                await page.goto(fileUrl, { waitUntil: 'domcontentloaded' });
+                console.warn(`Unexpected URL format: ${fileUrl}`);
+                return { success: false, error: 'Invalid file URL format' };
             }
 
             // Wait for download to start
+            console.log(`Waiting for download of ${fileName}...`);
             const download = await downloadPromise;
 
             // Save to our chosen location
@@ -102,7 +108,7 @@ export class DownloadService {
             }
 
             // Small delay between downloads
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await new Promise(resolve => setTimeout(resolve, 1000));
         }
 
         return { downloaded, skipped, failed, results };

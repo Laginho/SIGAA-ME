@@ -1,10 +1,13 @@
 /// <reference types="vite/client" />
 
 interface Window {
-    ipcRenderer: import('electron').IpcRenderer
     api: {
-        login: (credentials: any) => Promise<any>;
+        login: (credentials: { username: string; password: string }) => Promise<any>;
         getCourses: () => Promise<any>;
         getCourseFiles: (courseId: string) => Promise<any>;
-    }
+        selectDownloadFolder: () => Promise<any>;
+        downloadFile: (data: any) => Promise<any>;
+        downloadAllFiles: (data: any) => Promise<any>;
+    };
+    ipcRenderer: any;
 }

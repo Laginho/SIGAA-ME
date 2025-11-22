@@ -1,7 +1,7 @@
 var __defProp = Object.defineProperty;
 var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
-import { ipcMain, app, BrowserWindow } from "electron";
+import { ipcMain, dialog, app, BrowserWindow } from "electron";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { chromium } from "playwright";
@@ -205,7 +205,7 @@ class PlaywrightLoginService {
   }
   async downloadFile(courseId, courseName, fileName, fileUrl, basePath, downloadedFiles) {
     try {
-      const { DownloadService } = await import("./download.service-A-fOaLB3.js");
+      const { DownloadService } = await import("./download.service-dMMmjXyE.js");
       const downloadService = new DownloadService(this.browser);
       if (!this.browser) {
         this.browser = await chromium.launch({ headless: true });
@@ -232,7 +232,7 @@ class PlaywrightLoginService {
   }
   async downloadAllFiles(courseId, courseName, files, basePath, downloadedFiles) {
     try {
-      const { DownloadService } = await import("./download.service-A-fOaLB3.js");
+      const { DownloadService } = await import("./download.service-dMMmjXyE.js");
       const downloadService = new DownloadService(this.browser);
       if (!this.browser) {
         this.browser = await chromium.launch({ headless: true });
@@ -401,7 +401,6 @@ ipcMain.handle("get-course-files", async (_, courseId) => {
   return await sigaaService.getCourseFiles(courseId);
 });
 ipcMain.handle("select-download-folder", async () => {
-  const { dialog } = require("electron");
   const result = await dialog.showOpenDialog(win, {
     properties: ["openDirectory", "createDirectory"],
     title: "Selecione a pasta para downloads"

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { SigaaService } from './services/sigaa.service'
@@ -64,7 +64,6 @@ ipcMain.handle('get-course-files', async (_, courseId: string) => {
 
 // Download folder selection
 ipcMain.handle('select-download-folder', async () => {
-  const { dialog } = require('electron');
   const result = await dialog.showOpenDialog(win!, {
     properties: ['openDirectory', 'createDirectory'],
     title: 'Selecione a pasta para downloads'
