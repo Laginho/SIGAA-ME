@@ -323,7 +323,7 @@ export class PlaywrightLoginService {
 
             // Reinitialize browser for download
             if (!this.browser) {
-                this.browser = await chromium.launch({ headless: true });
+                this.browser = await chromium.launch({ headless: false });
             }
 
             const context = await this.browser.newContext();
@@ -376,7 +376,7 @@ export class PlaywrightLoginService {
 
             // Reinitialize browser for download
             if (!this.browser) {
-                this.browser = await chromium.launch({ headless: true });
+                this.browser = await chromium.launch({ headless: false });
             }
 
             const context = await this.browser.newContext();
