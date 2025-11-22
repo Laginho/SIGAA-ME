@@ -25,7 +25,7 @@ export class DownloadService {
 
             const filePath = path.join(courseFolder, this.sanitizeFileName(fileName));
 
-            // Check if file already exists (checking both with and without extension if possible)
+            // Check if file already exists
             if (fs.existsSync(filePath)) {
                 console.log(`File already exists: ${filePath}`);
                 return { success: true, filePath };
@@ -35,7 +35,7 @@ export class DownloadService {
                 return { success: true, filePath: filePath + '.pdf' };
             }
 
-            // Ensure we are on the page (sometimes downloads trigger reload)
+            // Ensure we are on the page
             if (page.url() === 'about:blank') {
                 throw new Error('Page lost context (about:blank)');
             }
@@ -48,47 +48,17 @@ export class DownloadService {
             if (await link.isVisible()) {
                 console.log(`Found link for ${fileName}, clicking...`);
 
-                // Setup response listener BEFORE clicking to avoid race conditions
-                let pdfResponse: any = null;
-                const responseHandler = async (response: any) => {
-                    try {
-                        const contentType = response.headers()['content-type'];
-                        if (contentType && (
-                            contentType.includes('application/pdf') ||
-                            contentType.includes('application/octet-stream') ||
-                            contentType.includes('application/zip')
-                        )) {
-                            // Check magic bytes for PDF to avoid HTML wrappers
-                            const buffer = await response.body();
-                            if (contentType.includes('application/pdf') && !this.isPdf(buffer)) {
-                                console.log(`Ignored fake PDF response (HTML wrapper): ${response.url()}`);
-                                return;
-                            }
-
-                            console.log(`Captured PDF response: ${response.url()} (${contentType})`);
-                            pdfResponse = response;
-                        }
-                    } catch (e) { /* ignore */ }
-                };
-
-                page.context().on('response', responseHandler);
-
-                // Race between download and popup (some files open in new tab)
-                const downloadPromise = page.waitForEvent('download', { timeout: 60000 });
+                // Wait for popup
                 const popupPromise = page.waitForEvent('popup', { timeout: 60000 });
+                const downloadPromise = page.waitForEvent('download', { timeout: 60000 });
 
-                // Use force click to bypass potential overlays
                 await link.click({ force: true });
 
-                // Wait for either download or popup
                 const result = await Promise.race([
                     downloadPromise.then(d => ({ type: 'download', data: d })),
                     popupPromise.then(p => ({ type: 'popup', data: p })),
                     new Promise(resolve => setTimeout(() => resolve({ type: 'timeout' }), 65000))
                 ]) as { type: string, data: any };
-
-                // Clean up listener
-                page.context().off('response', responseHandler);
 
                 if (result.type === 'download') {
                     const download = result.data;
@@ -97,114 +67,105 @@ export class DownloadService {
                     return { success: true, filePath };
                 } else if (result.type === 'popup') {
                     const popup = result.data;
+                    console.log(`Popup opened: ${popup.url()}`);
 
-                    // Helper to save response body
-                    const saveResponse = async (response: any, initialPath: string) => {
+                    // Listen for ALL responses in the popup to see what's being loaded
+                    let pdfResponse: any = null;
+                    const popupResponseHandler = async (response: any) => {
+                        const url = response.url();
+                        const contentType = response.headers()['content-type'] || '';
                         const status = response.status();
-                        console.log(`Response status: ${status}`);
 
-                        if (status >= 400) {
-                            throw new Error(`Response failed with status ${status}`);
+                        console.log(`Popup response: ${url} (${status}) [${contentType}]`);
+
+                        // Check if it's a PDF
+                        if (contentType.includes('application/pdf') ||
+                            contentType.includes('application/octet-stream') ||
+                            contentType.includes('application/zip')) {
+                            try {
+                                const buffer = await response.body();
+                                console.log(`Potential PDF response, size: ${buffer.length} bytes`);
+
+                                // Verify it's actually a PDF
+                                if (contentType.includes('application/pdf') && buffer.length > 0) {
+                                    if (this.isPdf(buffer)) {
+                                        console.log(`✓ Valid PDF found!`);
+                                        pdfResponse = response;
+                                    } else {
+                                        console.log(`✗ Not a PDF (HTML wrapper or other)`);
+                                    }
+                                } else if (buffer.length > 0) {
+                                    // Non-PDF file (zip, etc.)
+                                    pdfResponse = response;
+                                }
+                            } catch (e) {
+                                console.log(`Error reading response body: ${e}`);
+                            }
                         }
-
-                        let finalPath = initialPath;
-                        const contentType = response.headers()['content-type'];
-
-                        // Append extension if missing
-                        if (contentType && contentType.includes('application/pdf') && !finalPath.toLowerCase().endsWith('.pdf')) {
-                            finalPath += '.pdf';
-                            console.log(`Appended .pdf extension: ${finalPath}`);
-                        }
-
-                        const buffer = await response.body();
-                        console.log(`Buffer size: ${buffer.length} bytes`);
-
-                        if (buffer.length < 1000) {
-                            console.log(`Small buffer content: ${buffer.toString('utf-8')}`);
-                        }
-
-                        if (buffer.length === 0) {
-                            throw new Error('Response body is empty');
-                        }
-
-                        // Verify PDF magic bytes
-                        if (contentType && contentType.includes('application/pdf') && !this.isPdf(buffer)) {
-                            throw new Error('Response claims to be PDF but has invalid magic bytes (likely HTML wrapper)');
-                        }
-
-                        fs.writeFileSync(finalPath, buffer);
-                        console.log(`Saved popup content to: ${finalPath}`);
-                        return finalPath;
                     };
 
-                    // If we already captured a PDF response during the click/popup open
-                    if (pdfResponse) {
-                        console.log('Using captured PDF response from context...');
-                        try {
-                            const savedPath = await saveResponse(pdfResponse, filePath);
-                            await popup.close();
-                            return { success: true, filePath: savedPath };
-                        } catch (e: any) {
-                            console.error('Failed to save captured response:', e.message);
-                            // Fallthrough to try waiting again
-                        }
-                    }
+                    popup.on('response', popupResponseHandler);
 
-                    // If not, maybe it's still loading?
-                    console.log('Popup opened but no PDF response yet (or captured one was invalid). Waiting...');
                     try {
-                        // Now we can wait on the popup specifically if it hasn't finished
-                        const response = await popup.waitForResponse(async (response: any) => {
-                            const contentType = response.headers()['content-type'];
-                            if (contentType && (
-                                contentType.includes('application/pdf') ||
-                                contentType.includes('application/octet-stream')
-                            )) {
-                                // Check magic bytes
-                                try {
-                                    const buffer = await response.body();
-                                    if (contentType.includes('application/pdf') && !this.isPdf(buffer)) {
-                                        return false;
-                                    }
-                                    return true;
-                                } catch (e) { return false; }
+                        // Wait for the popup to fully load
+                        console.log('Waiting for popup to load...');
+                        await popup.waitForLoadState('networkidle', { timeout: 30000 });
+                        console.log('Popup loaded.');
+
+                        // Give it extra time for any JavaScript to execute and load the PDF
+                        await new Promise(resolve => setTimeout(resolve, 3000));
+
+                        if (pdfResponse) {
+                            console.log('Found PDF response, saving...');
+                            const buffer = await pdfResponse.body();
+
+                            let finalPath = filePath;
+                            const contentType = pdfResponse.headers()['content-type'];
+                            if (contentType && contentType.includes('application/pdf') && !finalPath.toLowerCase().endsWith('.pdf')) {
+                                finalPath += '.pdf';
+                                console.log(`Appended .pdf extension: ${finalPath}`);
                             }
-                            return false;
-                        }, { timeout: 30000 }); // Increased timeout
 
-                        const savedPath = await saveResponse(response, filePath);
-                        await popup.close();
-                        return { success: true, filePath: savedPath };
-                    } catch (e) {
-                        console.log('No valid PDF response found in popup or save failed.');
-                    }
-
-                    // Fallback to URL check
-                    const popupUrl = popup.url();
-                    console.log(`Popup URL: ${popupUrl}`);
-
-                    if (popupUrl.endsWith('.pdf') || popupUrl.includes('visualizar')) {
-                        const context = page.context();
-                        const response = await context.request.get(popupUrl);
-                        const buffer = await response.body();
-
-                        let finalPath = filePath;
-                        if (!finalPath.toLowerCase().endsWith('.pdf')) {
-                            finalPath += '.pdf';
-                        }
-
-                        // One last check
-                        if (this.isPdf(buffer)) {
                             fs.writeFileSync(finalPath, buffer);
+                            console.log(`✓ Saved: ${finalPath} (${buffer.length} bytes)`);
+
                             await popup.close();
                             return { success: true, filePath: finalPath };
                         } else {
-                            console.log('Fallback URL also returned non-PDF content.');
-                        }
-                    }
+                            console.log('No PDF response captured. Trying to extract from embed...');
 
-                    await popup.close();
-                    return { success: false, error: `Could not capture file from popup. URL: ${popupUrl}` };
+                            // Try to get the PDF from the embed element
+                            const embedSrc = await popup.evaluate(() => {
+                                const embed = document.querySelector('embed[type="application/pdf"]');
+                                return embed ? (embed as HTMLEmbedElement).src : null;
+                            });
+
+                            console.log(`Embed src: ${embedSrc}`);
+
+                            if (embedSrc && embedSrc !== 'about:blank' && !embedSrc.startsWith('blob:')) {
+                                // Try to fetch the PDF from the embed URL
+                                console.log(`Fetching PDF from embed URL: ${embedSrc}`);
+                                const context = popup.context();
+                                const response = await context.request.get(embedSrc);
+                                const buffer = await response.body();
+
+                                let finalPath = filePath;
+                                if (!finalPath.toLowerCase().endsWith('.pdf')) {
+                                    finalPath += '.pdf';
+                                }
+
+                                fs.writeFileSync(finalPath, buffer);
+                                console.log(`✓ Saved from embed: ${finalPath}`);
+                                await popup.close();
+                                return { success: true, filePath: finalPath };
+                            }
+
+                            await popup.close();
+                            return { success: false, error: 'Could not capture PDF from popup' };
+                        }
+                    } finally {
+                        popup.off('response', popupResponseHandler);
+                    }
                 } else {
                     throw new Error('Timeout waiting for download or popup');
                 }
@@ -265,7 +226,6 @@ export class DownloadService {
                     results.push({ fileName: file.name, status: 'skipped', filePath: existingPath });
                     continue;
                 }
-                // Also check with .pdf extension
                 if (fs.existsSync(existingPath + '.pdf')) {
                     console.log(`Skipping duplicate: ${file.name}.pdf`);
                     skipped++;
