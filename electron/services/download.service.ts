@@ -58,6 +58,13 @@ export class DownloadService {
                             contentType.includes('application/octet-stream') ||
                             contentType.includes('application/zip')
                         )) {
+                            // Check magic bytes for PDF to avoid HTML wrappers
+                            const buffer = await response.body();
+                            if (contentType.includes('application/pdf') && !this.isPdf(buffer)) {
+                                console.log(`Ignored fake PDF response (HTML wrapper): ${response.url()}`);
+                                return;
+                            }
+
                             console.log(`Captured PDF response: ${response.url()} (${contentType})`);
                             pdfResponse = response;
                         }
@@ -120,6 +127,11 @@ export class DownloadService {
                             throw new Error('Response body is empty');
                         }
 
+                        // Verify PDF magic bytes
+                        if (contentType && contentType.includes('application/pdf') && !this.isPdf(buffer)) {
+                            throw new Error('Response claims to be PDF but has invalid magic bytes (likely HTML wrapper)');
+                        }
+
                         fs.writeFileSync(finalPath, buffer);
                         console.log(`Saved popup content to: ${finalPath}`);
                         return finalPath;
@@ -133,28 +145,38 @@ export class DownloadService {
                             await popup.close();
                             return { success: true, filePath: savedPath };
                         } catch (e: any) {
-                            console.error('Failed to save captured response:', e);
-                            // Fallthrough to try waiting again?
+                            console.error('Failed to save captured response:', e.message);
+                            // Fallthrough to try waiting again
                         }
                     }
 
                     // If not, maybe it's still loading?
-                    console.log('Popup opened but no PDF response yet. Waiting...');
+                    console.log('Popup opened but no PDF response yet (or captured one was invalid). Waiting...');
                     try {
                         // Now we can wait on the popup specifically if it hasn't finished
-                        const response = await popup.waitForResponse((response: any) => {
+                        const response = await popup.waitForResponse(async (response: any) => {
                             const contentType = response.headers()['content-type'];
-                            return contentType && (
+                            if (contentType && (
                                 contentType.includes('application/pdf') ||
                                 contentType.includes('application/octet-stream')
-                            );
-                        }, { timeout: 15000 });
+                            )) {
+                                // Check magic bytes
+                                try {
+                                    const buffer = await response.body();
+                                    if (contentType.includes('application/pdf') && !this.isPdf(buffer)) {
+                                        return false;
+                                    }
+                                    return true;
+                                } catch (e) { return false; }
+                            }
+                            return false;
+                        }, { timeout: 30000 }); // Increased timeout
 
                         const savedPath = await saveResponse(response, filePath);
                         await popup.close();
                         return { success: true, filePath: savedPath };
                     } catch (e) {
-                        console.log('No PDF response found in popup or save failed.');
+                        console.log('No valid PDF response found in popup or save failed.');
                     }
 
                     // Fallback to URL check
@@ -171,9 +193,14 @@ export class DownloadService {
                             finalPath += '.pdf';
                         }
 
-                        fs.writeFileSync(finalPath, buffer);
-                        await popup.close();
-                        return { success: true, filePath: finalPath };
+                        // One last check
+                        if (this.isPdf(buffer)) {
+                            fs.writeFileSync(finalPath, buffer);
+                            await popup.close();
+                            return { success: true, filePath: finalPath };
+                        } else {
+                            console.log('Fallback URL also returned non-PDF content.');
+                        }
                     }
 
                     await popup.close();
@@ -271,5 +298,11 @@ export class DownloadService {
 
     private sanitizeFolderName(folderName: string): string {
         return folderName.replace(/[<>:"/\\|?*]/g, '_').substring(0, 100);
+    }
+
+    private isPdf(buffer: Buffer): boolean {
+        // Check for %PDF magic bytes (25 50 44 46)
+        if (buffer.length < 4) return false;
+        return buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46;
     }
 }
