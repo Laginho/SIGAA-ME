@@ -1,6 +1,6 @@
-import { Browser, Page } from 'playwright';
+import { Browser, Page, Response } from 'playwright';
 import * as fs from 'fs';
-import * as path from 'path';
+import * * path from 'path';
 
 export class DownloadService {
     private browser: Browser | null = null;
@@ -69,37 +69,36 @@ export class DownloadService {
                     const popup = result.data;
                     console.log(`Popup opened: ${popup.url()}`);
 
-                    // Listen for ALL responses in the popup to see what's being loaded
-                    let pdfResponse: any = null;
-                    const popupResponseHandler = async (response: any) => {
+                    // Listen for ALL responses in the popup to capture the PDF
+                    let pdfResponse: Response | null = null;
+                    const popupResponseHandler = async (response: Response) => {
                         const url = response.url();
                         const contentType = response.headers()['content-type'] || '';
                         const status = response.status();
 
-                        console.log(`Popup response: ${url} (${status}) [${contentType}]`);
+                        console.log(`  --> Response: ${url} (${status}) [${contentType}]`);
 
-                        // Check if it's a PDF
+                        // Check if it's a potential file
                         if (contentType.includes('application/pdf') ||
                             contentType.includes('application/octet-stream') ||
                             contentType.includes('application/zip')) {
                             try {
                                 const buffer = await response.body();
-                                console.log(`Potential PDF response, size: ${buffer.length} bytes`);
+                                console.log(`  --> Potential file, size: ${buffer.length} bytes`);
 
-                                // Verify it's actually a PDF
-                                if (contentType.includes('application/pdf') && buffer.length > 0) {
+                                if (contentType.includes('application/pdf')) {
                                     if (this.isPdf(buffer)) {
-                                        console.log(`✓ Valid PDF found!`);
+                                        console.log(`  --> ✓ Valid PDF found!`);
                                         pdfResponse = response;
                                     } else {
-                                        console.log(`✗ Not a PDF (HTML wrapper or other)`);
+                                        console.log(`  --> ✗ Not a PDF (HTML wrapper)`);
                                     }
-                                } else if (buffer.length > 0) {
-                                    // Non-PDF file (zip, etc.)
+                                } else if (buffer.length > 500) {
+                                    // Likely valid file
                                     pdfResponse = response;
                                 }
                             } catch (e) {
-                                console.log(`Error reading response body: ${e}`);
+                                console.log(`  --> Error reading body: ${e}`);
                             }
                         }
                     };
@@ -107,16 +106,32 @@ export class DownloadService {
                     popup.on('response', popupResponseHandler);
 
                     try {
-                        // Wait for the popup to fully load
+                        // Wait for popup to load
                         console.log('Waiting for popup to load...');
                         await popup.waitForLoadState('networkidle', { timeout: 30000 });
-                        console.log('Popup loaded.');
+                        console.log('Popup loaded (networkidle).');
 
-                        // Give it extra time for any JavaScript to execute and load the PDF
-                        await new Promise(resolve => setTimeout(resolve, 3000));
+                        // Monitor embed src for changes (PDF might be set via JavaScript)
+                        console.log('Monitoring embed element...');
+                        let embedSrc = 'about:blank';
+                        let attempts = 0;
+                        const maxAttempts = 20; // 10 seconds
 
+                        while (embedSrc === 'about:blank' && attempts < maxAttempts && !pdfResponse) {
+                            await new Promise(resolve => setTimeout(resolve, 500));
+                            embedSrc = await popup.evaluate(() => {
+                                const embed = document.querySelector('embed[type="application/pdf"]');
+                                return embed ? (embed as HTMLEmbedElement).src : 'about:blank';
+                            });
+                            attempts++;
+                            if (embedSrc !== 'about:blank') {
+                                console.log(`  --> Embed src changed: ${embedSrc}`);
+                            }
+                        }
+
+                        // If we captured a PDF response, save it
                         if (pdfResponse) {
-                            console.log('Found PDF response, saving...');
+                            console.log('Saving PDF from captured response...');
                             const buffer = await pdfResponse.body();
 
                             let finalPath = filePath;
@@ -131,38 +146,33 @@ export class DownloadService {
 
                             await popup.close();
                             return { success: true, filePath: finalPath };
-                        } else {
-                            console.log('No PDF response captured. Trying to extract from embed...');
+                        }
 
-                            // Try to get the PDF from the embed element
-                            const embedSrc = await popup.evaluate(() => {
-                                const embed = document.querySelector('embed[type="application/pdf"]');
-                                return embed ? (embed as HTMLEmbedElement).src : null;
-                            });
+                        // If embed src changed to a valid URL, try to fetch it
+                        if (embedSrc && embedSrc !== 'about:blank' && !embedSrc.startsWith('blob:')) {
+                            console.log(`Fetching PDF from embed URL: ${embedSrc}`);
+                            const context = popup.context();
+                            const response = await context.request.get(embedSrc);
+                            const buffer = await response.body();
 
-                            console.log(`Embed src: ${embedSrc}`);
+                            let finalPath = filePath;
+                            if (!finalPath.toLowerCase().endsWith('.pdf')) {
+                                finalPath += '.pdf';
+                            }
 
-                            if (embedSrc && embedSrc !== 'about:blank' && !embedSrc.startsWith('blob:')) {
-                                // Try to fetch the PDF from the embed URL
-                                console.log(`Fetching PDF from embed URL: ${embedSrc}`);
-                                const context = popup.context();
-                                const response = await context.request.get(embedSrc);
-                                const buffer = await response.body();
-
-                                let finalPath = filePath;
-                                if (!finalPath.toLowerCase().endsWith('.pdf')) {
-                                    finalPath += '.pdf';
-                                }
-
+                            if (this.isPdf(buffer)) {
                                 fs.writeFileSync(finalPath, buffer);
-                                console.log(`✓ Saved from embed: ${finalPath}`);
+                                console.log(`✓ Saved from embed URL: ${finalPath}`);
                                 await popup.close();
                                 return { success: true, filePath: finalPath };
                             }
-
-                            await popup.close();
-                            return { success: false, error: 'Could not capture PDF from popup' };
                         }
+
+                        // If blob URL, we can't fetch it - PDF might be embedded inline
+                        console.log(`No network PDF found. Embed src: ${embedSrc}`);
+                        await popup.close();
+                        return { success: false, error: `Could not capture PDF. Embed src: ${embedSrc}` };
+
                     } finally {
                         popup.off('response', popupResponseHandler);
                     }
@@ -171,7 +181,7 @@ export class DownloadService {
                 }
 
             } else {
-                // Fallback: try to find by href/onclick if available
+                // Fallback
                 console.log('Link not found by text, trying URL match...');
                 if (fileUrl.includes('javascript:')) {
                     const onclickPart = fileUrl.replace('javascript:', '');
@@ -186,7 +196,6 @@ export class DownloadService {
                         throw new Error(`Could not find link for file: ${fileName}`);
                     }
                 } else {
-                    // Direct URL navigation
                     await page.goto(fileUrl, { waitUntil: 'networkidle', timeout: 30000 });
                     return { success: true, filePath };
                 }
@@ -216,7 +225,6 @@ export class DownloadService {
         let failed = 0;
 
         for (const file of files) {
-            // Check if already downloaded
             const courseDownloads = downloadedFiles[courseId] || {};
             if (courseDownloads[file.name]) {
                 const existingPath = courseDownloads[file.name].path;
@@ -234,7 +242,6 @@ export class DownloadService {
                 }
             }
 
-            // Download file
             const result = await this.downloadFile(page, file.url, file.name, courseName, basePath);
 
             if (result.success) {
@@ -245,7 +252,6 @@ export class DownloadService {
                 results.push({ fileName: file.name, status: 'failed' });
             }
 
-            // Small delay between downloads
             await new Promise(resolve => setTimeout(resolve, 1000));
         }
 
@@ -261,7 +267,6 @@ export class DownloadService {
     }
 
     private isPdf(buffer: Buffer): boolean {
-        // Check for %PDF magic bytes (25 50 44 46)
         if (buffer.length < 4) return false;
         return buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46;
     }
