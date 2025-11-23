@@ -43,41 +43,31 @@ export class DownloadService {
             if (await link.isVisible()) {
                 console.log(`Found link for ${fileName}, clicking...`);
 
-                let pdfData: Buffer | null = null;
+                // NEW STRATEGY: CDP Download Behavior
+                // We hook into the popup creation to force Chrome to download files
+                // instead of displaying them in the PDF viewer.
 
-                // Use context-level listener to catch responses from ALL pages (parent + popup)
-                const responseHandler = async (response: Response) => {
-                    const url = response.url();
-                    const contentType = response.headers()['content-type'] || '';
-                    const contentDisposition = response.headers()['content-disposition'] || '';
-
-                    // Filter out noisy requests (images, css, etc.)
-                    if (contentType.includes('image') || contentType.includes('css') || contentType.includes('javascript')) {
-                        return;
-                    }
-
-                    console.log(`[Context Response] ${response.status()} ${url}`);
-                    console.log(`  Type: ${contentType}`);
-
-                    if (contentType.includes('application/pdf') ||
-                        contentType.includes('application/octet-stream') ||
-                        contentDisposition.includes('attachment')) {
-
-                        try {
-                            const buffer = await response.body();
-                            console.log(`  !! Potential file, size: ${buffer.length}`);
-
-                            if (buffer.length > 500 && this.isPdf(buffer)) {
-                                console.log(`  ✓✓✓ Found PDF in context response!`);
-                                pdfData = buffer;
-                            }
-                        } catch (e: any) {
-                            // ignore
-                        }
+                const popupHandler = async (popup: Page) => {
+                    console.log('Popup detected! Configuring CDP download behavior...');
+                    try {
+                        const client = await popup.context().newCDPSession(popup);
+                        await client.send('Page.setDownloadBehavior', {
+                            behavior: 'allow',
+                            downloadPath: courseFolder
+                        });
+                        console.log(`CDP download behavior set to: ${courseFolder}`);
+                    } catch (e) {
+                        console.error('Failed to set CDP behavior:', e);
                     }
                 };
 
-                console.log('Attaching context response listener...');
+                page.on('popup', popupHandler);
+
+                // Also listen for responses just in case
+                const responseHandler = async (response: Response) => {
+                    // Log everything to be sure
+                    console.log(`[Response] ${response.status()} ${response.url()} [${response.headers()['content-type']}]`);
+                };
                 page.context().on('response', responseHandler);
 
                 const downloadPromise = page.waitForEvent('download', { timeout: 60000 });
@@ -91,57 +81,88 @@ export class DownloadService {
                     new Promise(resolve => setTimeout(() => resolve({ type: 'timeout' }), 65000))
                 ]) as { type: string, data: any };
 
+                // Cleanup
+                page.off('popup', popupHandler);
+                page.context().off('response', responseHandler);
+
                 if (result.type === 'download') {
-                    page.context().off('response', responseHandler);
                     const download = result.data;
                     await download.saveAs(filePath);
-                    console.log(`Downloaded: ${filePath}`);
+                    console.log(`Downloaded via event: ${filePath}`);
                     return { success: true, filePath };
 
                 } else if (result.type === 'popup') {
                     const popup = result.data;
                     console.log(`Popup opened: ${popup.url()}`);
 
-                    // Wait a bit for loading
-                    await popup.waitForLoadState('domcontentloaded');
-                    await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3s for any redirects/scripts
+                    // Wait to see if a download starts automatically due to CDP
+                    try {
+                        console.log('Waiting for potential CDP-triggered download...');
+                        // We can't easily wait for a file to appear, but we can wait a bit
+                        await new Promise(resolve => setTimeout(resolve, 5000));
 
-                    // Check if we already caught it
-                    if (pdfData) {
-                        page.context().off('response', responseHandler);
+                        // Check if any new file appeared in the folder
+                        const files = fs.readdirSync(courseFolder);
+                        // Sort by creation time
+                        const recentFiles = files.map(f => ({
+                            name: f,
+                            time: fs.statSync(path.join(courseFolder, f)).birthtimeMs
+                        })).sort((a, b) => b.time - a.time);
+
+                        if (recentFiles.length > 0) {
+                            const newestFile = recentFiles[0];
+                            const newestFilePath = path.join(courseFolder, newestFile.name);
+                            const now = Date.now();
+
+                            // If file was created in the last 10 seconds
+                            if (now - newestFile.time < 10000) {
+                                console.log(`Found recently created file: ${newestFile.name}`);
+
+                                // Rename to target filename
+                                let finalPath = filePath;
+                                if (!finalPath.toLowerCase().endsWith('.pdf') && !newestFile.name.toLowerCase().endsWith('.pdf')) {
+                                    finalPath += '.pdf';
+                                } else if (newestFile.name.toLowerCase().endsWith('.pdf') && !finalPath.toLowerCase().endsWith('.pdf')) {
+                                    finalPath += '.pdf';
+                                }
+
+                                // Wait for file to be closed/finished writing
+                                await new Promise(resolve => setTimeout(resolve, 2000));
+
+                                try {
+                                    fs.renameSync(newestFilePath, finalPath);
+                                    console.log(`Renamed ${newestFile.name} to ${path.basename(finalPath)}`);
+                                    await popup.close();
+                                    return { success: true, filePath: finalPath };
+                                } catch (e) {
+                                    console.log(`Could not rename file (maybe still downloading?): ${e}`);
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.log('Error checking for CDP download:', e);
+                    }
+
+                    // Fallback: Try to print to PDF (since we know it renders!)
+                    console.log('CDP download failed. Attempting to print page to PDF...');
+                    try {
+                        await popup.waitForLoadState('networkidle');
                         let finalPath = filePath;
                         if (!finalPath.toLowerCase().endsWith('.pdf')) {
                             finalPath += '.pdf';
                         }
-                        fs.writeFileSync(finalPath, pdfData);
-                        console.log(`✓ Saved PDF from context capture: ${finalPath}`);
+                        await popup.pdf({ path: finalPath });
+                        console.log(`Saved via Page.pdf(): ${finalPath}`);
                         await popup.close();
                         return { success: true, filePath: finalPath };
-                    }
-
-                    // Debug: Dump HTML to see what's inside
-                    try {
-                        const html = await popup.content();
-                        console.log('--- Popup HTML Content Start ---');
-                        console.log(html.substring(0, 2000)); // Log first 2000 chars
-                        console.log('--- Popup HTML Content End ---');
                     } catch (e) {
-                        console.log('Could not dump HTML');
+                        console.log(`Print to PDF failed: ${e}`);
                     }
 
-                    // Try to find embed again
-                    const pdfUrl = await popup.evaluate(() => {
-                        const embed = document.querySelector('embed');
-                        return embed ? embed.src : null;
-                    });
-                    console.log(`Final embed src check: ${pdfUrl}`);
-
-                    page.context().off('response', responseHandler);
                     await popup.close();
-                    return { success: false, error: 'Could not capture PDF (check logs for HTML dump)' };
+                    return { success: false, error: 'Could not capture PDF via CDP or Print' };
 
                 } else {
-                    page.context().off('response', responseHandler);
                     throw new Error('Timeout waiting for download or popup');
                 }
 
