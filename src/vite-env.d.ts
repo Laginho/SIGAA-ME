@@ -8,6 +8,8 @@ interface Window {
         selectDownloadFolder: () => Promise<any>;
         downloadFile: (data: any) => Promise<any>;
         downloadAllFiles: (data: any) => Promise<any>;
+        checkFilesExistence: (filePaths: string[]) => Promise<any[]>;
+        onDownloadProgress: (callback: (data: any) => void) => () => void;
     };
     ipcRenderer: any;
 }

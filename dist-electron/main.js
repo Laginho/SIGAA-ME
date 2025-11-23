@@ -4,6 +4,7 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
 import { ipcMain, dialog, app, BrowserWindow } from "electron";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import fs from "node:fs";
 import { chromium } from "playwright";
 class PlaywrightLoginService {
   constructor() {
@@ -457,6 +458,12 @@ ipcMain.handle("download-all-files", async (_, data) => {
     data.downloadedFiles,
     onProgress
   );
+});
+ipcMain.handle("check-files-existence", async (_, filePaths) => {
+  return filePaths.map((filePath) => ({
+    path: filePath,
+    exists: fs.existsSync(filePath)
+  }));
 });
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {

@@ -22,6 +22,7 @@ electron.contextBridge.exposeInMainWorld("api", {
   login: (credentials) => electron.ipcRenderer.invoke("login-request", credentials),
   getCourses: () => electron.ipcRenderer.invoke("get-courses"),
   getCourseFiles: (courseId) => electron.ipcRenderer.invoke("get-course-files", courseId),
+  checkFilesExistence: (filePaths) => electron.ipcRenderer.invoke("check-files-existence", filePaths),
   selectDownloadFolder: () => electron.ipcRenderer.invoke("select-download-folder"),
   downloadFile: (data) => electron.ipcRenderer.invoke("download-file", data),
   downloadAllFiles: (data) => electron.ipcRenderer.invoke("download-all-files", data),

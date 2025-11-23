@@ -80,7 +80,34 @@ async function fetchCourseFiles(courseId: string) {
     } else {
       // Get downloaded status
       const downloadedFiles = JSON.parse(localStorage.getItem('downloadedFiles') || '{}');
-      const courseDownloads = downloadedFiles[courseId] || {};
+      let courseDownloads = downloadedFiles[courseId] || {};
+
+      // Verify existence
+      const filePaths = Object.values(courseDownloads).map((f: any) => f.path).filter(p => p);
+      if (filePaths.length > 0) {
+        try {
+          const existenceResults = await window.api.checkFilesExistence(filePaths);
+          let changed = false;
+
+          existenceResults.forEach((res: any) => {
+            if (!res.exists) {
+              // Find key by path
+              const key = Object.keys(courseDownloads).find(k => courseDownloads[k].path === res.path);
+              if (key) {
+                delete courseDownloads[key];
+                changed = true;
+              }
+            }
+          });
+
+          if (changed) {
+            downloadedFiles[courseId] = courseDownloads;
+            localStorage.setItem('downloadedFiles', JSON.stringify(downloadedFiles));
+          }
+        } catch (e) {
+          console.error('Failed to verify files:', e);
+        }
+      }
 
       filesListElement.innerHTML = course.files.map((file: any) => {
         const isDownloaded = !!courseDownloads[file.name];

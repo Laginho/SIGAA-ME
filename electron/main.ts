@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+import fs from 'node:fs'
 import { SigaaService } from './services/sigaa.service'
 
 
@@ -115,6 +116,14 @@ ipcMain.handle('download-all-files', async (_, data: {
     data.downloadedFiles,
     onProgress
   );
+})
+
+// Check if files exist
+ipcMain.handle('check-files-existence', async (_, filePaths: string[]) => {
+  return filePaths.map(filePath => ({
+    path: filePath,
+    exists: fs.existsSync(filePath)
+  }));
 })
 
 // Quit when all windows are closed, except on macOS. There, it's common
