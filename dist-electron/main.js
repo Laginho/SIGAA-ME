@@ -218,7 +218,7 @@ class PlaywrightLoginService {
   }
   async downloadFile(courseId, courseName, fileName, fileUrl, basePath, downloadedFiles) {
     try {
-      const { DownloadService } = await import("./download.service-DTJHbyZj.js");
+      const { DownloadService } = await import("./download.service-Bp9v3g-w.js");
       const downloadService = new DownloadService(this.browser);
       if (!this.browser) {
         this.browser = await chromium.launch({ headless: false });
@@ -250,7 +250,7 @@ class PlaywrightLoginService {
   }
   async downloadAllFiles(courseId, courseName, files, basePath, downloadedFiles) {
     try {
-      const { DownloadService } = await import("./download.service-DTJHbyZj.js");
+      const { DownloadService } = await import("./download.service-Bp9v3g-w.js");
       const downloadService = new DownloadService(this.browser);
       if (!this.browser) {
         this.browser = await chromium.launch({ headless: false });

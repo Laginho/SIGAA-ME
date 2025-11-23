@@ -44,47 +44,41 @@ export class DownloadService {
                 console.log(`Found link for ${fileName}, clicking...`);
 
                 let pdfData: Buffer | null = null;
-                let responseCount = 0;
 
+                // Use context-level listener to catch responses from ALL pages (parent + popup)
                 const responseHandler = async (response: Response) => {
-                    responseCount++;
                     const url = response.url();
                     const contentType = response.headers()['content-type'] || '';
                     const contentDisposition = response.headers()['content-disposition'] || '';
-                    const status = response.status();
 
-                    console.log(`[Parent Response #${responseCount}] ${status} ${url}`);
-                    console.log(`  Content-Type: ${contentType}`);
-                    if (contentDisposition) {
-                        console.log(`  Content-Disposition: ${contentDisposition}`);
+                    // Filter out noisy requests (images, css, etc.)
+                    if (contentType.includes('image') || contentType.includes('css') || contentType.includes('javascript')) {
+                        return;
                     }
+
+                    console.log(`[Context Response] ${response.status()} ${url}`);
+                    console.log(`  Type: ${contentType}`);
 
                     if (contentType.includes('application/pdf') ||
                         contentType.includes('application/octet-stream') ||
-                        contentDisposition.includes('attachment') ||
-                        contentType.includes('application/force-download')) {
+                        contentDisposition.includes('attachment')) {
 
                         try {
                             const buffer = await response.body();
-                            console.log(`  !! File response, buffer size: ${buffer.length} bytes`);
+                            console.log(`  !! Potential file, size: ${buffer.length}`);
 
-                            if (buffer.length > 500) {
-                                const isPdf = this.isPdf(buffer);
-                                console.log(`  !! Is PDF: ${isPdf}`);
-
-                                if (isPdf) {
-                                    console.log(`  ✓✓✓ Found PDF in response!`);
-                                    pdfData = buffer;
-                                }
+                            if (buffer.length > 500 && this.isPdf(buffer)) {
+                                console.log(`  ✓✓✓ Found PDF in context response!`);
+                                pdfData = buffer;
                             }
                         } catch (e: any) {
-                            console.log(`  Error getting body: ${e.message}`);
+                            // ignore
                         }
                     }
                 };
 
-                console.log('Attaching response listener to parent page...');
-                page.on('response', responseHandler);
+                console.log('Attaching context response listener...');
+                page.context().on('response', responseHandler);
 
                 const downloadPromise = page.waitForEvent('download', { timeout: 60000 });
                 const popupPromise = page.waitForEvent('popup', { timeout: 60000 });
@@ -97,10 +91,8 @@ export class DownloadService {
                     new Promise(resolve => setTimeout(() => resolve({ type: 'timeout' }), 65000))
                 ]) as { type: string, data: any };
 
-                page.off('response', responseHandler);
-                console.log(`Total responses captured: ${responseCount}`);
-
                 if (result.type === 'download') {
+                    page.context().off('response', responseHandler);
                     const download = result.data;
                     await download.saveAs(filePath);
                     console.log(`Downloaded: ${filePath}`);
@@ -110,72 +102,51 @@ export class DownloadService {
                     const popup = result.data;
                     console.log(`Popup opened: ${popup.url()}`);
 
+                    // Wait a bit for loading
+                    await popup.waitForLoadState('domcontentloaded');
+                    await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3s for any redirects/scripts
+
+                    // Check if we already caught it
                     if (pdfData) {
+                        page.context().off('response', responseHandler);
                         let finalPath = filePath;
                         if (!finalPath.toLowerCase().endsWith('.pdf')) {
                             finalPath += '.pdf';
                         }
                         fs.writeFileSync(finalPath, pdfData);
-                        console.log(`✓ Saved PDF from parent page: ${finalPath} (${pdfData.length} bytes)`);
+                        console.log(`✓ Saved PDF from context capture: ${finalPath}`);
                         await popup.close();
                         return { success: true, filePath: finalPath };
                     }
 
-                    console.log('No PDF captured from parent. Checking popup page source...');
+                    // Debug: Dump HTML to see what's inside
                     try {
-                        await popup.waitForLoadState('domcontentloaded', { timeout: 10000 });
-
-                        const pdfUrl = await popup.evaluate(() => {
-                            const embeds = document.querySelectorAll('embed[type="application/pdf"]');
-                            for (const embed of embeds) {
-                                const src = (embed as HTMLEmbedElement).src;
-                                if (src && src !== 'about:blank' && !src.startsWith('blob:')) {
-                                    return src;
-                                }
-                            }
-
-                            const scripts = document.querySelectorAll('script');
-                            for (const script of scripts) {
-                                const match = script.textContent?.match(/blob:[^"'\s]+/);
-                                if (match) {
-                                    return match[0];
-                                }
-                            }
-
-                            return null;
-                        });
-
-                        console.log(`Extracted URL from popup: ${pdfUrl}`);
-
-                        if (pdfUrl && !pdfUrl.startsWith('blob:')) {
-                            const context = popup.context();
-                            const response = await context.request.get(pdfUrl);
-                            const buffer = await response.body();
-
-                            if (this.isPdf(buffer)) {
-                                let finalPath = filePath;
-                                if (!finalPath.toLowerCase().endsWith('.pdf')) {
-                                    finalPath += '.pdf';
-                                }
-                                fs.writeFileSync(finalPath, buffer);
-                                console.log(`✓ Saved from extracted URL: ${finalPath}`);
-                                await popup.close();
-                                return { success: true, filePath: finalPath };
-                            }
-                        }
+                        const html = await popup.content();
+                        console.log('--- Popup HTML Content Start ---');
+                        console.log(html.substring(0, 2000)); // Log first 2000 chars
+                        console.log('--- Popup HTML Content End ---');
                     } catch (e) {
-                        console.log(`Error extracting from popup: ${e}`);
+                        console.log('Could not dump HTML');
                     }
 
+                    // Try to find embed again
+                    const pdfUrl = await popup.evaluate(() => {
+                        const embed = document.querySelector('embed');
+                        return embed ? embed.src : null;
+                    });
+                    console.log(`Final embed src check: ${pdfUrl}`);
+
+                    page.context().off('response', responseHandler);
                     await popup.close();
-                    return { success: false, error: 'Could not capture PDF data' };
+                    return { success: false, error: 'Could not capture PDF (check logs for HTML dump)' };
 
                 } else {
+                    page.context().off('response', responseHandler);
                     throw new Error('Timeout waiting for download or popup');
                 }
 
             } else {
-                console.log('Link not found by text, trying URL match...');
+                // Fallback
                 if (fileUrl.includes('javascript:')) {
                     const onclickPart = fileUrl.replace('javascript:', '');
                     const element = await page.$(`a[onclick*="${onclickPart}"]`);
@@ -185,13 +156,10 @@ export class DownloadService {
                         const download = await downloadPromise;
                         await download.saveAs(filePath);
                         return { success: true, filePath };
-                    } else {
-                        throw new Error(`Could not find link for file: ${fileName}`);
                     }
-                } else {
-                    await page.goto(fileUrl, { waitUntil: 'networkidle', timeout: 30000 });
-                    return { success: true, filePath };
                 }
+                await page.goto(fileUrl, { waitUntil: 'networkidle', timeout: 30000 });
+                return { success: true, filePath };
             }
         } catch (error: any) {
             console.error(`Download failed for ${fileName}:`, error);
