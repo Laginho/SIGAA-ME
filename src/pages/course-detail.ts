@@ -7,7 +7,7 @@ export function renderCourseDetailPage(container: HTMLDivElement, courseId: stri
         <button id="backButton" class="back-button">← Voltar</button>
         <h1 id="courseTitle">Carregando...</h1>
         <p id="courseCode" class="course-code-header"></p>
-        <button id="downloadAllBtn" class="btn-download-all">⬇️ Download All (TEST)</button>
+        <button id="downloadAllBtn" class="btn-download-all">⬇️ Baixar todos os arquivos</button>
       </div>
       
       <div class="course-content">
