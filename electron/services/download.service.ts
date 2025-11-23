@@ -43,34 +43,38 @@ export class DownloadService {
             if (await link.isVisible()) {
                 console.log(`Found link for ${fileName}, clicking...`);
 
-                // NEW STRATEGY: CDP Download Behavior
-                // We hook into the popup creation to force Chrome to download files
-                // instead of displaying them in the PDF viewer.
-
-                const popupHandler = async (popup: Page) => {
-                    console.log('Popup detected! Configuring CDP download behavior...');
+                // NEW STRATEGY: Intercept and Force Download
+                // We intercept the request, fetch it ourselves, and change the headers
+                // to force the browser to download it as a file instead of displaying it.
+                await page.route('**/*', async route => {
                     try {
-                        const client = await popup.context().newCDPSession(popup);
-                        await client.send('Page.setDownloadBehavior', {
-                            behavior: 'allow',
-                            downloadPath: courseFolder
-                        });
-                        console.log(`CDP download behavior set to: ${courseFolder}`);
+                        const response = await route.fetch();
+                        const headers = response.headers();
+                        const contentType = headers['content-type'] || '';
+
+                        if (contentType.includes('application/pdf')) {
+                            console.log(`Intercepted PDF request: ${route.request().url()}`);
+                            console.log('Forcing Content-Type to application/octet-stream');
+
+                            headers['content-type'] = 'application/octet-stream';
+                            headers['content-disposition'] = 'attachment';
+
+                            await route.fulfill({
+                                response,
+                                headers
+                            });
+                        } else {
+                            await route.continue();
+                        }
                     } catch (e) {
-                        console.error('Failed to set CDP behavior:', e);
+                        // If fetch fails, try to continue normally
+                        try { await route.continue(); } catch { }
                     }
-                };
-
-                page.on('popup', popupHandler);
-
-                // Also listen for responses just in case
-                const responseHandler = async (response: Response) => {
-                    // Log everything to be sure
-                    console.log(`[Response] ${response.status()} ${response.url()} [${response.headers()['content-type']}]`);
-                };
-                page.context().on('response', responseHandler);
+                });
 
                 const downloadPromise = page.waitForEvent('download', { timeout: 60000 });
+                // We still watch for popup because the click might open one, 
+                // but it should immediately close or stay blank while download starts
                 const popupPromise = page.waitForEvent('popup', { timeout: 60000 });
 
                 await link.click({ force: true });
@@ -81,86 +85,71 @@ export class DownloadService {
                     new Promise(resolve => setTimeout(() => resolve({ type: 'timeout' }), 65000))
                 ]) as { type: string, data: any };
 
-                // Cleanup
-                page.off('popup', popupHandler);
-                page.context().off('response', responseHandler);
+                // Unroute to clean up
+                await page.unroute('**/*');
 
                 if (result.type === 'download') {
                     const download = result.data;
                     await download.saveAs(filePath);
-                    console.log(`Downloaded via event: ${filePath}`);
+                    console.log(`Downloaded: ${filePath}`);
                     return { success: true, filePath };
 
                 } else if (result.type === 'popup') {
                     const popup = result.data;
                     console.log(`Popup opened: ${popup.url()}`);
 
-                    // Wait to see if a download starts automatically due to CDP
+                    // If popup opened, it means the download might be happening in the popup context
+                    // OR our interception didn't work for the popup's initial request.
+                    // But wait! The popup's request IS the one we intercepted?
+                    // If the popup opens, we should check if IT triggers a download.
+
                     try {
-                        console.log('Waiting for potential CDP-triggered download...');
-                        // We can't easily wait for a file to appear, but we can wait a bit
-                        await new Promise(resolve => setTimeout(resolve, 5000));
-
-                        // Check if any new file appeared in the folder
-                        const files = fs.readdirSync(courseFolder);
-                        // Sort by creation time
-                        const recentFiles = files.map(f => ({
-                            name: f,
-                            time: fs.statSync(path.join(courseFolder, f)).birthtimeMs
-                        })).sort((a, b) => b.time - a.time);
-
-                        if (recentFiles.length > 0) {
-                            const newestFile = recentFiles[0];
-                            const newestFilePath = path.join(courseFolder, newestFile.name);
-                            const now = Date.now();
-
-                            // If file was created in the last 10 seconds
-                            if (now - newestFile.time < 10000) {
-                                console.log(`Found recently created file: ${newestFile.name}`);
-
-                                // Rename to target filename
-                                let finalPath = filePath;
-                                if (!finalPath.toLowerCase().endsWith('.pdf') && !newestFile.name.toLowerCase().endsWith('.pdf')) {
-                                    finalPath += '.pdf';
-                                } else if (newestFile.name.toLowerCase().endsWith('.pdf') && !finalPath.toLowerCase().endsWith('.pdf')) {
-                                    finalPath += '.pdf';
-                                }
-
-                                // Wait for file to be closed/finished writing
-                                await new Promise(resolve => setTimeout(resolve, 2000));
-
-                                try {
-                                    fs.renameSync(newestFilePath, finalPath);
-                                    console.log(`Renamed ${newestFile.name} to ${path.basename(finalPath)}`);
-                                    await popup.close();
-                                    return { success: true, filePath: finalPath };
-                                } catch (e) {
-                                    console.log(`Could not rename file (maybe still downloading?): ${e}`);
-                                }
-                            }
-                        }
+                        const popupDownload = await popup.waitForEvent('download', { timeout: 5000 });
+                        await popupDownload.saveAs(filePath);
+                        console.log(`Downloaded from popup: ${filePath}`);
+                        await popup.close();
+                        return { success: true, filePath };
                     } catch (e) {
-                        console.log('Error checking for CDP download:', e);
+                        console.log('No download event in popup yet...');
                     }
 
-                    // Fallback: Try to print to PDF (since we know it renders!)
-                    console.log('CDP download failed. Attempting to print page to PDF...');
+                    // If we are here, the popup opened and showed the content (interception failed?)
+                    // OR the interception worked but the browser handled it weirdly.
+
+                    // Let's try to apply the same interception to the popup!
+                    // But it might be too late for the initial request.
+                    // However, if we reload the popup, it might trigger it?
+
+                    console.log('Reloading popup to force interception...');
+                    await popup.route('**/*', async route => {
+                        try {
+                            const response = await route.fetch();
+                            const headers = response.headers();
+                            if (headers['content-type']?.includes('application/pdf')) {
+                                console.log('Intercepted PDF in popup! Forcing download...');
+                                headers['content-type'] = 'application/octet-stream';
+                                headers['content-disposition'] = 'attachment';
+                                await route.fulfill({ response, headers });
+                            } else {
+                                await route.continue();
+                            }
+                        } catch { try { await route.continue(); } catch { } }
+                    });
+
                     try {
-                        await popup.waitForLoadState('networkidle');
-                        let finalPath = filePath;
-                        if (!finalPath.toLowerCase().endsWith('.pdf')) {
-                            finalPath += '.pdf';
-                        }
-                        await popup.pdf({ path: finalPath });
-                        console.log(`Saved via Page.pdf(): ${finalPath}`);
+                        const reloadDownloadPromise = popup.waitForEvent('download', { timeout: 10000 });
+                        await popup.reload();
+                        const download = await reloadDownloadPromise;
+                        await download.saveAs(filePath);
+                        console.log(`Downloaded after popup reload: ${filePath}`);
                         await popup.close();
-                        return { success: true, filePath: finalPath };
+                        return { success: true, filePath };
                     } catch (e) {
-                        console.log(`Print to PDF failed: ${e}`);
+                        console.log(`Reload strategy failed: ${e}`);
                     }
 
                     await popup.close();
-                    return { success: false, error: 'Could not capture PDF via CDP or Print' };
+                    return { success: false, error: 'Could not force download' };
 
                 } else {
                     throw new Error('Timeout waiting for download or popup');
@@ -184,6 +173,8 @@ export class DownloadService {
             }
         } catch (error: any) {
             console.error(`Download failed for ${fileName}:`, error);
+            // Ensure unroute is called if we crash
+            try { await page.unroute('**/*'); } catch { }
             return { success: false, error: error.message };
         }
     }
