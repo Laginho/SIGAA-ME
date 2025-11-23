@@ -17,7 +17,6 @@ export class DownloadService {
         basePath: string
     ): Promise<{ success: boolean; filePath?: string; error?: string }> {
         try {
-            // Create course folder
             const courseFolder = path.join(basePath, this.sanitizeFolderName(courseName));
             if (!fs.existsSync(courseFolder)) {
                 fs.mkdirSync(courseFolder, { recursive: true });
@@ -25,7 +24,6 @@ export class DownloadService {
 
             const filePath = path.join(courseFolder, this.sanitizeFileName(fileName));
 
-            // Check if file already exists
             if (fs.existsSync(filePath)) {
                 console.log(`File already exists: ${filePath}`);
                 return { success: true, filePath };
@@ -40,45 +38,52 @@ export class DownloadService {
             }
 
             console.log(`Looking for file link with text: "${fileName}"`);
-
             const link = page.locator(`a:has-text("${fileName}")`).first();
 
             if (await link.isVisible()) {
                 console.log(`Found link for ${fileName}, clicking...`);
 
-                // NEW STRATEGY: Intercept the PARENT page's requests (not popup)
-                // The click triggers a POST that returns PDF data
                 let pdfData: Buffer | null = null;
+                let responseCount = 0;
 
                 const responseHandler = async (response: Response) => {
-                    try {
-                        const url = response.url();
-                        const contentType = response.headers()['content-type'] || '';
-                        const contentDisposition = response.headers()['content-disposition'] || '';
+                    responseCount++;
+                    const url = response.url();
+                    const contentType = response.headers()['content-type'] || '';
+                    const contentDisposition = response.headers()['content-disposition'] || '';
+                    const status = response.status();
 
-                        console.log(`[Parent] Response: ${url}`);
-                        console.log(`  Content-Type: ${contentType}`);
+                    console.log(`[Parent Response #${responseCount}] ${status} ${url}`);
+                    console.log(`  Content-Type: ${contentType}`);
+                    if (contentDisposition) {
                         console.log(`  Content-Disposition: ${contentDisposition}`);
+                    }
 
-                        // Check if this response contains a PDF
-                        if (contentType.includes('application/pdf') ||
-                            contentType.includes('application/octet-stream') ||
-                            contentDisposition.includes('attachment')) {
+                    if (contentType.includes('application/pdf') ||
+                        contentType.includes('application/octet-stream') ||
+                        contentDisposition.includes('attachment') ||
+                        contentType.includes('application/force-download')) {
 
+                        try {
                             const buffer = await response.body();
-                            console.log(`  Buffer size: ${buffer.length} bytes`);
+                            console.log(`  !! File response, buffer size: ${buffer.length} bytes`);
 
-                            if (buffer.length > 1000 && this.isPdf(buffer)) {
-                                console.log(`  ✓ Found PDF in response!`);
-                                pdfData = buffer;
+                            if (buffer.length > 500) {
+                                const isPdf = this.isPdf(buffer);
+                                console.log(`  !! Is PDF: ${isPdf}`);
+
+                                if (isPdf) {
+                                    console.log(`  ✓✓✓ Found PDF in response!`);
+                                    pdfData = buffer;
+                                }
                             }
+                        } catch (e: any) {
+                            console.log(`  Error getting body: ${e.message}`);
                         }
-                    } catch (e) {
-                        // Ignore errors
                     }
                 };
 
-                // Listen on PARENT page for responses
+                console.log('Attaching response listener to parent page...');
                 page.on('response', responseHandler);
 
                 const downloadPromise = page.waitForEvent('download', { timeout: 60000 });
@@ -92,8 +97,8 @@ export class DownloadService {
                     new Promise(resolve => setTimeout(() => resolve({ type: 'timeout' }), 65000))
                 ]) as { type: string, data: any };
 
-                // Clean up listener
                 page.off('response', responseHandler);
+                console.log(`Total responses captured: ${responseCount}`);
 
                 if (result.type === 'download') {
                     const download = result.data;
@@ -105,7 +110,6 @@ export class DownloadService {
                     const popup = result.data;
                     console.log(`Popup opened: ${popup.url()}`);
 
-                    // Check if we captured PDF data from parent page
                     if (pdfData) {
                         let finalPath = filePath;
                         if (!finalPath.toLowerCase().endsWith('.pdf')) {
@@ -117,15 +121,11 @@ export class DownloadService {
                         return { success: true, filePath: finalPath };
                     }
 
-                    // If not, try to get the PDF content from the popup page itself
                     console.log('No PDF captured from parent. Checking popup page source...');
-
                     try {
                         await popup.waitForLoadState('domcontentloaded', { timeout: 10000 });
 
-                        // Try to extract PDF URL from page source or scripts
                         const pdfUrl = await popup.evaluate(() => {
-                            // Check all embed tags
                             const embeds = document.querySelectorAll('embed[type="application/pdf"]');
                             for (const embed of embeds) {
                                 const src = (embed as HTMLEmbedElement).src;
@@ -134,7 +134,6 @@ export class DownloadService {
                                 }
                             }
 
-                            // Check for any blob URLs in the page
                             const scripts = document.querySelectorAll('script');
                             for (const script of scripts) {
                                 const match = script.textContent?.match(/blob:[^"'\s]+/);
