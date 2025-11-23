@@ -24,10 +24,12 @@ export class DownloadService {
 
             const filePath = path.join(courseFolder, this.sanitizeFileName(fileName));
 
+            // Check if file already exists (exact match)
             if (fs.existsSync(filePath)) {
                 console.log(`File already exists: ${filePath}`);
                 return { success: true, filePath };
             }
+            // Check if file exists with .pdf extension
             if (fs.existsSync(filePath + '.pdf')) {
                 console.log(`File already exists: ${filePath}.pdf`);
                 return { success: true, filePath: filePath + '.pdf' };
@@ -54,7 +56,6 @@ export class DownloadService {
 
                         if (contentType.includes('application/pdf')) {
                             console.log(`Intercepted PDF request: ${route.request().url()}`);
-                            console.log('Forcing Content-Type to application/octet-stream');
 
                             headers['content-type'] = 'application/octet-stream';
                             headers['content-disposition'] = 'attachment';
@@ -67,14 +68,11 @@ export class DownloadService {
                             await route.continue();
                         }
                     } catch (e) {
-                        // If fetch fails, try to continue normally
                         try { await route.continue(); } catch { }
                     }
                 });
 
                 const downloadPromise = page.waitForEvent('download', { timeout: 60000 });
-                // We still watch for popup because the click might open one, 
-                // but it should immediately close or stay blank while download starts
                 const popupPromise = page.waitForEvent('popup', { timeout: 60000 });
 
                 await link.click({ force: true });
@@ -90,35 +88,31 @@ export class DownloadService {
 
                 if (result.type === 'download') {
                     const download = result.data;
-                    await download.saveAs(filePath);
-                    console.log(`Downloaded: ${filePath}`);
-                    return { success: true, filePath };
+                    let finalPath = filePath;
+                    if (!finalPath.toLowerCase().endsWith('.pdf')) {
+                        finalPath += '.pdf';
+                    }
+                    await download.saveAs(finalPath);
+                    console.log(`Downloaded: ${finalPath}`);
+                    return { success: true, filePath: finalPath };
 
                 } else if (result.type === 'popup') {
                     const popup = result.data;
                     console.log(`Popup opened: ${popup.url()}`);
 
-                    // If popup opened, it means the download might be happening in the popup context
-                    // OR our interception didn't work for the popup's initial request.
-                    // But wait! The popup's request IS the one we intercepted?
-                    // If the popup opens, we should check if IT triggers a download.
-
                     try {
                         const popupDownload = await popup.waitForEvent('download', { timeout: 5000 });
-                        await popupDownload.saveAs(filePath);
-                        console.log(`Downloaded from popup: ${filePath}`);
+                        let finalPath = filePath;
+                        if (!finalPath.toLowerCase().endsWith('.pdf')) {
+                            finalPath += '.pdf';
+                        }
+                        await popupDownload.saveAs(finalPath);
+                        console.log(`Downloaded from popup: ${finalPath}`);
                         await popup.close();
-                        return { success: true, filePath };
+                        return { success: true, filePath: finalPath };
                     } catch (e) {
-                        console.log('No download event in popup yet...');
+                        // Continue to reload strategy
                     }
-
-                    // If we are here, the popup opened and showed the content (interception failed?)
-                    // OR the interception worked but the browser handled it weirdly.
-
-                    // Let's try to apply the same interception to the popup!
-                    // But it might be too late for the initial request.
-                    // However, if we reload the popup, it might trigger it?
 
                     console.log('Reloading popup to force interception...');
                     await popup.route('**/*', async route => {
@@ -150,10 +144,14 @@ export class DownloadService {
                         });
 
                         const download = await reloadDownloadPromise;
-                        await download.saveAs(filePath);
-                        console.log(`Downloaded after popup reload: ${filePath}`);
+                        let finalPath = filePath;
+                        if (!finalPath.toLowerCase().endsWith('.pdf')) {
+                            finalPath += '.pdf';
+                        }
+                        await download.saveAs(finalPath);
+                        console.log(`Downloaded after popup reload: ${finalPath}`);
                         await popup.close();
-                        return { success: true, filePath };
+                        return { success: true, filePath: finalPath };
                     } catch (e) {
                         console.log(`Reload strategy failed: ${e}`);
                     }
@@ -174,8 +172,12 @@ export class DownloadService {
                         const downloadPromise = page.waitForEvent('download', { timeout: 30000 });
                         await element.click();
                         const download = await downloadPromise;
-                        await download.saveAs(filePath);
-                        return { success: true, filePath };
+                        let finalPath = filePath;
+                        if (!finalPath.toLowerCase().endsWith('.pdf')) {
+                            finalPath += '.pdf';
+                        }
+                        await download.saveAs(finalPath);
+                        return { success: true, filePath: finalPath };
                     }
                 }
                 await page.goto(fileUrl, { waitUntil: 'networkidle', timeout: 30000 });
@@ -183,7 +185,6 @@ export class DownloadService {
             }
         } catch (error: any) {
             console.error(`Download failed for ${fileName}:`, error);
-            // Ensure unroute is called if we crash
             try { await page.unroute('**/*'); } catch { }
             return { success: false, error: error.message };
         }
