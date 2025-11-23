@@ -24,5 +24,10 @@ electron.contextBridge.exposeInMainWorld("api", {
   getCourseFiles: (courseId) => electron.ipcRenderer.invoke("get-course-files", courseId),
   selectDownloadFolder: () => electron.ipcRenderer.invoke("select-download-folder"),
   downloadFile: (data) => electron.ipcRenderer.invoke("download-file", data),
-  downloadAllFiles: (data) => electron.ipcRenderer.invoke("download-all-files", data)
+  downloadAllFiles: (data) => electron.ipcRenderer.invoke("download-all-files", data),
+  onDownloadProgress: (callback) => {
+    const subscription = (_event, data) => callback(data);
+    electron.ipcRenderer.on("download-progress", subscription);
+    return () => electron.ipcRenderer.off("download-progress", subscription);
+  }
 });

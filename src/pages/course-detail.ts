@@ -78,30 +78,68 @@ async function fetchCourseFiles(courseId: string) {
         <div class="no-files">Nenhum material disponível nesta disciplina</div>
       `
     } else {
-      filesListElement.innerHTML = course.files.map((file: any) => `
+      // Get downloaded status
+      const downloadedFiles = JSON.parse(localStorage.getItem('downloadedFiles') || '{}');
+      const courseDownloads = downloadedFiles[courseId] || {};
+
+      filesListElement.innerHTML = course.files.map((file: any) => {
+        const isDownloaded = !!courseDownloads[file.name];
+
+        return `
         <div class="file-item">
           <div class="file-icon">📄</div>
           <div class="file-info">
             <div class="file-name">${file.name}</div>
             <div class="file-meta">Arquivo da disciplina</div>
           </div>
-          <button class="btn-download-file" title="Baixar arquivo" data-file-name="${file.name}" data-file-url="${file.url}">⬇️</button>
+          <div class="file-action">
+            ${isDownloaded
+            ? '<span class="status-done" title="Baixado">✅</span>'
+            : `<button class="btn-download-file" title="Baixar arquivo" data-file-name="${file.name}" data-file-url="${file.url}">⬇️</button>`
+          }
+          </div>
         </div>
-      `).join('')
+      `}).join('')
 
       // Add event listeners for individual buttons
       const downloadButtons = filesListElement.querySelectorAll('.btn-download-file');
       downloadButtons.forEach(btn => {
         btn.addEventListener('click', async (e) => {
-          e.stopPropagation(); // Prevent file-item click if any
+          e.stopPropagation();
           const target = e.currentTarget as HTMLElement;
           const fileName = target.getAttribute('data-file-name');
           const fileUrl = target.getAttribute('data-file-url');
 
           if (fileName && fileUrl) {
-            await downloadSingleFile(course, fileName, fileUrl);
+            // Show spinner immediately
+            target.innerHTML = '🔄';
+            target.classList.add('spinning');
+
+            await downloadSingleFile(course, fileName, fileUrl, target);
           }
         });
+      });
+
+      // Listen for progress events from "Download All"
+      if ((window as any).cleanupProgress) (window as any).cleanupProgress();
+
+      (window as any).cleanupProgress = window.api.onDownloadProgress((data: { fileName: string, status: string }) => {
+        const buttons = Array.from(document.querySelectorAll('.btn-download-file'));
+        const targetBtn = buttons.find(b => b.getAttribute('data-file-name') === data.fileName) as HTMLElement;
+
+        if (targetBtn) {
+          if (data.status === 'downloaded' || data.status === 'skipped') {
+            const span = document.createElement('span');
+            span.className = 'status-done';
+            span.textContent = '✅';
+            span.title = 'Baixado';
+            targetBtn.replaceWith(span);
+          } else if (data.status === 'failed') {
+            targetBtn.innerHTML = '❌';
+            targetBtn.classList.remove('spinning');
+            setTimeout(() => { targetBtn.innerHTML = '⬇️'; }, 3000);
+          }
+        }
       });
     }
   } catch (error: any) {
@@ -113,15 +151,16 @@ async function fetchCourseFiles(courseId: string) {
   }
 }
 
-async function downloadSingleFile(course: any, fileName: string, fileUrl: string) {
+async function downloadSingleFile(course: any, fileName: string, fileUrl: string, btnElement: HTMLElement) {
   try {
-    // Select download folder
     const folderResult = await window.api.selectDownloadFolder();
-    if (!folderResult.success) return;
+    if (!folderResult.success) {
+      btnElement.innerHTML = '⬇️';
+      btnElement.classList.remove('spinning');
+      return;
+    }
 
     const downloadedFiles = JSON.parse(localStorage.getItem('downloadedFiles') || '{}');
-
-    alert(`Iniciando download de "${fileName}"...`);
 
     const result = await window.api.downloadFile({
       courseId: course.id,
@@ -133,21 +172,30 @@ async function downloadSingleFile(course: any, fileName: string, fileUrl: string
     });
 
     if (result.success) {
-      alert(`Download concluído com sucesso!\nSalvo em: ${result.filePath}`);
-
-      // Update tracker
       if (!downloadedFiles[course.id]) downloadedFiles[course.id] = {};
       downloadedFiles[course.id][fileName] = {
         downloadedAt: Date.now(),
         path: result.filePath
       };
       localStorage.setItem('downloadedFiles', JSON.stringify(downloadedFiles));
+
+      const span = document.createElement('span');
+      span.className = 'status-done';
+      span.textContent = '✅';
+      span.title = 'Baixado';
+      btnElement.replaceWith(span);
+
+      alert(`Download concluído: ${fileName}`);
     } else {
       alert(`Erro no download: ${result.error}`);
+      btnElement.innerHTML = '❌';
+      btnElement.classList.remove('spinning');
     }
   } catch (error: any) {
     console.error('Download error:', error);
     alert('Erro ao baixar arquivo: ' + error.message);
+    btnElement.innerHTML = '❌';
+    btnElement.classList.remove('spinning');
   }
 }
 
@@ -155,7 +203,6 @@ async function testDownloadAll(courseId: string) {
   console.log('Testing download all for course:', courseId);
 
   try {
-    // Get cached course data
     const cachedData = localStorage.getItem('coursesWithFiles');
     if (!cachedData) {
       alert('No cached data found');
@@ -170,7 +217,6 @@ async function testDownloadAll(courseId: string) {
       return;
     }
 
-    // Select download folder
     const folderResult = await window.api.selectDownloadFolder();
     if (!folderResult.success) {
       return;
@@ -178,11 +224,13 @@ async function testDownloadAll(courseId: string) {
 
     console.log('Download folder selected:', folderResult.folderPath);
 
-    // Get downloaded files tracker
-    const downloadedFiles = JSON.parse(localStorage.getItem('downloadedFiles') || '{}');
+    const buttons = document.querySelectorAll('.btn-download-file');
+    buttons.forEach(b => {
+      b.innerHTML = '🔄';
+      b.classList.add('spinning');
+    });
 
-    // Start download
-    alert(`Iniciando download de ${course.files.length} arquivos para:\n${folderResult.folderPath}\n\nIsso pode levar alguns instantes...`);
+    const downloadedFiles = JSON.parse(localStorage.getItem('downloadedFiles') || '{}');
 
     const result = await window.api.downloadAllFiles({
       courseId: course.id,
@@ -193,21 +241,19 @@ async function testDownloadAll(courseId: string) {
     });
 
     if (result.success || result.downloaded > 0 || result.skipped > 0) {
-      let message = `Download finalizado!\n\n✅ ${result.downloaded} baixados\n⏩ ${result.skipped} pulados (já existem)\n❌ ${result.failed} falharam`;
+      let message = `Download finalizado!\n\n✅ ${result.downloaded} baixados\n⏩ ${result.skipped} pulados\n❌ ${result.failed} falharam`;
 
       if (result.failed > 0 && result.results) {
         const failedFiles = result.results
           .filter((r: any) => r.status === 'failed')
           .map((r: any) => r.fileName);
-
         if (failedFiles.length > 0) {
-          message += `\n\nArquivos que falharam:\n- ${failedFiles.join('\n- ')}`;
+          message += `\n\nFalhas:\n- ${failedFiles.join('\n- ')}`;
         }
       }
 
       alert(message);
 
-      // Update downloaded files tracker
       if (result.results) {
         result.results.forEach((r: any) => {
           if (r.status === 'downloaded' && r.filePath) {
@@ -220,12 +266,16 @@ async function testDownloadAll(courseId: string) {
         });
         localStorage.setItem('downloadedFiles', JSON.stringify(downloadedFiles));
       }
+
+      fetchCourseFiles(courseId);
+
     } else {
       alert('Falha no download: ' + (result.message || 'Erro desconhecido'));
+      fetchCourseFiles(courseId);
     }
   } catch (error: any) {
     console.error('Download error:', error);
     alert('Erro no processo de download: ' + error.message);
+    fetchCourseFiles(courseId);
   }
 }
-

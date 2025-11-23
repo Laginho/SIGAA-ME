@@ -112,7 +112,8 @@ export class SigaaService {
         courseName: string,
         files: Array<{ name: string; url: string }>,
         basePath: string,
-        downloadedFiles: Record<string, any>
+        downloadedFiles: Record<string, any>,
+        onProgress?: (fileName: string, status: 'downloaded' | 'skipped' | 'failed') => void
     ): Promise<{ success: boolean; downloaded?: number; skipped?: number; failed?: number; results?: any[]; message?: string }> {
         try {
             console.log(`SIGAA: Downloading all files for course ${courseName}...`);
@@ -121,7 +122,8 @@ export class SigaaService {
                 courseName,
                 files,
                 basePath,
-                downloadedFiles
+                downloadedFiles,
+                onProgress
             );
 
             return {

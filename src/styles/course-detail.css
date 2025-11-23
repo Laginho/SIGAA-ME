@@ -156,3 +156,25 @@
 .btn-download-file:active {
     transform: scale(0.95);
 }
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+.spinning {
+    animation: spin 1s linear infinite;
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+.status-done {
+    font-size: 1.5rem;
+    margin-left: 0.5rem;
+    cursor: default;
+}

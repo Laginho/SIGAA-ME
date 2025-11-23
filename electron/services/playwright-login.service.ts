@@ -363,7 +363,8 @@ export class PlaywrightLoginService {
         courseName: string,
         files: Array<{ name: string; url: string }>,
         basePath: string,
-        downloadedFiles: Record<string, any>
+        downloadedFiles: Record<string, any>,
+        onProgress?: (fileName: string, status: 'downloaded' | 'skipped' | 'failed') => void
     ): Promise<{
         downloaded: number;
         skipped: number;
@@ -400,7 +401,8 @@ export class PlaywrightLoginService {
                 courseName,
                 files,
                 basePath,
-                downloadedFiles
+                downloadedFiles,
+                onProgress
             );
 
             await this.close();

@@ -103,12 +103,17 @@ ipcMain.handle('download-all-files', async (_, data: {
   basePath: string;
   downloadedFiles: Record<string, any>;
 }) => {
+  const onProgress = (fileName: string, status: 'downloaded' | 'skipped' | 'failed') => {
+    win?.webContents.send('download-progress', { fileName, status });
+  };
+
   return await sigaaService.downloadAllFiles(
     data.courseId,
     data.courseName,
     data.files,
     data.basePath,
-    data.downloadedFiles
+    data.downloadedFiles,
+    onProgress
   );
 })
 

@@ -196,7 +196,8 @@ export class DownloadService {
         courseName: string,
         files: Array<{ name: string; url: string }>,
         basePath: string,
-        downloadedFiles: Record<string, any>
+        downloadedFiles: Record<string, any>,
+        onProgress?: (fileName: string, status: 'downloaded' | 'skipped' | 'failed') => void
     ): Promise<{
         downloaded: number;
         skipped: number;
@@ -217,6 +218,7 @@ export class DownloadService {
                     console.log(`Skipping duplicate: ${file.name}`);
                     skipped++;
                     results.push({ fileName: file.name, status: 'skipped', filePath: existingPath });
+                    if (onProgress) onProgress(file.name, 'skipped');
                     return false;
                 }
             }
@@ -255,9 +257,11 @@ export class DownloadService {
                     if (result.success) {
                         downloaded++;
                         results.push({ fileName: file.name, status: 'downloaded', filePath: result.filePath });
+                        if (onProgress) onProgress(file.name, 'downloaded');
                     } else {
                         failed++;
                         results.push({ fileName: file.name, status: 'failed' });
+                        if (onProgress) onProgress(file.name, 'failed');
                     }
                 }
             } catch (e) {

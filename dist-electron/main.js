@@ -218,7 +218,7 @@ class PlaywrightLoginService {
   }
   async downloadFile(courseId, courseName, fileName, fileUrl, basePath, downloadedFiles) {
     try {
-      const { DownloadService } = await import("./download.service-ZeZVwIj7.js");
+      const { DownloadService } = await import("./download.service-DGya2izB.js");
       const downloadService = new DownloadService(this.browser);
       if (!this.browser) {
         this.browser = await chromium.launch({ headless: false });
@@ -248,9 +248,9 @@ class PlaywrightLoginService {
       return { success: false, error: error.message };
     }
   }
-  async downloadAllFiles(courseId, courseName, files, basePath, downloadedFiles) {
+  async downloadAllFiles(courseId, courseName, files, basePath, downloadedFiles, onProgress) {
     try {
-      const { DownloadService } = await import("./download.service-ZeZVwIj7.js");
+      const { DownloadService } = await import("./download.service-DGya2izB.js");
       const downloadService = new DownloadService(this.browser);
       if (!this.browser) {
         this.browser = await chromium.launch({ headless: false });
@@ -271,7 +271,8 @@ class PlaywrightLoginService {
         courseName,
         files,
         basePath,
-        downloadedFiles
+        downloadedFiles,
+        onProgress
       );
       await this.close();
       return result;
@@ -367,7 +368,7 @@ class SigaaService {
       return { success: false, message: error.message || "Download failed" };
     }
   }
-  async downloadAllFiles(courseId, courseName, files, basePath, downloadedFiles) {
+  async downloadAllFiles(courseId, courseName, files, basePath, downloadedFiles, onProgress) {
     try {
       console.log(`SIGAA: Downloading all files for course ${courseName}...`);
       const result = await this.playwrightLogin.downloadAllFiles(
@@ -375,7 +376,8 @@ class SigaaService {
         courseName,
         files,
         basePath,
-        downloadedFiles
+        downloadedFiles,
+        onProgress
       );
       return {
         success: true,
@@ -444,12 +446,16 @@ ipcMain.handle("download-file", async (_, data) => {
   );
 });
 ipcMain.handle("download-all-files", async (_, data) => {
+  const onProgress = (fileName, status) => {
+    win == null ? void 0 : win.webContents.send("download-progress", { fileName, status });
+  };
   return await sigaaService.downloadAllFiles(
     data.courseId,
     data.courseName,
     data.files,
     data.basePath,
-    data.downloadedFiles
+    data.downloadedFiles,
+    onProgress
   );
 });
 app.on("window-all-closed", () => {

@@ -26,5 +26,10 @@ contextBridge.exposeInMainWorld('api', {
   getCourseFiles: (courseId: string) => ipcRenderer.invoke('get-course-files', courseId),
   selectDownloadFolder: () => ipcRenderer.invoke('select-download-folder'),
   downloadFile: (data: any) => ipcRenderer.invoke('download-file', data),
-  downloadAllFiles: (data: any) => ipcRenderer.invoke('download-all-files', data)
+  downloadAllFiles: (data: any) => ipcRenderer.invoke('download-all-files', data),
+  onDownloadProgress: (callback: (data: any) => void) => {
+    const subscription = (_event: any, data: any) => callback(data)
+    ipcRenderer.on('download-progress', subscription)
+    return () => ipcRenderer.off('download-progress', subscription)
+  }
 })
