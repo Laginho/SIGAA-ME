@@ -138,7 +138,17 @@ export class DownloadService {
 
                     try {
                         const reloadDownloadPromise = popup.waitForEvent('download', { timeout: 10000 });
-                        await popup.reload();
+
+                        // Reload triggers the request again, which we intercept
+                        // This might throw ERR_ABORTED because the navigation is cancelled by the download
+                        await popup.reload().catch(e => {
+                            if (e.message.includes('ERR_ABORTED') || e.message.includes('frame was detached')) {
+                                console.log('Reload aborted as expected (download started)');
+                            } else {
+                                throw e;
+                            }
+                        });
+
                         const download = await reloadDownloadPromise;
                         await download.saveAs(filePath);
                         console.log(`Downloaded after popup reload: ${filePath}`);
