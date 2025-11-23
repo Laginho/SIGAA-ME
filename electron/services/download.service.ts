@@ -208,36 +208,77 @@ export class DownloadService {
         let skipped = 0;
         let failed = 0;
 
-        for (const file of files) {
+        // Filter out duplicates first
+        const queue = files.filter(file => {
             const courseDownloads = downloadedFiles[courseId] || {};
             if (courseDownloads[file.name]) {
                 const existingPath = courseDownloads[file.name].path;
-                if (fs.existsSync(existingPath)) {
+                if (fs.existsSync(existingPath) || fs.existsSync(existingPath + '.pdf')) {
                     console.log(`Skipping duplicate: ${file.name}`);
                     skipped++;
                     results.push({ fileName: file.name, status: 'skipped', filePath: existingPath });
-                    continue;
-                }
-                if (fs.existsSync(existingPath + '.pdf')) {
-                    console.log(`Skipping duplicate: ${file.name}.pdf`);
-                    skipped++;
-                    results.push({ fileName: file.name, status: 'skipped', filePath: existingPath + '.pdf' });
-                    continue;
+                    return false;
                 }
             }
+            return true;
+        });
 
-            const result = await this.downloadFile(page, file.url, file.name, courseName, basePath);
+        console.log(`Starting parallel download for ${queue.length} files with 3 workers...`);
 
-            if (result.success) {
-                downloaded++;
-                results.push({ fileName: file.name, status: 'downloaded', filePath: result.filePath });
-            } else {
-                failed++;
-                results.push({ fileName: file.name, status: 'failed' });
+        const courseUrl = page.url();
+        const CONCURRENCY = 3;
+
+        const processQueue = async (workerId: number) => {
+            // Worker 0 uses the main page, others create new pages
+            let workerPage = workerId === 0 ? page : await page.context().newPage();
+
+            try {
+                // If new page, navigate to course
+                if (workerId !== 0) {
+                    console.log(`[Worker ${workerId}] Navigating to course...`);
+                    await workerPage.goto(courseUrl, { waitUntil: 'domcontentloaded' });
+                }
+
+                while (queue.length > 0) {
+                    const file = queue.shift();
+                    if (!file) break;
+
+                    console.log(`[Worker ${workerId}] Processing ${file.name}...`);
+
+                    // Ensure we are on the right page
+                    if (workerPage.url() !== courseUrl) {
+                        await workerPage.goto(courseUrl, { waitUntil: 'domcontentloaded' });
+                    }
+
+                    const result = await this.downloadFile(workerPage, file.url, file.name, courseName, basePath);
+
+                    if (result.success) {
+                        downloaded++;
+                        results.push({ fileName: file.name, status: 'downloaded', filePath: result.filePath });
+                    } else {
+                        failed++;
+                        results.push({ fileName: file.name, status: 'failed' });
+                    }
+                }
+            } catch (e) {
+                console.error(`[Worker ${workerId}] Error:`, e);
+            } finally {
+                // Close extra pages
+                if (workerId !== 0) {
+                    await workerPage.close();
+                }
             }
+        };
 
-            await new Promise(resolve => setTimeout(resolve, 1000));
+        const workers = [];
+        // Spawn workers (up to CONCURRENCY, but not more than queue length)
+        const numWorkers = Math.min(CONCURRENCY, Math.max(1, queue.length));
+
+        for (let i = 0; i < numWorkers; i++) {
+            workers.push(processQueue(i));
         }
+
+        await Promise.all(workers);
 
         return { downloaded, skipped, failed, results };
     }
