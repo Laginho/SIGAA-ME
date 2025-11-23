@@ -85,8 +85,24 @@ async function fetchCourseFiles(courseId: string) {
             <div class="file-name">${file.name}</div>
             <div class="file-meta">Arquivo da disciplina</div>
           </div>
+          <button class="btn-download-file" title="Baixar arquivo" data-file-name="${file.name}" data-file-url="${file.url}">⬇️</button>
         </div>
       `).join('')
+
+      // Add event listeners for individual buttons
+      const downloadButtons = filesListElement.querySelectorAll('.btn-download-file');
+      downloadButtons.forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation(); // Prevent file-item click if any
+          const target = e.currentTarget as HTMLElement;
+          const fileName = target.getAttribute('data-file-name');
+          const fileUrl = target.getAttribute('data-file-url');
+
+          if (fileName && fileUrl) {
+            await downloadSingleFile(course, fileName, fileUrl);
+          }
+        });
+      });
     }
   } catch (error: any) {
     filesListElement.innerHTML = `
@@ -94,6 +110,44 @@ async function fetchCourseFiles(courseId: string) {
         Erro ao carregar arquivos: ${error.message || 'Erro desconhecido'}
       </div>
     `
+  }
+}
+
+async function downloadSingleFile(course: any, fileName: string, fileUrl: string) {
+  try {
+    // Select download folder
+    const folderResult = await window.api.selectDownloadFolder();
+    if (!folderResult.success) return;
+
+    const downloadedFiles = JSON.parse(localStorage.getItem('downloadedFiles') || '{}');
+
+    alert(`Iniciando download de "${fileName}"...`);
+
+    const result = await window.api.downloadFile({
+      courseId: course.id,
+      courseName: course.name,
+      fileName: fileName,
+      fileUrl: fileUrl,
+      basePath: folderResult.folderPath,
+      downloadedFiles
+    });
+
+    if (result.success) {
+      alert(`Download concluído com sucesso!\nSalvo em: ${result.filePath}`);
+
+      // Update tracker
+      if (!downloadedFiles[course.id]) downloadedFiles[course.id] = {};
+      downloadedFiles[course.id][fileName] = {
+        downloadedAt: Date.now(),
+        path: result.filePath
+      };
+      localStorage.setItem('downloadedFiles', JSON.stringify(downloadedFiles));
+    } else {
+      alert(`Erro no download: ${result.error}`);
+    }
+  } catch (error: any) {
+    console.error('Download error:', error);
+    alert('Erro ao baixar arquivo: ' + error.message);
   }
 }
 
@@ -119,7 +173,6 @@ async function testDownloadAll(courseId: string) {
     // Select download folder
     const folderResult = await window.api.selectDownloadFolder();
     if (!folderResult.success) {
-      alert('Folder selection cancelled');
       return;
     }
 
@@ -129,7 +182,7 @@ async function testDownloadAll(courseId: string) {
     const downloadedFiles = JSON.parse(localStorage.getItem('downloadedFiles') || '{}');
 
     // Start download
-    alert(`Starting download of ${course.files.length} files to ${folderResult.folderPath}`);
+    alert(`Iniciando download de ${course.files.length} arquivos para:\n${folderResult.folderPath}\n\nIsso pode levar alguns instantes...`);
 
     const result = await window.api.downloadAllFiles({
       courseId: course.id,
@@ -139,8 +192,20 @@ async function testDownloadAll(courseId: string) {
       downloadedFiles
     });
 
-    if (result.success) {
-      alert(`Download complete!\n${result.downloaded} downloaded\n${result.skipped} skipped\n${result.failed} failed`);
+    if (result.success || result.downloaded > 0 || result.skipped > 0) {
+      let message = `Download finalizado!\n\n✅ ${result.downloaded} baixados\n⏩ ${result.skipped} pulados (já existem)\n❌ ${result.failed} falharam`;
+
+      if (result.failed > 0 && result.results) {
+        const failedFiles = result.results
+          .filter((r: any) => r.status === 'failed')
+          .map((r: any) => r.fileName);
+
+        if (failedFiles.length > 0) {
+          message += `\n\nArquivos que falharam:\n- ${failedFiles.join('\n- ')}`;
+        }
+      }
+
+      alert(message);
 
       // Update downloaded files tracker
       if (result.results) {
@@ -156,11 +221,11 @@ async function testDownloadAll(courseId: string) {
         localStorage.setItem('downloadedFiles', JSON.stringify(downloadedFiles));
       }
     } else {
-      alert('Download failed: ' + result.message);
+      alert('Falha no download: ' + (result.message || 'Erro desconhecido'));
     }
   } catch (error: any) {
     console.error('Download error:', error);
-    alert('Download error: ' + error.message);
+    alert('Erro no processo de download: ' + error.message);
   }
 }
 
