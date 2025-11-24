@@ -2,6 +2,7 @@ import './styles/main.css'
 import { renderLoginPage } from './pages/login'
 import { renderDashboardPage } from './pages/dashboard'
 import { renderCourseDetailPage } from './pages/course-detail'
+import { renderLoadingPage } from './pages/loading'
 
 const app = document.querySelector<HTMLDivElement>('#app')!
 
@@ -31,9 +32,12 @@ function route() {
 window.addEventListener('hashchange', route)
 
 // Initial route
-// Initial route
 if (!window.location.hash || window.location.hash === '#/login') {
+  renderLoadingPage(app);
+
   window.api.tryAutoLogin().then((result) => {
+    if ((window as any).stopLoadingInterval) (window as any).stopLoadingInterval();
+
     if (result.success && result.account) {
       console.log('Auto-login success!');
       sessionStorage.setItem('account', JSON.stringify(result.account));
@@ -41,7 +45,10 @@ if (!window.location.hash || window.location.hash === '#/login') {
     } else {
       route();
     }
-  }).catch(() => route());
+  }).catch(() => {
+    if ((window as any).stopLoadingInterval) (window as any).stopLoadingInterval();
+    route();
+  });
 } else {
   route();
 }

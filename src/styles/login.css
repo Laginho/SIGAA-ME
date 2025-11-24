@@ -107,3 +107,37 @@
     cursor: pointer;
     user-select: none;
 }
+
+.spinning-slow {
+    animation: spin 3s linear infinite;
+}
+
+.loading-bar-container {
+    width: 100%;
+    height: 4px;
+    background: #f0f0f0;
+    border-radius: 2px;
+    margin-top: 1.5rem;
+    overflow: hidden;
+}
+
+.loading-bar {
+    width: 50%;
+    height: 100%;
+    background: #007bff;
+    animation: loading-slide 1.5s infinite ease-in-out;
+}
+
+@keyframes loading-slide {
+    0% {
+        transform: translateX(-100%);
+    }
+
+    100% {
+        transform: translateX(200%);
+    }
+}
+
+#loadingText {
+    transition: opacity 0.2s ease-in-out;
+}
