@@ -31,7 +31,20 @@ function route() {
 window.addEventListener('hashchange', route)
 
 // Initial route
-route()
+// Initial route
+if (!window.location.hash || window.location.hash === '#/login') {
+  window.api.tryAutoLogin().then((result) => {
+    if (result.success && result.account) {
+      console.log('Auto-login success!');
+      sessionStorage.setItem('account', JSON.stringify(result.account));
+      window.location.hash = '#/dashboard';
+    } else {
+      route();
+    }
+  }).catch(() => route());
+} else {
+  route();
+}
 
 // Use contextBridge
 window.ipcRenderer.on('main-process-message', (_event, message) => {

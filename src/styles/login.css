@@ -1,43 +1,37 @@
 .login-container {
     display: flex;
-    align-items: center;
     justify-content: center;
-    height: 100%;
-    width: 100%;
-    padding: 20px;
+    align-items: center;
+    height: 100vh;
+    background-color: #f0f2f5;
 }
 
 .login-card {
-    background-color: var(--color-surface);
+    background: white;
     padding: 2.5rem;
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-md);
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     width: 100%;
     max-width: 400px;
     text-align: center;
-    border: 1px solid var(--color-border);
 }
 
 .login-logo {
-    width: 120px;
+    width: 80px;
     height: auto;
-    margin-bottom: 1.5rem;
-    /* Placeholder style until we have the real image */
-    background-color: #eee;
-    border-radius: 4px;
+    margin-bottom: 1rem;
 }
 
 .login-title {
-    font-size: 1.5rem;
-    font-weight: 600;
+    color: #333;
+    font-size: 1.8rem;
     margin-bottom: 0.5rem;
-    color: var(--color-primary);
 }
 
 .login-subtitle {
-    color: var(--color-text-muted);
-    margin-bottom: 2rem;
+    color: #666;
     font-size: 0.9rem;
+    margin-bottom: 2rem;
 }
 
 .login-form {
@@ -49,44 +43,67 @@
 .form-group {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
     text-align: left;
+    gap: 0.5rem;
 }
 
 .form-label {
-    font-size: 0.875rem;
+    font-size: 0.9rem;
     font-weight: 500;
-    margin-bottom: 0.25rem;
-    color: var(--color-text-main);
+    color: #333;
 }
 
 .form-input {
-    width: 100%;
     padding: 0.75rem;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+    border: 1px solid #ddd;
+    border-radius: 6px;
     font-size: 1rem;
-    transition: border-color 0.2s, box-shadow 0.2s;
+    transition: border-color 0.2s;
 }
 
 .form-input:focus {
     outline: none;
-    border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px rgba(0, 86, 163, 0.1);
+    border-color: #007bff;
 }
 
 .btn-primary {
-    background-color: var(--color-primary);
+    background-color: #007bff;
     color: white;
     border: none;
     padding: 0.75rem;
-    border-radius: var(--radius-md);
+    border-radius: 6px;
     font-size: 1rem;
-    font-weight: 600;
-    margin-top: 1rem;
+    font-weight: 500;
+    cursor: pointer;
     transition: background-color 0.2s;
+    margin-top: 1rem;
 }
 
 .btn-primary:hover {
-    background-color: var(--color-primary-hover);
+    background-color: #0056b3;
+}
+
+.btn-primary:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
+.checkbox-group {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.form-checkbox {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.form-label-checkbox {
+    font-size: 0.9rem;
+    color: #555;
+    cursor: pointer;
+    user-select: none;
 }

@@ -2,7 +2,8 @@
 
 interface Window {
     api: {
-        login: (credentials: { username: string; password: string }) => Promise<any>;
+        login: (credentials: { username: string; password: string; rememberMe?: boolean }) => Promise<any>;
+        tryAutoLogin: () => Promise<any>;
         getCourses: () => Promise<any>;
         getCourseFiles: (courseId: string) => Promise<any>;
         selectDownloadFolder: () => Promise<any>;

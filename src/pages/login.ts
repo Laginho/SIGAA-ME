@@ -19,6 +19,11 @@ export function renderLoginPage(app: HTMLDivElement) {
             <input type="password" id="password" class="form-input" placeholder="Digite sua senha" required>
           </div>
 
+          <div class="form-group checkbox-group">
+            <input type="checkbox" id="rememberMe" class="form-checkbox">
+            <label for="rememberMe" class="form-label-checkbox">Lembrai de mim</label>
+          </div>
+
           <button type="submit" class="btn-primary">Entrar</button>
         </form>
       </div>
@@ -31,6 +36,7 @@ export function renderLoginPage(app: HTMLDivElement) {
 
   const usernameInput = document.getElementById('username') as HTMLInputElement;
   const passwordInput = document.getElementById('password') as HTMLInputElement;
+  const rememberMeInput = document.getElementById('rememberMe') as HTMLInputElement;
   const submitButton = form.querySelector('button[type="submit"]') as HTMLButtonElement;
 
   form.addEventListener('submit', async (e) => {
@@ -38,6 +44,7 @@ export function renderLoginPage(app: HTMLDivElement) {
 
     const username = usernameInput.value;
     const password = passwordInput.value;
+    const rememberMe = rememberMeInput.checked;
 
     if (!username || !password) return;
 
@@ -48,7 +55,7 @@ export function renderLoginPage(app: HTMLDivElement) {
     }
 
     try {
-      const result = await window.api.login({ username, password });
+      const result = await window.api.login({ username, password, rememberMe });
 
       if (result.success && result.account) {
         console.log('Login success!');

@@ -1,7 +1,7 @@
 var __defProp = Object.defineProperty;
 var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
-import { ipcMain, dialog, app, BrowserWindow } from "electron";
+import { app, ipcMain, dialog, BrowserWindow, safeStorage } from "electron";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import fs from "node:fs";
@@ -417,8 +417,46 @@ function createWindow() {
     win.loadFile(path.join(RENDERER_DIST, "index.html"));
   }
 }
-ipcMain.handle("login-request", async (_event, { username, password }) => {
-  return await sigaaService.login(username, password);
+const CREDENTIALS_PATH = path.join(app.getPath("userData"), "credentials.json");
+function saveCredentials(username, password) {
+  if (safeStorage.isEncryptionAvailable()) {
+    const encrypted = safeStorage.encryptString(password);
+    fs.writeFileSync(CREDENTIALS_PATH, JSON.stringify({
+      username,
+      password: encrypted.toString("base64")
+    }));
+  }
+}
+function loadCredentials() {
+  if (fs.existsSync(CREDENTIALS_PATH) && safeStorage.isEncryptionAvailable()) {
+    try {
+      const data = JSON.parse(fs.readFileSync(CREDENTIALS_PATH, "utf-8"));
+      const password = safeStorage.decryptString(Buffer.from(data.password, "base64"));
+      return { username: data.username, password };
+    } catch (e) {
+      console.error("Failed to load credentials", e);
+    }
+  }
+  return null;
+}
+ipcMain.handle("login-request", async (_event, { username, password, rememberMe }) => {
+  const result = await sigaaService.login(username, password);
+  if (result.success && rememberMe) {
+    saveCredentials(username, password);
+  } else if (result.success && !rememberMe) {
+    if (fs.existsSync(CREDENTIALS_PATH)) {
+      fs.unlinkSync(CREDENTIALS_PATH);
+    }
+  }
+  return result;
+});
+ipcMain.handle("try-auto-login", async () => {
+  const creds = loadCredentials();
+  if (creds) {
+    console.log("Auto-login: Found credentials for", creds.username);
+    return await sigaaService.login(creds.username, creds.password);
+  }
+  return { success: false };
 });
 ipcMain.handle("get-courses", async () => {
   return await sigaaService.getCourses();
