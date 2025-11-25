@@ -298,7 +298,7 @@ export class PlaywrightLoginService {
                 }
 
                 // --- SCRAPE NEWS ---
-                // Look for the news table. It usually has "Título" and "Data" headers.
+                // Strategy 1: Look for the news table by headers
                 const tables = Array.from(document.querySelectorAll('table'));
                 console.log(`[Scraper] Found ${tables.length} tables on the page.`);
 
@@ -320,36 +320,57 @@ export class PlaywrightLoginService {
 
                             const cells = Array.from(row.querySelectorAll('td'));
                             if (cells.length >= 2) {
-                                // Try to identify columns based on content or position
-                                // Usually: Title (0), Date (1), Notification (2), Actions (3)
                                 const title = cells[0]?.innerText.trim();
                                 const date = cells[1]?.innerText.trim();
-                                const notification = cells[2]?.innerText.trim(); // "Sim" or "Não"
+                                const notification = cells[2]?.innerText.trim();
 
                                 if (!title || !date) continue;
 
-                                // Let's look for the magnifying glass link
                                 const viewLink = row.querySelector('a[onclick*="visualizarNoticia"]');
                                 let id = '';
 
                                 if (viewLink) {
-                                    // Extract ID from onclick: j_id_jsp_...:visualizarNoticia('ID')
                                     const onclick = viewLink.getAttribute('onclick');
-                                    // Match 'ID' inside the function call
                                     const match = onclick?.match(/visualizarNoticia\s*\(\s*['"]([^'"]+)['"]/);
                                     if (match) {
                                         id = match[1];
                                     }
                                 }
 
-                                // Only add if we have an ID (otherwise we can't view details)
                                 if (id) {
-                                    news.push({
-                                        title,
-                                        date,
-                                        notification,
-                                        id
-                                    });
+                                    news.push({ title, date, notification, id });
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Strategy 2: Fallback - Look for any link with 'visualizarNoticia'
+                if (news.length === 0) {
+                    console.log('[Scraper] No news found via table headers. Trying fallback strategy...');
+                    const newsLinks = Array.from(document.querySelectorAll('a[onclick*="visualizarNoticia"]'));
+
+                    for (const link of newsLinks) {
+                        const onclick = link.getAttribute('onclick');
+                        const match = onclick?.match(/visualizarNoticia\s*\(\s*['"]([^'"]+)['"]/);
+                        if (!match) continue;
+
+                        const id = match[1];
+                        // Avoid duplicates
+                        if (news.some(n => n.id === id)) continue;
+
+                        const row = link.closest('tr');
+                        if (row) {
+                            const cells = Array.from(row.querySelectorAll('td'));
+                            // Assume standard layout: Title (0), Date (1)
+                            if (cells.length >= 2) {
+                                const title = cells[0]?.innerText.trim();
+                                const date = cells[1]?.innerText.trim();
+                                const notification = cells[2]?.innerText.trim();
+
+                                if (title && date) {
+                                    console.log(`[Scraper] Found news via fallback: ${title}`);
+                                    news.push({ title, date, notification, id });
                                 }
                             }
                         }
