@@ -130,6 +130,7 @@ async function fullFetchWithProgress(coursesListElement: HTMLElement, syncStatus
       coursesWithFiles.push({
         ...course,
         files: filesResult.success ? filesResult.files : [],
+        news: filesResult.success ? filesResult.news : [],
         fileCount: filesResult.success ? filesResult.files?.length || 0 : 0
       });
     }
@@ -211,6 +212,7 @@ async function syncInBackground(cachedCourses: any[], coursesListElement: HTMLEl
         const newCourse = {
           ...course,
           files: filesResult.success ? filesResult.files : [],
+          news: filesResult.success ? filesResult.news : [],
           fileCount: filesResult.success ? filesResult.files?.length || 0 : 0
         };
 

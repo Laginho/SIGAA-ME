@@ -61,7 +61,7 @@ export class SigaaService {
         }
     }
 
-    async getCourseFiles(courseId: string): Promise<{ success: boolean; files?: any[]; message?: string }> {
+    async getCourseFiles(courseId: string): Promise<{ success: boolean; files?: any[]; news?: any[]; message?: string }> {
         try {
             console.log(`SIGAA: Fetching files for course ${courseId}...`);
             const result = await this.playwrightLogin.getCourseFiles(courseId);
@@ -70,7 +70,7 @@ export class SigaaService {
                 return { success: false, message: result.error || 'Failed to fetch files' };
             }
 
-            return { success: true, files: result.files };
+            return { success: true, files: result.files, news: result.news };
         } catch (error: any) {
             console.error('SIGAA: Error fetching files:', error);
             return { success: false, message: error.message || 'Failed to fetch files' };
@@ -136,6 +136,22 @@ export class SigaaService {
         } catch (error: any) {
             console.error('SIGAA: Error downloading files:', error);
             return { success: false, message: error.message || 'Download failed' };
+        }
+    }
+
+    async getNewsDetail(courseId: string, newsId: string): Promise<{ success: boolean; news?: any; message?: string }> {
+        try {
+            console.log(`SIGAA: Fetching news detail ${newsId}...`);
+            const result = await this.playwrightLogin.getNewsDetail(courseId, newsId);
+
+            if (!result.success) {
+                return { success: false, message: result.error || 'Failed to fetch news detail' };
+            }
+
+            return { success: true, news: result.news };
+        } catch (error: any) {
+            console.error('SIGAA: Error fetching news detail:', error);
+            return { success: false, message: error.message || 'Failed to fetch news detail' };
         }
     }
 }

@@ -33,5 +33,6 @@ contextBridge.exposeInMainWorld('api', {
     const subscription = (_event: any, data: any) => callback(data)
     ipcRenderer.on('download-progress', subscription)
     return () => ipcRenderer.off('download-progress', subscription)
-  }
+  },
+  getNewsDetail: (courseId: string, newsId: string) => ipcRenderer.invoke('get-news-detail', { courseId, newsId })
 })

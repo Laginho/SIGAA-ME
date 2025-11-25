@@ -159,7 +159,7 @@ export class PlaywrightLoginService {
                                 id: id,
                                 code: parts[0].trim(),
                                 name: parts.slice(1).join(' - ').trim(),
-                                period: periodCell ? periodCell.innerText.split('\n')[0] : '' // Try to get first line of period info
+                                period: periodCell ? (periodCell as HTMLElement).innerText.split('\n')[0] : '' // Try to get first line of period info
                             });
                         }
                     }
@@ -230,7 +230,7 @@ export class PlaywrightLoginService {
         }
     }
 
-    async getCourseFiles(courseId: string): Promise<{ success: boolean; files?: any[]; error?: string }> {
+    async getCourseFiles(courseId: string): Promise<{ success: boolean; files?: any[]; news?: any[]; error?: string }> {
         try {
             console.log(`Playwright: Fetching files for course ${courseId}...`);
 
@@ -255,9 +255,12 @@ export class PlaywrightLoginService {
 
             console.log('Playwright: Extracting files...');
 
-            // Extract files directly from main page
-            const filesData = await page.evaluate(() => {
+            // Extract files and news directly from main page
+            const data = await page.evaluate(() => {
                 const files: any[] = [];
+                const news: any[] = [];
+
+                // --- SCRAPE FILES ---
                 const links = Array.from(document.querySelectorAll('a'));
 
                 for (const link of links) {
@@ -294,13 +297,50 @@ export class PlaywrightLoginService {
                     }
                 }
 
-                return files;
+                // --- SCRAPE NEWS ---
+                // Look for the news table. It usually has "Título" and "Data" headers.
+                const tables = Array.from(document.querySelectorAll('table.listagem'));
+                for (const table of tables) {
+                    const headers = Array.from(table.querySelectorAll('th')).map(th => th.innerText.trim());
+                    if (headers.includes('Título') && headers.includes('Data')) {
+                        const rows = Array.from(table.querySelectorAll('tbody tr'));
+                        for (const row of rows) {
+                            const cells = Array.from(row.querySelectorAll('td'));
+                            if (cells.length >= 3) {
+                                const title = cells[0].innerText.trim();
+                                const date = cells[1].innerText.trim();
+                                // The third cell usually has the "Visualizar" icon
+
+                                // Let's look for the magnifying glass link
+                                const viewLink = row.querySelector('a[onclick*="visualizarNoticia"]');
+                                let id = '';
+
+                                if (viewLink) {
+                                    // Extract ID from onclick: j_id_jsp_...:visualizarNoticia('ID')
+                                    const onclick = viewLink.getAttribute('onclick');
+                                    const match = onclick?.match(/['"]([^'"]*)['"]\s*\)/); // matches 'ID')
+                                    if (match) {
+                                        id = match[1];
+                                    }
+                                }
+
+                                news.push({
+                                    title,
+                                    date,
+                                    id
+                                });
+                            }
+                        }
+                    }
+                }
+
+                return { files, news };
             });
 
-            console.log('Playwright: Found', filesData.length, 'files');
+            console.log('Playwright: Found', data.files.length, 'files and', data.news.length, 'news items');
 
             await this.close();
-            return { success: true, files: filesData };
+            return { success: true, files: data.files, news: data.news };
 
         } catch (error: any) {
             console.error('Playwright: Error fetching files:', error);
@@ -411,6 +451,126 @@ export class PlaywrightLoginService {
             console.error('Playwright: Download all error:', error);
             await this.close();
             return { downloaded: 0, skipped: 0, failed: files.length, results: [] };
+        }
+    }
+
+    async getNewsDetail(courseId: string, newsId: string): Promise<{ success: boolean; news?: any; error?: string }> {
+        try {
+            console.log(`Playwright: Fetching news detail ${newsId} for course ${courseId}...`);
+
+            if (!this.storedCookies || this.storedCookies.length === 0) {
+                return { success: false, error: 'No stored session - please login first' };
+            }
+
+            this.browser = await chromium.launch({
+                headless: true
+            });
+
+            const context = await this.browser.newContext();
+            await context.addCookies(this.storedCookies);
+            const page = await context.newPage();
+
+            // Navigate to course page
+            const navigated = await this.navigateToCourse(page, courseId);
+            if (!navigated) {
+                await this.close();
+                return { success: false, error: 'Failed to navigate to course page' };
+            }
+
+            console.log('Playwright: Clicking news link...');
+
+            // Find the link that calls visualizing news with this ID
+            // The ID we extracted was from onclick="...:visualizarNoticia('ID')..."
+            // So we look for an element with that in onclick
+
+            // We need to use evaluate to find and click because the ID might be part of a larger string
+            const clicked = await page.evaluate((id) => {
+                const links = Array.from(document.querySelectorAll('a'));
+                const targetLink = links.find(a => {
+                    const onclick = a.getAttribute('onclick');
+                    return onclick && onclick.includes(`visualizarNoticia`) && onclick.includes(`'${id}'`);
+                });
+
+                if (targetLink) {
+                    targetLink.click();
+                    return true;
+                }
+                return false;
+            }, newsId);
+
+            if (!clicked) {
+                await this.close();
+                return { success: false, error: 'News link not found' };
+            }
+
+            await page.waitForLoadState('networkidle');
+
+            // Now scrape the detail page
+            console.log('Playwright: Scraping news details...');
+            const newsDetail = await page.evaluate(() => {
+                // Based on the user image:
+                // Header: Visualização de Notícia
+                // Fields: Título, Data, Texto, Notificação
+
+                // Usually these are in a form or a specific container
+                // Let's try to find by labels
+
+                const getTextAfterLabel = (label: string) => {
+                    // Find an element containing the label
+                    const elements = Array.from(document.querySelectorAll('td, th, label, span, div'));
+                    const labelEl = elements.find(el => (el as HTMLElement).innerText.trim().replace(':', '') === label);
+
+                    if (labelEl) {
+                        // Try next sibling or parent's next sibling
+                        // In SIGAA, it's often: <td><label>Title:</label></td><td>Value</td>
+                        // Or <label>Title:</label> <span>Value</span>
+
+                        // Case 1: Table cell
+                        const parentTd = labelEl.closest('td');
+                        if (parentTd && parentTd.nextElementSibling) {
+                            return (parentTd.nextElementSibling as HTMLElement).innerText.trim();
+                        }
+
+                        // Case 2: Direct sibling
+                        if (labelEl.nextElementSibling) {
+                            return (labelEl.nextElementSibling as HTMLElement).innerText.trim();
+                        }
+                    }
+                    return '';
+                };
+
+                // Specific scraping for the "Texto" (Content) which might be a larger block
+                const getContent = () => {
+                    // Look for the label "Texto:"
+                    const elements = Array.from(document.querySelectorAll('td, th, label, span, div'));
+                    const labelEl = elements.find(el => (el as HTMLElement).innerText.trim().replace(':', '') === 'Texto');
+
+                    if (labelEl) {
+                        const parentTd = labelEl.closest('td');
+                        if (parentTd && parentTd.nextElementSibling) {
+                            return (parentTd.nextElementSibling as HTMLElement).innerHTML; // Keep HTML for formatting
+                        }
+                    }
+                    return '';
+                };
+
+                return {
+                    title: getTextAfterLabel('Título'),
+                    date: getTextAfterLabel('Data'),
+                    content: getContent(),
+                    notification: getTextAfterLabel('Notificação')
+                };
+            });
+
+            console.log('Playwright: Scraped news detail:', newsDetail.title);
+
+            await this.close();
+            return { success: true, news: newsDetail };
+
+        } catch (error: any) {
+            console.error('Playwright: Error fetching news detail:', error);
+            await this.close();
+            return { success: false, error: error.message };
         }
     }
 

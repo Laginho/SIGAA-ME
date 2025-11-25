@@ -31,5 +31,6 @@ electron.contextBridge.exposeInMainWorld("api", {
     const subscription = (_event, data) => callback(data);
     electron.ipcRenderer.on("download-progress", subscription);
     return () => electron.ipcRenderer.off("download-progress", subscription);
-  }
+  },
+  getNewsDetail: (courseId, newsId) => electron.ipcRenderer.invoke("get-news-detail", { courseId, newsId })
 });

@@ -168,6 +168,11 @@ ipcMain.handle('check-files-existence', async (_, filePaths: string[]) => {
   }));
 })
 
+// Get news detail
+ipcMain.handle('get-news-detail', async (_, { courseId, newsId }) => {
+  return await sigaaService.getNewsDetail(courseId, newsId);
+})
+
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.

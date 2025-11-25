@@ -11,12 +11,29 @@ export function renderCourseDetailPage(container: HTMLDivElement, courseId: stri
       </div>
       
       <div class="course-content">
+        <section class="news-section">
+          <h2>Notícias da Disciplina</h2>
+          <div id="newsList" class="news-list">
+            <div class="loading">Carregando notícias...</div>
+          </div>
+        </section>
+
         <section class="files-section">
           <h2>Materiais da Disciplina</h2>
           <div id="filesList" class="files-list">
             <div class="loading">Carregando arquivos...</div>
           </div>
         </section>
+      </div>
+      
+      <!-- News Modal -->
+      <div id="newsModal" class="modal-overlay">
+        <div class="modal-content">
+          <button class="modal-close">&times;</button>
+          <div id="modalBody">
+            <!-- Content injected here -->
+          </div>
+        </div>
       </div>
     </div>
   `
@@ -39,10 +56,11 @@ export function renderCourseDetailPage(container: HTMLDivElement, courseId: stri
 
 async function fetchCourseFiles(courseId: string) {
   const filesListElement = document.getElementById('filesList')
+  const newsListElement = document.getElementById('newsList')
   const courseTitleElement = document.getElementById('courseTitle')
   const courseCodeElement = document.getElementById('courseCode')
 
-  if (!filesListElement || !courseTitleElement || !courseCodeElement) return
+  if (!filesListElement || !newsListElement || !courseTitleElement || !courseCodeElement) return
 
   try {
     // Read from localStorage (persistent cache)
@@ -54,6 +72,7 @@ async function fetchCourseFiles(courseId: string) {
           Dados não encontrados. Por favor, volte ao dashboard.
         </div>
       `
+      newsListElement.innerHTML = ''
       return
     }
 
@@ -66,12 +85,39 @@ async function fetchCourseFiles(courseId: string) {
           Disciplina não encontrada.
         </div>
       `
+      newsListElement.innerHTML = ''
       return
     }
 
     // Update course info
     courseTitleElement.textContent = course.name
     courseCodeElement.textContent = course.code || `ID: ${courseId}`
+
+    // Render News
+    if (!course.news || course.news.length === 0) {
+      newsListElement.innerHTML = `
+        <div class="no-files">Nenhuma notícia recente</div>
+      `
+    } else {
+      newsListElement.innerHTML = course.news.map((item: any) => `
+        <div class="news-item" data-id="${item.id}">
+          <div class="news-title">${item.title}</div>
+          <div class="news-date">${item.date}</div>
+          ${item.notification === 'Sim' ? '<div class="news-notification">🔔 Notificação</div>' : ''}
+        </div>
+      `).join('')
+
+      // Add click listeners
+      const newsItems = newsListElement.querySelectorAll('.news-item')
+      newsItems.forEach(item => {
+        item.addEventListener('click', () => {
+          const newsId = item.getAttribute('data-id')
+          if (newsId) {
+            openNewsModal(courseId, newsId)
+          }
+        })
+      })
+    }
 
     if (!course.files || course.files.length === 0) {
       filesListElement.innerHTML = `
@@ -304,5 +350,59 @@ async function testDownloadAll(courseId: string) {
     console.error('Download error:', error);
     alert('Erro no processo de download: ' + error.message);
     fetchCourseFiles(courseId);
+  }
+}
+
+
+async function openNewsModal(courseId: string, newsId: string) {
+  const modal = document.getElementById('newsModal')
+  const modalBody = document.getElementById('modalBody')
+  const closeBtn = modal?.querySelector('.modal-close')
+
+  if (!modal || !modalBody) return
+
+  // Show loading state
+  modalBody.innerHTML = '<div class="loading">Carregando detalhes da notícia...</div>'
+  modal.classList.add('active')
+
+  // Close handler
+  const close = () => {
+    modal.classList.remove('active')
+  }
+
+  closeBtn?.addEventListener('click', close, { once: true })
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) close()
+  })
+
+  try {
+    const result = await window.api.getNewsDetail(courseId, newsId)
+
+    if (result.success && result.news) {
+      modalBody.innerHTML = `
+        <div class="modal-header">
+          <h3 class="modal-title">${result.news.title}</h3>
+          <div class="modal-meta">
+            <span>📅 ${result.news.date}</span>
+            ${result.news.notification === 'Sim' ? '<span>🔔 Notificação enviada</span>' : ''}
+          </div>
+        </div>
+        <div class="modal-body">
+          ${result.news.content}
+        </div>
+      `
+    } else {
+      modalBody.innerHTML = `
+        <div class="error-message">
+          Erro ao carregar notícia: ${result.message || 'Erro desconhecido'}
+        </div>
+      `
+    }
+  } catch (error: any) {
+    modalBody.innerHTML = `
+      <div class="error-message">
+        Erro ao carregar notícia: ${error.message}
+      </div>
+    `
   }
 }

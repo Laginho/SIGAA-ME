@@ -181,8 +181,9 @@ class PlaywrightLoginService {
         return { success: false, error: "Failed to navigate to course page" };
       }
       console.log("Playwright: Extracting files...");
-      const filesData = await page.evaluate(() => {
+      const data = await page.evaluate(() => {
         const files = [];
+        const news = [];
         const links = Array.from(document.querySelectorAll("a"));
         for (const link of links) {
           const text = link.innerText.trim();
@@ -206,11 +207,39 @@ class PlaywrightLoginService {
             });
           }
         }
-        return files;
+        const tables = Array.from(document.querySelectorAll("table.listagem"));
+        for (const table of tables) {
+          const headers = Array.from(table.querySelectorAll("th")).map((th) => th.innerText.trim());
+          if (headers.includes("Título") && headers.includes("Data")) {
+            const rows = Array.from(table.querySelectorAll("tbody tr"));
+            for (const row of rows) {
+              const cells = Array.from(row.querySelectorAll("td"));
+              if (cells.length >= 3) {
+                const title = cells[0].innerText.trim();
+                const date = cells[1].innerText.trim();
+                const viewLink = row.querySelector('a[onclick*="visualizarNoticia"]');
+                let id = "";
+                if (viewLink) {
+                  const onclick = viewLink.getAttribute("onclick");
+                  const match = onclick == null ? void 0 : onclick.match(/['"]([^'"]*)['"]\s*\)/);
+                  if (match) {
+                    id = match[1];
+                  }
+                }
+                news.push({
+                  title,
+                  date,
+                  id
+                });
+              }
+            }
+          }
+        }
+        return { files, news };
       });
-      console.log("Playwright: Found", filesData.length, "files");
+      console.log("Playwright: Found", data.files.length, "files and", data.news.length, "news items");
       await this.close();
-      return { success: true, files: filesData };
+      return { success: true, files: data.files, news: data.news };
     } catch (error) {
       console.error("Playwright: Error fetching files:", error);
       await this.close();
@@ -283,6 +312,84 @@ class PlaywrightLoginService {
       return { downloaded: 0, skipped: 0, failed: files.length, results: [] };
     }
   }
+  async getNewsDetail(courseId, newsId) {
+    try {
+      console.log(`Playwright: Fetching news detail ${newsId} for course ${courseId}...`);
+      if (!this.storedCookies || this.storedCookies.length === 0) {
+        return { success: false, error: "No stored session - please login first" };
+      }
+      this.browser = await chromium.launch({
+        headless: true
+      });
+      const context = await this.browser.newContext();
+      await context.addCookies(this.storedCookies);
+      const page = await context.newPage();
+      const navigated = await this.navigateToCourse(page, courseId);
+      if (!navigated) {
+        await this.close();
+        return { success: false, error: "Failed to navigate to course page" };
+      }
+      console.log("Playwright: Clicking news link...");
+      const clicked = await page.evaluate((id) => {
+        const links = Array.from(document.querySelectorAll("a"));
+        const targetLink = links.find((a) => {
+          const onclick = a.getAttribute("onclick");
+          return onclick && onclick.includes(`visualizarNoticia`) && onclick.includes(`'${id}'`);
+        });
+        if (targetLink) {
+          targetLink.click();
+          return true;
+        }
+        return false;
+      }, newsId);
+      if (!clicked) {
+        await this.close();
+        return { success: false, error: "News link not found" };
+      }
+      await page.waitForLoadState("networkidle");
+      console.log("Playwright: Scraping news details...");
+      const newsDetail = await page.evaluate(() => {
+        const getTextAfterLabel = (label) => {
+          const elements = Array.from(document.querySelectorAll("td, th, label, span, div"));
+          const labelEl = elements.find((el) => el.innerText.trim().replace(":", "") === label);
+          if (labelEl) {
+            const parentTd = labelEl.closest("td");
+            if (parentTd && parentTd.nextElementSibling) {
+              return parentTd.nextElementSibling.innerText.trim();
+            }
+            if (labelEl.nextElementSibling) {
+              return labelEl.nextElementSibling.innerText.trim();
+            }
+          }
+          return "";
+        };
+        const getContent = () => {
+          const elements = Array.from(document.querySelectorAll("td, th, label, span, div"));
+          const labelEl = elements.find((el) => el.innerText.trim().replace(":", "") === "Texto");
+          if (labelEl) {
+            const parentTd = labelEl.closest("td");
+            if (parentTd && parentTd.nextElementSibling) {
+              return parentTd.nextElementSibling.innerHTML;
+            }
+          }
+          return "";
+        };
+        return {
+          title: getTextAfterLabel("Título"),
+          date: getTextAfterLabel("Data"),
+          content: getContent(),
+          notification: getTextAfterLabel("Notificação")
+        };
+      });
+      console.log("Playwright: Scraped news detail:", newsDetail.title);
+      await this.close();
+      return { success: true, news: newsDetail };
+    } catch (error) {
+      console.error("Playwright: Error fetching news detail:", error);
+      await this.close();
+      return { success: false, error: error.message };
+    }
+  }
   async close() {
     if (this.browser) {
       console.log("Playwright: Closing browser...");
@@ -343,7 +450,7 @@ class SigaaService {
       if (!result.success) {
         return { success: false, message: result.error || "Failed to fetch files" };
       }
-      return { success: true, files: result.files };
+      return { success: true, files: result.files, news: result.news };
     } catch (error) {
       console.error("SIGAA: Error fetching files:", error);
       return { success: false, message: error.message || "Failed to fetch files" };
@@ -390,6 +497,19 @@ class SigaaService {
     } catch (error) {
       console.error("SIGAA: Error downloading files:", error);
       return { success: false, message: error.message || "Download failed" };
+    }
+  }
+  async getNewsDetail(courseId, newsId) {
+    try {
+      console.log(`SIGAA: Fetching news detail ${newsId}...`);
+      const result = await this.playwrightLogin.getNewsDetail(courseId, newsId);
+      if (!result.success) {
+        return { success: false, message: result.error || "Failed to fetch news detail" };
+      }
+      return { success: true, news: result.news };
+    } catch (error) {
+      console.error("SIGAA: Error fetching news detail:", error);
+      return { success: false, message: error.message || "Failed to fetch news detail" };
     }
   }
 }
@@ -502,6 +622,9 @@ ipcMain.handle("check-files-existence", async (_, filePaths) => {
     path: filePath,
     exists: fs.existsSync(filePath)
   }));
+});
+ipcMain.handle("get-news-detail", async (_, { courseId, newsId }) => {
+  return await sigaaService.getNewsDetail(courseId, newsId);
 });
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
