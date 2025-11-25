@@ -10,14 +10,18 @@ export function renderCourseDetailPage(container: HTMLDivElement, courseId: stri
         <button id="downloadAllBtn" class="btn-download-all">⬇️ Baixar todos os arquivos</button>
       </div>
       
-      <div class="course-content">
+      <!-- News Section -->
+      <div class="course-content mb-4">
         <section class="news-section">
           <h2>Notícias da Disciplina</h2>
           <div id="newsList" class="news-list">
             <div class="loading">Carregando notícias...</div>
           </div>
         </section>
+      </div>
 
+      <!-- Files Section -->
+      <div class="course-content">
         <section class="files-section">
           <h2>Materiais da Disciplina</h2>
           <div id="filesList" class="files-list">
