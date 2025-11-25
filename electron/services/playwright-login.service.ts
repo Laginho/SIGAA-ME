@@ -304,9 +304,9 @@ export class PlaywrightLoginService {
                 for (const table of tables) {
                     const headers = Array.from(table.querySelectorAll('th, td')).map(cell => (cell as HTMLElement).innerText.trim());
 
-                    // Check if this table looks like a news table
-                    const hasTitle = headers.some(h => h.includes('Título') || h.includes('Assunto'));
-                    const hasDate = headers.some(h => h.includes('Data'));
+                    // Check if this table looks like a news table (case insensitive)
+                    const hasTitle = headers.some(h => /t[ií]tulo|assunto/i.test(h));
+                    const hasDate = headers.some(h => /data/i.test(h));
 
                     if (hasTitle && hasDate) {
                         // Found a candidate table!

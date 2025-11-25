@@ -211,8 +211,8 @@ class PlaywrightLoginService {
         const tables = Array.from(document.querySelectorAll("table"));
         for (const table of tables) {
           const headers = Array.from(table.querySelectorAll("th, td")).map((cell) => cell.innerText.trim());
-          const hasTitle = headers.some((h) => h.includes("Título") || h.includes("Assunto"));
-          const hasDate = headers.some((h) => h.includes("Data"));
+          const hasTitle = headers.some((h) => /t[ií]tulo|assunto/i.test(h));
+          const hasDate = headers.some((h) => /data/i.test(h));
           if (hasTitle && hasDate) {
             const rows = Array.from(table.querySelectorAll("tr"));
             for (const row of rows) {

@@ -183,18 +183,9 @@ async function syncInBackground(cachedCourses: any[], coursesListElement: HTMLEl
     for (const serverCourse of result.courses) {
       const cachedCourse = cachedCourses.find(c => c.id === serverCourse.id);
 
-      if (!cachedCourse) {
-        // New course!
-        coursesToUpdate.push(serverCourse);
-      } else if (!cachedCourse.news) {
-        // Existing course but missing news data (feature update)
-        coursesToUpdate.push(serverCourse);
-      } else {
-        // We need to check file count - but we don't have it yet from getCourses
-        // For now, just mark all as needing check
-        // In a real app, getCourses would return file counts too
-        // For MVP, we'll skip the smart comparison and just show cached
-      }
+      // Always update to check for new files/news
+      // In a more advanced version, we could check file counts if the API returned them
+      coursesToUpdate.push(serverCourse);
     }
 
     if (coursesToUpdate.length === 0) {
