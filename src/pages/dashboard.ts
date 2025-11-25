@@ -186,6 +186,9 @@ async function syncInBackground(cachedCourses: any[], coursesListElement: HTMLEl
       if (!cachedCourse) {
         // New course!
         coursesToUpdate.push(serverCourse);
+      } else if (!cachedCourse.news) {
+        // Existing course but missing news data (feature update)
+        coursesToUpdate.push(serverCourse);
       } else {
         // We need to check file count - but we don't have it yet from getCourses
         // For now, just mark all as needing check
