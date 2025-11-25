@@ -101,8 +101,8 @@ ipcMain.handle('get-courses', async () => {
   return await sigaaService.getCourses()
 })
 
-ipcMain.handle('get-course-files', async (_, courseId: string) => {
-  return await sigaaService.getCourseFiles(courseId);
+ipcMain.handle('get-course-files', async (_, { courseId, courseName }) => {
+  return await sigaaService.getCourseFiles(courseId, courseName);
 })
 
 // Download folder selection

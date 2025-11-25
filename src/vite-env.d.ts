@@ -5,7 +5,7 @@ interface Window {
         login: (credentials: { username: string; password: string; rememberMe?: boolean }) => Promise<any>;
         tryAutoLogin: () => Promise<any>;
         getCourses: () => Promise<any>;
-        getCourseFiles: (courseId: string) => Promise<any>;
+        getCourseFiles: (courseId: string, courseName?: string) => Promise<any>;
         selectDownloadFolder: () => Promise<any>;
         downloadFile: (data: any) => Promise<any>;
         downloadAllFiles: (data: any) => Promise<any>;

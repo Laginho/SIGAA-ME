@@ -61,10 +61,10 @@ export class SigaaService {
         }
     }
 
-    async getCourseFiles(courseId: string): Promise<{ success: boolean; files?: any[]; news?: any[]; message?: string }> {
+    async getCourseFiles(courseId: string, courseName?: string): Promise<{ success: boolean; files?: any[]; news?: any[]; message?: string }> {
         try {
-            console.log(`SIGAA: Fetching files for course ${courseId}...`);
-            const result = await this.playwrightLogin.getCourseFiles(courseId);
+            console.log(`SIGAA: Fetching files for course ${courseName || courseId}...`);
+            const result = await this.playwrightLogin.getCourseFiles(courseId, courseName);
 
             if (!result.success) {
                 return { success: false, message: result.error || 'Failed to fetch files' };

@@ -24,7 +24,7 @@ contextBridge.exposeInMainWorld('api', {
   login: (credentials: any) => ipcRenderer.invoke('login-request', credentials),
   tryAutoLogin: () => ipcRenderer.invoke('try-auto-login'),
   getCourses: () => ipcRenderer.invoke('get-courses'),
-  getCourseFiles: (courseId: string) => ipcRenderer.invoke('get-course-files', courseId),
+  getCourseFiles: (courseId: string, courseName?: string) => ipcRenderer.invoke('get-course-files', { courseId, courseName }),
   checkFilesExistence: (filePaths: string[]) => ipcRenderer.invoke('check-files-existence', filePaths),
   selectDownloadFolder: () => ipcRenderer.invoke('select-download-folder'),
   downloadFile: (data: any) => ipcRenderer.invoke('download-file', data),

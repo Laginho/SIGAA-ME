@@ -125,7 +125,7 @@ async function fullFetchWithProgress(coursesListElement: HTMLElement, syncStatus
       if (progressFill) progressFill.style.width = `${progress}%`;
       if (progressText) progressText.textContent = `${progress}% - ${course.code}`;
 
-      const filesResult = await window.api.getCourseFiles(course.id);
+      const filesResult = await window.api.getCourseFiles(course.id, course.name);
 
       coursesWithFiles.push({
         ...course,
@@ -202,7 +202,7 @@ async function syncInBackground(cachedCourses: any[], coursesListElement: HTMLEl
       console.log(`Updating ${coursesToUpdate.length} courses...`);
 
       for (const course of coursesToUpdate) {
-        const filesResult = await window.api.getCourseFiles(course.id);
+        const filesResult = await window.api.getCourseFiles(course.id, course.name);
         const newCourse = {
           ...course,
           files: filesResult.success ? filesResult.files : [],
