@@ -203,11 +203,16 @@ async function syncInBackground(cachedCourses: any[], coursesListElement: HTMLEl
 
       for (const course of coursesToUpdate) {
         const filesResult = await window.api.getCourseFiles(course.id, course.name);
+        // If fetch failed, keep existing files/news to avoid wiping data
+        const cachedCourse = updatedCourses.find(c => c.id === course.id);
+        const files = filesResult.success ? filesResult.files : (cachedCourse?.files || []);
+        const news = filesResult.success ? filesResult.news : (cachedCourse?.news || []);
+
         const newCourse = {
           ...course,
-          files: filesResult.success ? filesResult.files : [],
-          news: filesResult.success ? filesResult.news : [],
-          fileCount: filesResult.success ? filesResult.files?.length || 0 : 0
+          files,
+          news,
+          fileCount: files?.length || 0
         };
 
         const existingIndex = updatedCourses.findIndex(c => c.id === course.id);
