@@ -182,6 +182,7 @@ class PlaywrightLoginService {
       }
       console.log("Playwright: Extracting files...");
       const data = await page.evaluate(() => {
+        var _a, _b, _c;
         const files = [];
         const news = [];
         const links = Array.from(document.querySelectorAll("a"));
@@ -207,30 +208,38 @@ class PlaywrightLoginService {
             });
           }
         }
-        const tables = Array.from(document.querySelectorAll("table.listagem"));
+        const tables = Array.from(document.querySelectorAll("table"));
         for (const table of tables) {
-          const headers = Array.from(table.querySelectorAll("th")).map((th) => th.innerText.trim());
-          if (headers.includes("Título") && headers.includes("Data")) {
-            const rows = Array.from(table.querySelectorAll("tbody tr"));
+          const headers = Array.from(table.querySelectorAll("th, td")).map((cell) => cell.innerText.trim());
+          const hasTitle = headers.some((h) => h.includes("Título") || h.includes("Assunto"));
+          const hasDate = headers.some((h) => h.includes("Data"));
+          if (hasTitle && hasDate) {
+            const rows = Array.from(table.querySelectorAll("tr"));
             for (const row of rows) {
+              if (row.querySelector("th")) continue;
               const cells = Array.from(row.querySelectorAll("td"));
-              if (cells.length >= 3) {
-                const title = cells[0].innerText.trim();
-                const date = cells[1].innerText.trim();
+              if (cells.length >= 2) {
+                const title = (_a = cells[0]) == null ? void 0 : _a.innerText.trim();
+                const date = (_b = cells[1]) == null ? void 0 : _b.innerText.trim();
+                const notification = (_c = cells[2]) == null ? void 0 : _c.innerText.trim();
+                if (!title || !date) continue;
                 const viewLink = row.querySelector('a[onclick*="visualizarNoticia"]');
                 let id = "";
                 if (viewLink) {
                   const onclick = viewLink.getAttribute("onclick");
-                  const match = onclick == null ? void 0 : onclick.match(/['"]([^'"]*)['"]\s*\)/);
+                  const match = onclick == null ? void 0 : onclick.match(/visualizarNoticia\s*\(\s*['"]([^'"]+)['"]/);
                   if (match) {
                     id = match[1];
                   }
                 }
-                news.push({
-                  title,
-                  date,
-                  id
-                });
+                if (id) {
+                  news.push({
+                    title,
+                    date,
+                    notification,
+                    id
+                  });
+                }
               }
             }
           }

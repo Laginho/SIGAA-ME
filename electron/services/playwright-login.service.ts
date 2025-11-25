@@ -298,18 +298,33 @@ export class PlaywrightLoginService {
                 }
 
                 // --- SCRAPE NEWS ---
+                // --- SCRAPE NEWS ---
                 // Look for the news table. It usually has "Título" and "Data" headers.
-                const tables = Array.from(document.querySelectorAll('table.listagem'));
+                const tables = Array.from(document.querySelectorAll('table'));
                 for (const table of tables) {
-                    const headers = Array.from(table.querySelectorAll('th')).map(th => th.innerText.trim());
-                    if (headers.includes('Título') && headers.includes('Data')) {
-                        const rows = Array.from(table.querySelectorAll('tbody tr'));
+                    const headers = Array.from(table.querySelectorAll('th, td')).map(cell => (cell as HTMLElement).innerText.trim());
+
+                    // Check if this table looks like a news table
+                    const hasTitle = headers.some(h => h.includes('Título') || h.includes('Assunto'));
+                    const hasDate = headers.some(h => h.includes('Data'));
+
+                    if (hasTitle && hasDate) {
+                        // Found a candidate table!
+                        const rows = Array.from(table.querySelectorAll('tr'));
+
                         for (const row of rows) {
+                            // Skip header rows
+                            if (row.querySelector('th')) continue;
+
                             const cells = Array.from(row.querySelectorAll('td'));
-                            if (cells.length >= 3) {
-                                const title = cells[0].innerText.trim();
-                                const date = cells[1].innerText.trim();
-                                // The third cell usually has the "Visualizar" icon
+                            if (cells.length >= 2) {
+                                // Try to identify columns based on content or position
+                                // Usually: Title (0), Date (1), Notification (2), Actions (3)
+                                const title = cells[0]?.innerText.trim();
+                                const date = cells[1]?.innerText.trim();
+                                const notification = cells[2]?.innerText.trim(); // "Sim" or "Não"
+
+                                if (!title || !date) continue;
 
                                 // Let's look for the magnifying glass link
                                 const viewLink = row.querySelector('a[onclick*="visualizarNoticia"]');
@@ -318,17 +333,22 @@ export class PlaywrightLoginService {
                                 if (viewLink) {
                                     // Extract ID from onclick: j_id_jsp_...:visualizarNoticia('ID')
                                     const onclick = viewLink.getAttribute('onclick');
-                                    const match = onclick?.match(/['"]([^'"]*)['"]\s*\)/); // matches 'ID')
+                                    // Match 'ID' inside the function call
+                                    const match = onclick?.match(/visualizarNoticia\s*\(\s*['"]([^'"]+)['"]/);
                                     if (match) {
                                         id = match[1];
                                     }
                                 }
 
-                                news.push({
-                                    title,
-                                    date,
-                                    id
-                                });
+                                // Only add if we have an ID (otherwise we can't view details)
+                                if (id) {
+                                    news.push({
+                                        title,
+                                        date,
+                                        notification,
+                                        id
+                                    });
+                                }
                             }
                         }
                     }
