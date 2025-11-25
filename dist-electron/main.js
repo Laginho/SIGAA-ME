@@ -182,7 +182,7 @@ class PlaywrightLoginService {
       }
       console.log("Playwright: Extracting files...");
       const data = await page.evaluate(() => {
-        var _a, _b, _c;
+        var _a, _b, _c, _d, _e, _f;
         const files = [];
         const news = [];
         const links = Array.from(document.querySelectorAll("a"));
@@ -236,12 +236,31 @@ class PlaywrightLoginService {
                   }
                 }
                 if (id) {
-                  news.push({
-                    title,
-                    date,
-                    notification,
-                    id
-                  });
+                  news.push({ title, date, notification, id });
+                }
+              }
+            }
+          }
+        }
+        if (news.length === 0) {
+          console.log("[Scraper] No news found via table headers. Trying fallback strategy...");
+          const newsLinks = Array.from(document.querySelectorAll('a[onclick*="visualizarNoticia"]'));
+          for (const link of newsLinks) {
+            const onclick = link.getAttribute("onclick");
+            const match = onclick == null ? void 0 : onclick.match(/visualizarNoticia\s*\(\s*['"]([^'"]+)['"]/);
+            if (!match) continue;
+            const id = match[1];
+            if (news.some((n) => n.id === id)) continue;
+            const row = link.closest("tr");
+            if (row) {
+              const cells = Array.from(row.querySelectorAll("td"));
+              if (cells.length >= 2) {
+                const title = (_d = cells[0]) == null ? void 0 : _d.innerText.trim();
+                const date = (_e = cells[1]) == null ? void 0 : _e.innerText.trim();
+                const notification = (_f = cells[2]) == null ? void 0 : _f.innerText.trim();
+                if (title && date) {
+                  console.log(`[Scraper] Found news via fallback: ${title}`);
+                  news.push({ title, date, notification, id });
                 }
               }
             }
