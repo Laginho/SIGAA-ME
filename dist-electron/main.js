@@ -163,98 +163,6 @@ class PlaywrightLoginService {
       return false;
     }
   }
-  async getCourseFiles(courseId) {
-    try {
-      console.log(`Playwright: Fetching files for course ${courseId}...`);
-      if (!this.storedCookies || this.storedCookies.length === 0) {
-        return { success: false, error: "No stored session - please login first" };
-      }
-      this.browser = await chromium.launch({
-        headless: true
-      });
-      const context = await this.browser.newContext();
-      await context.addCookies(this.storedCookies);
-      const page = await context.newPage();
-      const navigated = await this.navigateToCourse(page, courseId);
-      if (!navigated) {
-        await this.close();
-        return { success: false, error: "Failed to navigate to course page" };
-      }
-      console.log("Playwright: Extracting files...");
-      const data = await page.evaluate(() => {
-        var _a, _b, _c;
-        const files = [];
-        const news = [];
-        const links = Array.from(document.querySelectorAll("a"));
-        for (const link of links) {
-          const text = link.innerText.trim();
-          let href = link.href;
-          const onclick = link.getAttribute("onclick");
-          if (text && (text.match(/\.(pdf|doc|docx|ppt|pptx|xls|xlsx|zip|rar|txt|png|jpg|jpeg)$/i) || text.toLowerCase().includes("lista") || text.toLowerCase().includes("exerc"))) {
-            if (href.endsWith("#") || href.includes("index.jsf#")) {
-              if (onclick) {
-                const urlMatch = onclick.match(/['"]([^'"]*downloadArquivo[^'"]*)['"]/i) || onclick.match(/['"]([^'"]*visualizar[^'"]*)['"]/i) || onclick.match(/['"]([^'"]*\.(pdf|doc|docx)[^'"]*)['"]/i);
-                if (urlMatch) {
-                  href = urlMatch[1];
-                  if (!href.startsWith("http")) {
-                    href = "https://si3.ufc.br" + (href.startsWith("/") ? href : "/sigaa/" + href);
-                  }
-                }
-              }
-            }
-            files.push({
-              name: text,
-              url: href
-            });
-          }
-        }
-        const tables = Array.from(document.querySelectorAll("table"));
-        for (const table of tables) {
-          const headers = Array.from(table.querySelectorAll("th, td")).map((cell) => cell.innerText.trim());
-          const hasTitle = headers.some((h) => /t[ií]tulo|assunto/i.test(h));
-          const hasDate = headers.some((h) => /data/i.test(h));
-          if (hasTitle && hasDate) {
-            const rows = Array.from(table.querySelectorAll("tr"));
-            for (const row of rows) {
-              if (row.querySelector("th")) continue;
-              const cells = Array.from(row.querySelectorAll("td"));
-              if (cells.length >= 2) {
-                const title = (_a = cells[0]) == null ? void 0 : _a.innerText.trim();
-                const date = (_b = cells[1]) == null ? void 0 : _b.innerText.trim();
-                const notification = (_c = cells[2]) == null ? void 0 : _c.innerText.trim();
-                if (!title || !date) continue;
-                const viewLink = row.querySelector('a[onclick*="visualizarNoticia"]');
-                let id = "";
-                if (viewLink) {
-                  const onclick = viewLink.getAttribute("onclick");
-                  const match = onclick == null ? void 0 : onclick.match(/visualizarNoticia\s*\(\s*['"]([^'"]+)['"]/);
-                  if (match) {
-                    id = match[1];
-                  }
-                }
-                if (id) {
-                  news.push({
-                    title,
-                    date,
-                    notification,
-                    id
-                  });
-                }
-              }
-            }
-          }
-        }
-        return { files, news };
-      });
-      console.log("Playwright: Found", data.files.length, "files and", data.news.length, "news items");
-      await this.close();
-      return { success: true, files: data.files, news: data.news };
-    } catch (error) {
-      console.error("Playwright: Error fetching files:", error);
-      await this.close();
-      return { success: false, error: error.message };
-    }
-  }
   async downloadFile(courseId, courseName, fileName, fileUrl, basePath, downloadedFiles) {
     try {
       const { DownloadService } = await import("./download.service-DGya2izB.js");
@@ -452,10 +360,10 @@ class SigaaService {
       return { success: false, message: error.message || "Failed to fetch courses" };
     }
   }
-  async getCourseFiles(courseId) {
+  async getCourseFiles(courseId, courseName) {
     try {
-      console.log(`SIGAA: Fetching files for course ${courseId}...`);
-      const result = await this.playwrightLogin.getCourseFiles(courseId);
+      console.log(`SIGAA: Fetching files for course ${courseName || courseId}...`);
+      const result = await this.playwrightLogin.getCourseFiles(courseId, courseName);
       if (!result.success) {
         return { success: false, message: result.error || "Failed to fetch files" };
       }
@@ -590,8 +498,8 @@ ipcMain.handle("try-auto-login", async () => {
 ipcMain.handle("get-courses", async () => {
   return await sigaaService.getCourses();
 });
-ipcMain.handle("get-course-files", async (_, courseId) => {
-  return await sigaaService.getCourseFiles(courseId);
+ipcMain.handle("get-course-files", async (_, { courseId, courseName }) => {
+  return await sigaaService.getCourseFiles(courseId, courseName);
 });
 ipcMain.handle("select-download-folder", async () => {
   const result = await dialog.showOpenDialog(win, {
