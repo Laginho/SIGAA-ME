@@ -212,12 +212,30 @@ export class HttpScraperService {
             const dashboardResponse = await axios.get(`${this.baseUrl}/sigaa/portais/discente/discente.jsf`, {
                 headers: { 'Cookie': this.cookies }
             });
+
+            // Check for redirect to login
+            if (dashboardResponse.request?.res?.responseUrl?.includes('login') || dashboardResponse.data.includes('verTelaLogin')) {
+                console.log('[HttpScraper] Session expired (redirected to login)');
+                return { success: false, error: 'Session expired (redirected to login)' };
+            }
+
             const $ = cheerio.load(dashboardResponse.data);
+
+            // Debug: Log page title
+            const pageTitle = $('title').text().trim();
+            console.log(`[HttpScraper] Dashboard loaded. Title: "${pageTitle}"`);
+
             // SIGAA uses 'idTurma' for the course ID in the form
-            const input = $(`input[name="idTurma"][value="${courseId}"]`);
+            // Try both 'id' and 'idTurma' just in case
+            let input = $(`input[name="idTurma"][value="${courseId}"]`);
+            if (input.length === 0) {
+                input = $(`input[name="id"][value="${courseId}"]`);
+            }
+
             if (input.length === 0) {
                 console.log(`[HttpScraper] Course input not found for ID ${courseId} in getNewsDetail.`);
-                return { success: false, error: 'Course not found' };
+                console.log('[HttpScraper] Available hidden inputs:', $('input[type="hidden"]').map((i, el) => `${$(el).attr('name')}=${$(el).attr('value')}`).get().join(', '));
+                return { success: false, error: 'Course not found on dashboard' };
             }
 
             const form = input.closest('form');
