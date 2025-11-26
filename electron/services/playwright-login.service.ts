@@ -465,35 +465,36 @@ export class PlaywrightLoginService {
                             continue;
                         }
 
-                        // Click the news link
-                        const clicked = await detailPage.evaluate((id) => {
-                            const idInput = document.querySelector(`input[name="id"][value="${id}"]`);
-                            if (idInput) {
-                                const form = idInput.closest('form');
-                                const link = form?.querySelector('a');
-                                if (link) {
-                                    link.click();
-                                    return true;
-                                }
-                            }
+                        // Try to find and click the link using Locators (more stable than evaluate)
+                        // Selector 1: Form based (Sidebar)
+                        const formSelector = `form:has(input[name="id"][value="${newsItem.id}"]) a`;
+                        // Selector 2: Link based (Fallback)
+                        const linkSelector = `a[onclick*="visualizarNoticia"][onclick*="${newsItem.id}"]`;
 
-                            // Fallback for table style
-                            const links = Array.from(document.querySelectorAll('a'));
-                            const targetLink = links.find(a => {
-                                const onclick = a.getAttribute('onclick');
-                                return onclick && onclick.match(new RegExp(`visualizarNoticia.*['"]${id}['"]`, 'i'));
-                            });
+                        let clicked = false;
 
-                            if (targetLink) {
-                                targetLink.click();
-                                return true;
+                        try {
+                            if (await detailPage.locator(formSelector).count() > 0) {
+                                console.log('Playwright: Clicking news via form selector...');
+                                await Promise.all([
+                                    detailPage.waitForLoadState('networkidle'),
+                                    detailPage.locator(formSelector).first().click()
+                                ]);
+                                clicked = true;
+                            } else if (await detailPage.locator(linkSelector).count() > 0) {
+                                console.log('Playwright: Clicking news via link selector...');
+                                await Promise.all([
+                                    detailPage.waitForLoadState('networkidle'),
+                                    detailPage.locator(linkSelector).first().click()
+                                ]);
+                                clicked = true;
                             }
-                            return false;
-                        }, newsItem.id);
+                        } catch (clickError) {
+                            console.log('Playwright: Click failed or navigation timeout', clickError);
+                            // Sometimes navigation happens but timeout occurs, we check content anyway
+                        }
 
                         if (clicked) {
-                            await detailPage.waitForLoadState('networkidle');
-
                             // Scrape content
                             const content = await detailPage.evaluate(() => {
                                 const getTextAfterLabel = (label: string) => {
@@ -537,261 +538,348 @@ export class PlaywrightLoginService {
                     }
                 }
             }
-
-            await this.close();
-            return { success: true, files: data.files, news: data.news };
-
-        } catch (error: any) {
-            console.error('Playwright: Error fetching files:', error);
-            await this.close();
-            return { success: false, error: error.message };
         }
+
+            await this.close();
+        return { success: true, files: data.files, news: data.news };
+
+    } catch(error: any) {
+        console.error('Playwright: Error fetching files:', error);
+        await this.close();
+        return { success: false, error: error.message };
     }
+}
 
 
     async downloadFile(
-        courseId: string,
-        courseName: string,
-        fileName: string,
-        fileUrl: string,
-        basePath: string,
-        downloadedFiles: Record<string, any>
-    ): Promise<{ success: boolean; filePath?: string; error?: string }> {
-        try {
-            const { DownloadService } = await import('./download.service');
-            const downloadService = new DownloadService(this.browser);
+    courseId: string,
+    courseName: string,
+    fileName: string,
+    fileUrl: string,
+    basePath: string,
+    downloadedFiles: Record<string, any>
+): Promise < { success: boolean; filePath?: string; error?: string } > {
+    try {
+        const { DownloadService } = await import('./download.service');
+        const downloadService = new DownloadService(this.browser);
 
-            // Reinitialize browser for download
-            if (!this.browser) {
-                this.browser = await chromium.launch({ headless: false });
-            }
+        // Reinitialize browser for download
+        if(!this.browser) {
+    this.browser = await chromium.launch({ headless: false });
+}
 
-            const context = await this.browser.newContext();
-            // Inject stored cookies
-            if (this.storedCookies.length > 0) {
-                await context.addCookies(this.storedCookies);
-            }
+const context = await this.browser.newContext();
+// Inject stored cookies
+if (this.storedCookies.length > 0) {
+    await context.addCookies(this.storedCookies);
+}
 
-            const page = await context.newPage();
+const page = await context.newPage();
 
-            // Navigate to course page first
-            const navigated = await this.navigateToCourse(page, courseId);
-            if (!navigated) {
-                await this.close();
-                return { success: false, error: 'Failed to navigate to course page' };
-            }
+// Navigate to course page first
+const navigated = await this.navigateToCourse(page, courseId);
+if (!navigated) {
+    await this.close();
+    return { success: false, error: 'Failed to navigate to course page' };
+}
 
-            const result = await downloadService.downloadFile(
-                page,
-                fileUrl,
-                fileName,
-                courseName,
-                basePath
-            );
+const result = await downloadService.downloadFile(
+    page,
+    fileUrl,
+    fileName,
+    courseName,
+    basePath
+);
 
-            await this.close();
-            return result;
+await this.close();
+return result;
         } catch (error: any) {
-            console.error('Playwright: Download error:', error);
-            await this.close();
-            return { success: false, error: error.message };
-        }
+    console.error('Playwright: Download error:', error);
+    await this.close();
+    return { success: false, error: error.message };
+}
     }
 
     async downloadAllFiles(
-        courseId: string,
-        courseName: string,
-        files: Array<{ name: string; url: string }>,
-        basePath: string,
-        downloadedFiles: Record<string, any>,
-        onProgress?: (fileName: string, status: 'downloaded' | 'skipped' | 'failed') => void
-    ): Promise<{
-        downloaded: number;
-        skipped: number;
-        failed: number;
-        results: any[];
-    }> {
-        try {
-            const { DownloadService } = await import('./download.service');
-            const downloadService = new DownloadService(this.browser);
+    courseId: string,
+    courseName: string,
+    files: Array<{ name: string; url: string }>,
+    basePath: string,
+    downloadedFiles: Record<string, any>,
+    onProgress ?: (fileName: string, status: 'downloaded' | 'skipped' | 'failed') => void
+    ): Promise < {
+    downloaded: number;
+    skipped: number;
+    failed: number;
+    results: any[];
+} > {
+    try {
+        const { DownloadService } = await import('./download.service');
+        const downloadService = new DownloadService(this.browser);
 
-            // Reinitialize browser for download
-            if (!this.browser) {
-                this.browser = await chromium.launch({ headless: false });
-            }
+        // Reinitialize browser for download
+        if(!this.browser) {
+    this.browser = await chromium.launch({ headless: false });
+}
 
-            const context = await this.browser.newContext();
-            // Inject stored cookies
-            if (this.storedCookies.length > 0) {
-                await context.addCookies(this.storedCookies);
-            }
+const context = await this.browser.newContext();
+// Inject stored cookies
+if (this.storedCookies.length > 0) {
+    await context.addCookies(this.storedCookies);
+}
 
-            const page = await context.newPage();
+const page = await context.newPage();
 
-            // Navigate to course page first
-            const navigated = await this.navigateToCourse(page, courseId);
-            if (!navigated) {
-                await this.close();
-                return { downloaded: 0, skipped: 0, failed: files.length, results: [] };
-            }
+// Navigate to course page first
+const navigated = await this.navigateToCourse(page, courseId);
+if (!navigated) {
+    await this.close();
+    return { downloaded: 0, skipped: 0, failed: files.length, results: [] };
+}
 
-            const result = await downloadService.downloadCourseFiles(
-                page,
-                courseId,
-                courseName,
-                files,
-                basePath,
-                downloadedFiles,
-                onProgress
-            );
+const result = await downloadService.downloadCourseFiles(
+    page,
+    courseId,
+    courseName,
+    files,
+    basePath,
+    downloadedFiles,
+    onProgress
+);
 
-            await this.close();
-            return result;
+await this.close();
+return result;
         } catch (error: any) {
-            console.error('Playwright: Download all error:', error);
-            await this.close();
-            return { downloaded: 0, skipped: 0, failed: files.length, results: [] };
+    console.error('Playwright: Download all error:', error);
+    await this.close();
+    return { downloaded: 0, skipped: 0, failed: files.length, results: [] };
+}
+    }
+
+    async getNewsDetail(courseId: string, newsId: string): Promise < { success: boolean; news?: any; error?: string } > {
+    try {
+        console.log(`Playwright: Fetching news detail ${newsId} for course ${courseId}...`);
+
+        if(!this.storedCookies || this.storedCookies.length === 0) {
+    return { success: false, error: 'No stored session - please login first' };
+}
+
+this.browser = await chromium.launch({
+    headless: true
+});
+
+const context = await this.browser.newContext();
+await context.addCookies(this.storedCookies);
+const page = await context.newPage();
+
+// Navigate to course page
+const navigated = await this.navigateToCourse(page, courseId);
+if (!navigated) {
+    await this.close();
+    return { success: false, error: 'Failed to navigate to course page' };
+}
+
+console.log('Playwright: Clicking news link...');
+
+// Find the link that calls visualizing news with this ID
+// Strategy 1: Look for JSF form with hidden input for this ID (Sidebar style)
+const clicked = await page.evaluate((id) => {
+    // Try to find hidden input with the ID
+    const idInput = document.querySelector(`input[name="id"][value="${id}"]`);
+    if (idInput) {
+        const form = idInput.closest('form');
+        if (form) {
+            const link = form.querySelector('a');
+            if (link) {
+                console.log('Found JSF form link for news, clicking...');
+                link.click();
+                return true;
+            }
         }
     }
 
-    async getNewsDetail(courseId: string, newsId: string): Promise<{ success: boolean; news?: any; error?: string }> {
-        try {
-            console.log(`Playwright: Fetching news detail ${newsId} for course ${courseId}...`);
+    // Strategy 2: Look for direct onclick (Table style)
+    const links = Array.from(document.querySelectorAll('a'));
+    const targetLink = links.find(a => {
+        const onclick = a.getAttribute('onclick');
+        return onclick && onclick.match(new RegExp(`visualizarNoticia.*['"]${id}['"]`, 'i'));
+    });
 
-            if (!this.storedCookies || this.storedCookies.length === 0) {
-                return { success: false, error: 'No stored session - please login first' };
-            }
+    if (targetLink) {
+        console.log('Found direct onclick link for news, clicking...');
+        targetLink.click();
+        return true;
+    }
+    return false;
+}, newsId);
 
-            this.browser = await chromium.launch({
-                headless: true
-            });
+if (!clicked) {
+    await this.close();
+    return { success: false, error: 'News link not found' };
+}
 
-            const context = await this.browser.newContext();
-            await context.addCookies(this.storedCookies);
-            const page = await context.newPage();
+await page.waitForLoadState('networkidle');
 
-            // Navigate to course page
-            const navigated = await this.navigateToCourse(page, courseId);
-            if (!navigated) {
-                await this.close();
-                return { success: false, error: 'Failed to navigate to course page' };
-            }
+// Now scrape the detail page
+console.log('Playwright: Scraping news details...');
+const newsDetail = await page.evaluate(() => {
+    // Based on the user image:
+    // Header: Visualização de Notícia
+    // Fields: Título, Data, Texto, Notificação
 
-            console.log('Playwright: Clicking news link...');
+    // Usually these are in a form or a specific container
+    // Let's try to find by labels
 
-            // Find the link that calls visualizing news with this ID
-            // Strategy 1: Look for JSF form with hidden input for this ID (Sidebar style)
-            const clicked = await page.evaluate((id) => {
-                // Try to find hidden input with the ID
-                const idInput = document.querySelector(`input[name="id"][value="${id}"]`);
-                if (idInput) {
-                    const form = idInput.closest('form');
-                    if (form) {
-                        const link = form.querySelector('a');
-                        if (link) {
-                            console.log('Found JSF form link for news, clicking...');
-                            link.click();
-                            return true;
-                        }
-                    }
-                }
+    const getTextAfterLabel = (label: string) => {
+        // Find an element containing the label
+        const elements = Array.from(document.querySelectorAll('td, th, label, span, div'));
+        const labelEl = elements.find(el => (el as HTMLElement).innerText.trim().replace(':', '') === label);
+        if (labelEl) {
+            const parentTd = labelEl.closest('td');
+            if (parentTd && parentTd.nextElementSibling) return (parentTd.nextElementSibling as HTMLElement).innerText.trim();
+            if (labelEl.nextElementSibling) return (labelEl.nextElementSibling as HTMLElement).innerText.trim();
+        }
+        return '';
+    };
 
-                // Strategy 2: Look for direct onclick (Table style)
-                const links = Array.from(document.querySelectorAll('a'));
-                const targetLink = links.find(a => {
-                    const onclick = a.getAttribute('onclick');
-                    return onclick && onclick.match(new RegExp(`visualizarNoticia.*['"]${id}['"]`, 'i'));
-                });
+    const getContent = () => {
+        const elements = Array.from(document.querySelectorAll('td, th, label, span, div'));
+        const labelEl = elements.find(el => (el as HTMLElement).innerText.trim().replace(':', '') === 'Texto');
+        if (labelEl) {
+            const parentTd = labelEl.closest('td');
+            if (parentTd && parentTd.nextElementSibling) return (parentTd.nextElementSibling as HTMLElement).innerHTML;
+        }
+        return '';
+    };
 
-                if (targetLink) {
-                    console.log('Found direct onclick link for news, clicking...');
-                    targetLink.click();
-                    return true;
-                }
-                return false;
-            }, newsId);
+    return {
+        title: getTextAfterLabel('Título') || getTextAfterLabel('Assunto'),
+        date: getTextAfterLabel('Data'),
+        content: getContent(),
+        notification: getTextAfterLabel('Notificação')
+    };
+});
 
-            if (!clicked) {
-                await this.close();
-                return { success: false, error: 'News link not found' };
-            }
-
-            await page.waitForLoadState('networkidle');
-
-            // Now scrape the detail page
-            console.log('Playwright: Scraping news details...');
-            const newsDetail = await page.evaluate(() => {
-                // Based on the user image:
-                // Header: Visualização de Notícia
-                // Fields: Título, Data, Texto, Notificação
-
-                // Usually these are in a form or a specific container
-                // Let's try to find by labels
-
-                const getTextAfterLabel = (label: string) => {
-                    // Find an element containing the label
-                    const elements = Array.from(document.querySelectorAll('td, th, label, span, div'));
-                    const labelEl = elements.find(el => (el as HTMLElement).innerText.trim().replace(':', '') === label);
-
-                    if (labelEl) {
-                        // Try next sibling or parent's next sibling
-                        // In SIGAA, it's often: <td><label>Title:</label></td><td>Value</td>
-                        // Or <label>Title:</label> <span>Value</span>
-
-                        // Case 1: Table cell
-                        const parentTd = labelEl.closest('td');
-                        if (parentTd && parentTd.nextElementSibling) {
-                            return (parentTd.nextElementSibling as HTMLElement).innerText.trim();
-                        }
-
-                        // Case 2: Direct sibling
-                        if (labelEl.nextElementSibling) {
-                            return (labelEl.nextElementSibling as HTMLElement).innerText.trim();
-                        }
-                    }
-                    return '';
-                };
-
-                // Specific scraping for the "Texto" (Content) which might be a larger block
-                const getContent = () => {
-                    // Look for the label "Texto:"
-                    const elements = Array.from(document.querySelectorAll('td, th, label, span, div'));
-                    const labelEl = elements.find(el => (el as HTMLElement).innerText.trim().replace(':', '') === 'Texto');
-
-                    if (labelEl) {
-                        const parentTd = labelEl.closest('td');
-                        if (parentTd && parentTd.nextElementSibling) {
-                            return (parentTd.nextElementSibling as HTMLElement).innerHTML; // Keep HTML for formatting
-                        }
-                    }
-                    return '';
-                };
-
-                return {
-                    title: getTextAfterLabel('Título'),
-                    date: getTextAfterLabel('Data'),
-                    content: getContent(),
-                    notification: getTextAfterLabel('Notificação')
-                };
-            });
-
-            console.log('Playwright: Scraped news detail:', newsDetail.title);
-
-            await this.close();
-            return { success: true, news: newsDetail };
+await this.close();
+return { success: true, news: newsDetail };
 
         } catch (error: any) {
-            console.error('Playwright: Error fetching news detail:', error);
-            await this.close();
-            return { success: false, error: error.message };
+    console.error('Playwright: Error fetching news detail:', error);
+    await this.close();
+    return { success: false, error: error.message };
+}
+    }
+const clicked = await page.evaluate((id) => {
+    // Try to find hidden input with the ID
+    const idInput = document.querySelector(`input[name="id"][value="${id}"]`);
+    if (idInput) {
+        const form = idInput.closest('form');
+        if (form) {
+            const link = form.querySelector('a');
+            if (link) {
+                console.log('Found JSF form link for news, clicking...');
+                link.click();
+                return true;
+            }
         }
+    }
+
+    // Strategy 2: Look for direct onclick (Table style)
+    const links = Array.from(document.querySelectorAll('a'));
+    const targetLink = links.find(a => {
+        const onclick = a.getAttribute('onclick');
+        return onclick && onclick.match(new RegExp(`visualizarNoticia.*['"]${id}['"]`, 'i'));
+    });
+
+    if (targetLink) {
+        console.log('Found direct onclick link for news, clicking...');
+        targetLink.click();
+        return true;
+    }
+    return false;
+}, newsId);
+
+if (!clicked) {
+    await this.close();
+    return { success: false, error: 'News link not found' };
+}
+
+await page.waitForLoadState('networkidle');
+
+// Now scrape the detail page
+console.log('Playwright: Scraping news details...');
+const newsDetail = await page.evaluate(() => {
+    // Based on the user image:
+    // Header: Visualização de Notícia
+    // Fields: Título, Data, Texto, Notificação
+
+    // Usually these are in a form or a specific container
+    // Let's try to find by labels
+
+    const getTextAfterLabel = (label: string) => {
+        // Find an element containing the label
+        const elements = Array.from(document.querySelectorAll('td, th, label, span, div'));
+        const labelEl = elements.find(el => (el as HTMLElement).innerText.trim().replace(':', '') === label);
+
+        if (labelEl) {
+            // Try next sibling or parent's next sibling
+            // In SIGAA, it's often: <td><label>Title:</label></td><td>Value</td>
+            // Or <label>Title:</label> <span>Value</span>
+
+            // Case 1: Table cell
+            const parentTd = labelEl.closest('td');
+            if (parentTd && parentTd.nextElementSibling) {
+                return (parentTd.nextElementSibling as HTMLElement).innerText.trim();
+            }
+
+            // Case 2: Direct sibling
+            if (labelEl.nextElementSibling) {
+                return (labelEl.nextElementSibling as HTMLElement).innerText.trim();
+            }
+        }
+        return '';
+    };
+
+    // Specific scraping for the "Texto" (Content) which might be a larger block
+    const getContent = () => {
+        // Look for the label "Texto:"
+        const elements = Array.from(document.querySelectorAll('td, th, label, span, div'));
+        const labelEl = elements.find(el => (el as HTMLElement).innerText.trim().replace(':', '') === 'Texto');
+
+        if (labelEl) {
+            const parentTd = labelEl.closest('td');
+            if (parentTd && parentTd.nextElementSibling) {
+                return (parentTd.nextElementSibling as HTMLElement).innerHTML; // Keep HTML for formatting
+            }
+        }
+        return '';
+    };
+
+    return {
+        title: getTextAfterLabel('Título'),
+        date: getTextAfterLabel('Data'),
+        content: getContent(),
+        notification: getTextAfterLabel('Notificação')
+    };
+});
+
+console.log('Playwright: Scraped news detail:', newsDetail.title);
+
+await this.close();
+return { success: true, news: newsDetail };
+
+        } catch (error: any) {
+    console.error('Playwright: Error fetching news detail:', error);
+    await this.close();
+    return { success: false, error: error.message };
+}
     }
 
     async close() {
-        if (this.browser) {
-            console.log('Playwright: Closing browser...');
-            await this.browser.close();
-            this.browser = null;
-        }
+    if (this.browser) {
+        console.log('Playwright: Closing browser...');
+        await this.browser.close();
+        this.browser = null;
     }
+}
 }
