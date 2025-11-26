@@ -301,61 +301,123 @@ export class PlaywrightLoginService {
                 }
 
                 // --- SCRAPE NEWS ---
-                // Strategy 1: Look for the news table by headers
-                const tables = Array.from(document.querySelectorAll('table'));
-                console.log(`[Scraper] Found ${tables.length} tables on the page.`);
+                // Strategy 1: Sidebar Widget (Most likely for this user)
+                // Look for the "Notícias" panel in the sidebar
+                const headers = Array.from(document.querySelectorAll('.rich-stglpanel-header'));
+                const newsHeader = headers.find(h => h.innerText.trim().includes('Notícias'));
 
-                for (const table of tables) {
-                    const headers = Array.from(table.querySelectorAll('th, td')).map(cell => (cell as HTMLElement).innerText.trim());
-                    console.log(`[Scraper] Table headers: ${headers.join(', ')}`);
+                if (newsHeader) {
+                    console.log('[Scraper] Found "Notícias" sidebar header');
+                    // The body is usually the sibling or close by.
+                    // Structure: header -> hidden input -> body
+                    const parent = newsHeader.closest('.rich-stglpanel');
+                    const body = parent?.querySelector('.rich-stglpanel-body');
 
-                    // Check if this table looks like a news table (case insensitive)
-                    const hasTitle = headers.some(h => /t[ií]tulo|assunto/i.test(h));
-                    const hasDate = headers.some(h => /data/i.test(h));
+                    if (body) {
+                        console.log('[Scraper] Found news body container');
+                        const forms = Array.from(body.querySelectorAll('form'));
 
-                    if (hasTitle && hasDate) {
-                        console.log('[Scraper] Found potential news table!');
-                        const rows = Array.from(table.querySelectorAll('tr'));
+                        for (const form of forms) {
+                            const idInput = form.querySelector('input[name="id"]');
+                            if (idInput) {
+                                const id = (idInput as HTMLInputElement).value;
 
-                        for (const row of rows) {
-                            // Skip header rows
-                            if (row.querySelector('th')) continue;
+                                // Walk backwards from form to find Title (<i>) and Date (text)
+                                let node = form.previousSibling;
+                                let title = '';
+                                let date = '';
 
-                            const cells = Array.from(row.querySelectorAll('td'));
-                            if (cells.length >= 2) {
-                                const title = cells[0]?.innerText.trim();
-                                const date = cells[1]?.innerText.trim();
-                                const notification = cells[2]?.innerText.trim();
+                                while (node) {
+                                    // If we hit another form, we went too far back
+                                    if (node.nodeName === 'FORM') break;
 
-                                if (!title || !date) continue;
-
-                                const viewLink = row.querySelector('a[onclick*="visualizarNoticia"]');
-                                let id = '';
-
-                                if (viewLink) {
-                                    const onclick = viewLink.getAttribute('onclick');
-                                    const match = onclick?.match(/visualizarNoticia\s*\(\s*['"]([^'"]+)['"]/);
-                                    if (match) {
-                                        id = match[1];
+                                    if (node.nodeName === 'I') {
+                                        title = (node as HTMLElement).innerText.trim();
+                                    } else if (node.nodeType === Node.TEXT_NODE) {
+                                        const text = node.textContent?.trim();
+                                        // Match date pattern like 04/11/2025 08:30
+                                        if (text && text.match(/\d{2}\/\d{2}\/\d{4}/)) {
+                                            date = text;
+                                            // Once we have date, we assume we found the block
+                                            break;
+                                        }
                                     }
+                                    node = node.previousSibling;
                                 }
 
-                                if (id) {
-                                    news.push({ title, date, notification, id });
+                                if (id && title) {
+                                    // Avoid duplicates
+                                    if (!news.some(n => n.id === id)) {
+                                        console.log(`[Scraper] Found news via sidebar: ${title}`);
+                                        news.push({ title, date, notification: 'Sim', id });
+                                    }
                                 }
                             }
                         }
                     }
                 }
 
-                // Strategy 2: Fallback - Look for any link with 'visualizarNoticia'
+                // Strategy 2: Table Headers (Legacy/Fallback)
                 if (news.length === 0) {
-                    console.log('[Scraper] No news found via table headers. Trying fallback strategy...');
-                    const newsLinks = Array.from(document.querySelectorAll('a[onclick*="visualizarNoticia"]'));
+                    const tables = Array.from(document.querySelectorAll('table'));
+                    console.log(`[Scraper] Found ${tables.length} tables on the page.`);
 
-                    for (const link of newsLinks) {
+                    for (const table of tables) {
+                        const headers = Array.from(table.querySelectorAll('th, td')).map(cell => (cell as HTMLElement).innerText.trim());
+
+                        // Check if this table looks like a news table (case insensitive)
+                        const hasTitle = headers.some(h => /t[ií]tulo|assunto/i.test(h));
+                        const hasDate = headers.some(h => /data/i.test(h));
+
+                        if (hasTitle && hasDate) {
+                            console.log('[Scraper] Found potential news table!');
+                            const rows = Array.from(table.querySelectorAll('tr'));
+
+                            for (const row of rows) {
+                                // Skip header rows
+                                if (row.querySelector('th')) continue;
+
+                                const cells = Array.from(row.querySelectorAll('td'));
+                                if (cells.length >= 2) {
+                                    const title = cells[0]?.innerText.trim();
+                                    const date = cells[1]?.innerText.trim();
+                                    const notification = cells[2]?.innerText.trim();
+
+                                    if (!title || !date) continue;
+
+                                    const viewLink = row.querySelector('a[onclick*="visualizarNoticia"]');
+                                    let id = '';
+
+                                    if (viewLink) {
+                                        const onclick = viewLink.getAttribute('onclick');
+                                        const match = onclick?.match(/visualizarNoticia\s*\(\s*['"]([^'"]+)['"]/);
+                                        if (match) {
+                                            id = match[1];
+                                        }
+                                    }
+
+                                    if (id) {
+                                        news.push({ title, date, notification, id });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Strategy 3: Fallback - Look for any link with 'visualizarNoticia' (Case Insensitive)
+                if (news.length === 0) {
+                    console.log('[Scraper] No news found via sidebar or table. Trying fallback strategy...');
+
+                    // Get ALL links to be safe against CSS case sensitivity
+                    const allLinks = Array.from(document.querySelectorAll('a'));
+
+                    for (const link of allLinks) {
                         const onclick = link.getAttribute('onclick');
-                        const match = onclick?.match(/visualizarNoticia\s*\(\s*['"]([^'"]+)['"]/);
+                        if (!onclick) continue;
+
+                        // Case insensitive match
+                        const match = onclick.match(/visualizarNoticia\s*\(\s*['"]([^'"]+)['"]/i);
                         if (!match) continue;
 
                         const id = match[1];
@@ -393,6 +455,7 @@ export class PlaywrightLoginService {
             return { success: false, error: error.message };
         }
     }
+
 
     async downloadFile(
         courseId: string,
@@ -525,18 +588,31 @@ export class PlaywrightLoginService {
             console.log('Playwright: Clicking news link...');
 
             // Find the link that calls visualizing news with this ID
-            // The ID we extracted was from onclick="...:visualizarNoticia('ID')..."
-            // So we look for an element with that in onclick
-
-            // We need to use evaluate to find and click because the ID might be part of a larger string
+            // Strategy 1: Look for JSF form with hidden input for this ID (Sidebar style)
             const clicked = await page.evaluate((id) => {
+                // Try to find hidden input with the ID
+                const idInput = document.querySelector(`input[name="id"][value="${id}"]`);
+                if (idInput) {
+                    const form = idInput.closest('form');
+                    if (form) {
+                        const link = form.querySelector('a');
+                        if (link) {
+                            console.log('Found JSF form link for news, clicking...');
+                            link.click();
+                            return true;
+                        }
+                    }
+                }
+
+                // Strategy 2: Look for direct onclick (Table style)
                 const links = Array.from(document.querySelectorAll('a'));
                 const targetLink = links.find(a => {
                     const onclick = a.getAttribute('onclick');
-                    return onclick && onclick.includes(`visualizarNoticia`) && onclick.includes(`'${id}'`);
+                    return onclick && onclick.match(new RegExp(`visualizarNoticia.*['"]${id}['"]`, 'i'));
                 });
 
                 if (targetLink) {
+                    console.log('Found direct onclick link for news, clicking...');
                     targetLink.click();
                     return true;
                 }
