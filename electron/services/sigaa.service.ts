@@ -1,15 +1,18 @@
 import { PlaywrightLoginService } from './playwright-login.service';
+import { HttpScraperService } from './http-scraper.service';
 
-// This class will handle all the logic for talking to SIGAA using Playwright.
+// This class will handle all the logic for talking to SIGAA using Playwright and HTTP.
 // We keep it here in the "Backend" (Electron Main Process) so it's secure.
 export class SigaaService {
     private playwrightLogin: PlaywrightLoginService;
+    private httpScraper: HttpScraperService;
 
     constructor() {
-        // Initialize Playwright login service
+        // Initialize services
         this.playwrightLogin = new PlaywrightLoginService();
+        this.httpScraper = new HttpScraperService();
 
-        console.log('SIGAA: Service initialized with Playwright');
+        console.log('SIGAA: Service initialized with Playwright and HttpScraper');
     }
 
     async login(username: string, password: string): Promise<{ success: boolean; message?: string; account?: { name: string; photoUrl?: string } }> {
@@ -23,6 +26,11 @@ export class SigaaService {
             }
 
             console.log('SIGAA: Login successful!');
+
+            // Pass cookies to HttpScraper
+            if (result.cookies) {
+                this.httpScraper.setCookies(result.cookies);
+            }
 
             // Return the user data extracted by Playwright
             return {
@@ -42,7 +50,7 @@ export class SigaaService {
         try {
             console.log('SIGAA: Fetching courses using Playwright...');
 
-            // Use Playwright to scrape courses from the page
+            // Use Playwright to scrape courses from the page (keep this for now as it's the entry point)
             const result = await this.playwrightLogin.getCourses();
 
             if (!result.success) {
@@ -63,8 +71,9 @@ export class SigaaService {
 
     async getCourseFiles(courseId: string, courseName?: string): Promise<{ success: boolean; files?: any[]; news?: any[]; message?: string }> {
         try {
-            console.log(`SIGAA: Fetching files for course ${courseName || courseId}...`);
-            const result = await this.playwrightLogin.getCourseFiles(courseId, courseName);
+            console.log(`SIGAA: Fetching files for course ${courseName || courseId} using HTTP Scraper...`);
+            // Use HTTP Scraper for speed
+            const result = await this.httpScraper.getCourseFiles(courseId, courseName);
 
             if (!result.success) {
                 return { success: false, message: result.error || 'Failed to fetch files' };
@@ -87,6 +96,7 @@ export class SigaaService {
     ): Promise<{ success: boolean; filePath?: string; message?: string }> {
         try {
             console.log(`SIGAA: Downloading file ${fileName}...`);
+            // Keep Playwright for downloads for now as HTTP download is not fully implemented
             const result = await this.playwrightLogin.downloadFile(
                 courseId,
                 courseName,
@@ -117,6 +127,7 @@ export class SigaaService {
     ): Promise<{ success: boolean; downloaded?: number; skipped?: number; failed?: number; results?: any[]; message?: string }> {
         try {
             console.log(`SIGAA: Downloading all files for course ${courseName}...`);
+            // Keep Playwright for downloads
             const result = await this.playwrightLogin.downloadAllFiles(
                 courseId,
                 courseName,
@@ -141,8 +152,9 @@ export class SigaaService {
 
     async getNewsDetail(courseId: string, newsId: string): Promise<{ success: boolean; news?: any; message?: string }> {
         try {
-            console.log(`SIGAA: Fetching news detail ${newsId}...`);
-            const result = await this.playwrightLogin.getNewsDetail(courseId, newsId);
+            console.log(`SIGAA: Fetching news detail ${newsId} using HTTP Scraper...`);
+            // Use HTTP Scraper for speed
+            const result = await this.httpScraper.getNewsDetail(courseId, newsId);
 
             if (!result.success) {
                 return { success: false, message: result.error || 'Failed to fetch news detail' };
