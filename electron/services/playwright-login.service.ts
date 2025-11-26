@@ -446,6 +446,98 @@ export class PlaywrightLoginService {
             });
 
             console.log('Playwright: Found', data.files.length, 'files and', data.news.length, 'news items');
+
+            // --- PRE-FETCH NEWS DETAILS ---
+            // To ensure "offline" access, we fetch the details for the most recent news (limit to 3 to save time)
+            if (data.news.length > 0) {
+                console.log('Playwright: Pre-fetching details for recent news...');
+                const newsToFetch = data.news.slice(0, 3); // Limit to top 3
+
+                for (const newsItem of newsToFetch) {
+                    try {
+                        console.log(`Playwright: Fetching detail for news "${newsItem.title}"...`);
+                        const detailPage = await context.newPage();
+
+                        // Navigate to course page in new tab
+                        const navigated = await this.navigateToCourse(detailPage, courseId);
+                        if (!navigated) {
+                            await detailPage.close();
+                            continue;
+                        }
+
+                        // Click the news link
+                        const clicked = await detailPage.evaluate((id) => {
+                            const idInput = document.querySelector(`input[name="id"][value="${id}"]`);
+                            if (idInput) {
+                                const form = idInput.closest('form');
+                                const link = form?.querySelector('a');
+                                if (link) {
+                                    link.click();
+                                    return true;
+                                }
+                            }
+
+                            // Fallback for table style
+                            const links = Array.from(document.querySelectorAll('a'));
+                            const targetLink = links.find(a => {
+                                const onclick = a.getAttribute('onclick');
+                                return onclick && onclick.match(new RegExp(`visualizarNoticia.*['"]${id}['"]`, 'i'));
+                            });
+
+                            if (targetLink) {
+                                targetLink.click();
+                                return true;
+                            }
+                            return false;
+                        }, newsItem.id);
+
+                        if (clicked) {
+                            await detailPage.waitForLoadState('networkidle');
+
+                            // Scrape content
+                            const content = await detailPage.evaluate(() => {
+                                const getTextAfterLabel = (label: string) => {
+                                    const elements = Array.from(document.querySelectorAll('td, th, label, span, div'));
+                                    const labelEl = elements.find(el => (el as HTMLElement).innerText.trim().replace(':', '') === label);
+                                    if (labelEl) {
+                                        const parentTd = labelEl.closest('td');
+                                        if (parentTd && parentTd.nextElementSibling) return (parentTd.nextElementSibling as HTMLElement).innerText.trim();
+                                        if (labelEl.nextElementSibling) return (labelEl.nextElementSibling as HTMLElement).innerText.trim();
+                                    }
+                                    return '';
+                                };
+
+                                const getContent = () => {
+                                    const elements = Array.from(document.querySelectorAll('td, th, label, span, div'));
+                                    const labelEl = elements.find(el => (el as HTMLElement).innerText.trim().replace(':', '') === 'Texto');
+                                    if (labelEl) {
+                                        const parentTd = labelEl.closest('td');
+                                        if (parentTd && parentTd.nextElementSibling) return (parentTd.nextElementSibling as HTMLElement).innerHTML;
+                                    }
+                                    return '';
+                                };
+
+                                return {
+                                    content: getContent(),
+                                    notification: getTextAfterLabel('Notificação')
+                                };
+                            });
+
+                            if (content.content) {
+                                newsItem.content = content.content;
+                                newsItem.notification = content.notification || newsItem.notification;
+                                console.log('Playwright: Scraped content for', newsItem.title);
+                            }
+                        }
+
+                        await detailPage.close();
+                    } catch (err) {
+                        console.error(`Playwright: Failed to pre-fetch news ${newsItem.id}`, err);
+                        // Continue to next item even if one fails
+                    }
+                }
+            }
+
             await this.close();
             return { success: true, files: data.files, news: data.news };
 

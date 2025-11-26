@@ -365,7 +365,7 @@ async function openNewsModal(courseId: string, newsId: string) {
 
   if (!modal || !modalBody) return
 
-  // Show loading state
+  // Show loading state initially
   modalBody.innerHTML = '<div class="loading">Carregando detalhes da notícia...</div>'
   modal.classList.add('active')
 
@@ -380,6 +380,47 @@ async function openNewsModal(courseId: string, newsId: string) {
   })
 
   try {
+    // Check cache first
+    const cachedData = localStorage.getItem('coursesWithFiles')
+    let cachedContent = null;
+    let cachedTitle = '';
+    let cachedDate = '';
+    let cachedNotification = '';
+
+    if (cachedData) {
+      const courses = JSON.parse(cachedData);
+      const course = courses.find((c: any) => c.id === courseId);
+      if (course && course.news) {
+        const newsItem = course.news.find((n: any) => n.id === newsId);
+        if (newsItem) {
+          cachedTitle = newsItem.title;
+          cachedDate = newsItem.date;
+          cachedNotification = newsItem.notification;
+          if (newsItem.content) {
+            cachedContent = newsItem.content;
+          }
+        }
+      }
+    }
+
+    if (cachedContent) {
+      console.log('Using cached news content');
+      modalBody.innerHTML = `
+        <div class="modal-header">
+          <h3 class="modal-title">${cachedTitle}</h3>
+          <div class="modal-meta">
+            <span>📅 ${cachedDate}</span>
+            ${cachedNotification === 'Sim' ? '<span>🔔 Notificação enviada</span>' : ''}
+          </div>
+        </div>
+        <div class="modal-body">
+          ${cachedContent}
+        </div>
+      `
+      return;
+    }
+
+    // If not cached, fetch it
     const result = await window.api.getNewsDetail(courseId, newsId)
 
     if (result.success && result.news) {

@@ -183,7 +183,7 @@ class PlaywrightLoginService {
       }
       console.log("Playwright: Extracting files...");
       const data = await page.evaluate(() => {
-        var _a, _b, _c, _d, _e, _f;
+        var _a, _b, _c, _d, _e, _f, _g;
         const files = [];
         const news = [];
         const links = Array.from(document.querySelectorAll("a"));
@@ -209,46 +209,87 @@ class PlaywrightLoginService {
             });
           }
         }
-        const tables = Array.from(document.querySelectorAll("table"));
-        console.log(`[Scraper] Found ${tables.length} tables on the page.`);
-        for (const table of tables) {
-          const headers = Array.from(table.querySelectorAll("th, td")).map((cell) => cell.innerText.trim());
-          console.log(`[Scraper] Table headers: ${headers.join(", ")}`);
-          const hasTitle = headers.some((h) => /t[ií]tulo|assunto/i.test(h));
-          const hasDate = headers.some((h) => /data/i.test(h));
-          if (hasTitle && hasDate) {
-            console.log("[Scraper] Found potential news table!");
-            const rows = Array.from(table.querySelectorAll("tr"));
-            for (const row of rows) {
-              if (row.querySelector("th")) continue;
-              const cells = Array.from(row.querySelectorAll("td"));
-              if (cells.length >= 2) {
-                const title = (_a = cells[0]) == null ? void 0 : _a.innerText.trim();
-                const date = (_b = cells[1]) == null ? void 0 : _b.innerText.trim();
-                const notification = (_c = cells[2]) == null ? void 0 : _c.innerText.trim();
-                if (!title || !date) continue;
-                const viewLink = row.querySelector('a[onclick*="visualizarNoticia"]');
-                let id = "";
-                if (viewLink) {
-                  const onclick = viewLink.getAttribute("onclick");
-                  const match = onclick == null ? void 0 : onclick.match(/visualizarNoticia\s*\(\s*['"]([^'"]+)['"]/);
-                  if (match) {
-                    id = match[1];
+        const headers = Array.from(document.querySelectorAll(".rich-stglpanel-header"));
+        const newsHeader = headers.find((h) => h.innerText.trim().includes("Notícias"));
+        if (newsHeader) {
+          console.log('[Scraper] Found "Notícias" sidebar header');
+          const parent = newsHeader.closest(".rich-stglpanel");
+          const body = parent == null ? void 0 : parent.querySelector(".rich-stglpanel-body");
+          if (body) {
+            console.log("[Scraper] Found news body container");
+            const forms = Array.from(body.querySelectorAll("form"));
+            for (const form of forms) {
+              const idInput = form.querySelector('input[name="id"]');
+              if (idInput) {
+                const id = idInput.value;
+                let node = form.previousSibling;
+                let title = "";
+                let date = "";
+                while (node) {
+                  if (node.nodeName === "FORM") break;
+                  if (node.nodeName === "I") {
+                    title = node.innerText.trim();
+                  } else if (node.nodeType === Node.TEXT_NODE) {
+                    const text = (_a = node.textContent) == null ? void 0 : _a.trim();
+                    if (text && text.match(/\d{2}\/\d{2}\/\d{4}/)) {
+                      date = text;
+                      break;
+                    }
                   }
+                  node = node.previousSibling;
                 }
-                if (id) {
-                  news.push({ title, date, notification, id });
+                if (id && title) {
+                  if (!news.some((n) => n.id === id)) {
+                    console.log(`[Scraper] Found news via sidebar: ${title}`);
+                    news.push({ title, date, notification: "Sim", id });
+                  }
                 }
               }
             }
           }
         }
         if (news.length === 0) {
-          console.log("[Scraper] No news found via table headers. Trying fallback strategy...");
-          const newsLinks = Array.from(document.querySelectorAll('a[onclick*="visualizarNoticia"]'));
-          for (const link of newsLinks) {
+          const tables = Array.from(document.querySelectorAll("table"));
+          console.log(`[Scraper] Found ${tables.length} tables on the page.`);
+          for (const table of tables) {
+            const headers2 = Array.from(table.querySelectorAll("th, td")).map((cell) => cell.innerText.trim());
+            const hasTitle = headers2.some((h) => /t[ií]tulo|assunto/i.test(h));
+            const hasDate = headers2.some((h) => /data/i.test(h));
+            if (hasTitle && hasDate) {
+              console.log("[Scraper] Found potential news table!");
+              const rows = Array.from(table.querySelectorAll("tr"));
+              for (const row of rows) {
+                if (row.querySelector("th")) continue;
+                const cells = Array.from(row.querySelectorAll("td"));
+                if (cells.length >= 2) {
+                  const title = (_b = cells[0]) == null ? void 0 : _b.innerText.trim();
+                  const date = (_c = cells[1]) == null ? void 0 : _c.innerText.trim();
+                  const notification = (_d = cells[2]) == null ? void 0 : _d.innerText.trim();
+                  if (!title || !date) continue;
+                  const viewLink = row.querySelector('a[onclick*="visualizarNoticia"]');
+                  let id = "";
+                  if (viewLink) {
+                    const onclick = viewLink.getAttribute("onclick");
+                    const match = onclick == null ? void 0 : onclick.match(/visualizarNoticia\s*\(\s*['"]([^'"]+)['"]/);
+                    if (match) {
+                      id = match[1];
+                    }
+                  }
+                  if (id) {
+                    news.push({ title, date, notification, id });
+                  }
+                }
+              }
+            }
+          }
+        }
+        if (news.length === 0) {
+          console.log("[Scraper] No news found via sidebar or table. Trying fallback strategy...");
+          const allLinks = Array.from(document.querySelectorAll("a"));
+          for (const link of allLinks) {
             const onclick = link.getAttribute("onclick");
-            const match = onclick == null ? void 0 : onclick.match(/visualizarNoticia\s*\(\s*['"]([^'"]+)['"]/);
+            if (!onclick) continue;
+            const match = onclick.match(/visualizarNoticia\s*\(\s*['"]([^'"]+)['"]/i);
             if (!match) continue;
             const id = match[1];
             if (news.some((n) => n.id === id)) continue;
@@ -256,9 +297,9 @@ class PlaywrightLoginService {
             if (row) {
               const cells = Array.from(row.querySelectorAll("td"));
               if (cells.length >= 2) {
-                const title = (_d = cells[0]) == null ? void 0 : _d.innerText.trim();
-                const date = (_e = cells[1]) == null ? void 0 : _e.innerText.trim();
-                const notification = (_f = cells[2]) == null ? void 0 : _f.innerText.trim();
+                const title = (_e = cells[0]) == null ? void 0 : _e.innerText.trim();
+                const date = (_f = cells[1]) == null ? void 0 : _f.innerText.trim();
+                const notification = (_g = cells[2]) == null ? void 0 : _g.innerText.trim();
                 if (title && date) {
                   console.log(`[Scraper] Found news via fallback: ${title}`);
                   news.push({ title, date, notification, id });
@@ -270,6 +311,78 @@ class PlaywrightLoginService {
         return { files, news };
       });
       console.log("Playwright: Found", data.files.length, "files and", data.news.length, "news items");
+      if (data.news.length > 0) {
+        console.log("Playwright: Pre-fetching details for recent news...");
+        const newsToFetch = data.news.slice(0, 3);
+        for (const newsItem of newsToFetch) {
+          try {
+            console.log(`Playwright: Fetching detail for news "${newsItem.title}"...`);
+            const detailPage = await context.newPage();
+            const navigated2 = await this.navigateToCourse(detailPage, courseId);
+            if (!navigated2) {
+              await detailPage.close();
+              continue;
+            }
+            const clicked = await detailPage.evaluate((id) => {
+              const idInput = document.querySelector(`input[name="id"][value="${id}"]`);
+              if (idInput) {
+                const form = idInput.closest("form");
+                const link = form == null ? void 0 : form.querySelector("a");
+                if (link) {
+                  link.click();
+                  return true;
+                }
+              }
+              const links = Array.from(document.querySelectorAll("a"));
+              const targetLink = links.find((a) => {
+                const onclick = a.getAttribute("onclick");
+                return onclick && onclick.match(new RegExp(`visualizarNoticia.*['"]${id}['"]`, "i"));
+              });
+              if (targetLink) {
+                targetLink.click();
+                return true;
+              }
+              return false;
+            }, newsItem.id);
+            if (clicked) {
+              await detailPage.waitForLoadState("networkidle");
+              const content = await detailPage.evaluate(() => {
+                const getTextAfterLabel = (label) => {
+                  const elements = Array.from(document.querySelectorAll("td, th, label, span, div"));
+                  const labelEl = elements.find((el) => el.innerText.trim().replace(":", "") === label);
+                  if (labelEl) {
+                    const parentTd = labelEl.closest("td");
+                    if (parentTd && parentTd.nextElementSibling) return parentTd.nextElementSibling.innerText.trim();
+                    if (labelEl.nextElementSibling) return labelEl.nextElementSibling.innerText.trim();
+                  }
+                  return "";
+                };
+                const getContent = () => {
+                  const elements = Array.from(document.querySelectorAll("td, th, label, span, div"));
+                  const labelEl = elements.find((el) => el.innerText.trim().replace(":", "") === "Texto");
+                  if (labelEl) {
+                    const parentTd = labelEl.closest("td");
+                    if (parentTd && parentTd.nextElementSibling) return parentTd.nextElementSibling.innerHTML;
+                  }
+                  return "";
+                };
+                return {
+                  content: getContent(),
+                  notification: getTextAfterLabel("Notificação")
+                };
+              });
+              if (content.content) {
+                newsItem.content = content.content;
+                newsItem.notification = content.notification || newsItem.notification;
+                console.log("Playwright: Scraped content for", newsItem.title);
+              }
+            }
+            await detailPage.close();
+          } catch (err) {
+            console.error(`Playwright: Failed to pre-fetch news ${newsItem.id}`, err);
+          }
+        }
+      }
       await this.close();
       return { success: true, files: data.files, news: data.news };
     } catch (error) {
@@ -363,12 +476,25 @@ class PlaywrightLoginService {
       }
       console.log("Playwright: Clicking news link...");
       const clicked = await page.evaluate((id) => {
+        const idInput = document.querySelector(`input[name="id"][value="${id}"]`);
+        if (idInput) {
+          const form = idInput.closest("form");
+          if (form) {
+            const link = form.querySelector("a");
+            if (link) {
+              console.log("Found JSF form link for news, clicking...");
+              link.click();
+              return true;
+            }
+          }
+        }
         const links = Array.from(document.querySelectorAll("a"));
         const targetLink = links.find((a) => {
           const onclick = a.getAttribute("onclick");
-          return onclick && onclick.includes(`visualizarNoticia`) && onclick.includes(`'${id}'`);
+          return onclick && onclick.match(new RegExp(`visualizarNoticia.*['"]${id}['"]`, "i"));
         });
         if (targetLink) {
+          console.log("Found direct onclick link for news, clicking...");
           targetLink.click();
           return true;
         }
