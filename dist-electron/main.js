@@ -175,6 +175,7 @@ class PlaywrightLoginService {
       const context = await this.browser.newContext();
       await context.addCookies(this.storedCookies);
       const page = await context.newPage();
+      page.on("console", (msg) => console.log("Playwright Browser Log:", msg.text()));
       const navigated = await this.navigateToCourse(page, courseId);
       if (!navigated) {
         await this.close();

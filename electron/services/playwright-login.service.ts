@@ -246,6 +246,9 @@ export class PlaywrightLoginService {
             await context.addCookies(this.storedCookies);
             const page = await context.newPage();
 
+            // Enable console logs from the browser to Node.js
+            page.on('console', msg => console.log('Playwright Browser Log:', msg.text()));
+
             // Navigate to course page
             const navigated = await this.navigateToCourse(page, courseId);
             if (!navigated) {
