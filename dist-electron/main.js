@@ -212,20 +212,19 @@ class PlaywrightLoginService {
     }
   }
   async downloadFile(courseId, courseName, fileName, fileUrl, basePath, downloadedFiles) {
+    let localBrowser = null;
     try {
       const { DownloadService } = await import("./download.service-DGya2izB.js");
-      const downloadService = new DownloadService(this.browser);
-      if (!this.browser) {
-        this.browser = await chromium.launch({ headless: false });
-      }
-      const context = await this.browser.newContext();
+      localBrowser = await chromium.launch({ headless: false });
+      const downloadService = new DownloadService(localBrowser);
+      const context = await localBrowser.newContext();
       if (this.storedCookies.length > 0) {
         await context.addCookies(this.storedCookies);
       }
       const page = await context.newPage();
       const navigated = await this.navigateToCourse(page, courseId);
       if (!navigated) {
-        await this.close();
+        await localBrowser.close();
         return { success: false, error: "Failed to navigate to course page" };
       }
       const result = await downloadService.downloadFile(
@@ -235,29 +234,30 @@ class PlaywrightLoginService {
         courseName,
         basePath
       );
-      await this.close();
+      await localBrowser.close();
       return result;
     } catch (error) {
       console.error("Playwright: Download error:", error);
-      await this.close();
+      if (localBrowser) {
+        await localBrowser.close();
+      }
       return { success: false, error: error.message };
     }
   }
   async downloadAllFiles(courseId, courseName, files, basePath, downloadedFiles, onProgress) {
+    let localBrowser = null;
     try {
       const { DownloadService } = await import("./download.service-DGya2izB.js");
-      const downloadService = new DownloadService(this.browser);
-      if (!this.browser) {
-        this.browser = await chromium.launch({ headless: false });
-      }
-      const context = await this.browser.newContext();
+      localBrowser = await chromium.launch({ headless: false });
+      const downloadService = new DownloadService(localBrowser);
+      const context = await localBrowser.newContext();
       if (this.storedCookies.length > 0) {
         await context.addCookies(this.storedCookies);
       }
       const page = await context.newPage();
       const navigated = await this.navigateToCourse(page, courseId);
       if (!navigated) {
-        await this.close();
+        await localBrowser.close();
         return { downloaded: 0, skipped: 0, failed: files.length, results: [] };
       }
       const result = await downloadService.downloadCourseFiles(
@@ -269,11 +269,13 @@ class PlaywrightLoginService {
         downloadedFiles,
         onProgress
       );
-      await this.close();
+      await localBrowser.close();
       return result;
     } catch (error) {
       console.error("Playwright: Download all error:", error);
-      await this.close();
+      if (localBrowser) {
+        await localBrowser.close();
+      }
       return { downloaded: 0, skipped: 0, failed: files.length, results: [] };
     }
   }
@@ -11976,7 +11978,14 @@ var _eval = EvalError;
 var range = RangeError;
 var ref = ReferenceError;
 var syntax = SyntaxError;
-var type = TypeError;
+var type;
+var hasRequiredType;
+function requireType() {
+  if (hasRequiredType) return type;
+  hasRequiredType = 1;
+  type = TypeError;
+  return type;
+}
 var uri = URIError;
 var abs$1 = Math.abs;
 var floor$1 = Math.floor;
@@ -12222,7 +12231,7 @@ function requireCallBindApplyHelpers() {
   if (hasRequiredCallBindApplyHelpers) return callBindApplyHelpers;
   hasRequiredCallBindApplyHelpers = 1;
   var bind3 = functionBind;
-  var $TypeError2 = type;
+  var $TypeError2 = requireType();
   var $call2 = requireFunctionCall();
   var $actualApply = requireActualApply();
   callBindApplyHelpers = function callBindBasic(args) {
@@ -12295,7 +12304,7 @@ var $EvalError = _eval;
 var $RangeError = range;
 var $ReferenceError = ref;
 var $SyntaxError = syntax;
-var $TypeError$1 = type;
+var $TypeError$1 = requireType();
 var $URIError = uri;
 var abs = abs$1;
 var floor = floor$1;
@@ -12626,7 +12635,7 @@ var GetIntrinsic2 = getIntrinsic;
 var $defineProperty = GetIntrinsic2("%Object.defineProperty%", true);
 var hasToStringTag = requireShams()();
 var hasOwn$2 = hasown;
-var $TypeError = type;
+var $TypeError = requireType();
 var toStringTag = hasToStringTag ? Symbol.toStringTag : null;
 var esSetTostringtag = function setToStringTag(object, value) {
   var overrideIfSet = arguments.length > 2 && !!arguments[2] && arguments[2].force;
@@ -64564,8 +64573,9 @@ class HttpScraperService {
         }
       });
       const $2 = load(dashboardResponse.data);
-      const input = $2(`input[name="id"][value="${courseId}"]`);
+      const input = $2(`input[name="idTurma"][value="${courseId}"]`);
       if (input.length === 0) {
+        console.log(`[HttpScraper] Course input not found for ID ${courseId}. Dumping inputs:`, $2('input[type="hidden"]').map((i, el) => $2(el).attr("name") + "=" + $2(el).attr("value")).get().join(", "));
         return { success: false, error: "Course link not found on dashboard" };
       }
       const form = input.closest("form");
@@ -64644,7 +64654,7 @@ class HttpScraperService {
           });
         }
       });
-      console.log(`[HttpScraper] Found ${files.length} files and ${news.length} news items.`);
+      console.log(`[HttpScraper] Found ${files.length} files and ${news.length} news items for course ${courseId}.`);
       return { success: true, files, news };
     } catch (error) {
       console.error("[HttpScraper] Error fetching course files:", error);
@@ -64657,8 +64667,11 @@ class HttpScraperService {
         headers: { "Cookie": this.cookies }
       });
       const $2 = load(dashboardResponse.data);
-      const input = $2(`input[name="id"][value="${courseId}"]`);
-      if (input.length === 0) return { success: false, error: "Course not found" };
+      const input = $2(`input[name="idTurma"][value="${courseId}"]`);
+      if (input.length === 0) {
+        console.log(`[HttpScraper] Course input not found for ID ${courseId} in getNewsDetail.`);
+        return { success: false, error: "Course not found" };
+      }
       const form = input.closest("form");
       const formData = new URLSearchParams();
       form.find("input").each((i, el) => {

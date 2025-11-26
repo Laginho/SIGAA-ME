@@ -238,16 +238,15 @@ export class PlaywrightLoginService {
         basePath: string,
         downloadedFiles: Record<string, any>
     ): Promise<{ success: boolean; filePath?: string; error?: string }> {
+        let localBrowser: Browser | null = null;
         try {
             const { DownloadService } = await import('./download.service');
-            const downloadService = new DownloadService(this.browser);
 
-            // Reinitialize browser for download
-            if (!this.browser) {
-                this.browser = await chromium.launch({ headless: false });
-            }
+            // Launch a dedicated browser for this download to avoid concurrency issues
+            localBrowser = await chromium.launch({ headless: false });
+            const downloadService = new DownloadService(localBrowser);
 
-            const context = await this.browser.newContext();
+            const context = await localBrowser.newContext();
             // Inject stored cookies
             if (this.storedCookies.length > 0) {
                 await context.addCookies(this.storedCookies);
@@ -258,7 +257,7 @@ export class PlaywrightLoginService {
             // Navigate to course page first
             const navigated = await this.navigateToCourse(page, courseId);
             if (!navigated) {
-                await this.close();
+                await localBrowser.close();
                 return { success: false, error: 'Failed to navigate to course page' };
             }
 
@@ -270,11 +269,13 @@ export class PlaywrightLoginService {
                 basePath
             );
 
-            await this.close();
+            await localBrowser.close();
             return result;
         } catch (error: any) {
             console.error('Playwright: Download error:', error);
-            await this.close();
+            if (localBrowser) {
+                await localBrowser.close();
+            }
             return { success: false, error: error.message };
         }
     }
@@ -292,16 +293,15 @@ export class PlaywrightLoginService {
         failed: number;
         results: any[];
     }> {
+        let localBrowser: Browser | null = null;
         try {
             const { DownloadService } = await import('./download.service');
-            const downloadService = new DownloadService(this.browser);
 
-            // Reinitialize browser for download
-            if (!this.browser) {
-                this.browser = await chromium.launch({ headless: false });
-            }
+            // Launch a dedicated browser for this batch download
+            localBrowser = await chromium.launch({ headless: false });
+            const downloadService = new DownloadService(localBrowser);
 
-            const context = await this.browser.newContext();
+            const context = await localBrowser.newContext();
             // Inject stored cookies
             if (this.storedCookies.length > 0) {
                 await context.addCookies(this.storedCookies);
@@ -312,7 +312,7 @@ export class PlaywrightLoginService {
             // Navigate to course page first
             const navigated = await this.navigateToCourse(page, courseId);
             if (!navigated) {
-                await this.close();
+                await localBrowser.close();
                 return { downloaded: 0, skipped: 0, failed: files.length, results: [] };
             }
 
@@ -326,11 +326,13 @@ export class PlaywrightLoginService {
                 onProgress
             );
 
-            await this.close();
+            await localBrowser.close();
             return result;
         } catch (error: any) {
             console.error('Playwright: Download all error:', error);
-            await this.close();
+            if (localBrowser) {
+                await localBrowser.close();
+            }
             return { downloaded: 0, skipped: 0, failed: files.length, results: [] };
         }
     }

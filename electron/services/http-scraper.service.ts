@@ -61,11 +61,10 @@ export class HttpScraperService {
 
             // Step 2: Find the form/link for the course
             // We look for the input with value=courseId
-            const input = $(`input[name="id"][value="${courseId}"]`);
+            // SIGAA uses 'idTurma' for the course ID in the form
+            const input = $(`input[name="idTurma"][value="${courseId}"]`);
             if (input.length === 0) {
-                // Try fallback strategy (onclick link)
-                // This might be harder with Cheerio if it's just JS.
-                // But usually it's inside a form.
+                console.log(`[HttpScraper] Course input not found for ID ${courseId}. Dumping inputs:`, $('input[type="hidden"]').map((i, el) => $(el).attr('name') + '=' + $(el).attr('value')).get().join(', '));
                 return { success: false, error: 'Course link not found on dashboard' };
             }
 
@@ -186,7 +185,7 @@ export class HttpScraperService {
                 }
             });
 
-            console.log(`[HttpScraper] Found ${files.length} files and ${news.length} news items.`);
+            console.log(`[HttpScraper] Found ${files.length} files and ${news.length} news items for course ${courseId}.`);
             return { success: true, files, news };
 
         } catch (error: any) {
@@ -209,16 +208,17 @@ export class HttpScraperService {
             // Actually, if we just send the POST request to `visualizarNoticia` endpoint, it might work if the server knows we are in the course.
             // But to be safe, let's re-enter the course.
 
-            // ... (Re-implement Enter Course logic - maybe refactor to helper) ...
-            // For now, let's copy-paste the enter logic or extract it.
-
             // Let's assume we need to fetch the dashboard first to get the fresh ViewState.
             const dashboardResponse = await axios.get(`${this.baseUrl}/sigaa/portais/discente/discente.jsf`, {
                 headers: { 'Cookie': this.cookies }
             });
             const $ = cheerio.load(dashboardResponse.data);
-            const input = $(`input[name="id"][value="${courseId}"]`);
-            if (input.length === 0) return { success: false, error: 'Course not found' };
+            // SIGAA uses 'idTurma' for the course ID in the form
+            const input = $(`input[name="idTurma"][value="${courseId}"]`);
+            if (input.length === 0) {
+                console.log(`[HttpScraper] Course input not found for ID ${courseId} in getNewsDetail.`);
+                return { success: false, error: 'Course not found' };
+            }
 
             const form = input.closest('form');
             const formData = new URLSearchParams();
