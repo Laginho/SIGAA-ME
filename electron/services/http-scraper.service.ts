@@ -57,7 +57,17 @@ export class HttpScraperService {
                 }
             });
 
+            // Check for redirect to login
+            if (dashboardResponse.request?.res?.responseUrl?.includes('login') || dashboardResponse.data.includes('verTelaLogin')) {
+                console.log('[HttpScraper] Session expired (redirected to login) in getCourseFiles');
+                return { success: false, error: 'Session expired (redirected to login)' };
+            }
+
             const $ = cheerio.load(dashboardResponse.data);
+
+            // Debug: Log page title
+            const pageTitle = $('title').text().trim();
+            console.log(`[HttpScraper] Dashboard loaded in getCourseFiles. Title: "${pageTitle}"`);
 
             // Step 2: Find the form/link for the course
             // We look for the input with value=courseId
@@ -196,36 +206,153 @@ export class HttpScraperService {
 
     async getNewsDetail(courseId: string, newsId: string): Promise<{ success: boolean; news?: any; error?: string }> {
         try {
-            // To get news detail, we usually need to be IN the course page and then submit a form.
-            // If we assume we are NOT in the course page (stateless), we need to enter it first.
-            // Optimization: If we just called getCourseFiles, we might be in the session? 
-            return result;
-        };
+            // Step 1: Fetch Dashboard to get fresh session/ViewState
+            const dashboardResponse = await axios.get(`${this.baseUrl}/sigaa/portais/discente/discente.jsf`, {
+                headers: {
+                    'Cookie': this.cookies,
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                }
+            });
 
-        const newsDetail = {
-            title: getTextAfterLabel('Título') || getTextAfterLabel('Assunto'),
-            date: getTextAfterLabel('Data'),
-            content: getContent(),
-            notification: getTextAfterLabel('Notificação')
-        };
+            if (dashboardResponse.request?.res?.responseUrl?.includes('login') || dashboardResponse.data.includes('verTelaLogin')) {
+                console.log('[HttpScraper] Session expired (redirected to login)');
+                return { success: false, error: 'Session expired (redirected to login)' };
+            }
 
-        return { success: true, news: newsDetail };
+            const $ = cheerio.load(dashboardResponse.data);
 
-    } catch(error: any) {
-        console.error('[HttpScraper] Error fetching news detail:', error);
-        return { success: false, error: error.message };
+            // Debug: Log page title
+            const pageTitle = $('title').text().trim();
+            console.log(`[HttpScraper] Dashboard loaded. Title: "${pageTitle}"`);
+
+            // SIGAA uses 'idTurma' for the course ID in the form
+            let input = $(`input[name="idTurma"][value="${courseId}"]`);
+            if (input.length === 0) {
+                input = $(`input[name="id"][value="${courseId}"]`);
+            }
+
+            if (input.length === 0) {
+                console.log(`[HttpScraper] Course input not found for ID ${courseId} in getNewsDetail.`);
+                console.log('[HttpScraper] Available hidden inputs:', $('input[type="hidden"]').map((i, el) => `${$(el).attr('name')}=${$(el).attr('value')}`).get().join(', '));
+                return { success: false, error: 'Course not found on dashboard' };
+            }
+
+            const form = input.closest('form');
+            const formData = new URLSearchParams();
+            form.find('input').each((i, el) => {
+                const name = $(el).attr('name');
+                const value = $(el).attr('value');
+                if (name && value) formData.append(name, value);
+            });
+
+            const coursePageResponse = await axios.post(`${this.baseUrl}/sigaa/portais/discente/discente.jsf`, formData, {
+                headers: {
+                    'Cookie': this.cookies,
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                }
+            });
+
+            const $course = cheerio.load(coursePageResponse.data);
+
+            // Step 2: Find the News Link/Form in the Course Page
+            let targetForm: any = null;
+            let submitScript = '';
+
+            $course('a').each((i, el) => {
+                const onclick = $(el).attr('onclick');
+                if (onclick && onclick.includes(newsId)) {
+                    submitScript = onclick;
+                    targetForm = $(el).closest('form');
+                }
+            });
+
+            if (!targetForm || targetForm.length === 0) {
+                const hiddenInput = $course(`input[value="${newsId}"]`);
+                if (hiddenInput.length > 0) {
+                    targetForm = hiddenInput.closest('form');
+                }
+            }
+
+            if (!targetForm || targetForm.length === 0) {
+                targetForm = $course('form').first();
+            }
+
+            const newsFormData = new URLSearchParams();
+            targetForm.find('input').each((i: any, el: any) => {
+                const name = $(el).attr('name');
+                const value = $(el).attr('value');
+                if (name && value) newsFormData.append(name, value);
+            });
+
+            newsFormData.set('id', newsId);
+
+            console.log(`[HttpScraper] Requesting news detail ${newsId}...`);
+            const newsResponse = await axios.post(`${this.baseUrl}/sigaa/portais/discente/discente.jsf`, newsFormData, {
+                headers: {
+                    'Cookie': this.cookies,
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                }
+            });
+
+            const $news = cheerio.load(newsResponse.data);
+
+            // Step 3: Parse Detail
+            const getTextAfterLabel = (label: string) => {
+                let result = '';
+                $news('td, th, label, span, div').each((i, el) => {
+                    if ($news(el).text().trim().replace(':', '') === label) {
+                        const parentTd = $news(el).closest('td');
+                        if (parentTd.length && parentTd.next().length) {
+                            result = parentTd.next().text().trim();
+                            return false; // break
+                        }
+                        if ($news(el).next().length) {
+                            result = $news(el).next().text().trim();
+                            return false;
+                        }
+                    }
+                });
+                return result;
+            };
+
+            const getContent = () => {
+                let result = '';
+                $news('td, th, label, span, div').each((i, el) => {
+                    if ($news(el).text().trim().replace(':', '') === 'Texto') {
+                        const parentTd = $news(el).closest('td');
+                        if (parentTd.length && parentTd.next().length) {
+                            result = parentTd.next().html() || '';
+                            return false;
+                        }
+                    }
+                });
+                return result;
+            };
+
+            const newsDetail = {
+                title: getTextAfterLabel('Título') || getTextAfterLabel('Assunto'),
+                date: getTextAfterLabel('Data'),
+                content: getContent(),
+                notification: getTextAfterLabel('Notificação')
+            };
+
+            return { success: true, news: newsDetail };
+
+        } catch (error: any) {
+            console.error('[HttpScraper] Error fetching news detail:', error);
+            return { success: false, error: error.message };
+        }
     }
-}
 
     async downloadFile(
-    courseId: string,
-    fileId: string, // We need the ID now, not just URL
-    fileName: string,
-    basePath: string,
-    onProgress ?: (progress: number) => void
-    ): Promise < { success: boolean; filePath?: string; error?: string } > {
-    // This requires similar logic: Enter Course -> Submit Form with File ID.
-    // And handling the response as a stream.
-    return { success: false, error: 'Not implemented yet' };
-}
+        courseId: string,
+        fileId: string,
+        fileName: string,
+        basePath: string,
+        onProgress?: (progress: number) => void
+    ): Promise<{ success: boolean; filePath?: string; error?: string }> {
+        return { success: false, error: 'Not implemented yet' };
+    }
 }
