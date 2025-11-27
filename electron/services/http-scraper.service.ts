@@ -199,201 +199,33 @@ export class HttpScraperService {
             // To get news detail, we usually need to be IN the course page and then submit a form.
             // If we assume we are NOT in the course page (stateless), we need to enter it first.
             // Optimization: If we just called getCourseFiles, we might be in the session? 
-            // No, HTTP is stateless unless we maintain a jar. Axios with cookies header is stateless per request 
-            // unless the server maintains state via the JSESSIONID (which it does).
-            // So if we send the same JSESSIONID, we *might* be on the last page we visited?
-            // SIGAA is finicky. It's safer to "Enter Course" -> "Click News".
+            return result;
+        };
 
-            // Step 1: Enter Course (Re-do logic or assume we can just post to the news link if we are "in" the portal?)
-            // Actually, if we just send the POST request to `visualizarNoticia` endpoint, it might work if the server knows we are in the course.
-            // But to be safe, let's re-enter the course.
+        const newsDetail = {
+            title: getTextAfterLabel('Título') || getTextAfterLabel('Assunto'),
+            date: getTextAfterLabel('Data'),
+            content: getContent(),
+            notification: getTextAfterLabel('Notificação')
+        };
 
-            // Let's assume we need to fetch the dashboard first to get the fresh ViewState.
-            const dashboardResponse = await axios.get(`${this.baseUrl}/sigaa/portais/discente/discente.jsf`, {
-                headers: { 'Cookie': this.cookies }
-            });
+        return { success: true, news: newsDetail };
 
-            // Check for redirect to login
-            if (dashboardResponse.request?.res?.responseUrl?.includes('login') || dashboardResponse.data.includes('verTelaLogin')) {
-                console.log('[HttpScraper] Session expired (redirected to login)');
-                return { success: false, error: 'Session expired (redirected to login)' };
-            }
-
-            const $ = cheerio.load(dashboardResponse.data);
-
-            // Debug: Log page title
-            const pageTitle = $('title').text().trim();
-            console.log(`[HttpScraper] Dashboard loaded. Title: "${pageTitle}"`);
-
-            // SIGAA uses 'idTurma' for the course ID in the form
-            // Try both 'id' and 'idTurma' just in case
-            let input = $(`input[name="idTurma"][value="${courseId}"]`);
-            if (input.length === 0) {
-                input = $(`input[name="id"][value="${courseId}"]`);
-            }
-
-            if (input.length === 0) {
-                console.log(`[HttpScraper] Course input not found for ID ${courseId} in getNewsDetail.`);
-                console.log('[HttpScraper] Available hidden inputs:', $('input[type="hidden"]').map((i, el) => `${$(el).attr('name')}=${$(el).attr('value')}`).get().join(', '));
-                return { success: false, error: 'Course not found on dashboard' };
-            }
-
-            const form = input.closest('form');
-            const formData = new URLSearchParams();
-            form.find('input').each((i, el) => {
-                const name = $(el).attr('name');
-                const value = $(el).attr('value');
-                if (name && value) formData.append(name, value);
-            });
-
-            const coursePageResponse = await axios.post(`${this.baseUrl}/sigaa/portais/discente/discente.jsf`, formData, {
-                headers: {
-                    'Cookie': this.cookies,
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                }
-            });
-
-            // Step 2: Find the News Link/Form in the Course Page
-            const $course = cheerio.load(coursePageResponse.data);
-
-            // We need to find the form that contains the news ID or the link that submits it.
-            // Usually: <a href="#" onclick="visualizarNoticia('formID','newsID')">
-            // This submits the form 'formID' with extra params.
-
-            // Let's look for the specific news ID in the page
-            // The onclick usually looks like: `visualizarNoticia(form, 'ID')`
-            // And `visualizarNoticia` sets a hidden input `id` to the value and submits.
-
-            // We need to find the MAIN form of the page (usually `form_acessarTurmaVirtual` or similar, but inside the course it changes).
-            // Let's find ANY form that has the hidden input `id` (if it exists) or just the main form.
-
-            // In the sidebar news, it's often a separate form.
-            // In the "Notícias" page, it's a table.
-
-            // Generic approach: Find the form that would be submitted.
-            // If we can't parse the JS, we might be stuck.
-            // BUT, usually SIGAA uses a standard pattern:
-            // Hidden input `id` gets updated.
-            // Hidden input `j_id_jsp_...:hidden_button` gets clicked.
-
-            // Let's try to find the link with the news ID in `onclick`.
-            let targetForm: any = null;
-            let submitScript = '';
-
-            $course('a').each((i, el) => {
-                const onclick = $(el).attr('onclick');
-                if (onclick && onclick.includes(newsId)) {
-                    submitScript = onclick;
-                    targetForm = $(el).closest('form');
-                }
-            });
-
-            if (!targetForm || targetForm.length === 0) {
-                // Try finding a form with a hidden input with that value
-                const hiddenInput = $course(`input[value="${newsId}"]`);
-                if (hiddenInput.length > 0) {
-                    targetForm = hiddenInput.closest('form');
-                }
-            }
-
-            if (!targetForm || targetForm.length === 0) {
-                // Fallback: Use the main form (usually the first big one)
-                targetForm = $course('form').first();
-            }
-
-            // Construct the POST data for the news detail
-            // We need to simulate what `visualizarNoticia` does.
-            // Usually: sets `id` = newsId, and submits.
-            // We also need the `javax.faces.ViewState`.
-
-            const newsFormData = new URLSearchParams();
-            targetForm.find('input').each((i: any, el: any) => {
-                const name = $(el).attr('name');
-                const value = $(el).attr('value');
-                if (name && value) newsFormData.append(name, value);
-            });
-
-            // Update/Add the ID
-            newsFormData.set('id', newsId);
-
-            // We might need to set the "action" parameter.
-            // Often it's `formName:j_id_jsp_...`.
-            // This is the hardest part of generic JSF scraping.
-            // If we can't find the exact parameter, we might fail.
-
-            // HACK: Try to find the input that looks like a button/link action.
-            // Or just submit and hope the `id` parameter is enough (sometimes it is).
-
-            console.log(`[HttpScraper] Requesting news detail ${newsId}...`);
-            const newsResponse = await axios.post(`${this.baseUrl}/sigaa/portais/discente/discente.jsf`, newsFormData, {
-                headers: {
-                    'Cookie': this.cookies,
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                }
-            });
-
-            const $news = cheerio.load(newsResponse.data);
-
-            // Step 3: Parse Detail
-            // Look for "Título", "Data", "Texto", "Notificação"
-            // (Same logic as Playwright but with Cheerio)
-
-            const getTextAfterLabel = (label: string) => {
-                let result = '';
-                $news('td, th, label, span, div').each((i, el) => {
-                    if ($(el).text().trim().replace(':', '') === label) {
-                        const parentTd = $(el).closest('td');
-                        if (parentTd.length && parentTd.next().length) {
-                            result = parentTd.next().text().trim();
-                            return false; // break
-                        }
-                        if ($(el).next().length) {
-                            result = $(el).next().text().trim();
-                            return false;
-                        }
-                    }
-                });
-                return result;
-            };
-
-            const getContent = () => {
-                let result = '';
-                $news('td, th, label, span, div').each((i, el) => {
-                    if ($(el).text().trim().replace(':', '') === 'Texto') {
-                        const parentTd = $(el).closest('td');
-                        if (parentTd.length && parentTd.next().length) {
-                            result = parentTd.next().html() || '';
-                            return false;
-                        }
-                    }
-                });
-                return result;
-            };
-
-            const newsDetail = {
-                title: getTextAfterLabel('Título') || getTextAfterLabel('Assunto'),
-                date: getTextAfterLabel('Data'),
-                content: getContent(),
-                notification: getTextAfterLabel('Notificação')
-            };
-
-            return { success: true, news: newsDetail };
-
-        } catch (error: any) {
-            console.error('[HttpScraper] Error fetching news detail:', error);
-            return { success: false, error: error.message };
-        }
+    } catch(error: any) {
+        console.error('[HttpScraper] Error fetching news detail:', error);
+        return { success: false, error: error.message };
     }
+}
 
     async downloadFile(
-        courseId: string,
-        fileId: string, // We need the ID now, not just URL
-        fileName: string,
-        basePath: string,
-        onProgress?: (progress: number) => void
-    ): Promise<{ success: boolean; filePath?: string; error?: string }> {
-        // This requires similar logic: Enter Course -> Submit Form with File ID.
-        // And handling the response as a stream.
-        return { success: false, error: 'Not implemented yet' };
-    }
+    courseId: string,
+    fileId: string, // We need the ID now, not just URL
+    fileName: string,
+    basePath: string,
+    onProgress ?: (progress: number) => void
+    ): Promise < { success: boolean; filePath?: string; error?: string } > {
+    // This requires similar logic: Enter Course -> Submit Form with File ID.
+    // And handling the response as a stream.
+    return { success: false, error: 'Not implemented yet' };
+}
 }
