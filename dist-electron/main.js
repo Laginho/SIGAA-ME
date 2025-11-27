@@ -11978,7 +11978,14 @@ var _eval = EvalError;
 var range = RangeError;
 var ref = ReferenceError;
 var syntax = SyntaxError;
-var type = TypeError;
+var type;
+var hasRequiredType;
+function requireType() {
+  if (hasRequiredType) return type;
+  hasRequiredType = 1;
+  type = TypeError;
+  return type;
+}
 var uri = URIError;
 var abs$1 = Math.abs;
 var floor$1 = Math.floor;
@@ -12224,7 +12231,7 @@ function requireCallBindApplyHelpers() {
   if (hasRequiredCallBindApplyHelpers) return callBindApplyHelpers;
   hasRequiredCallBindApplyHelpers = 1;
   var bind3 = functionBind;
-  var $TypeError2 = type;
+  var $TypeError2 = requireType();
   var $call2 = requireFunctionCall();
   var $actualApply = requireActualApply();
   callBindApplyHelpers = function callBindBasic(args) {
@@ -12297,7 +12304,7 @@ var $EvalError = _eval;
 var $RangeError = range;
 var $ReferenceError = ref;
 var $SyntaxError = syntax;
-var $TypeError$1 = type;
+var $TypeError$1 = requireType();
 var $URIError = uri;
 var abs = abs$1;
 var floor = floor$1;
@@ -12628,7 +12635,7 @@ var GetIntrinsic2 = getIntrinsic;
 var $defineProperty = GetIntrinsic2("%Object.defineProperty%", true);
 var hasToStringTag = requireShams()();
 var hasOwn$2 = hasown;
-var $TypeError = type;
+var $TypeError = requireType();
 var toStringTag = hasToStringTag ? Symbol.toStringTag : null;
 var esSetTostringtag = function setToStringTag(object, value) {
   var overrideIfSet = arguments.length > 2 && !!arguments[2] && arguments[2].force;
@@ -12669,9 +12676,9 @@ var asynckit = asynckit$1;
 var setToStringTag2 = esSetTostringtag;
 var hasOwn$1 = hasown;
 var populate = populate$1;
-function FormData$2(options) {
-  if (!(this instanceof FormData$2)) {
-    return new FormData$2(options);
+function FormData$1(options) {
+  if (!(this instanceof FormData$1)) {
+    return new FormData$1(options);
   }
   this._overheadLength = 0;
   this._valueLength = 0;
@@ -12682,10 +12689,10 @@ function FormData$2(options) {
     this[option] = options[option];
   }
 }
-util$n.inherits(FormData$2, CombinedStream);
-FormData$2.LINE_BREAK = "\r\n";
-FormData$2.DEFAULT_CONTENT_TYPE = "application/octet-stream";
-FormData$2.prototype.append = function(field, value, options) {
+util$n.inherits(FormData$1, CombinedStream);
+FormData$1.LINE_BREAK = "\r\n";
+FormData$1.DEFAULT_CONTENT_TYPE = "application/octet-stream";
+FormData$1.prototype.append = function(field, value, options) {
   options = options || {};
   if (typeof options === "string") {
     options = { filename: options };
@@ -12705,7 +12712,7 @@ FormData$2.prototype.append = function(field, value, options) {
   append3(footer);
   this._trackLength(header, value, options);
 };
-FormData$2.prototype._trackLength = function(header, value, options) {
+FormData$1.prototype._trackLength = function(header, value, options) {
   var valueLength = 0;
   if (options.knownLength != null) {
     valueLength += Number(options.knownLength);
@@ -12715,7 +12722,7 @@ FormData$2.prototype._trackLength = function(header, value, options) {
     valueLength = Buffer.byteLength(value);
   }
   this._valueLength += valueLength;
-  this._overheadLength += Buffer.byteLength(header) + FormData$2.LINE_BREAK.length;
+  this._overheadLength += Buffer.byteLength(header) + FormData$1.LINE_BREAK.length;
   if (!value || !value.path && !(value.readable && hasOwn$1(value, "httpVersion")) && !(value instanceof Stream)) {
     return;
   }
@@ -12723,7 +12730,7 @@ FormData$2.prototype._trackLength = function(header, value, options) {
     this._valuesToMeasure.push(value);
   }
 };
-FormData$2.prototype._lengthRetriever = function(value, callback) {
+FormData$1.prototype._lengthRetriever = function(value, callback) {
   if (hasOwn$1(value, "fd")) {
     if (value.end != void 0 && value.end != Infinity && value.start != void 0) {
       callback(null, value.end + 1 - (value.start ? value.start : 0));
@@ -12749,7 +12756,7 @@ FormData$2.prototype._lengthRetriever = function(value, callback) {
     callback("Unknown stream");
   }
 };
-FormData$2.prototype._multiPartHeader = function(field, value, options) {
+FormData$1.prototype._multiPartHeader = function(field, value, options) {
   if (typeof options.header === "string") {
     return options.header;
   }
@@ -12776,13 +12783,13 @@ FormData$2.prototype._multiPartHeader = function(field, value, options) {
         header = [header];
       }
       if (header.length) {
-        contents2 += prop2 + ": " + header.join("; ") + FormData$2.LINE_BREAK;
+        contents2 += prop2 + ": " + header.join("; ") + FormData$1.LINE_BREAK;
       }
     }
   }
-  return "--" + this.getBoundary() + FormData$2.LINE_BREAK + contents2 + FormData$2.LINE_BREAK;
+  return "--" + this.getBoundary() + FormData$1.LINE_BREAK + contents2 + FormData$1.LINE_BREAK;
 };
-FormData$2.prototype._getContentDisposition = function(value, options) {
+FormData$1.prototype._getContentDisposition = function(value, options) {
   var filename;
   if (typeof options.filepath === "string") {
     filename = path.normalize(options.filepath).replace(/\\/g, "/");
@@ -12795,7 +12802,7 @@ FormData$2.prototype._getContentDisposition = function(value, options) {
     return 'filename="' + filename + '"';
   }
 };
-FormData$2.prototype._getContentType = function(value, options) {
+FormData$1.prototype._getContentType = function(value, options) {
   var contentType = options.contentType;
   if (!contentType && value && value.name) {
     contentType = mime.lookup(value.name);
@@ -12810,13 +12817,13 @@ FormData$2.prototype._getContentType = function(value, options) {
     contentType = mime.lookup(options.filepath || options.filename);
   }
   if (!contentType && value && typeof value === "object") {
-    contentType = FormData$2.DEFAULT_CONTENT_TYPE;
+    contentType = FormData$1.DEFAULT_CONTENT_TYPE;
   }
   return contentType;
 };
-FormData$2.prototype._multiPartFooter = function() {
+FormData$1.prototype._multiPartFooter = function() {
   return (function(next2) {
-    var footer = FormData$2.LINE_BREAK;
+    var footer = FormData$1.LINE_BREAK;
     var lastPart = this._streams.length === 0;
     if (lastPart) {
       footer += this._lastBoundary();
@@ -12824,10 +12831,10 @@ FormData$2.prototype._multiPartFooter = function() {
     next2(footer);
   }).bind(this);
 };
-FormData$2.prototype._lastBoundary = function() {
-  return "--" + this.getBoundary() + "--" + FormData$2.LINE_BREAK;
+FormData$1.prototype._lastBoundary = function() {
+  return "--" + this.getBoundary() + "--" + FormData$1.LINE_BREAK;
 };
-FormData$2.prototype.getHeaders = function(userHeaders) {
+FormData$1.prototype.getHeaders = function(userHeaders) {
   var header;
   var formHeaders = {
     "content-type": "multipart/form-data; boundary=" + this.getBoundary()
@@ -12839,19 +12846,19 @@ FormData$2.prototype.getHeaders = function(userHeaders) {
   }
   return formHeaders;
 };
-FormData$2.prototype.setBoundary = function(boundary) {
+FormData$1.prototype.setBoundary = function(boundary) {
   if (typeof boundary !== "string") {
     throw new TypeError("FormData boundary must be a string");
   }
   this._boundary = boundary;
 };
-FormData$2.prototype.getBoundary = function() {
+FormData$1.prototype.getBoundary = function() {
   if (!this._boundary) {
     this._generateBoundary();
   }
   return this._boundary;
 };
-FormData$2.prototype.getBuffer = function() {
+FormData$1.prototype.getBuffer = function() {
   var dataBuffer = new Buffer.alloc(0);
   var boundary = this.getBoundary();
   for (var i = 0, len = this._streams.length; i < len; i++) {
@@ -12862,16 +12869,16 @@ FormData$2.prototype.getBuffer = function() {
         dataBuffer = Buffer.concat([dataBuffer, Buffer.from(this._streams[i])]);
       }
       if (typeof this._streams[i] !== "string" || this._streams[i].substring(2, boundary.length + 2) !== boundary) {
-        dataBuffer = Buffer.concat([dataBuffer, Buffer.from(FormData$2.LINE_BREAK)]);
+        dataBuffer = Buffer.concat([dataBuffer, Buffer.from(FormData$1.LINE_BREAK)]);
       }
     }
   }
   return Buffer.concat([dataBuffer, Buffer.from(this._lastBoundary())]);
 };
-FormData$2.prototype._generateBoundary = function() {
+FormData$1.prototype._generateBoundary = function() {
   this._boundary = "--------------------------" + crypto$1.randomBytes(12).toString("hex");
 };
-FormData$2.prototype.getLengthSync = function() {
+FormData$1.prototype.getLengthSync = function() {
   var knownLength = this._overheadLength + this._valueLength;
   if (this._streams.length) {
     knownLength += this._lastBoundary().length;
@@ -12881,14 +12888,14 @@ FormData$2.prototype.getLengthSync = function() {
   }
   return knownLength;
 };
-FormData$2.prototype.hasKnownLength = function() {
+FormData$1.prototype.hasKnownLength = function() {
   var hasKnownLength = true;
   if (this._valuesToMeasure.length) {
     hasKnownLength = false;
   }
   return hasKnownLength;
 };
-FormData$2.prototype.getLength = function(cb) {
+FormData$1.prototype.getLength = function(cb) {
   var knownLength = this._overheadLength + this._valueLength;
   if (this._streams.length) {
     knownLength += this._lastBoundary().length;
@@ -12908,7 +12915,7 @@ FormData$2.prototype.getLength = function(cb) {
     cb(null, knownLength);
   });
 };
-FormData$2.prototype.submit = function(params, cb) {
+FormData$1.prototype.submit = function(params, cb) {
   var request2;
   var options;
   var defaults2 = { method: "post" };
@@ -12955,19 +12962,19 @@ FormData$2.prototype.submit = function(params, cb) {
   }).bind(this));
   return request2;
 };
-FormData$2.prototype._error = function(err) {
+FormData$1.prototype._error = function(err) {
   if (!this.error) {
     this.error = err;
     this.pause();
     this.emit("error", err);
   }
 };
-FormData$2.prototype.toString = function() {
+FormData$1.prototype.toString = function() {
   return "[object FormData]";
 };
-setToStringTag2(FormData$2.prototype, "FormData");
-var form_data = FormData$2;
-const FormData$1 = /* @__PURE__ */ getDefaultExportFromCjs(form_data);
+setToStringTag2(FormData$1.prototype, "FormData");
+var form_data = FormData$1;
+const FormData$2 = /* @__PURE__ */ getDefaultExportFromCjs(form_data);
 function isVisitable(thing) {
   return utils$2.isPlainObject(thing) || utils$2.isArray(thing);
 }
@@ -12991,7 +12998,7 @@ function toFormData$1(obj, formData, options) {
   if (!utils$2.isObject(obj)) {
     throw new TypeError("target must be an object");
   }
-  formData = formData || new (FormData$1 || FormData)();
+  formData = formData || new (FormData$2 || FormData)();
   options = utils$2.toFlatObject(options, {
     metaTokens: true,
     dots: false,
@@ -13227,7 +13234,7 @@ const platform$1 = {
   isNode: true,
   classes: {
     URLSearchParams: URLSearchParams$1,
-    FormData: FormData$1,
+    FormData: FormData$2,
     Blob: typeof Blob !== "undefined" && Blob || null
   },
   ALPHABET,
@@ -21020,7 +21027,7 @@ function parseSelector(subselects2, selector, selectorIndex) {
   finalizeSubselector();
   return selectorIndex;
 }
-var boolbase$1 = {
+var boolbase = {
   trueFunc: function trueFunc() {
     return true;
   },
@@ -21028,7 +21035,7 @@ var boolbase$1 = {
     return false;
   }
 };
-const boolbase = /* @__PURE__ */ getDefaultExportFromCjs(boolbase$1);
+const boolbase$1 = /* @__PURE__ */ getDefaultExportFromCjs(boolbase);
 const procedure = /* @__PURE__ */ new Map([
   [SelectorType.Universal, 50],
   [SelectorType.Tag, 30],
@@ -21178,7 +21185,7 @@ const attributeRules = {
     const { adapter: adapter2 } = options;
     const { name, value } = data2;
     if (/\s/.test(value)) {
-      return boolbase.falseFunc;
+      return boolbase$1.falseFunc;
     }
     const regex = new RegExp(`(?:^|\\s)${escapeRegex(value)}(?:$|\\s)`, shouldIgnoreCase(data2, options) ? "i" : "");
     return function element(elem) {
@@ -21195,7 +21202,7 @@ const attributeRules = {
     let { value } = data2;
     const len = value.length;
     if (len === 0) {
-      return boolbase.falseFunc;
+      return boolbase$1.falseFunc;
     }
     if (shouldIgnoreCase(data2, options)) {
       value = value.toLowerCase();
@@ -21215,7 +21222,7 @@ const attributeRules = {
     let { value } = data2;
     const len = -value.length;
     if (len === 0) {
-      return boolbase.falseFunc;
+      return boolbase$1.falseFunc;
     }
     if (shouldIgnoreCase(data2, options)) {
       value = value.toLowerCase();
@@ -21233,7 +21240,7 @@ const attributeRules = {
     const { adapter: adapter2 } = options;
     const { name, value } = data2;
     if (value === "") {
-      return boolbase.falseFunc;
+      return boolbase$1.falseFunc;
     }
     if (shouldIgnoreCase(data2, options)) {
       const regex = new RegExp(escapeRegex(value), "i");
@@ -21322,13 +21329,13 @@ function compile(parsed) {
   const a = parsed[0];
   const b = parsed[1] - 1;
   if (b < 0 && a <= 0)
-    return boolbase.falseFunc;
+    return boolbase$1.falseFunc;
   if (a === -1)
     return (index2) => index2 <= b;
   if (a === 0)
     return (index2) => index2 === b;
   if (a === 1)
-    return b < 0 ? boolbase.trueFunc : (index2) => index2 >= b;
+    return b < 0 ? boolbase$1.trueFunc : (index2) => index2 >= b;
   const absA = Math.abs(a);
   const bMod = (b % absA + absA) % absA;
   return a > 1 ? (index2) => index2 >= b && index2 % absA === bMod : (index2) => index2 <= b && index2 % absA === bMod;
@@ -21357,9 +21364,9 @@ const filters = {
   // Location specific methods
   "nth-child"(next2, rule, { adapter: adapter2, equals }) {
     const func = nthCheck(rule);
-    if (func === boolbase.falseFunc)
-      return boolbase.falseFunc;
-    if (func === boolbase.trueFunc)
+    if (func === boolbase$1.falseFunc)
+      return boolbase$1.falseFunc;
+    if (func === boolbase$1.trueFunc)
       return getChildFunc(next2, adapter2);
     return function nthChild(elem) {
       const siblings2 = adapter2.getSiblings(elem);
@@ -21376,9 +21383,9 @@ const filters = {
   },
   "nth-last-child"(next2, rule, { adapter: adapter2, equals }) {
     const func = nthCheck(rule);
-    if (func === boolbase.falseFunc)
-      return boolbase.falseFunc;
-    if (func === boolbase.trueFunc)
+    if (func === boolbase$1.falseFunc)
+      return boolbase$1.falseFunc;
+    if (func === boolbase$1.trueFunc)
       return getChildFunc(next2, adapter2);
     return function nthLastChild(elem) {
       const siblings2 = adapter2.getSiblings(elem);
@@ -21395,9 +21402,9 @@ const filters = {
   },
   "nth-of-type"(next2, rule, { adapter: adapter2, equals }) {
     const func = nthCheck(rule);
-    if (func === boolbase.falseFunc)
-      return boolbase.falseFunc;
-    if (func === boolbase.trueFunc)
+    if (func === boolbase$1.falseFunc)
+      return boolbase$1.falseFunc;
+    if (func === boolbase$1.trueFunc)
       return getChildFunc(next2, adapter2);
     return function nthOfType(elem) {
       const siblings2 = adapter2.getSiblings(elem);
@@ -21415,9 +21422,9 @@ const filters = {
   },
   "nth-last-of-type"(next2, rule, { adapter: adapter2, equals }) {
     const func = nthCheck(rule);
-    if (func === boolbase.falseFunc)
-      return boolbase.falseFunc;
-    if (func === boolbase.trueFunc)
+    if (func === boolbase$1.falseFunc)
+      return boolbase$1.falseFunc;
+    if (func === boolbase$1.trueFunc)
       return getChildFunc(next2, adapter2);
     return function nthLastOfType(elem) {
       const siblings2 = adapter2.getSiblings(elem);
@@ -21458,7 +21465,7 @@ function dynamicStatePseudo(name) {
   return function dynamicPseudo(next2, _rule, { adapter: adapter2 }) {
     const func = adapter2[name];
     if (typeof func !== "function") {
-      return boolbase.falseFunc;
+      return boolbase$1.falseFunc;
     }
     return function active(elem) {
       return func(elem) && next2(elem);
@@ -21565,8 +21572,8 @@ const aliases = {
 };
 const PLACEHOLDER_ELEMENT = {};
 function ensureIsTag(next2, adapter2) {
-  if (next2 === boolbase.falseFunc)
-    return boolbase.falseFunc;
+  if (next2 === boolbase$1.falseFunc)
+    return boolbase$1.falseFunc;
   return (elem) => adapter2.isTag(elem) && next2(elem);
 }
 function getNextSiblings(elem, adapter2) {
@@ -21592,7 +21599,7 @@ function copyOptions(options) {
 }
 const is$2 = (next2, token, options, context, compileToken2) => {
   const func = compileToken2(token, copyOptions(options), context);
-  return func === boolbase.trueFunc ? next2 : func === boolbase.falseFunc ? boolbase.falseFunc : (elem) => func(elem) && next2(elem);
+  return func === boolbase$1.trueFunc ? next2 : func === boolbase$1.falseFunc ? boolbase$1.falseFunc : (elem) => func(elem) && next2(elem);
 };
 const subselects = {
   is: is$2,
@@ -21603,7 +21610,7 @@ const subselects = {
   where: is$2,
   not(next2, token, options, context, compileToken2) {
     const func = compileToken2(token, copyOptions(options), context);
-    return func === boolbase.falseFunc ? next2 : func === boolbase.trueFunc ? boolbase.falseFunc : (elem) => !func(elem) && next2(elem);
+    return func === boolbase$1.falseFunc ? next2 : func === boolbase$1.trueFunc ? boolbase$1.falseFunc : (elem) => !func(elem) && next2(elem);
   },
   has(next2, subselect, options, _context2, compileToken2) {
     const { adapter: adapter2 } = options;
@@ -21614,10 +21621,10 @@ const subselects = {
       [PLACEHOLDER_ELEMENT]
     ) : void 0;
     const compiled = compileToken2(subselect, opts, context);
-    if (compiled === boolbase.falseFunc)
-      return boolbase.falseFunc;
+    if (compiled === boolbase$1.falseFunc)
+      return boolbase$1.falseFunc;
     const hasElement = ensureIsTag(compiled, adapter2);
-    if (context && compiled !== boolbase.trueFunc) {
+    if (context && compiled !== boolbase$1.trueFunc) {
       const { shouldTestNextSiblings = false } = compiled;
       return (elem) => {
         if (!next2(elem))
@@ -21843,19 +21850,19 @@ function compileToken(token, options, context) {
       }
     }
     return compileRules(rules, options, finalContext);
-  }).reduce(reduceRules, boolbase.falseFunc);
+  }).reduce(reduceRules, boolbase$1.falseFunc);
   query.shouldTestNextSiblings = shouldTestNextSiblings;
   return query;
 }
 function compileRules(rules, options, context) {
   var _a3;
-  return rules.reduce((previous, rule) => previous === boolbase.falseFunc ? boolbase.falseFunc : compileGeneralSelector(previous, rule, options, context, compileToken), (_a3 = options.rootFunc) !== null && _a3 !== void 0 ? _a3 : boolbase.trueFunc);
+  return rules.reduce((previous, rule) => previous === boolbase$1.falseFunc ? boolbase$1.falseFunc : compileGeneralSelector(previous, rule, options, context, compileToken), (_a3 = options.rootFunc) !== null && _a3 !== void 0 ? _a3 : boolbase$1.trueFunc);
 }
 function reduceRules(a, b) {
-  if (b === boolbase.falseFunc || a === boolbase.trueFunc) {
+  if (b === boolbase$1.falseFunc || a === boolbase$1.trueFunc) {
     return a;
   }
-  if (a === boolbase.falseFunc || b === boolbase.trueFunc) {
+  if (a === boolbase$1.falseFunc || b === boolbase$1.trueFunc) {
     return b;
   }
   return function combine(elem) {
@@ -22095,8 +22102,8 @@ function findFilterElements(root2, selector, options, queryForSelector, totalLim
        */
       rootFunc: (el) => result.includes(el)
     };
-  } else if (options.rootFunc && options.rootFunc !== boolbase$1.trueFunc) {
-    options = { ...options, rootFunc: boolbase$1.trueFunc };
+  } else if (options.rootFunc && options.rootFunc !== boolbase.trueFunc) {
+    options = { ...options, rootFunc: boolbase.trueFunc };
   }
   return remainingSelector.some(isFilter) ? findFilterElements(result, remainingSelector, options, false, totalLimit) : remainingHasTraversal ? (
     // Query existing elements to resolve traversal.
@@ -22119,7 +22126,7 @@ function filterElements(elements, sel, options) {
   if (els.length === 0)
     return els;
   const query = _compileToken(sel, options);
-  return query === boolbase$1.trueFunc ? els : els.filter(query);
+  return query === boolbase.trueFunc ? els : els.filter(query);
 }
 const reSiblingSelector = /^\s*[+~]/;
 function find(selectorOrHaystack) {
@@ -24183,98 +24190,98 @@ function getTagID(tagName) {
   var _a3;
   return (_a3 = TAG_NAME_TO_ID.get(tagName)) !== null && _a3 !== void 0 ? _a3 : TAG_ID.UNKNOWN;
 }
-const $ = TAG_ID;
+const $$1 = TAG_ID;
 const SPECIAL_ELEMENTS = {
   [NS.HTML]: /* @__PURE__ */ new Set([
-    $.ADDRESS,
-    $.APPLET,
-    $.AREA,
-    $.ARTICLE,
-    $.ASIDE,
-    $.BASE,
-    $.BASEFONT,
-    $.BGSOUND,
-    $.BLOCKQUOTE,
-    $.BODY,
-    $.BR,
-    $.BUTTON,
-    $.CAPTION,
-    $.CENTER,
-    $.COL,
-    $.COLGROUP,
-    $.DD,
-    $.DETAILS,
-    $.DIR,
-    $.DIV,
-    $.DL,
-    $.DT,
-    $.EMBED,
-    $.FIELDSET,
-    $.FIGCAPTION,
-    $.FIGURE,
-    $.FOOTER,
-    $.FORM,
-    $.FRAME,
-    $.FRAMESET,
-    $.H1,
-    $.H2,
-    $.H3,
-    $.H4,
-    $.H5,
-    $.H6,
-    $.HEAD,
-    $.HEADER,
-    $.HGROUP,
-    $.HR,
-    $.HTML,
-    $.IFRAME,
-    $.IMG,
-    $.INPUT,
-    $.LI,
-    $.LINK,
-    $.LISTING,
-    $.MAIN,
-    $.MARQUEE,
-    $.MENU,
-    $.META,
-    $.NAV,
-    $.NOEMBED,
-    $.NOFRAMES,
-    $.NOSCRIPT,
-    $.OBJECT,
-    $.OL,
-    $.P,
-    $.PARAM,
-    $.PLAINTEXT,
-    $.PRE,
-    $.SCRIPT,
-    $.SECTION,
-    $.SELECT,
-    $.SOURCE,
-    $.STYLE,
-    $.SUMMARY,
-    $.TABLE,
-    $.TBODY,
-    $.TD,
-    $.TEMPLATE,
-    $.TEXTAREA,
-    $.TFOOT,
-    $.TH,
-    $.THEAD,
-    $.TITLE,
-    $.TR,
-    $.TRACK,
-    $.UL,
-    $.WBR,
-    $.XMP
+    $$1.ADDRESS,
+    $$1.APPLET,
+    $$1.AREA,
+    $$1.ARTICLE,
+    $$1.ASIDE,
+    $$1.BASE,
+    $$1.BASEFONT,
+    $$1.BGSOUND,
+    $$1.BLOCKQUOTE,
+    $$1.BODY,
+    $$1.BR,
+    $$1.BUTTON,
+    $$1.CAPTION,
+    $$1.CENTER,
+    $$1.COL,
+    $$1.COLGROUP,
+    $$1.DD,
+    $$1.DETAILS,
+    $$1.DIR,
+    $$1.DIV,
+    $$1.DL,
+    $$1.DT,
+    $$1.EMBED,
+    $$1.FIELDSET,
+    $$1.FIGCAPTION,
+    $$1.FIGURE,
+    $$1.FOOTER,
+    $$1.FORM,
+    $$1.FRAME,
+    $$1.FRAMESET,
+    $$1.H1,
+    $$1.H2,
+    $$1.H3,
+    $$1.H4,
+    $$1.H5,
+    $$1.H6,
+    $$1.HEAD,
+    $$1.HEADER,
+    $$1.HGROUP,
+    $$1.HR,
+    $$1.HTML,
+    $$1.IFRAME,
+    $$1.IMG,
+    $$1.INPUT,
+    $$1.LI,
+    $$1.LINK,
+    $$1.LISTING,
+    $$1.MAIN,
+    $$1.MARQUEE,
+    $$1.MENU,
+    $$1.META,
+    $$1.NAV,
+    $$1.NOEMBED,
+    $$1.NOFRAMES,
+    $$1.NOSCRIPT,
+    $$1.OBJECT,
+    $$1.OL,
+    $$1.P,
+    $$1.PARAM,
+    $$1.PLAINTEXT,
+    $$1.PRE,
+    $$1.SCRIPT,
+    $$1.SECTION,
+    $$1.SELECT,
+    $$1.SOURCE,
+    $$1.STYLE,
+    $$1.SUMMARY,
+    $$1.TABLE,
+    $$1.TBODY,
+    $$1.TD,
+    $$1.TEMPLATE,
+    $$1.TEXTAREA,
+    $$1.TFOOT,
+    $$1.TH,
+    $$1.THEAD,
+    $$1.TITLE,
+    $$1.TR,
+    $$1.TRACK,
+    $$1.UL,
+    $$1.WBR,
+    $$1.XMP
   ]),
-  [NS.MATHML]: /* @__PURE__ */ new Set([$.MI, $.MO, $.MN, $.MS, $.MTEXT, $.ANNOTATION_XML]),
-  [NS.SVG]: /* @__PURE__ */ new Set([$.TITLE, $.FOREIGN_OBJECT, $.DESC]),
+  [NS.MATHML]: /* @__PURE__ */ new Set([$$1.MI, $$1.MO, $$1.MN, $$1.MS, $$1.MTEXT, $$1.ANNOTATION_XML]),
+  [NS.SVG]: /* @__PURE__ */ new Set([$$1.TITLE, $$1.FOREIGN_OBJECT, $$1.DESC]),
   [NS.XLINK]: /* @__PURE__ */ new Set(),
   [NS.XML]: /* @__PURE__ */ new Set(),
   [NS.XMLNS]: /* @__PURE__ */ new Set()
 };
-const NUMBERED_HEADERS = /* @__PURE__ */ new Set([$.H1, $.H2, $.H3, $.H4, $.H5, $.H6]);
+const NUMBERED_HEADERS = /* @__PURE__ */ new Set([$$1.H1, $$1.H2, $$1.H3, $$1.H4, $$1.H5, $$1.H6]);
 const UNESCAPED_TEXT = /* @__PURE__ */ new Set([
   TAG_NAMES.STYLE,
   TAG_NAMES.SCRIPT,
@@ -64554,52 +64561,11 @@ class HttpScraperService {
     console.log("[HttpScraper] Cookies set. Length:", this.cookies.length);
   }
   async getCourseFiles(courseId, courseName) {
-    var _a3, _b2, _c2;
     try {
       if (!this.cookies) {
         return { success: false, error: "No session cookies. Please login first." };
       }
       console.log(`[HttpScraper] Fetching course page for ${courseName || courseId}...`);
-      const dashboardResponse = await axios.get(`${this.baseUrl}/sigaa/portais/discente/discente.jsf`, {
-        headers: {
-          "Cookie": this.cookies,
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        }
-      });
-      if (((_c2 = (_b2 = (_a3 = dashboardResponse.request) == null ? void 0 : _a3.res) == null ? void 0 : _b2.responseUrl) == null ? void 0 : _c2.includes("login")) || dashboardResponse.data.includes("verTelaLogin")) {
-        console.log("[HttpScraper] Session expired (redirected to login) in getCourseFiles");
-        return { success: false, error: "Session expired (redirected to login)" };
-      }
-      const $2 = load(dashboardResponse.data);
-      const pageTitle = $2("title").text().trim();
-      console.log(`[HttpScraper] Dashboard loaded in getCourseFiles. Title: "${pageTitle}"`);
-      const input = $2(`input[name="idTurma"][value="${courseId}"]`);
-      if (input.length === 0) {
-        console.log(`[HttpScraper] Course input not found for ID ${courseId}. Dumping inputs:`, $2('input[type="hidden"]').map((i, el) => $2(el).attr("name") + "=" + $2(el).attr("value")).get().join(", "));
-        return { success: false, error: "Course link not found on dashboard" };
-      }
-      const form = input.closest("form");
-      if (form.length === 0) {
-        return { success: false, error: "Course form not found" };
-      }
-      const formData = new URLSearchParams();
-      const formInputs = form.find("input");
-      formInputs.each((i, el) => {
-        const name = $2(el).attr("name");
-        const value = $2(el).attr("value");
-        if (name && value) {
-          formData.append(name, value);
-        }
-      });
-      console.log(`[HttpScraper] Entering course ${courseId}...`);
-      const coursePageResponse = await axios.post(`${this.baseUrl}/sigaa/portais/discente/discente.jsf`, formData, {
-        headers: {
-          "Cookie": this.cookies,
-          "Content-Type": "application/x-www-form-urlencoded",
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        }
-      });
-      const $course = load(coursePageResponse.data);
       const files = [];
       const news = [];
       $course("a").each((i, el) => {
@@ -64634,10 +64600,10 @@ class HttpScraperService {
           $course(table).find("tr").each((j, row) => {
             const cells = $course(row).find("td");
             if (cells.length >= 2) {
-              const title = $2(cells[0]).text().trim();
-              const date2 = $2(cells[1]).text().trim();
-              const notification = $2(cells[2]).text().trim();
-              const link = $2(cells[0]).find("a");
+              const title = $(cells[0]).text().trim();
+              const date2 = $(cells[1]).text().trim();
+              const notification = $(cells[2]).text().trim();
+              const link = $(cells[0]).find("a");
               const onclick = link.attr("onclick");
               if (title && date2 && onclick) {
                 const idMatch = onclick.match(/['"](\d+)['"]/);
@@ -64700,10 +64666,10 @@ class HttpScraperService {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
       });
-      const $course = load(coursePageResponse.data);
+      const $course2 = load(coursePageResponse.data);
       let targetForm = null;
       let submitScript = "";
-      $course("a").each((i, el) => {
+      $course2("a").each((i, el) => {
         const onclick = $2(el).attr("onclick");
         if (onclick && onclick.includes(newsId)) {
           submitScript = onclick;
@@ -64711,13 +64677,13 @@ class HttpScraperService {
         }
       });
       if (!targetForm || targetForm.length === 0) {
-        const hiddenInput = $course(`input[value="${newsId}"]`);
+        const hiddenInput = $course2(`input[value="${newsId}"]`);
         if (hiddenInput.length > 0) {
           targetForm = hiddenInput.closest("form");
         }
       }
       if (!targetForm || targetForm.length === 0) {
-        targetForm = $course("form").first();
+        targetForm = $course2("form").first();
       }
       const newsFormData = new URLSearchParams();
       targetForm.find("input").each((i, el) => {
