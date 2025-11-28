@@ -64775,81 +64775,85 @@ class HttpScraperService {
       const $2 = load(coursePageData);
       let filesPageData = coursePageData;
       let conteudoLink = null;
-      $2(".itemMenu").each((_, el) => {
-        const text2 = $2(el).text().trim();
-        if (text2.includes(" Conte") || text2.includes("nteudo")) {
-          this.log(`[HttpScraper] Found potential link: "${text2}"`);
-          conteudoLink = $2(el).parent("a");
-          return false;
-        }
-      });
-      if (!conteudoLink) {
-        this.log("[HttpScraper] Strategy 1 failed. Trying Strategy 2 (Materiais header)...");
-        const materiaisHeader = $2(".itemMenuHeaderMateriais");
-        if (materiaisHeader.length > 0) {
-          const contentExterior = materiaisHeader.parent().find(".rich-panelbar-content-exterior");
-          const firstLink = contentExterior.find("a").first();
-          if (firstLink.length > 0) {
-            this.log("[HttpScraper] Found first link under Materiais.");
-            conteudoLink = firstLink;
+      if (!preFetchedHtml) {
+        $2(".itemMenu").each((_, el) => {
+          const text2 = $2(el).text().trim();
+          if (text2.includes(" Conte") || text2.includes("nteudo")) {
+            this.log(`[HttpScraper] Found potential link: "${text2}"`);
+            conteudoLink = $2(el).parent("a");
+            return false;
+          }
+        });
+        if (!conteudoLink) {
+          this.log("[HttpScraper] Strategy 1 failed. Trying Strategy 2 (Materiais header)...");
+          const materiaisHeader = $2(".itemMenuHeaderMateriais");
+          if (materiaisHeader.length > 0) {
+            const contentExterior = materiaisHeader.parent().find(".rich-panelbar-content-exterior");
+            const firstLink = contentExterior.find("a").first();
+            if (firstLink.length > 0) {
+              this.log("[HttpScraper] Found first link under Materiais.");
+              conteudoLink = firstLink;
+            }
           }
         }
-      }
-      if (conteudoLink) {
-        this.log('[HttpScraper] Found "Conteúdo" link in sidebar. Navigating to files...');
-        const onclick = conteudoLink.attr("onclick");
-        const match = onclick == null ? void 0 : onclick.match(/jsfcljs\(document\.forms\['([^']+)'\],'([^']+)'/);
-        if (match) {
-          const formName = match[1];
-          const paramsStr = match[2];
-          const form = $2(`form[name="${formName}"]`);
-          const formData = new URLSearchParams();
-          form.find("input").each((_, el) => {
-            const name = $2(el).attr("name");
-            const value = $2(el).attr("value");
-            if (name && value) formData.append(name, value);
-          });
-          if (!formData.has("javax.faces.ViewState")) {
-            this.log("[HttpScraper] ViewState not found in form. Searching globally...");
-            const globalViewState = $2('input[name="javax.faces.ViewState"]').val();
-            if (globalViewState) {
-              this.log(`[HttpScraper] Found global ViewState: ${String(globalViewState).substring(0, 15)}...`);
-              formData.append("javax.faces.ViewState", globalViewState);
+        if (conteudoLink) {
+          this.log('[HttpScraper] Found "Conteúdo" link in sidebar. Navigating to files...');
+          const onclick = conteudoLink.attr("onclick");
+          const match = onclick == null ? void 0 : onclick.match(/jsfcljs\(document\.forms\['([^']+)'\],'([^']+)'/);
+          if (match) {
+            const formName = match[1];
+            const paramsStr = match[2];
+            const form = $2(`form[name="${formName}"]`);
+            const formData = new URLSearchParams();
+            form.find("input").each((_, el) => {
+              const name = $2(el).attr("name");
+              const value = $2(el).attr("value");
+              if (name && value) formData.append(name, value);
+            });
+            if (!formData.has("javax.faces.ViewState")) {
+              this.log("[HttpScraper] ViewState not found in form. Searching globally...");
+              const globalViewState = $2('input[name="javax.faces.ViewState"]').val();
+              if (globalViewState) {
+                this.log(`[HttpScraper] Found global ViewState: ${String(globalViewState).substring(0, 15)}...`);
+                formData.append("javax.faces.ViewState", globalViewState);
+              } else {
+                this.log("[HttpScraper] CRITICAL: ViewState not found anywhere! Request will likely fail.");
+              }
             } else {
-              this.log("[HttpScraper] CRITICAL: ViewState not found anywhere! Request will likely fail.");
+              this.log("[HttpScraper] ViewState found in form.");
             }
+            const params = paramsStr.split(",");
+            for (let i = 0; i < params.length; i += 2) {
+              if (params[i] && params[i + 1]) {
+                formData.append(params[i], params[i + 1]);
+              }
+            }
+            this.log(`[HttpScraper] Sending POST to open files. Form: ${formName}, Params: ${paramsStr}`);
+            const filesResponse = await axios.post(`${this.baseUrl}/sigaa/ava/index.jsf`, formData.toString(), {
+              headers: {
+                "Cookie": this.getCookieHeader(`${this.baseUrl}/sigaa/ava/index.jsf`),
+                "Content-Type": "application/x-www-form-urlencoded",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "Referer": currentUrl,
+                "Connection": "keep-alive"
+              },
+              timeout: 1e4
+            });
+            this.updateCookies(filesResponse);
+            filesPageData = filesResponse.data;
+            const $filesDebug = load(filesPageData);
+            const pageTitle = $filesDebug("title").text().trim();
+            const pageHeader = $filesDebug("h1, h2, .titulo").first().text().trim();
+            this.log(`[HttpScraper] Files page loaded. Title: "${pageTitle}", Header: "${pageHeader}"`);
+            this.log(`[HttpScraper] Response size: ${filesPageData.length} bytes`);
           } else {
-            this.log("[HttpScraper] ViewState found in form.");
+            this.log('[HttpScraper] Could not parse onclick for "Conteúdo" link.');
           }
-          const params = paramsStr.split(",");
-          for (let i = 0; i < params.length; i += 2) {
-            if (params[i] && params[i + 1]) {
-              formData.append(params[i], params[i + 1]);
-            }
-          }
-          this.log(`[HttpScraper] Sending POST to open files. Form: ${formName}, Params: ${paramsStr}`);
-          const filesResponse = await axios.post(`${this.baseUrl}/sigaa/ava/index.jsf`, formData.toString(), {
-            headers: {
-              "Cookie": this.getCookieHeader(`${this.baseUrl}/sigaa/ava/index.jsf`),
-              "Content-Type": "application/x-www-form-urlencoded",
-              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-              "Referer": currentUrl,
-              "Connection": "keep-alive"
-            },
-            timeout: 1e4
-          });
-          this.updateCookies(filesResponse);
-          filesPageData = filesResponse.data;
-          const $filesDebug = load(filesPageData);
-          const pageTitle = $filesDebug("title").text().trim();
-          const pageHeader = $filesDebug("h1, h2, .titulo").first().text().trim();
-          this.log(`[HttpScraper] Files page loaded. Title: "${pageTitle}", Header: "${pageHeader}"`);
-          this.log(`[HttpScraper] Response size: ${filesPageData.length} bytes`);
         } else {
-          this.log('[HttpScraper] Could not parse onclick for "Conteúdo" link.');
+          this.log('[HttpScraper] "Conteúdo" link not found in sidebar. Scanning current page...');
         }
       } else {
-        this.log('[HttpScraper] "Conteúdo" link not found in sidebar. Scanning current page...');
+        this.log("[HttpScraper] Using Playwright HTML directly.");
       }
       const $files = load(filesPageData);
       const files = [];

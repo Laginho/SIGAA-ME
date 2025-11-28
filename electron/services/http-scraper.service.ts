@@ -148,6 +148,10 @@ export class HttpScraperService {
             let conteudoLink: any = null;
 
             // Skip navigation if using Playwright HTML (already navigated)
+            // DEBUG: Save Playwright HTML
+            if (preFetchedHtml) {
+                try { require('fs').writeFileSync('debug_playwright.html', preFetchedHtml); this.log('[HttpScraper] Saved Playwright HTML to debug_playwright.html'); } catch (e) { this.log('[HttpScraper] Failed to save debug file'); }
+            }
             if (!preFetchedHtml) {
             $('.itemMenu').each((_, el) => {
                 const text = $(el).text().trim();
