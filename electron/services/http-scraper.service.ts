@@ -115,7 +115,9 @@ export class HttpScraperService {
                     'Cookie': this.getCookieHeader(dashboardUrl),
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9',
-                    'Accept-Language': 'pt-BR,pt;q=0.9'
+                    'Accept-Language': 'pt-BR,pt;q=0.9',
+                    'Referer': `${this.baseUrl}/sigaa/verPortalDiscente.do`,
+                    'Connection': 'keep-alive'
                 },
                 timeout: 10000
             });
@@ -147,7 +149,9 @@ export class HttpScraperService {
                 headers: {
                     'Cookie': this.getCookieHeader(dashboardUrl),
                     'Content-Type': 'application/x-www-form-urlencoded',
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'Referer': dashboardUrl,
+                    'Connection': 'keep-alive'
                 },
                 timeout: 10000
             });
@@ -229,13 +233,19 @@ export class HttpScraperService {
             const dashboardResponse = await axios.get(dashboardUrl, {
                 headers: {
                     'Cookie': this.getCookieHeader(dashboardUrl),
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'Referer': `${this.baseUrl}/sigaa/verPortalDiscente.do`,
+                    'Connection': 'keep-alive'
                 },
                 timeout: 10000
             });
 
             this.updateCookies(dashboardResponse);
             console.log(`[HttpScraper] Dashboard loaded. Status: ${dashboardResponse.status}, Data length: ${dashboardResponse.data.length}`);
+            if (dashboardResponse.data.length < 500) {
+                console.log('[HttpScraper] Short response body:', dashboardResponse.data);
+            }
+
 
             const $ = cheerio.load(dashboardResponse.data);
             let input = $(`input[name="idTurma"][value="${courseId}"]`);
@@ -300,7 +310,9 @@ export class HttpScraperService {
                 headers: {
                     'Cookie': this.getCookieHeader(dashboardUrl),
                     'Content-Type': 'application/x-www-form-urlencoded',
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'Referer': dashboardUrl,
+                    'Connection': 'keep-alive'
                 },
                 timeout: 10000
             });

@@ -64654,7 +64654,9 @@ class HttpScraperService {
           "Cookie": this.getCookieHeader(dashboardUrl),
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
           "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9",
-          "Accept-Language": "pt-BR,pt;q=0.9"
+          "Accept-Language": "pt-BR,pt;q=0.9",
+          "Referer": `${this.baseUrl}/sigaa/verPortalDiscente.do`,
+          "Connection": "keep-alive"
         },
         timeout: 1e4
       });
@@ -64680,7 +64682,9 @@ class HttpScraperService {
         headers: {
           "Cookie": this.getCookieHeader(dashboardUrl),
           "Content-Type": "application/x-www-form-urlencoded",
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "Referer": dashboardUrl,
+          "Connection": "keep-alive"
         },
         timeout: 1e4
       });
@@ -64747,12 +64751,17 @@ class HttpScraperService {
       const dashboardResponse = await axios.get(dashboardUrl, {
         headers: {
           "Cookie": this.getCookieHeader(dashboardUrl),
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "Referer": `${this.baseUrl}/sigaa/verPortalDiscente.do`,
+          "Connection": "keep-alive"
         },
         timeout: 1e4
       });
       this.updateCookies(dashboardResponse);
       console.log(`[HttpScraper] Dashboard loaded. Status: ${dashboardResponse.status}, Data length: ${dashboardResponse.data.length}`);
+      if (dashboardResponse.data.length < 500) {
+        console.log("[HttpScraper] Short response body:", dashboardResponse.data);
+      }
       const $2 = load(dashboardResponse.data);
       let input = $2(`input[name="idTurma"][value="${courseId}"]`);
       if (input.length === 0) {
@@ -64805,7 +64814,9 @@ class HttpScraperService {
         headers: {
           "Cookie": this.getCookieHeader(dashboardUrl),
           "Content-Type": "application/x-www-form-urlencoded",
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "Referer": dashboardUrl,
+          "Connection": "keep-alive"
         },
         timeout: 1e4
       });
