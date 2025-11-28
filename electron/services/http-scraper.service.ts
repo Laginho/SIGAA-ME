@@ -235,6 +235,7 @@ export class HttpScraperService {
             });
 
             this.updateCookies(dashboardResponse);
+            console.log(`[HttpScraper] Dashboard loaded. Status: ${dashboardResponse.status}, Data length: ${dashboardResponse.data.length}`);
 
             const $ = cheerio.load(dashboardResponse.data);
             let input = $(`input[name="idTurma"][value="${courseId}"]`);

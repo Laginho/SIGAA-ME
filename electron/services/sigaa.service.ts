@@ -73,6 +73,9 @@ export class SigaaService {
         try {
             console.log(`SIGAA: Fetching files for course ${courseName || courseId} using HTTP Scraper...`);
             // Use HTTP Scraper for speed
+
+            const freshCookies = await this.playwrightLogin.getCookies();
+            this.httpScraper.setCookies(freshCookies);
             const result = await this.httpScraper.getCourseFiles(courseId, courseName);
 
             if (!result.success) {
@@ -154,6 +157,8 @@ export class SigaaService {
         try {
             console.log(`SIGAA: Fetching news detail ${newsId} using HTTP Scraper...`);
             // Use HTTP Scraper for speed
+            const freshCookies = await this.playwrightLogin.getCookies();
+            this.httpScraper.setCookies(freshCookies);
             const result = await this.httpScraper.getNewsDetail(courseId, newsId);
 
             if (!result.success) {

@@ -1,4 +1,4 @@
-import { chromium, Browser } from 'playwright';
+import { chromium, Browser, BrowserContext, Page } from 'playwright';
 
 /**
  * Uses Playwright to automate a real browser for UFC SIGAA login.
@@ -7,6 +7,8 @@ import { chromium, Browser } from 'playwright';
 export class PlaywrightLoginService {
     private browser: Browser | null = null;
     private storedCookies: any[] = [];
+    private context: BrowserContext | null = null;
+    private page: Page | null = null;
 
     async login(username: string, password: string): Promise<{ success: boolean; cookies?: any[]; userName?: string; error?: string }> {
         try {
@@ -16,7 +18,9 @@ export class PlaywrightLoginService {
                 headless: true
             });
 
-            const context = await this.browser.newContext();
+            const context = await this.browser.newContext({
+                userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            });
             const page = await context.newPage();
 
             console.log('Playwright: Navigating to login page...');
@@ -63,7 +67,9 @@ export class PlaywrightLoginService {
             // Store cookies for future use
             this.storedCookies = cookies;
 
-            await this.close();
+            this.context = context;
+            this.page = page;
+            console.log('Playwright: Keeping session alive for cookie refresh');
 
             return {
                 success: true,
@@ -75,6 +81,25 @@ export class PlaywrightLoginService {
             console.error('Playwright: Error during login:', error);
             await this.close();
             return { success: false, error: error.message };
+        }
+    }
+
+    /**
+ * Get fresh cookies from the live Playwright session
+ */
+    async getCookies(): Promise<any[]> {
+        if (!this.context) {
+            console.warn('Playwright: No active context, returning stored cookies');
+            return this.storedCookies || [];
+        }
+        try {
+            const cookies = await this.context.cookies();
+            this.storedCookies = cookies;
+            console.log('Playwright: Refreshed cookies');
+            return cookies;
+        } catch (error) {
+            console.error('Playwright: Error getting cookies:', error);
+            return this.storedCookies || [];
         }
     }
 

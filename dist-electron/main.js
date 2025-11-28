@@ -58,6 +58,8 @@ class PlaywrightLoginService {
   constructor() {
     __publicField(this, "browser", null);
     __publicField(this, "storedCookies", []);
+    __publicField(this, "context", null);
+    __publicField(this, "page", null);
   }
   async login(username, password) {
     try {
@@ -65,7 +67,9 @@ class PlaywrightLoginService {
       this.browser = await chromium.launch({
         headless: true
       });
-      const context = await this.browser.newContext();
+      const context = await this.browser.newContext({
+        userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+      });
       const page = await context.newPage();
       console.log("Playwright: Navigating to login page...");
       await page.goto("https://si3.ufc.br/sigaa/verTelaLogin.do");
@@ -91,7 +95,9 @@ class PlaywrightLoginService {
       const cookies2 = await context.cookies();
       console.log("Playwright: Found cookies:", cookies2.map((c) => c.name).join(", "));
       this.storedCookies = cookies2;
-      await this.close();
+      this.context = context;
+      this.page = page;
+      console.log("Playwright: Keeping session alive for cookie refresh");
       return {
         success: true,
         cookies: cookies2,
@@ -101,6 +107,24 @@ class PlaywrightLoginService {
       console.error("Playwright: Error during login:", error);
       await this.close();
       return { success: false, error: error.message };
+    }
+  }
+  /**
+  * Get fresh cookies from the live Playwright session
+  */
+  async getCookies() {
+    if (!this.context) {
+      console.warn("Playwright: No active context, returning stored cookies");
+      return this.storedCookies || [];
+    }
+    try {
+      const cookies2 = await this.context.cookies();
+      this.storedCookies = cookies2;
+      console.log("Playwright: Refreshed cookies");
+      return cookies2;
+    } catch (error) {
+      console.error("Playwright: Error getting cookies:", error);
+      return this.storedCookies || [];
     }
   }
   async getCourses() {
@@ -64728,6 +64752,7 @@ class HttpScraperService {
         timeout: 1e4
       });
       this.updateCookies(dashboardResponse);
+      console.log(`[HttpScraper] Dashboard loaded. Status: ${dashboardResponse.status}, Data length: ${dashboardResponse.data.length}`);
       const $2 = load(dashboardResponse.data);
       let input = $2(`input[name="idTurma"][value="${courseId}"]`);
       if (input.length === 0) {
@@ -64885,6 +64910,8 @@ class SigaaService {
   async getCourseFiles(courseId, courseName) {
     try {
       console.log(`SIGAA: Fetching files for course ${courseName || courseId} using HTTP Scraper...`);
+      const freshCookies = await this.playwrightLogin.getCookies();
+      this.httpScraper.setCookies(freshCookies);
       const result = await this.httpScraper.getCourseFiles(courseId, courseName);
       if (!result.success) {
         return { success: false, message: result.error || "Failed to fetch files" };
@@ -64941,6 +64968,8 @@ class SigaaService {
   async getNewsDetail(courseId, newsId) {
     try {
       console.log(`SIGAA: Fetching news detail ${newsId} using HTTP Scraper...`);
+      const freshCookies = await this.playwrightLogin.getCookies();
+      this.httpScraper.setCookies(freshCookies);
       const result = await this.httpScraper.getNewsDetail(courseId, newsId);
       if (!result.success) {
         return { success: false, message: result.error || "Failed to fetch news detail" };
