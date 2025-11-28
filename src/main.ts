@@ -54,6 +54,6 @@ if (!window.location.hash || window.location.hash === '#/login') {
 }
 
 // Use contextBridge
-window.ipcRenderer.on('main-process-message', (_event, message) => {
+window.ipcRenderer.on('main-process-message', (_event: any, message: any) => {
   console.log(message)
 })

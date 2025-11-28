@@ -127,6 +127,7 @@ ipcMain.handle('download-file', async (_, data: {
   fileUrl: string;
   basePath: string;
   downloadedFiles: Record<string, any>;
+  script?: string;
 }) => {
   return await sigaaService.downloadFile(
     data.courseId,
@@ -134,7 +135,8 @@ ipcMain.handle('download-file', async (_, data: {
     data.fileName,
     data.fileUrl,
     data.basePath,
-    data.downloadedFiles
+    data.downloadedFiles,
+    data.script
   );
 })
 
@@ -142,7 +144,7 @@ ipcMain.handle('download-file', async (_, data: {
 ipcMain.handle('download-all-files', async (_, data: {
   courseId: string;
   courseName: string;
-  files: Array<{ name: string; url: string }>;
+  files: Array<{ name: string; url: string; script?: string }>;
   basePath: string;
   downloadedFiles: Record<string, any>;
 }) => {

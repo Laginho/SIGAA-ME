@@ -275,24 +275,24 @@ export class PlaywrightLoginService {
 
             // Click on "Conteúdo" link to load files section
             console.log('Playwright: Attempting to click "Conteúdo" link using native locator...');
-            
+
             try {
                 // Wait for the menu to be visible
                 await page.waitForSelector('.itemMenu', { timeout: 5000 });
-                
+
                 // Find the link containing "Conteúdo"
                 // We use a broad locator and filter by text to be safe
                 const conteudoLink = page.locator('.itemMenu').filter({ hasText: 'Conteúdo' }).first();
-                
+
                 if (await conteudoLink.isVisible()) {
                     console.log('Playwright: Found "Conteúdo" link, clicking...');
                     await conteudoLink.click();
-                    
+
                     // Wait for navigation/reload
                     // JSF usually reloads the page or updates a large part of it
                     await page.waitForLoadState('networkidle');
                     await page.waitForTimeout(2000); // Extra safety wait for JSF
-                    
+
                     console.log('Playwright: Click processed, current URL:', page.url());
                 } else {
                     console.log('Playwright: "Conteúdo" link not visible');
@@ -370,7 +370,8 @@ export class PlaywrightLoginService {
         fileName: string,
         fileUrl: string,
         basePath: string,
-        downloadedFiles: Record<string, any>
+        _downloadedFiles: Record<string, any>,
+        script?: string
     ): Promise<{ success: boolean; filePath?: string; error?: string }> {
         let localBrowser: Browser | null = null;
         try {
@@ -400,7 +401,8 @@ export class PlaywrightLoginService {
                 fileUrl,
                 fileName,
                 courseName,
-                basePath
+                basePath,
+                script
             );
 
             await localBrowser.close();
@@ -417,7 +419,7 @@ export class PlaywrightLoginService {
     async downloadAllFiles(
         courseId: string,
         courseName: string,
-        files: Array<{ name: string; url: string }>,
+        files: Array<{ name: string; url: string; script?: string }>,
         basePath: string,
         downloadedFiles: Record<string, any>,
         onProgress?: (fileName: string, status: 'downloaded' | 'skipped' | 'failed') => void

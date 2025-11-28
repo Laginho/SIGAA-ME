@@ -1,12 +1,10 @@
-import { Browser, Page, Response } from 'playwright';
+import { Browser, Page } from 'playwright';
 import * as fs from 'fs';
 import * as path from 'path';
 
 export class DownloadService {
-    private browser: Browser | null = null;
-
-    constructor(browser: Browser | null) {
-        this.browser = browser;
+    constructor(_browser: Browser | null) {
+        // browser is not used but kept for compatibility if needed
     }
 
     async downloadFile(
@@ -14,7 +12,8 @@ export class DownloadService {
         fileUrl: string,
         fileName: string,
         courseName: string,
-        basePath: string
+        basePath: string,
+        script?: string
     ): Promise<{ success: boolean; filePath?: string; error?: string }> {
         try {
             const courseFolder = path.join(basePath, this.sanitizeFolderName(courseName));
@@ -39,153 +38,130 @@ export class DownloadService {
                 throw new Error('Page lost context (about:blank)');
             }
 
-            console.log(`Looking for file link with text: "${fileName}"`);
-            const link = page.locator(`a:has-text("${fileName}")`).first();
+            console.log(`Starting download for "${fileName}"`);
 
-            if (await link.isVisible()) {
-                console.log(`Found link for ${fileName}, clicking...`);
+            // Setup listeners
+            const downloadPromise = page.waitForEvent('download', { timeout: 60000 });
+            const popupPromise = page.waitForEvent('popup', { timeout: 60000 });
 
-                // NEW STRATEGY: Intercept and Force Download
-                // We intercept the request, fetch it ourselves, and change the headers
-                // to force the browser to download it as a file instead of displaying it.
-                await page.route('**/*', async route => {
+            // Trigger action
+            if (script) {
+                console.log('Executing JSF script to trigger download...');
+                // We need to execute the script in the page context
+                // The script is usually: if(typeof jsfcljs == 'function'){jsfcljs(...)}return false
+                await page.evaluate((scriptStr: string) => {
+                    const func = new Function(scriptStr.replace('return false', ''));
+                    func();
+                }, script);
+            } else {
+                console.log(`Looking for file link with text: "${fileName}"`);
+                const link = page.locator(`a:has-text("${fileName}")`).first();
+                if (await link.isVisible()) {
+                    await link.click({ force: true });
+                } else {
+                    // Fallback to URL navigation if no link found and no script
+                    if (fileUrl && !fileUrl.includes('javascript:')) {
+                        await page.goto(fileUrl, { waitUntil: 'networkidle', timeout: 30000 });
+                        return { success: true, filePath };
+                    }
+                    throw new Error('Link not found and no script provided');
+                }
+            }
+
+            // Handle result (Download or Popup)
+            const result = await Promise.race([
+                downloadPromise.then(d => ({ type: 'download', data: d })),
+                popupPromise.then(p => ({ type: 'popup', data: p })),
+                new Promise(resolve => setTimeout(() => resolve({ type: 'timeout' }), 65000))
+            ]) as { type: string, data: any };
+
+            if (result.type === 'download') {
+                const download = result.data;
+                let finalPath = filePath;
+                // Add extension if missing and we can guess it
+                const suggestedFilename = download.suggestedFilename();
+                const ext = path.extname(suggestedFilename);
+                if (ext && !path.extname(finalPath)) {
+                    finalPath += ext;
+                }
+
+                await download.saveAs(finalPath);
+                console.log(`Downloaded: ${finalPath}`);
+                return { success: true, filePath: finalPath };
+
+            } else if (result.type === 'popup') {
+                const popup = result.data;
+                console.log(`Popup opened: ${popup.url()}`);
+
+                try {
+                    const popupDownload = await popup.waitForEvent('download', { timeout: 10000 });
+                    let finalPath = filePath;
+                    const suggestedFilename = popupDownload.suggestedFilename();
+                    const ext = path.extname(suggestedFilename);
+                    if (ext && !path.extname(finalPath)) {
+                        finalPath += ext;
+                    }
+
+                    await popupDownload.saveAs(finalPath);
+                    console.log(`Downloaded from popup: ${finalPath}`);
+                    await popup.close();
+                    return { success: true, filePath: finalPath };
+                } catch (e) {
+                    // Try to intercept if download event didn't fire
+                    console.log('Popup download event timeout, trying interception...');
+                }
+
+                // Interception logic for popup
+                await popup.route('**/*', async (route: any) => {
                     try {
                         const response = await route.fetch();
                         const headers = response.headers();
                         const contentType = headers['content-type'] || '';
 
-                        if (contentType.includes('application/pdf')) {
-                            console.log(`Intercepted PDF request: ${route.request().url()}`);
+                        // Force download for common document types
+                        if (contentType.includes('application/pdf') ||
+                            contentType.includes('application/msword') ||
+                            contentType.includes('application/vnd.openxmlformats') ||
+                            contentType.includes('application/zip')) {
 
+                            console.log('Intercepted file in popup! Forcing download...');
                             headers['content-type'] = 'application/octet-stream';
                             headers['content-disposition'] = 'attachment';
-
-                            await route.fulfill({
-                                response,
-                                headers
-                            });
+                            await route.fulfill({ response, headers });
                         } else {
                             await route.continue();
                         }
-                    } catch (e) {
-                        try { await route.continue(); } catch { }
-                    }
+                    } catch { try { await route.continue(); } catch { } }
                 });
 
-                const downloadPromise = page.waitForEvent('download', { timeout: 60000 });
-                const popupPromise = page.waitForEvent('popup', { timeout: 60000 });
+                try {
+                    const reloadDownloadPromise = popup.waitForEvent('download', { timeout: 15000 });
+                    await popup.reload();
+                    const download = await reloadDownloadPromise;
 
-                await link.click({ force: true });
-
-                const result = await Promise.race([
-                    downloadPromise.then(d => ({ type: 'download', data: d })),
-                    popupPromise.then(p => ({ type: 'popup', data: p })),
-                    new Promise(resolve => setTimeout(() => resolve({ type: 'timeout' }), 65000))
-                ]) as { type: string, data: any };
-
-                // Unroute to clean up
-                await page.unroute('**/*');
-
-                if (result.type === 'download') {
-                    const download = result.data;
                     let finalPath = filePath;
-                    if (!finalPath.toLowerCase().endsWith('.pdf')) {
-                        finalPath += '.pdf';
+                    const suggestedFilename = download.suggestedFilename();
+                    const ext = path.extname(suggestedFilename);
+                    if (ext && !path.extname(finalPath)) {
+                        finalPath += ext;
                     }
+
                     await download.saveAs(finalPath);
-                    console.log(`Downloaded: ${finalPath}`);
-                    return { success: true, filePath: finalPath };
-
-                } else if (result.type === 'popup') {
-                    const popup = result.data;
-                    console.log(`Popup opened: ${popup.url()}`);
-
-                    try {
-                        const popupDownload = await popup.waitForEvent('download', { timeout: 5000 });
-                        let finalPath = filePath;
-                        if (!finalPath.toLowerCase().endsWith('.pdf')) {
-                            finalPath += '.pdf';
-                        }
-                        await popupDownload.saveAs(finalPath);
-                        console.log(`Downloaded from popup: ${finalPath}`);
-                        await popup.close();
-                        return { success: true, filePath: finalPath };
-                    } catch (e) {
-                        // Continue to reload strategy
-                    }
-
-                    console.log('Reloading popup to force interception...');
-                    await popup.route('**/*', async route => {
-                        try {
-                            const response = await route.fetch();
-                            const headers = response.headers();
-                            if (headers['content-type']?.includes('application/pdf')) {
-                                console.log('Intercepted PDF in popup! Forcing download...');
-                                headers['content-type'] = 'application/octet-stream';
-                                headers['content-disposition'] = 'attachment';
-                                await route.fulfill({ response, headers });
-                            } else {
-                                await route.continue();
-                            }
-                        } catch { try { await route.continue(); } catch { } }
-                    });
-
-                    try {
-                        const reloadDownloadPromise = popup.waitForEvent('download', { timeout: 10000 });
-
-                        // Reload triggers the request again, which we intercept
-                        // This might throw ERR_ABORTED because the navigation is cancelled by the download
-                        await popup.reload().catch(e => {
-                            if (e.message.includes('ERR_ABORTED') || e.message.includes('frame was detached')) {
-                                console.log('Reload aborted as expected (download started)');
-                            } else {
-                                throw e;
-                            }
-                        });
-
-                        const download = await reloadDownloadPromise;
-                        let finalPath = filePath;
-                        if (!finalPath.toLowerCase().endsWith('.pdf')) {
-                            finalPath += '.pdf';
-                        }
-                        await download.saveAs(finalPath);
-                        console.log(`Downloaded after popup reload: ${finalPath}`);
-                        await popup.close();
-                        return { success: true, filePath: finalPath };
-                    } catch (e) {
-                        console.log(`Reload strategy failed: ${e}`);
-                    }
-
+                    console.log(`Downloaded after popup reload: ${finalPath}`);
                     await popup.close();
-                    return { success: false, error: 'Could not force download' };
-
-                } else {
-                    throw new Error('Timeout waiting for download or popup');
+                    return { success: true, filePath: finalPath };
+                } catch (e) {
+                    console.log(`Reload strategy failed: ${e}`);
+                    await popup.close();
+                    return { success: false, error: 'Could not force download from popup' };
                 }
 
             } else {
-                // Fallback
-                if (fileUrl.includes('javascript:')) {
-                    const onclickPart = fileUrl.replace('javascript:', '');
-                    const element = await page.$(`a[onclick*="${onclickPart}"]`);
-                    if (element) {
-                        const downloadPromise = page.waitForEvent('download', { timeout: 30000 });
-                        await element.click();
-                        const download = await downloadPromise;
-                        let finalPath = filePath;
-                        if (!finalPath.toLowerCase().endsWith('.pdf')) {
-                            finalPath += '.pdf';
-                        }
-                        await download.saveAs(finalPath);
-                        return { success: true, filePath: finalPath };
-                    }
-                }
-                await page.goto(fileUrl, { waitUntil: 'networkidle', timeout: 30000 });
-                return { success: true, filePath };
+                throw new Error('Timeout waiting for download or popup');
             }
+
         } catch (error: any) {
             console.error(`Download failed for ${fileName}:`, error);
-            try { await page.unroute('**/*'); } catch { }
             return { success: false, error: error.message };
         }
     }
@@ -194,7 +170,7 @@ export class DownloadService {
         page: Page,
         courseId: string,
         courseName: string,
-        files: Array<{ name: string; url: string }>,
+        files: Array<{ name: string; url: string; script?: string }>,
         basePath: string,
         downloadedFiles: Record<string, any>,
         onProgress?: (fileName: string, status: 'downloaded' | 'skipped' | 'failed') => void
@@ -214,7 +190,7 @@ export class DownloadService {
             const courseDownloads = downloadedFiles[courseId] || {};
             if (courseDownloads[file.name]) {
                 const existingPath = courseDownloads[file.name].path;
-                if (fs.existsSync(existingPath) || fs.existsSync(existingPath + '.pdf')) {
+                if (fs.existsSync(existingPath)) {
                     console.log(`Skipping duplicate: ${file.name}`);
                     skipped++;
                     results.push({ fileName: file.name, status: 'skipped', filePath: existingPath });
@@ -252,7 +228,7 @@ export class DownloadService {
                         await workerPage.goto(courseUrl, { waitUntil: 'domcontentloaded' });
                     }
 
-                    const result = await this.downloadFile(workerPage, file.url, file.name, courseName, basePath);
+                    const result = await this.downloadFile(workerPage, file.url, file.name, courseName, basePath, file.script);
 
                     if (result.success) {
                         downloaded++;
@@ -275,7 +251,6 @@ export class DownloadService {
         };
 
         const workers = [];
-        // Spawn workers (up to CONCURRENCY, but not more than queue length)
         const numWorkers = Math.min(CONCURRENCY, Math.max(1, queue.length));
 
         for (let i = 0; i < numWorkers; i++) {
@@ -293,10 +268,5 @@ export class DownloadService {
 
     private sanitizeFolderName(folderName: string): string {
         return folderName.replace(/[<>:"/\\|?*]/g, '_').substring(0, 100);
-    }
-
-    private isPdf(buffer: Buffer): boolean {
-        if (buffer.length < 4) return false;
-        return buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46;
     }
 }

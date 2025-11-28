@@ -172,7 +172,7 @@ async function fetchCourseFiles(courseId: string) {
           <div class="file-action">
             ${isDownloaded
             ? '<span class="status-done" title="Baixado">✅</span>'
-            : `<button class="btn-download-file" title="Baixar arquivo" data-file-name="${file.name}" data-file-url="${file.url}">⬇️</button>`
+            : `<button class="btn-download-file" title="Baixar arquivo" data-file-name="${file.name}" data-file-url="${file.url}" data-file-script="${file.script || ''}">⬇️</button>`
           }
           </div>
         </div>
@@ -186,13 +186,14 @@ async function fetchCourseFiles(courseId: string) {
           const target = e.currentTarget as HTMLElement;
           const fileName = target.getAttribute('data-file-name');
           const fileUrl = target.getAttribute('data-file-url');
+          const script = target.getAttribute('data-file-script');
 
-          if (fileName && fileUrl) {
+          if (fileName && (fileUrl || script)) {
             // Show spinner immediately
             target.innerHTML = '🔄';
             target.classList.add('spinning');
 
-            await downloadSingleFile(course, fileName, fileUrl, target);
+            await downloadSingleFile(course, fileName, fileUrl || '', target, script || undefined);
           }
         });
       });
@@ -228,7 +229,7 @@ async function fetchCourseFiles(courseId: string) {
   }
 }
 
-async function downloadSingleFile(course: any, fileName: string, fileUrl: string, btnElement: HTMLElement) {
+async function downloadSingleFile(course: any, fileName: string, fileUrl: string, btnElement: HTMLElement, script?: string) {
   try {
     const folderResult = await window.api.selectDownloadFolder();
     if (!folderResult.success) {
@@ -245,7 +246,8 @@ async function downloadSingleFile(course: any, fileName: string, fileUrl: string
       fileName: fileName,
       fileUrl: fileUrl,
       basePath: folderResult.folderPath,
-      downloadedFiles
+      downloadedFiles,
+      script
     });
 
     if (result.success) {

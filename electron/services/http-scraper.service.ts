@@ -153,93 +153,93 @@ export class HttpScraperService {
                 try { fs.writeFileSync(`debug_playwright_${courseId}.html`, preFetchedHtml); this.log('[HttpScraper] Saved Playwright HTML to debug_playwright.html'); } catch (e) { this.log('[HttpScraper] Failed to save debug file'); }
             }
             if (!preFetchedHtml) {
-            $('.itemMenu').each((_, el) => {
-                const text = $(el).text().trim();
-                if (text.includes(' Conte') || text.includes('nteudo')) {
-                    this.log(`[HttpScraper] Found potential link: "${text}"`);
-                    conteudoLink = $(el).parent('a');
-                    return false;
-                }
-            });
+                $('.itemMenu').each((_, el) => {
+                    const text = $(el).text().trim();
+                    if (text.includes(' Conte') || text.includes('nteudo')) {
+                        this.log(`[HttpScraper] Found potential link: "${text}"`);
+                        conteudoLink = $(el).parent('a');
+                        return false;
+                    }
+                });
 
-            if (!conteudoLink) {
-                this.log('[HttpScraper] Strategy 1 failed. Trying Strategy 2 (Materiais header)...');
-                const materiaisHeader = $('.itemMenuHeaderMateriais');
-                if (materiaisHeader.length > 0) {
-                    const contentExterior = materiaisHeader.parent().find('.rich-panelbar-content-exterior');
-                    const firstLink = contentExterior.find('a').first();
-                    if (firstLink.length > 0) {
-                        this.log('[HttpScraper] Found first link under Materiais.');
-                        conteudoLink = firstLink;
+                if (!conteudoLink) {
+                    this.log('[HttpScraper] Strategy 1 failed. Trying Strategy 2 (Materiais header)...');
+                    const materiaisHeader = $('.itemMenuHeaderMateriais');
+                    if (materiaisHeader.length > 0) {
+                        const contentExterior = materiaisHeader.parent().find('.rich-panelbar-content-exterior');
+                        const firstLink = contentExterior.find('a').first();
+                        if (firstLink.length > 0) {
+                            this.log('[HttpScraper] Found first link under Materiais.');
+                            conteudoLink = firstLink;
+                        }
                     }
                 }
-            }
 
-            if (conteudoLink) {
-                this.log('[HttpScraper] Found "Conteúdo" link in sidebar. Navigating to files...');
-                const onclick = conteudoLink.attr('onclick');
-                const match = onclick?.match(/jsfcljs\(document\.forms\['([^']+)'\],'([^']+)'/);
+                if (conteudoLink) {
+                    this.log('[HttpScraper] Found "Conteúdo" link in sidebar. Navigating to files...');
+                    const onclick = conteudoLink.attr('onclick');
+                    const match = onclick?.match(/jsfcljs\(document\.forms\['([^']+)'\],'([^']+)'/);
 
-                if (match) {
-                    const formName = match[1];
-                    const paramsStr = match[2];
+                    if (match) {
+                        const formName = match[1];
+                        const paramsStr = match[2];
 
-                    const form = $(`form[name="${formName}"]`);
-                    const formData = new URLSearchParams();
+                        const form = $(`form[name="${formName}"]`);
+                        const formData = new URLSearchParams();
 
-                    form.find('input').each((_, el) => {
-                        const name = $(el).attr('name');
-                        const value = $(el).attr('value');
-                        if (name && value) formData.append(name, value);
-                    });
+                        form.find('input').each((_, el) => {
+                            const name = $(el).attr('name');
+                            const value = $(el).attr('value');
+                            if (name && value) formData.append(name, value);
+                        });
 
-                    // Ensure ViewState is present
-                    if (!formData.has('javax.faces.ViewState')) {
-                        this.log('[HttpScraper] ViewState not found in form. Searching globally...');
-                        const globalViewState = $('input[name="javax.faces.ViewState"]').val();
-                        if (globalViewState) {
-                            this.log(`[HttpScraper] Found global ViewState: ${String(globalViewState).substring(0, 15)}...`);
-                            formData.append('javax.faces.ViewState', globalViewState as string);
+                        // Ensure ViewState is present
+                        if (!formData.has('javax.faces.ViewState')) {
+                            this.log('[HttpScraper] ViewState not found in form. Searching globally...');
+                            const globalViewState = $('input[name="javax.faces.ViewState"]').val();
+                            if (globalViewState) {
+                                this.log(`[HttpScraper] Found global ViewState: ${String(globalViewState).substring(0, 15)}...`);
+                                formData.append('javax.faces.ViewState', globalViewState as string);
+                            } else {
+                                this.log('[HttpScraper] CRITICAL: ViewState not found anywhere! Request will likely fail.');
+                            }
                         } else {
-                            this.log('[HttpScraper] CRITICAL: ViewState not found anywhere! Request will likely fail.');
+                            this.log('[HttpScraper] ViewState found in form.');
                         }
+
+                        const params = paramsStr.split(',');
+                        for (let i = 0; i < params.length; i += 2) {
+                            if (params[i] && params[i + 1]) {
+                                formData.append(params[i], params[i + 1]);
+                            }
+                        }
+
+                        this.log(`[HttpScraper] Sending POST to open files. Form: ${formName}, Params: ${paramsStr}`);
+
+                        const filesResponse = await axios.post(`${this.baseUrl}/sigaa/ava/index.jsf`, formData.toString(), {
+                            headers: {
+                                'Cookie': this.getCookieHeader(`${this.baseUrl}/sigaa/ava/index.jsf`),
+                                'Content-Type': 'application/x-www-form-urlencoded',
+                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                                'Referer': currentUrl,
+                                'Connection': 'keep-alive'
+                            },
+                            timeout: 10000
+                        });
+                        this.updateCookies(filesResponse);
+                        filesPageData = filesResponse.data;
+
+                        const $filesDebug = cheerio.load(filesPageData);
+                        const pageTitle = $filesDebug('title').text().trim();
+                        const pageHeader = $filesDebug('h1, h2, .titulo').first().text().trim();
+                        this.log(`[HttpScraper] Files page loaded. Title: "${pageTitle}", Header: "${pageHeader}"`);
+                        this.log(`[HttpScraper] Response size: ${filesPageData.length} bytes`);
                     } else {
-                        this.log('[HttpScraper] ViewState found in form.');
+                        this.log('[HttpScraper] Could not parse onclick for "Conteúdo" link.');
                     }
-
-                    const params = paramsStr.split(',');
-                    for (let i = 0; i < params.length; i += 2) {
-                        if (params[i] && params[i + 1]) {
-                            formData.append(params[i], params[i + 1]);
-                        }
-                    }
-
-                    this.log(`[HttpScraper] Sending POST to open files. Form: ${formName}, Params: ${paramsStr}`);
-
-                    const filesResponse = await axios.post(`${this.baseUrl}/sigaa/ava/index.jsf`, formData.toString(), {
-                        headers: {
-                            'Cookie': this.getCookieHeader(`${this.baseUrl}/sigaa/ava/index.jsf`),
-                            'Content-Type': 'application/x-www-form-urlencoded',
-                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                            'Referer': currentUrl,
-                            'Connection': 'keep-alive'
-                        },
-                        timeout: 10000
-                    });
-                    this.updateCookies(filesResponse);
-                    filesPageData = filesResponse.data;
-
-                    const $filesDebug = cheerio.load(filesPageData);
-                    const pageTitle = $filesDebug('title').text().trim();
-                    const pageHeader = $filesDebug('h1, h2, .titulo').first().text().trim();
-                    this.log(`[HttpScraper] Files page loaded. Title: "${pageTitle}", Header: "${pageHeader}"`);
-                    this.log(`[HttpScraper] Response size: ${filesPageData.length} bytes`);
                 } else {
-                    this.log('[HttpScraper] Could not parse onclick for "Conteúdo" link.');
+                    this.log('[HttpScraper] "Conteúdo" link not found in sidebar. Scanning current page...');
                 }
-            } else {
-                this.log('[HttpScraper] "Conteúdo" link not found in sidebar. Scanning current page...');
-            }
 
             } else {
                 this.log('[HttpScraper] Using Playwright HTML directly.');
@@ -265,18 +265,16 @@ export class HttpScraperService {
 
                     if (isFile) {
                         if (onclick && onclick.includes('id')) {
-                            // Try to match standard SIGAA jsfcljs format: id,12345,key,...
-                        let idMatch = onclick.match(/,id,([^,]+)/);
-                        
-                        // Fallback to JSON-like format if that fails
-                        if (!idMatch) {
-                            idMatch = onclick.match(/'id':'([^']+)'/);
-                        }
+                            // Extract id and key from jsfcljs format: id,12345,key,abc123
+                            const idMatch = onclick.match(/,id,([^,]+)/);
+                            const keyMatch = onclick.match(/,key,([^,'"]+)/);
+
                             if (idMatch) {
                                 files.push({
                                     title: text,
                                     type: 'file',
                                     id: idMatch[1],
+                                    key: keyMatch ? keyMatch[1] : undefined,
                                     script: onclick
                                 });
                             }
@@ -451,11 +449,11 @@ export class HttpScraperService {
     }
 
     async downloadFile(
-        courseId: string,
-        fileId: string,
-        fileName: string,
-        basePath: string,
-        onProgress?: (progress: number) => void
+        _courseId: string,
+        _fileId: string,
+        _fileName: string,
+        _basePath: string,
+        _onProgress?: (progress: number) => void
     ): Promise<{ success: boolean; filePath?: string; error?: string }> {
         return { success: false, error: 'Not implemented yet' };
     }

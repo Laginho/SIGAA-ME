@@ -22,3 +22,11 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Build output
+release/
+dist-electron/
+
+# Debug files
+debug_playwright_*.html
+*.py
