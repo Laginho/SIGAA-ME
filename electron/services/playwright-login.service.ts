@@ -274,42 +274,33 @@ export class PlaywrightLoginService {
             await page.waitForTimeout(1000);
 
             // Click on "Conteúdo" link to load files section
-            console.log('Playwright: Attempting to click "Conteúdo" link...');
-            const conteudoClicked = await page.evaluate(() => {
-                // Strategy 1: Look for sidebar link
-                const itemMenus = Array.from(document.querySelectorAll('.itemMenu'));
-                for (const item of itemMenus) {
-                    const text = item.textContent || '';
-                    if (text.includes('Conte') || text.includes('nteúdo')) {
-                        const link = item.closest('a') as HTMLElement;
-                        if (link) {
-                            link.click();
-                            return true;
-                        }
-                    }
-                }
+            console.log('Playwright: Attempting to click "Conteúdo" link using native locator...');
+            
+            try {
+                // Wait for the menu to be visible
+                await page.waitForSelector('.itemMenu', { timeout: 5000 });
                 
-                // Strategy 2: Look under Materiais header
-                const materiaisHeader = document.querySelector('.itemMenuHeaderMateriais');
-                if (materiaisHeader) {
-                    const contentExterior = materiaisHeader.parentElement?.querySelector('.rich-panelbar-content-exterior');
-                    const firstLink = contentExterior?.querySelector('a') as HTMLElement;
-                    if (firstLink) {
-                        firstLink.click();
-                        return true;
-                    }
-                }
+                // Find the link containing "Conteúdo"
+                // We use a broad locator and filter by text to be safe
+                const conteudoLink = page.locator('.itemMenu').filter({ hasText: 'Conteúdo' }).first();
                 
-                return false;
-            });
-
-            if (conteudoClicked) {
-                console.log('Playwright: Clicked "Conteúdo" link, waiting for files to load...');
-                await page.waitForLoadState('networkidle');
-                await page.waitForTimeout(1000);
-            } else {
-                console.log('Playwright: Could not find "Conteúdo" link, continuing with current page...');
+                if (await conteudoLink.isVisible()) {
+                    console.log('Playwright: Found "Conteúdo" link, clicking...');
+                    await conteudoLink.click();
+                    
+                    // Wait for navigation/reload
+                    // JSF usually reloads the page or updates a large part of it
+                    await page.waitForLoadState('networkidle');
+                    await page.waitForTimeout(2000); // Extra safety wait for JSF
+                    
+                    console.log('Playwright: Click processed, current URL:', page.url());
+                } else {
+                    console.log('Playwright: "Conteúdo" link not visible');
+                }
+            } catch (e) {
+                console.error('Playwright: Error clicking Conteúdo:', e);
             }
+
             // Get HTML and Cookies
             const html = await page.content();
             const cookies = await this.context!.cookies();
