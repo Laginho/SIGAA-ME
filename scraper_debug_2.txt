@@ -1,0 +1,36 @@
+[2025-11-28T21:57:45.363Z] [HttpScraper] Cookies set. Count: 1
+[2025-11-28T21:58:00.889Z] [HttpScraper] Cookies set. Count: 1
+[2025-11-28T21:58:00.891Z] [HttpScraper] Fetching course page for ÁLGEBRA APLICADA I...
+[2025-11-28T21:58:00.891Z] [HttpScraper] Using pre-fetched HTML from Playwright. Length: 56113
+[2025-11-28T21:58:01.008Z] [HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[2025-11-28T21:58:01.068Z] [HttpScraper] Using Playwright HTML directly.
+[2025-11-28T21:58:01.118Z] [HttpScraper] Scanning for files...
+[2025-11-28T21:58:01.163Z] [HttpScraper] Found 0 files and 0 news items.
+[2025-11-28T21:58:18.856Z] [HttpScraper] Cookies set. Count: 1
+[2025-11-28T21:58:18.857Z] [HttpScraper] Fetching course page for CÁLCULO FUNDAMENTAL II...
+[2025-11-28T21:58:18.859Z] [HttpScraper] Using pre-fetched HTML from Playwright. Length: 56449
+[2025-11-28T21:58:18.887Z] [HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[2025-11-28T21:58:18.910Z] [HttpScraper] Using Playwright HTML directly.
+[2025-11-28T21:58:18.945Z] [HttpScraper] Scanning for files...
+[2025-11-28T21:58:18.981Z] [HttpScraper] Found 0 files and 0 news items.
+[2025-11-28T21:58:36.140Z] [HttpScraper] Cookies set. Count: 1
+[2025-11-28T21:58:36.141Z] [HttpScraper] Fetching course page for FUNDAMENTOS DE FÍSICA II...
+[2025-11-28T21:58:36.143Z] [HttpScraper] Using pre-fetched HTML from Playwright. Length: 56798
+[2025-11-28T21:58:36.259Z] [HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[2025-11-28T21:58:36.299Z] [HttpScraper] Using Playwright HTML directly.
+[2025-11-28T21:58:36.381Z] [HttpScraper] Scanning for files...
+[2025-11-28T21:58:36.438Z] [HttpScraper] Found 0 files and 0 news items.
+[2025-11-28T21:58:44.638Z] [HttpScraper] Cookies set. Count: 1
+[2025-11-28T21:58:44.639Z] [HttpScraper] Fetching course page for FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO...
+[2025-11-28T21:58:44.640Z] [HttpScraper] Using pre-fetched HTML from Playwright. Length: 56285
+[2025-11-28T21:58:44.670Z] [HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[2025-11-28T21:58:44.700Z] [HttpScraper] Using Playwright HTML directly.
+[2025-11-28T21:58:44.725Z] [HttpScraper] Scanning for files...
+[2025-11-28T21:58:44.760Z] [HttpScraper] Found 0 files and 0 news items.
+[2025-11-28T21:58:52.001Z] [HttpScraper] Cookies set. Count: 1
+[2025-11-28T21:58:52.002Z] [HttpScraper] Fetching course page for PROGRAMAÇÃO ORIENTADA A OBJETOS...
+[2025-11-28T21:58:52.003Z] [HttpScraper] Using pre-fetched HTML from Playwright. Length: 59424
+[2025-11-28T21:58:52.019Z] [HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[2025-11-28T21:58:52.052Z] [HttpScraper] Using Playwright HTML directly.
+[2025-11-28T21:58:52.067Z] [HttpScraper] Scanning for files...
+[2025-11-28T21:58:52.105Z] [HttpScraper] Found 0 files and 0 news items.
