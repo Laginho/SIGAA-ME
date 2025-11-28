@@ -107,19 +107,21 @@ export class SigaaService {
         fileName: string,
         fileUrl: string,
         basePath: string,
-        downloadedFiles: Record<string, any>
+        downloadedFiles: Record<string, any>,
+        script?: string
     ): Promise<{ success: boolean; filePath?: string; message?: string }> {
         try {
             console.log(`SIGAA: Downloading file ${fileName}...`);
             // Keep Playwright for downloads for now as HTTP download is not fully implemented
             const result = await this.playwrightLogin.downloadFile(
-                courseId,
-                courseName,
-                fileName,
-                fileUrl,
-                basePath,
-                downloadedFiles
-            );
+            courseId,
+            courseName,
+            fileName,
+            fileUrl,
+            basePath,
+            downloadedFiles,
+            script
+        );
 
             if (!result.success) {
                 return { success: false, message: result.error || 'Download failed' };
@@ -135,7 +137,7 @@ export class SigaaService {
     async downloadAllFiles(
         courseId: string,
         courseName: string,
-        files: Array<{ name: string; url: string }>,
+        files: Array<{ name: string; url: string; script?: string }>,
         basePath: string,
         downloadedFiles: Record<string, any>,
         onProgress?: (fileName: string, status: 'downloaded' | 'skipped' | 'failed') => void

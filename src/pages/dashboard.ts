@@ -181,7 +181,8 @@ async function syncInBackground(cachedCourses: any[], coursesListElement: HTMLEl
     const updatedCourses = [...cachedCourses];
 
     for (const serverCourse of result.courses) {
-      const cachedCourse = cachedCourses.find(c => c.id === serverCourse.id);
+      // cachedCourse is not used here
+      // const cachedCourse = cachedCourses.find(c => c.id === serverCourse.id);
 
       // Always update to check for new files/news
       // In a more advanced version, we could check file counts if the API returned them
