@@ -1,0 +1,50 @@
+diff --git a/electron/services/playwright-login.service.ts b/electron/services/playwright-login.service.ts
+index 1234567..abcdefg 100644
+--- a/electron/services/playwright-login.service.ts
++++ b/electron/services/playwright-login.service.ts
+@@ -270,7 +270,43 @@
+                 await page.waitForLoadState('networkidle');
+             }
+ 
+             // Wait for dynamic content
+             await page.waitForTimeout(1000);
++
++            // Click on "Conteúdo" link to load files section
++            console.log('Playwright: Attempting to click "Conteúdo" link...');
++            const conteudoClicked = await page.evaluate(() => {
++                // Strategy 1: Look for sidebar link
++                const itemMenus = Array.from(document.querySelectorAll('.itemMenu'));
++                for (const item of itemMenus) {
++                    const text = item.textContent || '';
++                    if (text.includes('Conte') || text.includes('nteúdo')) {
++                        const link = item.closest('a') as HTMLElement;
++                        if (link) {
++                            link.click();
++                            return true;
++                        }
++                    }
++                }
++                
++                // Strategy 2: Look under Materiais header
++                const materiaisHeader = document.querySelector('.itemMenuHeaderMateriais');
++                if (materiaisHeader) {
++                    const contentExterior = materiaisHeader.parentElement?.querySelector('.rich-panelbar-content-exterior');
++                    const firstLink = contentExterior?.querySelector('a') as HTMLElement;
++                    if (firstLink) {
++                        firstLink.click();
++                        return true;
++                    }
++                }
++                
++                return false;
++            });
++
++            if (conteudoClicked) {
++                console.log('Playwright: Clicked "Conteúdo" link, waiting for files to load...');
++                await page.waitForLoadState('networkidle');
++                await page.waitForTimeout(1000);
++            } else {
++                console.log('Playwright: Could not find "Conteúdo" link, continuing with current page...');
++            }
+ 
+             // Get HTML and Cookies

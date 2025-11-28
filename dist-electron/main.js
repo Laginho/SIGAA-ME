@@ -244,6 +244,38 @@ class PlaywrightLoginService {
         await page.waitForLoadState("networkidle");
       }
       await page.waitForTimeout(1e3);
+      console.log('Playwright: Attempting to click "Conteúdo" link...');
+      const conteudoClicked = await page.evaluate(() => {
+        var _a3;
+        const itemMenus = Array.from(document.querySelectorAll(".itemMenu"));
+        for (const item of itemMenus) {
+          const text2 = item.textContent || "";
+          if (text2.includes("Conte") || text2.includes("nteúdo")) {
+            const link = item.closest("a");
+            if (link) {
+              link.click();
+              return true;
+            }
+          }
+        }
+        const materiaisHeader = document.querySelector(".itemMenuHeaderMateriais");
+        if (materiaisHeader) {
+          const contentExterior = (_a3 = materiaisHeader.parentElement) == null ? void 0 : _a3.querySelector(".rich-panelbar-content-exterior");
+          const firstLink = contentExterior == null ? void 0 : contentExterior.querySelector("a");
+          if (firstLink) {
+            firstLink.click();
+            return true;
+          }
+        }
+        return false;
+      });
+      if (conteudoClicked) {
+        console.log('Playwright: Clicked "Conteúdo" link, waiting for files to load...');
+        await page.waitForLoadState("networkidle");
+        await page.waitForTimeout(1e3);
+      } else {
+        console.log('Playwright: Could not find "Conteúdo" link, continuing with current page...');
+      }
       const html2 = await page.content();
       const cookies2 = await this.context.cookies();
       console.log(`Playwright: Captured HTML for course ${courseId} (${html2.length} bytes)`);
@@ -12057,7 +12089,14 @@ var _eval = EvalError;
 var range = RangeError;
 var ref = ReferenceError;
 var syntax = SyntaxError;
-var type = TypeError;
+var type;
+var hasRequiredType;
+function requireType() {
+  if (hasRequiredType) return type;
+  hasRequiredType = 1;
+  type = TypeError;
+  return type;
+}
 var uri = URIError;
 var abs$1 = Math.abs;
 var floor$1 = Math.floor;
@@ -12303,7 +12342,7 @@ function requireCallBindApplyHelpers() {
   if (hasRequiredCallBindApplyHelpers) return callBindApplyHelpers;
   hasRequiredCallBindApplyHelpers = 1;
   var bind3 = functionBind;
-  var $TypeError2 = type;
+  var $TypeError2 = requireType();
   var $call2 = requireFunctionCall();
   var $actualApply = requireActualApply();
   callBindApplyHelpers = function callBindBasic(args) {
@@ -12376,7 +12415,7 @@ var $EvalError = _eval;
 var $RangeError = range;
 var $ReferenceError = ref;
 var $SyntaxError = syntax;
-var $TypeError$1 = type;
+var $TypeError$1 = requireType();
 var $URIError = uri;
 var abs = abs$1;
 var floor = floor$1;
@@ -12707,7 +12746,7 @@ var GetIntrinsic2 = getIntrinsic;
 var $defineProperty = GetIntrinsic2("%Object.defineProperty%", true);
 var hasToStringTag = requireShams()();
 var hasOwn$2 = hasown;
-var $TypeError = type;
+var $TypeError = requireType();
 var toStringTag = hasToStringTag ? Symbol.toStringTag : null;
 var esSetTostringtag = function setToStringTag(object, value) {
   var overrideIfSet = arguments.length > 2 && !!arguments[2] && arguments[2].force;
