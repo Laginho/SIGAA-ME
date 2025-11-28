@@ -147,6 +147,8 @@ export class HttpScraperService {
             let filesPageData = coursePageData;
             let conteudoLink: any = null;
 
+            // Skip navigation if using Playwright HTML (already navigated)
+            if (!preFetchedHtml) {
             $('.itemMenu').each((_, el) => {
                 const text = $(el).text().trim();
                 if (text.includes(' Conte') || text.includes('nteudo')) {
@@ -233,6 +235,10 @@ export class HttpScraperService {
                 }
             } else {
                 this.log('[HttpScraper] "Conteúdo" link not found in sidebar. Scanning current page...');
+            }
+
+            } else {
+                this.log('[HttpScraper] Using Playwright HTML directly.');
             }
 
             const $files = cheerio.load(filesPageData);
