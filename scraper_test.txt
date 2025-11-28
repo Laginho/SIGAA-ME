@@ -1,0 +1,53 @@
+[2025-11-28T21:46:05.479Z] [HttpScraper] Cookies set. Count: 1
+[2025-11-28T21:46:20.086Z] [HttpScraper] Cookies set. Count: 1
+[2025-11-28T21:46:20.088Z] [HttpScraper] Fetching course page for ÁLGEBRA APLICADA I...
+[2025-11-28T21:46:20.089Z] [HttpScraper] Using pre-fetched HTML from Playwright. Length: 56113
+[2025-11-28T21:46:20.170Z] [HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[2025-11-28T21:46:20.208Z] [HttpScraper] Strategy 1 failed. Trying Strategy 2 (Materiais header)...
+[2025-11-28T21:46:20.212Z] [HttpScraper] Found first link under Materiais.
+[2025-11-28T21:46:20.213Z] [HttpScraper] Found "Conteúdo" link in sidebar. Navigating to files...
+[2025-11-28T21:46:20.219Z] [HttpScraper] ViewState found in form.
+[2025-11-28T21:46:20.220Z] [HttpScraper] Sending POST to open files. Form: formMenu, Params: formMenu:j_id_jsp_1319588823_54,formMenu:j_id_jsp_1319588823_54
+[2025-11-28T21:46:20.492Z] [HttpScraper] Files page loaded. Title: "", Header: ""
+[2025-11-28T21:46:20.493Z] [HttpScraper] Response size: 225 bytes
+[2025-11-28T21:46:20.495Z] [HttpScraper] Scanning for files...
+[2025-11-28T21:46:20.519Z] [HttpScraper] Found 0 files and 0 news items.
+[2025-11-28T21:46:52.446Z] [HttpScraper] Cookies set. Count: 1
+[2025-11-28T21:46:52.447Z] [HttpScraper] Fetching course page for FUNDAMENTOS DE FÍSICA II...
+[2025-11-28T21:46:52.447Z] [HttpScraper] Using pre-fetched HTML from Playwright. Length: 56798
+[2025-11-28T21:46:52.539Z] [HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[2025-11-28T21:46:52.598Z] [HttpScraper] Strategy 1 failed. Trying Strategy 2 (Materiais header)...
+[2025-11-28T21:46:52.603Z] [HttpScraper] Found first link under Materiais.
+[2025-11-28T21:46:52.605Z] [HttpScraper] Found "Conteúdo" link in sidebar. Navigating to files...
+[2025-11-28T21:46:52.611Z] [HttpScraper] ViewState found in form.
+[2025-11-28T21:46:52.614Z] [HttpScraper] Sending POST to open files. Form: formMenu, Params: formMenu:j_id_jsp_1319588823_54,formMenu:j_id_jsp_1319588823_54
+[2025-11-28T21:46:52.769Z] [HttpScraper] Files page loaded. Title: "", Header: ""
+[2025-11-28T21:46:52.770Z] [HttpScraper] Response size: 225 bytes
+[2025-11-28T21:46:52.771Z] [HttpScraper] Scanning for files...
+[2025-11-28T21:46:52.806Z] [HttpScraper] Found 0 files and 0 news items.
+[2025-11-28T21:46:59.836Z] [HttpScraper] Cookies set. Count: 1
+[2025-11-28T21:46:59.837Z] [HttpScraper] Fetching course page for FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO...
+[2025-11-28T21:46:59.838Z] [HttpScraper] Using pre-fetched HTML from Playwright. Length: 56285
+[2025-11-28T21:46:59.869Z] [HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[2025-11-28T21:46:59.901Z] [HttpScraper] Strategy 1 failed. Trying Strategy 2 (Materiais header)...
+[2025-11-28T21:46:59.908Z] [HttpScraper] Found first link under Materiais.
+[2025-11-28T21:46:59.911Z] [HttpScraper] Found "Conteúdo" link in sidebar. Navigating to files...
+[2025-11-28T21:46:59.917Z] [HttpScraper] ViewState found in form.
+[2025-11-28T21:46:59.918Z] [HttpScraper] Sending POST to open files. Form: formMenu, Params: formMenu:j_id_jsp_1319588823_54,formMenu:j_id_jsp_1319588823_54
+[2025-11-28T21:47:00.128Z] [HttpScraper] Files page loaded. Title: "", Header: ""
+[2025-11-28T21:47:00.130Z] [HttpScraper] Response size: 225 bytes
+[2025-11-28T21:47:00.131Z] [HttpScraper] Scanning for files...
+[2025-11-28T21:47:00.159Z] [HttpScraper] Found 0 files and 0 news items.
+[2025-11-28T21:47:07.089Z] [HttpScraper] Cookies set. Count: 1
+[2025-11-28T21:47:07.090Z] [HttpScraper] Fetching course page for PROGRAMAÇÃO ORIENTADA A OBJETOS...
+[2025-11-28T21:47:07.091Z] [HttpScraper] Using pre-fetched HTML from Playwright. Length: 59424
+[2025-11-28T21:47:07.119Z] [HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[2025-11-28T21:47:07.140Z] [HttpScraper] Strategy 1 failed. Trying Strategy 2 (Materiais header)...
+[2025-11-28T21:47:07.143Z] [HttpScraper] Found first link under Materiais.
+[2025-11-28T21:47:07.146Z] [HttpScraper] Found "Conteúdo" link in sidebar. Navigating to files...
+[2025-11-28T21:47:07.148Z] [HttpScraper] ViewState found in form.
+[2025-11-28T21:47:07.150Z] [HttpScraper] Sending POST to open files. Form: formMenu, Params: formMenu:j_id_jsp_1319588823_54,formMenu:j_id_jsp_1319588823_54
+[2025-11-28T21:47:07.293Z] [HttpScraper] Files page loaded. Title: "", Header: ""
+[2025-11-28T21:47:07.294Z] [HttpScraper] Response size: 225 bytes
+[2025-11-28T21:47:07.295Z] [HttpScraper] Scanning for files...
+[2025-11-28T21:47:07.325Z] [HttpScraper] Found 0 files and 0 news items.
