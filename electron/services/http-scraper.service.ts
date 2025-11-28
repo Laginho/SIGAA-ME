@@ -1,5 +1,7 @@
 import axios, { AxiosResponse } from 'axios';
 import * as cheerio from 'cheerio';
+import * as fs from 'fs';
+import * as path from 'path';
 
 interface Cookie {
     name: string;
@@ -12,8 +14,25 @@ interface Cookie {
 export class HttpScraperService {
     private cookies: Cookie[] = [];
     private baseUrl: string = 'https://si3.ufc.br';
+    private logPath = path.join(process.cwd(), 'scraper.log');
 
-    constructor() { }
+    constructor() {
+        // Clear log file on startup
+        try {
+            fs.writeFileSync(this.logPath, '');
+        } catch (e) { }
+    }
+
+    private log(message: string) {
+        const timestamp = new Date().toISOString();
+        const logMessage = `[${timestamp}] ${message}\n`;
+        console.log(message);
+        try {
+            fs.appendFileSync(this.logPath, logMessage);
+        } catch (e) {
+            console.error('Failed to write to log file:', e);
+        }
+    }
 
     setCookies(cookies: Array<{ name: string; value: string; domain?: string; path?: string }>) {
         this.cookies = cookies.map(c => ({
@@ -22,26 +41,16 @@ export class HttpScraperService {
             domain: c.domain || new URL(this.baseUrl).hostname,
             path: c.path || '/'
         }));
-        console.log('[HttpScraper] Cookies set. Count:', this.cookies.length);
-        console.log('[HttpScraper] Cookie names:', this.cookies.map(c => c.name).join(', '));
+        this.log(`[HttpScraper] Cookies set. Count: ${this.cookies.length}`);
     }
 
     private getCookieHeader(url: string): string {
         const urlObj = new URL(url);
         const validCookies = this.cookies.filter(cookie => {
-            // Filter by path
-            if (cookie.path && !urlObj.pathname.startsWith(cookie.path)) {
-                return false;
-            }
-            // Filter by domain
+            if (cookie.path && !urlObj.pathname.startsWith(cookie.path)) return false;
             const requestDomain = urlObj.hostname;
-            if (!requestDomain.endsWith(cookie.domain)) {
-                return false;
-            }
-            // Filter by expiration
-            if (cookie.expires && cookie.expires < new Date()) {
-                return false;
-            }
+            if (!requestDomain.endsWith(cookie.domain)) return false;
+            if (cookie.expires && cookie.expires < new Date()) return false;
             return true;
         });
 
@@ -57,7 +66,6 @@ export class HttpScraperService {
         for (const cookieStr of cookies) {
             const parsed = this.parseCookie(cookieStr);
             if (parsed) {
-                // Remove existing cookie with same name/domain
                 this.cookies = this.cookies.filter(
                     c => !(c.name === parsed.name && c.domain === parsed.domain)
                 );
@@ -87,16 +95,12 @@ export class HttpScraperService {
 
         const flags = remaining.split('; ');
         for (const flag of flags) {
-            if (flag.match(/^Path=/i)) {
-                cookie.path = flag.replace(/^Path=/i, '');
-            } else if (flag.match(/^Domain=/i)) {
-                cookie.domain = flag.replace(/^Domain=\.?/i, '');
-            } else if (flag.match(/^Max-Age=/i)) {
+            if (flag.match(/^Path=/i)) cookie.path = flag.replace(/^Path=/i, '');
+            else if (flag.match(/^Domain=/i)) cookie.domain = flag.replace(/^Domain=\.?/i, '');
+            else if (flag.match(/^Max-Age=/i)) {
                 const maxAge = Number(flag.replace(/^Max-Age=/i, ''));
                 cookie.expires = new Date(Date.now() + maxAge * 1000);
-            } else if (flag.match(/^Expires=/i)) {
-                cookie.expires = new Date(flag.replace(/^Expires=/i, ''));
-            }
+            } else if (flag.match(/^Expires=/i)) cookie.expires = new Date(flag.replace(/^Expires=/i, ''));
         }
 
         return cookie;
@@ -108,17 +112,19 @@ export class HttpScraperService {
                 return { success: false, error: 'No session cookies. Please login first.' };
             }
 
-            console.log(`[HttpScraper] Fetching course page for ${courseName || courseId}...`);
+            this.log(`[HttpScraper] Fetching course page for ${courseName || courseId}...`);
 
             let coursePageData = '';
             let currentUrl = `${this.baseUrl}/sigaa/ava/index.jsf`;
 
             if (preFetchedHtml) {
-                console.log('[HttpScraper] Using pre-fetched HTML from Playwright.');
+                this.log(`[HttpScraper] Using pre-fetched HTML from Playwright. Length: ${preFetchedHtml.length}`);
                 coursePageData = preFetchedHtml;
+
+                const $debug = cheerio.load(coursePageData);
+                this.log(`[HttpScraper] Pre-fetched page title: "${$debug('title').text().trim()}"`);
             } else {
-                // Fallback: Try to fetch dashboard and enter course (Legacy/Flaky)
-                console.warn('[HttpScraper] WARNING: No pre-fetched HTML provided. Falling back to HTTP entry (likely to fail).');
+                this.log('[HttpScraper] WARNING: No pre-fetched HTML provided. Falling back to HTTP entry.');
 
                 const dashboardUrl = `${this.baseUrl}/sigaa/portais/discente/discente.jsf`;
                 const dashboardResponse = await axios.get(dashboardUrl, {
@@ -137,39 +143,34 @@ export class HttpScraperService {
                 coursePageData = dashboardResponse.data;
             }
 
-            // 2. Find "Conteúdo" link in the sidebar
             const $ = cheerio.load(coursePageData);
             let filesPageData = coursePageData;
-
             let conteudoLink: any = null;
 
-            // Strategy 1: Direct text search (robust against encoding)
             $('.itemMenu').each((_, el) => {
                 const text = $(el).text().trim();
-                // Match "Conteúdo", "Conteudo", "Conte" (safe substring)
                 if (text.includes(' Conte') || text.includes('nteudo')) {
-                    console.log(`[HttpScraper] Found potential link: "${text}"`);
+                    this.log(`[HttpScraper] Found potential link: "${text}"`);
                     conteudoLink = $(el).parent('a');
-                    return false; // break
+                    return false;
                 }
             });
 
-            // Strategy 2: Look for "Materiais" header and traverse
             if (!conteudoLink) {
-                console.log('[HttpScraper] Strategy 1 failed. Trying Strategy 2 (Materiais header)...');
+                this.log('[HttpScraper] Strategy 1 failed. Trying Strategy 2 (Materiais header)...');
                 const materiaisHeader = $('.itemMenuHeaderMateriais');
                 if (materiaisHeader.length > 0) {
                     const contentExterior = materiaisHeader.parent().find('.rich-panelbar-content-exterior');
                     const firstLink = contentExterior.find('a').first();
                     if (firstLink.length > 0) {
-                        console.log('[HttpScraper] Found first link under Materiais.');
+                        this.log('[HttpScraper] Found first link under Materiais.');
                         conteudoLink = firstLink;
                     }
                 }
             }
 
             if (conteudoLink) {
-                console.log('[HttpScraper] Found "Conteúdo" link in sidebar. Navigating to files...');
+                this.log('[HttpScraper] Found "Conteúdo" link in sidebar. Navigating to files...');
                 const onclick = conteudoLink.attr('onclick');
                 const match = onclick?.match(/jsfcljs\(document\.forms\['([^']+)'\],'([^']+)'/);
 
@@ -180,20 +181,34 @@ export class HttpScraperService {
                     const form = $(`form[name="${formName}"]`);
                     const formData = new URLSearchParams();
 
-                    // Add existing form hidden inputs
                     form.find('input').each((_, el) => {
                         const name = $(el).attr('name');
                         const value = $(el).attr('value');
                         if (name && value) formData.append(name, value);
                     });
 
-                    // Add JSF params
+                    // Ensure ViewState is present
+                    if (!formData.has('javax.faces.ViewState')) {
+                        this.log('[HttpScraper] ViewState not found in form. Searching globally...');
+                        const globalViewState = $('input[name="javax.faces.ViewState"]').val();
+                        if (globalViewState) {
+                            this.log(`[HttpScraper] Found global ViewState: ${String(globalViewState).substring(0, 15)}...`);
+                            formData.append('javax.faces.ViewState', globalViewState as string);
+                        } else {
+                            this.log('[HttpScraper] CRITICAL: ViewState not found anywhere! Request will likely fail.');
+                        }
+                    } else {
+                        this.log('[HttpScraper] ViewState found in form.');
+                    }
+
                     const params = paramsStr.split(',');
                     for (let i = 0; i < params.length; i += 2) {
                         if (params[i] && params[i + 1]) {
                             formData.append(params[i], params[i + 1]);
                         }
                     }
+
+                    this.log(`[HttpScraper] Sending POST to open files. Form: ${formName}, Params: ${paramsStr}`);
 
                     const filesResponse = await axios.post(`${this.baseUrl}/sigaa/ava/index.jsf`, formData.toString(), {
                         headers: {
@@ -207,20 +222,24 @@ export class HttpScraperService {
                     });
                     this.updateCookies(filesResponse);
                     filesPageData = filesResponse.data;
-                    console.log('[HttpScraper] Files page loaded.');
+
+                    const $filesDebug = cheerio.load(filesPageData);
+                    const pageTitle = $filesDebug('title').text().trim();
+                    const pageHeader = $filesDebug('h1, h2, .titulo').first().text().trim();
+                    this.log(`[HttpScraper] Files page loaded. Title: "${pageTitle}", Header: "${pageHeader}"`);
+                    this.log(`[HttpScraper] Response size: ${filesPageData.length} bytes`);
                 } else {
-                    console.log('[HttpScraper] Could not parse onclick for "Conteúdo" link.');
+                    this.log('[HttpScraper] Could not parse onclick for "Conteúdo" link.');
                 }
             } else {
-                console.log('[HttpScraper] "Conteúdo" link not found in sidebar. Scanning current page...');
+                this.log('[HttpScraper] "Conteúdo" link not found in sidebar. Scanning current page...');
             }
 
-            // 3. Scrape files from the loaded page (filesPageData)
             const $files = cheerio.load(filesPageData);
             const files: any[] = [];
             const news: any[] = [];
 
-            console.log('[HttpScraper] Scanning for files...');
+            this.log('[HttpScraper] Scanning for files...');
             $files('a').each((_, el) => {
                 const link = $files(el);
                 const text = link.text().trim();
@@ -228,7 +247,6 @@ export class HttpScraperService {
                 const onclick = link.attr('onclick');
 
                 if (text) {
-                    // Check for file extensions or keywords
                     const isFile = text.match(/\.(pdf|doc|docx|ppt|pptx|xls|xlsx|zip|rar|txt|png|jpg|jpeg)$/i) ||
                         text.toLowerCase().includes('lista') ||
                         text.toLowerCase().includes('exerc') ||
@@ -257,7 +275,6 @@ export class HttpScraperService {
                 }
             });
 
-            // Scrape news
             const $newsPage = cheerio.load(coursePageData);
             $newsPage('table').each((_, table) => {
                 const headers = $newsPage(table).find('th').map((__, th) => $newsPage(th).text().trim()).get();
@@ -283,11 +300,12 @@ export class HttpScraperService {
                 }
             });
 
-            console.log(`[HttpScraper] Found ${files.length} files and ${news.length} news items.`);
+            this.log(`[HttpScraper] Found ${files.length} files and ${news.length} news items.`);
             return { success: true, files, news };
 
         } catch (error: any) {
             console.error('[HttpScraper] Error fetching course files:', error);
+            this.log(`[HttpScraper] Error fetching course files: ${error.message}`);
             return { success: false, error: error.message };
         }
     }
@@ -306,21 +324,12 @@ export class HttpScraperService {
             });
 
             this.updateCookies(dashboardResponse);
-            console.log(`[HttpScraper] Dashboard loaded. Status: ${dashboardResponse.status}, Data length: ${dashboardResponse.data.length}`);
-            if (dashboardResponse.data.length < 500) {
-                console.log('[HttpScraper] Short response body:', dashboardResponse.data);
-            }
-
 
             const $ = cheerio.load(dashboardResponse.data);
             let input = $(`input[name="idTurma"][value="${courseId}"]`);
-            if (input.length === 0) {
-                input = $(`input[name="id"][value="${courseId}"]`);
-            }
+            if (input.length === 0) input = $(`input[name="id"][value="${courseId}"]`);
 
-            if (input.length === 0) {
-                return { success: false, error: 'Course not found on dashboard' };
-            }
+            if (input.length === 0) return { success: false, error: 'Course not found on dashboard' };
 
             const form = input.closest('form');
             const formData = new URLSearchParams();
@@ -342,25 +351,18 @@ export class HttpScraperService {
             this.updateCookies(coursePageResponse);
 
             const $course = cheerio.load(coursePageResponse.data);
-
             let targetForm: any = null;
             $course('a').each((_, el) => {
                 const onclick = $(el).attr('onclick');
-                if (onclick && onclick.includes(newsId)) {
-                    targetForm = $(el).closest('form');
-                }
+                if (onclick && onclick.includes(newsId)) targetForm = $(el).closest('form');
             });
 
             if (!targetForm || targetForm.length === 0) {
                 const hiddenInput = $course(`input[value="${newsId}"]`);
-                if (hiddenInput.length > 0) {
-                    targetForm = hiddenInput.closest('form');
-                }
+                if (hiddenInput.length > 0) targetForm = hiddenInput.closest('form');
             }
 
-            if (!targetForm || targetForm.length === 0) {
-                targetForm = $course('form').first();
-            }
+            if (!targetForm || targetForm.length === 0) targetForm = $course('form').first();
 
             const newsFormData = new URLSearchParams();
             targetForm.find('input').each((_: any, el: any) => {
@@ -383,7 +385,6 @@ export class HttpScraperService {
             });
 
             this.updateCookies(newsResponse);
-
             const $news = cheerio.load(newsResponse.data);
 
             const getTextAfterLabel = (label: string) => {
