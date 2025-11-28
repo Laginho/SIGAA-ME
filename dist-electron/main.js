@@ -244,37 +244,21 @@ class PlaywrightLoginService {
         await page.waitForLoadState("networkidle");
       }
       await page.waitForTimeout(1e3);
-      console.log('Playwright: Attempting to click "Conteúdo" link...');
-      const conteudoClicked = await page.evaluate(() => {
-        var _a3;
-        const itemMenus = Array.from(document.querySelectorAll(".itemMenu"));
-        for (const item of itemMenus) {
-          const text2 = item.textContent || "";
-          if (text2.includes("Conte") || text2.includes("nteúdo")) {
-            const link = item.closest("a");
-            if (link) {
-              link.click();
-              return true;
-            }
-          }
+      console.log('Playwright: Attempting to click "Conteúdo" link using native locator...');
+      try {
+        await page.waitForSelector(".itemMenu", { timeout: 5e3 });
+        const conteudoLink = page.locator(".itemMenu").filter({ hasText: "Conteúdo" }).first();
+        if (await conteudoLink.isVisible()) {
+          console.log('Playwright: Found "Conteúdo" link, clicking...');
+          await conteudoLink.click();
+          await page.waitForLoadState("networkidle");
+          await page.waitForTimeout(2e3);
+          console.log("Playwright: Click processed, current URL:", page.url());
+        } else {
+          console.log('Playwright: "Conteúdo" link not visible');
         }
-        const materiaisHeader = document.querySelector(".itemMenuHeaderMateriais");
-        if (materiaisHeader) {
-          const contentExterior = (_a3 = materiaisHeader.parentElement) == null ? void 0 : _a3.querySelector(".rich-panelbar-content-exterior");
-          const firstLink = contentExterior == null ? void 0 : contentExterior.querySelector("a");
-          if (firstLink) {
-            firstLink.click();
-            return true;
-          }
-        }
-        return false;
-      });
-      if (conteudoClicked) {
-        console.log('Playwright: Clicked "Conteúdo" link, waiting for files to load...');
-        await page.waitForLoadState("networkidle");
-        await page.waitForTimeout(1e3);
-      } else {
-        console.log('Playwright: Could not find "Conteúdo" link, continuing with current page...');
+      } catch (e) {
+        console.error("Playwright: Error clicking Conteúdo:", e);
       }
       const html2 = await page.content();
       const cookies2 = await this.context.cookies();
