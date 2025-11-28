@@ -16,15 +16,17 @@ var __superGet = (cls, obj, key2) => __reflectGet(__getProtoOf(cls), key2, obj);
 var _a2, _handler, _b, _c, _paused, _reason, _aborted, _abort, _handler2, _controller, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _client, _ProxyAgent_instances, getUrl_fn, _q, _noProxyValue, _noProxyEntries, _opts, _EnvHttpProxyAgent_instances, getProxyAgentForUrl_fn, shouldProxy_fn, parseNoProxy_fn, noProxyChanged_get, noProxyEnv_get, _agent, _options, _client2, _H2CClient_instances, buildConnector_fn, _flushTimeout, _isUrlExcluded, _snapshots, _snapshotPath, _maxSnapshots, _autoFlush, _headerFilters, _SnapshotRecorder_instances, startAutoFlush_fn, stopAutoFlush_fn, scheduleFlush_fn, _r, _SnapshotAgent_instances, asyncDispatch_fn, recordAndReplay_fn, replaySnapshot_fn, setupMockInterceptors_fn, _handler3, _onCompleteCalled, _onErrorCalled, _onResponseStartCalled, _s, _statusCode, _contentType, _decoder, _headers, _body, _ResponseErrorHandler_instances, checkContentType_fn, _maxSize, _dumped, _size, _controller2, _DumpHandler_instances, abort_fn, _maxTTL, _maxItems, _records, _DNSInstance_instances, defaultLookup_fn, defaultPick_fn, _state, _opts2, _dispatch, _origin, _controller3, _newOrigin, _firstTry, _cacheKey, _cacheType, _cacheByDefault, _store, _handler4, _writeStream, _t, _maxCount, _maxSize2, _maxEntrySize, _size2, _count, _entries, _hasEmittedMaxSizeEvent, _u, _successful, _callback, _handler5, _context, _allowErrorStatusCodes, _v, _decompressors, _pipelineStream, _skipStatusCodes, _skipErrorResponses, _DecompressHandler_instances, shouldSkipDecompression_fn, createDecompressionChain_fn, setupDecompressorEvents_fn, setupSingleDecompressor_fn, setupMultipleDecompressors_fn, cleanupDecompressors_fn, _maxEntrySize2, _maxCount2, _db, _getValuesQuery, _updateValueQuery, _insertValueQuery, _deleteExpiredValuesQuery, _deleteByUrlQuery, _countEntriesQuery, _deleteOldValuesQuery, _SqliteCacheStore_instances, prune_fn, makeValueUrl_fn, findValue_fn, _w;
 import { app, ipcMain, dialog, BrowserWindow, safeStorage } from "electron";
 import { fileURLToPath } from "node:url";
-import path$1 from "node:path";
-import fs$1 from "node:fs";
+import path$2 from "node:path";
+import fs$2 from "node:fs";
 import { chromium } from "playwright";
 import require$$1$2 from "util";
 import stream$2, { Readable as Readable$4 } from "stream";
+import * as path$1 from "path";
 import path__default from "path";
 import require$$3$1 from "http";
 import require$$4$1 from "https";
 import require$$0$2 from "url";
+import * as fs$1 from "fs";
 import fs__default from "fs";
 import require$$8 from "crypto";
 import http2$1 from "http2";
@@ -23012,8 +23014,8 @@ function extract(map2) {
     if (isArray2) {
       ret[key2] = this._findBySelector(selector, Number.POSITIVE_INFINITY).map((_, el) => fn(el, key2, ret)).get();
     } else {
-      const $ = this._findBySelector(selector, 1);
-      ret[key2] = $.length > 0 ? fn($[0], key2, ret) : void 0;
+      const $2 = this._findBySelector(selector, 1);
+      ret[key2] = $2.length > 0 ? fn($2[0], key2, ret) : void 0;
     }
   }
   return ret;
@@ -24260,98 +24262,98 @@ function getTagID(tagName) {
   var _a3;
   return (_a3 = TAG_NAME_TO_ID.get(tagName)) !== null && _a3 !== void 0 ? _a3 : TAG_ID.UNKNOWN;
 }
-const $$1 = TAG_ID;
+const $ = TAG_ID;
 const SPECIAL_ELEMENTS = {
   [NS.HTML]: /* @__PURE__ */ new Set([
-    $$1.ADDRESS,
-    $$1.APPLET,
-    $$1.AREA,
-    $$1.ARTICLE,
-    $$1.ASIDE,
-    $$1.BASE,
-    $$1.BASEFONT,
-    $$1.BGSOUND,
-    $$1.BLOCKQUOTE,
-    $$1.BODY,
-    $$1.BR,
-    $$1.BUTTON,
-    $$1.CAPTION,
-    $$1.CENTER,
-    $$1.COL,
-    $$1.COLGROUP,
-    $$1.DD,
-    $$1.DETAILS,
-    $$1.DIR,
-    $$1.DIV,
-    $$1.DL,
-    $$1.DT,
-    $$1.EMBED,
-    $$1.FIELDSET,
-    $$1.FIGCAPTION,
-    $$1.FIGURE,
-    $$1.FOOTER,
-    $$1.FORM,
-    $$1.FRAME,
-    $$1.FRAMESET,
-    $$1.H1,
-    $$1.H2,
-    $$1.H3,
-    $$1.H4,
-    $$1.H5,
-    $$1.H6,
-    $$1.HEAD,
-    $$1.HEADER,
-    $$1.HGROUP,
-    $$1.HR,
-    $$1.HTML,
-    $$1.IFRAME,
-    $$1.IMG,
-    $$1.INPUT,
-    $$1.LI,
-    $$1.LINK,
-    $$1.LISTING,
-    $$1.MAIN,
-    $$1.MARQUEE,
-    $$1.MENU,
-    $$1.META,
-    $$1.NAV,
-    $$1.NOEMBED,
-    $$1.NOFRAMES,
-    $$1.NOSCRIPT,
-    $$1.OBJECT,
-    $$1.OL,
-    $$1.P,
-    $$1.PARAM,
-    $$1.PLAINTEXT,
-    $$1.PRE,
-    $$1.SCRIPT,
-    $$1.SECTION,
-    $$1.SELECT,
-    $$1.SOURCE,
-    $$1.STYLE,
-    $$1.SUMMARY,
-    $$1.TABLE,
-    $$1.TBODY,
-    $$1.TD,
-    $$1.TEMPLATE,
-    $$1.TEXTAREA,
-    $$1.TFOOT,
-    $$1.TH,
-    $$1.THEAD,
-    $$1.TITLE,
-    $$1.TR,
-    $$1.TRACK,
-    $$1.UL,
-    $$1.WBR,
-    $$1.XMP
+    $.ADDRESS,
+    $.APPLET,
+    $.AREA,
+    $.ARTICLE,
+    $.ASIDE,
+    $.BASE,
+    $.BASEFONT,
+    $.BGSOUND,
+    $.BLOCKQUOTE,
+    $.BODY,
+    $.BR,
+    $.BUTTON,
+    $.CAPTION,
+    $.CENTER,
+    $.COL,
+    $.COLGROUP,
+    $.DD,
+    $.DETAILS,
+    $.DIR,
+    $.DIV,
+    $.DL,
+    $.DT,
+    $.EMBED,
+    $.FIELDSET,
+    $.FIGCAPTION,
+    $.FIGURE,
+    $.FOOTER,
+    $.FORM,
+    $.FRAME,
+    $.FRAMESET,
+    $.H1,
+    $.H2,
+    $.H3,
+    $.H4,
+    $.H5,
+    $.H6,
+    $.HEAD,
+    $.HEADER,
+    $.HGROUP,
+    $.HR,
+    $.HTML,
+    $.IFRAME,
+    $.IMG,
+    $.INPUT,
+    $.LI,
+    $.LINK,
+    $.LISTING,
+    $.MAIN,
+    $.MARQUEE,
+    $.MENU,
+    $.META,
+    $.NAV,
+    $.NOEMBED,
+    $.NOFRAMES,
+    $.NOSCRIPT,
+    $.OBJECT,
+    $.OL,
+    $.P,
+    $.PARAM,
+    $.PLAINTEXT,
+    $.PRE,
+    $.SCRIPT,
+    $.SECTION,
+    $.SELECT,
+    $.SOURCE,
+    $.STYLE,
+    $.SUMMARY,
+    $.TABLE,
+    $.TBODY,
+    $.TD,
+    $.TEMPLATE,
+    $.TEXTAREA,
+    $.TFOOT,
+    $.TH,
+    $.THEAD,
+    $.TITLE,
+    $.TR,
+    $.TRACK,
+    $.UL,
+    $.WBR,
+    $.XMP
   ]),
-  [NS.MATHML]: /* @__PURE__ */ new Set([$$1.MI, $$1.MO, $$1.MN, $$1.MS, $$1.MTEXT, $$1.ANNOTATION_XML]),
-  [NS.SVG]: /* @__PURE__ */ new Set([$$1.TITLE, $$1.FOREIGN_OBJECT, $$1.DESC]),
+  [NS.MATHML]: /* @__PURE__ */ new Set([$.MI, $.MO, $.MN, $.MS, $.MTEXT, $.ANNOTATION_XML]),
+  [NS.SVG]: /* @__PURE__ */ new Set([$.TITLE, $.FOREIGN_OBJECT, $.DESC]),
   [NS.XLINK]: /* @__PURE__ */ new Set(),
   [NS.XML]: /* @__PURE__ */ new Set(),
   [NS.XMLNS]: /* @__PURE__ */ new Set()
 };
-const NUMBERED_HEADERS = /* @__PURE__ */ new Set([$$1.H1, $$1.H2, $$1.H3, $$1.H4, $$1.H5, $$1.H6]);
+const NUMBERED_HEADERS = /* @__PURE__ */ new Set([$.H1, $.H2, $.H3, $.H4, $.H5, $.H6]);
 const UNESCAPED_TEXT = /* @__PURE__ */ new Set([
   TAG_NAMES.STYLE,
   TAG_NAMES.SCRIPT,
@@ -54141,7 +54143,7 @@ var snapshotUtils = {
   validateSnapshotMode: validateSnapshotMode$1
 };
 const { writeFile, readFile, mkdir } = require$$0$c;
-const { dirname, resolve } = path$1;
+const { dirname, resolve } = path$2;
 const { setTimeout: setTimeout$1, clearTimeout: clearTimeout$1 } = require$$2$4;
 const { InvalidArgumentError: InvalidArgumentError$5, UndiciError: UndiciError$1 } = errors;
 const { hashId, isUrlExcludedFactory, normalizeHeaders: normalizeHeaders$2, createHeaderFilters } = snapshotUtils;
@@ -64624,6 +64626,22 @@ class HttpScraperService {
   constructor() {
     __publicField(this, "cookies", []);
     __publicField(this, "baseUrl", "https://si3.ufc.br");
+    __publicField(this, "logPath", path$1.join(process.cwd(), "scraper.log"));
+    try {
+      fs$1.writeFileSync(this.logPath, "");
+    } catch (e) {
+    }
+  }
+  log(message) {
+    const timestamp = (/* @__PURE__ */ new Date()).toISOString();
+    const logMessage = `[${timestamp}] ${message}
+`;
+    console.log(message);
+    try {
+      fs$1.appendFileSync(this.logPath, logMessage);
+    } catch (e) {
+      console.error("Failed to write to log file:", e);
+    }
   }
   setCookies(cookies2) {
     this.cookies = cookies2.map((c) => ({
@@ -64632,22 +64650,15 @@ class HttpScraperService {
       domain: c.domain || new URL(this.baseUrl).hostname,
       path: c.path || "/"
     }));
-    console.log("[HttpScraper] Cookies set. Count:", this.cookies.length);
-    console.log("[HttpScraper] Cookie names:", this.cookies.map((c) => c.name).join(", "));
+    this.log(`[HttpScraper] Cookies set. Count: ${this.cookies.length}`);
   }
   getCookieHeader(url2) {
     const urlObj = new URL(url2);
     const validCookies = this.cookies.filter((cookie) => {
-      if (cookie.path && !urlObj.pathname.startsWith(cookie.path)) {
-        return false;
-      }
+      if (cookie.path && !urlObj.pathname.startsWith(cookie.path)) return false;
       const requestDomain = urlObj.hostname;
-      if (!requestDomain.endsWith(cookie.domain)) {
-        return false;
-      }
-      if (cookie.expires && cookie.expires < /* @__PURE__ */ new Date()) {
-        return false;
-      }
+      if (!requestDomain.endsWith(cookie.domain)) return false;
+      if (cookie.expires && cookie.expires < /* @__PURE__ */ new Date()) return false;
       return true;
     });
     if (validCookies.length === 0) return "";
@@ -64683,16 +64694,12 @@ class HttpScraperService {
     };
     const flags = remaining.split("; ");
     for (const flag of flags) {
-      if (flag.match(/^Path=/i)) {
-        cookie.path = flag.replace(/^Path=/i, "");
-      } else if (flag.match(/^Domain=/i)) {
-        cookie.domain = flag.replace(/^Domain=\.?/i, "");
-      } else if (flag.match(/^Max-Age=/i)) {
+      if (flag.match(/^Path=/i)) cookie.path = flag.replace(/^Path=/i, "");
+      else if (flag.match(/^Domain=/i)) cookie.domain = flag.replace(/^Domain=\.?/i, "");
+      else if (flag.match(/^Max-Age=/i)) {
         const maxAge = Number(flag.replace(/^Max-Age=/i, ""));
         cookie.expires = new Date(Date.now() + maxAge * 1e3);
-      } else if (flag.match(/^Expires=/i)) {
-        cookie.expires = new Date(flag.replace(/^Expires=/i, ""));
-      }
+      } else if (flag.match(/^Expires=/i)) cookie.expires = new Date(flag.replace(/^Expires=/i, ""));
     }
     return cookie;
   }
@@ -64701,14 +64708,16 @@ class HttpScraperService {
       if (this.cookies.length === 0) {
         return { success: false, error: "No session cookies. Please login first." };
       }
-      console.log(`[HttpScraper] Fetching course page for ${courseName || courseId}...`);
+      this.log(`[HttpScraper] Fetching course page for ${courseName || courseId}...`);
       let coursePageData = "";
       let currentUrl = `${this.baseUrl}/sigaa/ava/index.jsf`;
       if (preFetchedHtml) {
-        console.log("[HttpScraper] Using pre-fetched HTML from Playwright.");
+        this.log(`[HttpScraper] Using pre-fetched HTML from Playwright. Length: ${preFetchedHtml.length}`);
         coursePageData = preFetchedHtml;
+        const $debug = load(coursePageData);
+        this.log(`[HttpScraper] Pre-fetched page title: "${$debug("title").text().trim()}"`);
       } else {
-        console.warn("[HttpScraper] WARNING: No pre-fetched HTML provided. Falling back to HTTP entry (likely to fail).");
+        this.log("[HttpScraper] WARNING: No pre-fetched HTML provided. Falling back to HTTP entry.");
         const dashboardUrl = `${this.baseUrl}/sigaa/portais/discente/discente.jsf`;
         const dashboardResponse = await axios.get(dashboardUrl, {
           headers: {
@@ -64724,49 +64733,62 @@ class HttpScraperService {
         this.updateCookies(dashboardResponse);
         coursePageData = dashboardResponse.data;
       }
-      const $ = load(coursePageData);
+      const $2 = load(coursePageData);
       let filesPageData = coursePageData;
       let conteudoLink = null;
-      $(".itemMenu").each((_, el) => {
-        const text2 = $(el).text().trim();
+      $2(".itemMenu").each((_, el) => {
+        const text2 = $2(el).text().trim();
         if (text2.includes(" Conte") || text2.includes("nteudo")) {
-          console.log(`[HttpScraper] Found potential link: "${text2}"`);
-          conteudoLink = $(el).parent("a");
+          this.log(`[HttpScraper] Found potential link: "${text2}"`);
+          conteudoLink = $2(el).parent("a");
           return false;
         }
       });
       if (!conteudoLink) {
-        console.log("[HttpScraper] Strategy 1 failed. Trying Strategy 2 (Materiais header)...");
-        const materiaisHeader = $(".itemMenuHeaderMateriais");
+        this.log("[HttpScraper] Strategy 1 failed. Trying Strategy 2 (Materiais header)...");
+        const materiaisHeader = $2(".itemMenuHeaderMateriais");
         if (materiaisHeader.length > 0) {
           const contentExterior = materiaisHeader.parent().find(".rich-panelbar-content-exterior");
           const firstLink = contentExterior.find("a").first();
           if (firstLink.length > 0) {
-            console.log("[HttpScraper] Found first link under Materiais.");
+            this.log("[HttpScraper] Found first link under Materiais.");
             conteudoLink = firstLink;
           }
         }
       }
       if (conteudoLink) {
-        console.log('[HttpScraper] Found "Conteúdo" link in sidebar. Navigating to files...');
+        this.log('[HttpScraper] Found "Conteúdo" link in sidebar. Navigating to files...');
         const onclick = conteudoLink.attr("onclick");
         const match = onclick == null ? void 0 : onclick.match(/jsfcljs\(document\.forms\['([^']+)'\],'([^']+)'/);
         if (match) {
           const formName = match[1];
           const paramsStr = match[2];
-          const form = $(`form[name="${formName}"]`);
+          const form = $2(`form[name="${formName}"]`);
           const formData = new URLSearchParams();
           form.find("input").each((_, el) => {
-            const name = $(el).attr("name");
-            const value = $(el).attr("value");
+            const name = $2(el).attr("name");
+            const value = $2(el).attr("value");
             if (name && value) formData.append(name, value);
           });
+          if (!formData.has("javax.faces.ViewState")) {
+            this.log("[HttpScraper] ViewState not found in form. Searching globally...");
+            const globalViewState = $2('input[name="javax.faces.ViewState"]').val();
+            if (globalViewState) {
+              this.log(`[HttpScraper] Found global ViewState: ${String(globalViewState).substring(0, 15)}...`);
+              formData.append("javax.faces.ViewState", globalViewState);
+            } else {
+              this.log("[HttpScraper] CRITICAL: ViewState not found anywhere! Request will likely fail.");
+            }
+          } else {
+            this.log("[HttpScraper] ViewState found in form.");
+          }
           const params = paramsStr.split(",");
           for (let i = 0; i < params.length; i += 2) {
             if (params[i] && params[i + 1]) {
               formData.append(params[i], params[i + 1]);
             }
           }
+          this.log(`[HttpScraper] Sending POST to open files. Form: ${formName}, Params: ${paramsStr}`);
           const filesResponse = await axios.post(`${this.baseUrl}/sigaa/ava/index.jsf`, formData.toString(), {
             headers: {
               "Cookie": this.getCookieHeader(`${this.baseUrl}/sigaa/ava/index.jsf`),
@@ -64779,17 +64801,21 @@ class HttpScraperService {
           });
           this.updateCookies(filesResponse);
           filesPageData = filesResponse.data;
-          console.log("[HttpScraper] Files page loaded.");
+          const $filesDebug = load(filesPageData);
+          const pageTitle = $filesDebug("title").text().trim();
+          const pageHeader = $filesDebug("h1, h2, .titulo").first().text().trim();
+          this.log(`[HttpScraper] Files page loaded. Title: "${pageTitle}", Header: "${pageHeader}"`);
+          this.log(`[HttpScraper] Response size: ${filesPageData.length} bytes`);
         } else {
-          console.log('[HttpScraper] Could not parse onclick for "Conteúdo" link.');
+          this.log('[HttpScraper] Could not parse onclick for "Conteúdo" link.');
         }
       } else {
-        console.log('[HttpScraper] "Conteúdo" link not found in sidebar. Scanning current page...');
+        this.log('[HttpScraper] "Conteúdo" link not found in sidebar. Scanning current page...');
       }
       const $files = load(filesPageData);
       const files = [];
       const news = [];
-      console.log("[HttpScraper] Scanning for files...");
+      this.log("[HttpScraper] Scanning for files...");
       $files("a").each((_, el) => {
         const link = $files(el);
         const text2 = link.text().trim();
@@ -64825,10 +64851,10 @@ class HttpScraperService {
           $newsPage(table).find("tr").each((__, row) => {
             const cells = $newsPage(row).find("td");
             if (cells.length >= 2) {
-              const title = $(cells[0]).text().trim();
-              const date2 = $(cells[1]).text().trim();
-              const notification = $(cells[2]).text().trim();
-              const link = $(cells[0]).find("a");
+              const title = $2(cells[0]).text().trim();
+              const date2 = $2(cells[1]).text().trim();
+              const notification = $2(cells[2]).text().trim();
+              const link = $2(cells[0]).find("a");
               const onclick = link.attr("onclick");
               if (title && date2 && onclick) {
                 const idMatch = onclick.match(/['"](\\d+)['"]/);
@@ -64840,10 +64866,11 @@ class HttpScraperService {
           });
         }
       });
-      console.log(`[HttpScraper] Found ${files.length} files and ${news.length} news items.`);
+      this.log(`[HttpScraper] Found ${files.length} files and ${news.length} news items.`);
       return { success: true, files, news };
     } catch (error) {
       console.error("[HttpScraper] Error fetching course files:", error);
+      this.log(`[HttpScraper] Error fetching course files: ${error.message}`);
       return { success: false, error: error.message };
     }
   }
@@ -64860,23 +64887,15 @@ class HttpScraperService {
         timeout: 1e4
       });
       this.updateCookies(dashboardResponse);
-      console.log(`[HttpScraper] Dashboard loaded. Status: ${dashboardResponse.status}, Data length: ${dashboardResponse.data.length}`);
-      if (dashboardResponse.data.length < 500) {
-        console.log("[HttpScraper] Short response body:", dashboardResponse.data);
-      }
-      const $ = load(dashboardResponse.data);
-      let input = $(`input[name="idTurma"][value="${courseId}"]`);
-      if (input.length === 0) {
-        input = $(`input[name="id"][value="${courseId}"]`);
-      }
-      if (input.length === 0) {
-        return { success: false, error: "Course not found on dashboard" };
-      }
+      const $2 = load(dashboardResponse.data);
+      let input = $2(`input[name="idTurma"][value="${courseId}"]`);
+      if (input.length === 0) input = $2(`input[name="id"][value="${courseId}"]`);
+      if (input.length === 0) return { success: false, error: "Course not found on dashboard" };
       const form = input.closest("form");
       const formData = new URLSearchParams();
       form.find("input").each((_, el) => {
-        const name = $(el).attr("name");
-        const value = $(el).attr("value");
+        const name = $2(el).attr("name");
+        const value = $2(el).attr("value");
         if (name && value) formData.append(name, value);
       });
       const coursePageResponse = await axios.post(dashboardUrl, formData.toString(), {
@@ -64891,24 +64910,18 @@ class HttpScraperService {
       const $course = load(coursePageResponse.data);
       let targetForm = null;
       $course("a").each((_, el) => {
-        const onclick = $(el).attr("onclick");
-        if (onclick && onclick.includes(newsId)) {
-          targetForm = $(el).closest("form");
-        }
+        const onclick = $2(el).attr("onclick");
+        if (onclick && onclick.includes(newsId)) targetForm = $2(el).closest("form");
       });
       if (!targetForm || targetForm.length === 0) {
         const hiddenInput = $course(`input[value="${newsId}"]`);
-        if (hiddenInput.length > 0) {
-          targetForm = hiddenInput.closest("form");
-        }
+        if (hiddenInput.length > 0) targetForm = hiddenInput.closest("form");
       }
-      if (!targetForm || targetForm.length === 0) {
-        targetForm = $course("form").first();
-      }
+      if (!targetForm || targetForm.length === 0) targetForm = $course("form").first();
       const newsFormData = new URLSearchParams();
       targetForm.find("input").each((_, el) => {
-        const name = $(el).attr("name");
-        const value = $(el).attr("value");
+        const name = $2(el).attr("name");
+        const value = $2(el).attr("value");
         if (name && value) newsFormData.append(name, value);
       });
       newsFormData.set("id", newsId);
@@ -65102,19 +65115,19 @@ class SigaaService {
     }
   }
 }
-const __dirname$1 = path$1.dirname(fileURLToPath(import.meta.url));
-process.env.APP_ROOT = path$1.join(__dirname$1, "..");
+const __dirname$1 = path$2.dirname(fileURLToPath(import.meta.url));
+process.env.APP_ROOT = path$2.join(__dirname$1, "..");
 const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
-const MAIN_DIST = path$1.join(process.env.APP_ROOT, "dist-electron");
-const RENDERER_DIST = path$1.join(process.env.APP_ROOT, "dist");
-process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path$1.join(process.env.APP_ROOT, "public") : RENDERER_DIST;
+const MAIN_DIST = path$2.join(process.env.APP_ROOT, "dist-electron");
+const RENDERER_DIST = path$2.join(process.env.APP_ROOT, "dist");
+process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path$2.join(process.env.APP_ROOT, "public") : RENDERER_DIST;
 let win;
 const sigaaService = new SigaaService();
 function createWindow() {
   win = new BrowserWindow({
-    icon: path$1.join(process.env.VITE_PUBLIC, "electron-vite.svg"),
+    icon: path$2.join(process.env.VITE_PUBLIC, "electron-vite.svg"),
     webPreferences: {
-      preload: path$1.join(__dirname$1, "preload.mjs")
+      preload: path$2.join(__dirname$1, "preload.mjs")
     }
   });
   win.webContents.on("did-finish-load", () => {
@@ -65123,23 +65136,23 @@ function createWindow() {
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL);
   } else {
-    win.loadFile(path$1.join(RENDERER_DIST, "index.html"));
+    win.loadFile(path$2.join(RENDERER_DIST, "index.html"));
   }
 }
-const CREDENTIALS_PATH = path$1.join(app.getPath("userData"), "credentials.json");
+const CREDENTIALS_PATH = path$2.join(app.getPath("userData"), "credentials.json");
 function saveCredentials(username, password) {
   if (safeStorage.isEncryptionAvailable()) {
     const encrypted = safeStorage.encryptString(password);
-    fs$1.writeFileSync(CREDENTIALS_PATH, JSON.stringify({
+    fs$2.writeFileSync(CREDENTIALS_PATH, JSON.stringify({
       username,
       password: encrypted.toString("base64")
     }));
   }
 }
 function loadCredentials() {
-  if (fs$1.existsSync(CREDENTIALS_PATH) && safeStorage.isEncryptionAvailable()) {
+  if (fs$2.existsSync(CREDENTIALS_PATH) && safeStorage.isEncryptionAvailable()) {
     try {
-      const data2 = JSON.parse(fs$1.readFileSync(CREDENTIALS_PATH, "utf-8"));
+      const data2 = JSON.parse(fs$2.readFileSync(CREDENTIALS_PATH, "utf-8"));
       const password = safeStorage.decryptString(Buffer.from(data2.password, "base64"));
       return { username: data2.username, password };
     } catch (e) {
@@ -65153,8 +65166,8 @@ ipcMain.handle("login-request", async (_event, { username, password, rememberMe 
   if (result.success && rememberMe) {
     saveCredentials(username, password);
   } else if (result.success && !rememberMe) {
-    if (fs$1.existsSync(CREDENTIALS_PATH)) {
-      fs$1.unlinkSync(CREDENTIALS_PATH);
+    if (fs$2.existsSync(CREDENTIALS_PATH)) {
+      fs$2.unlinkSync(CREDENTIALS_PATH);
     }
   }
   return result;
@@ -65209,7 +65222,7 @@ ipcMain.handle("download-all-files", async (_, data2) => {
 ipcMain.handle("check-files-existence", async (_, filePaths) => {
   return filePaths.map((filePath) => ({
     path: filePath,
-    exists: fs$1.existsSync(filePath)
+    exists: fs$2.existsSync(filePath)
   }));
 });
 ipcMain.handle("get-news-detail", async (_, { courseId, newsId }) => {
