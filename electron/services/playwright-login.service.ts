@@ -198,7 +198,13 @@ export class PlaywrightLoginService {
                 console.log('Playwright: Sample courses:', courses.slice(0, 3));
             }
 
-            await this.close();
+            // DO NOT CLOSE BROWSER HERE - Keep it alive for course entry
+            // await this.close(); 
+
+            // Store the page/context for reuse
+            this.context = context;
+            this.page = page;
+
             return { success: true, courses };
 
         } catch (error: any) {
@@ -208,6 +214,81 @@ export class PlaywrightLoginService {
         }
     }
 
+    async enterCourseAndGetHTML(courseId: string): Promise<{ success: boolean; html?: string; cookies?: any[]; error?: string }> {
+        try {
+            if (!this.browser || !this.context) {
+                // If browser is closed, relaunch it
+                console.log('Playwright: Browser not active, relaunching...');
+                await this.getCourses(); // This will relaunch and set this.context/this.page
+            }
+
+            if (!this.page) {
+                this.page = await this.context!.newPage();
+            }
+
+            const page = this.page!;
+
+            // Ensure we are on the portal
+            if (!page.url().includes('verPortalDiscente')) {
+                console.log('Playwright: Navigating to portal...');
+                await page.goto('https://si3.ufc.br/sigaa/verPortalDiscente.do');
+                await page.waitForLoadState('networkidle');
+            }
+
+            // Enter the course
+            console.log(`Playwright: Entering course ${courseId}...`);
+            const entered = await page.evaluate((id: string) => {
+                const inputs = Array.from(document.querySelectorAll('input[name="idTurma"]'));
+                const targetInput = inputs.find(input => (input as HTMLInputElement).value === id);
+
+                if (targetInput) {
+                    const row = targetInput.closest('tr');
+                    if (row) {
+                        const link = row.querySelector('a[id*="turmaVirtual"]') as HTMLElement;
+                        if (link) {
+                            console.log('Clicking course:', link.innerText);
+                            link.click();
+                            return { success: true };
+                        }
+                    }
+                }
+                return { success: false };
+            }, courseId);
+
+            if (!entered.success) {
+                return { success: false, error: 'Course link not found in portal' };
+            }
+
+            await page.waitForLoadState('networkidle');
+            // Wait for course selection to register
+            await page.waitForTimeout(2000);
+
+            // Navigate to AVA to ensure we are in the course context
+            // Note: Clicking the link usually redirects to AVA, but we ensure it here
+            if (!page.url().includes('ava/index.jsf')) {
+                await page.goto('https://si3.ufc.br/sigaa/ava/index.jsf');
+                await page.waitForLoadState('networkidle');
+            }
+
+            // Wait for dynamic content
+            await page.waitForTimeout(1000);
+
+            // Get HTML and Cookies
+            const html = await page.content();
+            const cookies = await this.context!.cookies();
+
+            console.log(`Playwright: Captured HTML for course ${courseId} (${html.length} bytes)`);
+
+            return { success: true, html, cookies };
+
+        } catch (error: any) {
+            console.error('Playwright: Error entering course:', error);
+            // Don't close browser on single course error, try to recover
+            return { success: false, error: error.message };
+        }
+    }
+
+    // Kept for backward compatibility but now unused by the new flow
     private async navigateToCourse(page: any, courseId: string): Promise<boolean> {
         try {
             // Go to portal

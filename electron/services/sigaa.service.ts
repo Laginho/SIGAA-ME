@@ -71,12 +71,24 @@ export class SigaaService {
 
     async getCourseFiles(courseId: string, courseName?: string): Promise<{ success: boolean; files?: any[]; news?: any[]; message?: string }> {
         try {
-            console.log(`SIGAA: Fetching files for course ${courseName || courseId} using HTTP Scraper...`);
-            // Use HTTP Scraper for speed
+            console.log(`SIGAA: Fetching files for course ${courseName || courseId}...`);
 
-            const freshCookies = await this.playwrightLogin.getCookies();
-            this.httpScraper.setCookies(freshCookies);
-            const result = await this.httpScraper.getCourseFiles(courseId, courseName);
+            // 1. Use Playwright to enter the course and capture HTML (Hybrid Approach)
+            console.log('SIGAA: Entering course via Playwright to ensure session validity...');
+            const entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId);
+
+            if (!entryResult.success || !entryResult.html) {
+                console.error('SIGAA: Failed to enter course via Playwright:', entryResult.error);
+                return { success: false, message: entryResult.error || 'Failed to enter course' };
+            }
+
+            // 2. Pass cookies and HTML to HttpScraper for fast parsing
+            console.log('SIGAA: Passing captured HTML to HttpScraper...');
+            if (entryResult.cookies) {
+                this.httpScraper.setCookies(entryResult.cookies);
+            }
+
+            const result = await this.httpScraper.getCourseFiles(courseId, courseName, entryResult.html);
 
             if (!result.success) {
                 return { success: false, message: result.error || 'Failed to fetch files' };
