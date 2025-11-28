@@ -1,82 +1,185 @@
-import axios from 'axios';
+import axios, { AxiosResponse } from 'axios';
 import * as cheerio from 'cheerio';
-import { app } from 'electron';
-import * as fs from 'fs';
-import * as path from 'path';
+
+interface Cookie {
+    name: string;
+    value: string;
+    path?: string;
+    domain: string;
+    expires?: Date;
+}
 
 export class HttpScraperService {
-    private cookies: string = '';
-    private baseUrl: string = 'https://sigaa.unifei.edu.br'; // Adjust if needed, or extract from Playwright
+    private cookies: Cookie[] = [];
+    private baseUrl: string = 'https://sigaa.unifei.edu.br';
 
     constructor() { }
 
-    setCookies(cookies: Array<{ name: string; value: string }>) {
-        // Convert Playwright cookies objects to a single Cookie header string
-        this.cookies = cookies.map(c => `${c.name}=${c.value}`).join('; ');
-        console.log('[HttpScraper] Cookies set. Length:', this.cookies.length);
+    setCookies(cookies: Array<{ name: string; value: string; domain?: string; path?: string }>) {
+        this.cookies = cookies.map(c => ({
+            name: c.name,
+            value: c.value,
+            domain: c.domain || 'sigaa.unifei.edu.br',
+            path: c.path || '/'
+        }));
+        console.log('[HttpScraper] Cookies set. Count:', this.cookies.length);
+    }
+
+    private getCookieHeader(url: string): string {
+        const urlObj = new URL(url);
+        const validCookies = this.cookies.filter(cookie => {
+            // Filter by path
+            if (cookie.path && !urlObj.pathname.startsWith(cookie.path)) {
+                return false;
+            }
+            // Filter by domain
+            const requestDomain = urlObj.hostname;
+            if (!requestDomain.endsWith(cookie.domain)) {
+                return false;
+            }
+            // Filter by expiration
+            if (cookie.expires && cookie.expires < new Date()) {
+                return false;
+            }
+            return true;
+        });
+
+        if (validCookies.length === 0) return '';
+        return validCookies.map(c => `${c.name}=${c.value}`).join('; ');
+    }
+
+    private updateCookies(response: AxiosResponse) {
+        const setCookie = response.headers['set-cookie'];
+        if (!setCookie) return;
+
+        const cookies = Array.isArray(setCookie) ? setCookie : [setCookie];
+        for (const cookieStr of cookies) {
+            const parsed = this.parseCookie(cookieStr);
+            if (parsed) {
+                // Remove existing cookie with same name/domain
+                this.cookies = this.cookies.filter(
+                    c => !(c.name === parsed.name && c.domain === parsed.domain)
+                );
+                this.cookies.unshift(parsed);
+            }
+        }
+    }
+
+    private parseCookie(cookieStr: string): Cookie | null {
+        const nameMatch = cookieStr.match(/^[^()<>@,;:\\" \t\n/[\]?={}]+/);
+        if (!nameMatch) return null;
+
+        const name = nameMatch[0];
+        let remaining = cookieStr.substr(name.length);
+
+        const valueMatch = remaining.match(/^=([^; \t\n,\\]*)/);
+        if (!valueMatch) return null;
+
+        const value = valueMatch[1].replace(/^"|"$/g, '');
+        remaining = remaining.substr(valueMatch[0].length);
+
+        const cookie: Cookie = {
+            name,
+            value,
+            domain: 'sigaa.unifei.edu.br'
+        };
+
+        const flags = remaining.split('; ');
+        for (const flag of flags) {
+            if (flag.match(/^Path=/i)) {
+                cookie.path = flag.replace(/^Path=/i, '');
+            } else if (flag.match(/^Domain=/i)) {
+                cookie.domain = flag.replace(/^Domain=\.?/i, '');
+            } else if (flag.match(/^Max-Age=/i)) {
+                const maxAge = Number(flag.replace(/^Max-Age=/i, ''));
+                cookie.expires = new Date(Date.now() + maxAge * 1000);
+            } else if (flag.match(/^Expires=/i)) {
+                cookie.expires = new Date(flag.replace(/^Expires=/i, ''));
+            }
+        }
+
+        return cookie;
     }
 
     async getCourseFiles(courseId: string, courseName?: string): Promise<{ success: boolean; files?: any[]; news?: any[]; error?: string }> {
         try {
-            if (!this.cookies) {
+            if (this.cookies.length === 0) {
                 return { success: false, error: 'No session cookies. Please login first.' };
             }
 
             console.log(`[HttpScraper] Fetching course page for ${courseName || courseId}...`);
 
-            // We need to navigate to the course page. 
-            // In SIGAA, usually you click a form/link to "enter" the course.
-            // However, if we have the ID, maybe we can construct the URL or we might need to "enter" it via a POST request first if it's stateful.
-            // SIGAA is often stateful (JSF). This is the tricky part of HTTP scraping.
-            // If the URL contains the session state, we might need to grab the specific URL from the dashboard.
+            const dashboardUrl = `${this.baseUrl}/sigaa/portais/discente/discente.jsf`;
+            const dashboardResponse = await axios.get(dashboardUrl, {
+                headers: {
+                    'Cookie': this.getCookieHeader(dashboardUrl),
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9',
+                    'Accept-Language': 'pt-BR,pt;q=0.9'
+                },
+                timeout: 10000
+            });
 
-            // Assumption: We might need to rely on the "portal" page first or try to access the course URL directly if we have it.
-            // BUT, Playwright `getCourseFiles` was navigating to `https://sigaa.unifei.edu.br/sigaa/portais/discente/discente.jsf` and then clicking.
-            // To do this with HTTP, we need to replicate that flow or find a direct link.
+            this.updateCookies(dashboardResponse);
 
-            // WAIT. The Playwright service was finding the link on the dashboard.
-            // We might need to pass the *URL* of the course, not just the ID, or the specific form parameters.
+            console.log(`[HttpScraper] Dashboard response: ${dashboardResponse.status}`);
 
-            // Let's look at how Playwright did it:
-            // It clicked a link with `id` in `form`.
-            // This submits a POST request to `https://sigaa.unifei.edu.br/sigaa/portais/discente/discente.jsf`.
-            // The body contains `form_id`, `id`, `j_id_jsp_...`.
+            const $ = cheerio.load(dashboardResponse.data);
+            const pageTitle = $('title').text().trim();
+            console.log(`[HttpScraper] Dashboard loaded. Title: "${pageTitle}"`);
 
-            // This is complex to replicate with Axios without parsing the dashboard first.
-            // STRATEGY: 
-            // Step 4: Parse Files and News
+            const input = $(`input[name="idTurma"][value="${courseId}"]`);
+            if (input.length === 0) {
+                console.log(`[HttpScraper] Course input not found for ID ${courseId}.`);
+                return { success: false, error: 'Course link not found on dashboard' };
+            }
+
+            const form = input.closest('form');
+            const formData = new URLSearchParams();
+            form.find('input').each((_, el) => {
+                const name = $(el).attr('name');
+                const value = $(el).attr('value');
+                if (name && value) formData.append(name, value);
+            });
+
+            console.log(`[HttpScraper] Entering course ${courseId}...`);
+            const coursePageResponse = await axios.post(dashboardUrl, formData.toString(), {
+                headers: {
+                    'Cookie': this.getCookieHeader(dashboardUrl),
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                },
+                timeout: 10000
+            });
+
+            this.updateCookies(coursePageResponse);
+
+            const $course = cheerio.load(coursePageResponse.data);
+
             const files: any[] = [];
             const news: any[] = [];
 
-            // --- SCRAPE FILES ---
-            // Look for links with file extensions
-            $course('a').each((i, el) => {
+            // Scrape files
+            $course('a').each((_, el) => {
                 const link = $course(el);
                 const text = link.text().trim();
                 const href = link.attr('href');
                 const onclick = link.attr('onclick');
 
-                if (text && (
-                    text.match(/\.(pdf|doc|docx|ppt|pptx|xls|xlsx|zip|rar|txt|png|jpg|jpeg)$/i) ||
+                if (text && (text.match(/\.(pdf|doc|docx|ppt|pptx|xls|xlsx|zip|rar|txt|png|jpg|jpeg)$/i) ||
                     text.toLowerCase().includes('lista') ||
-                    text.toLowerCase().includes('exerc')
-                )) {
-                    // Check if it's a real file link
+                    text.toLowerCase().includes('exerc'))) {
                     if (onclick && onclick.includes('id')) {
-                        // It's a JSF postback link (most common in SIGAA)
-                        // We need to extract the ID to download it later
-                        // Format: jsfcljs(document.forms['form'],{'id':'12345, ...})
                         const idMatch = onclick.match(/'id':'([^']+)'/);
                         if (idMatch) {
                             files.push({
                                 title: text,
                                 type: 'file',
                                 id: idMatch[1],
-                                script: onclick // Store the full script if needed
+                                script: onclick
                             });
                         }
                     } else if (href && !href.startsWith('#') && !href.startsWith('javascript')) {
-                        // Direct link
                         files.push({
                             title: text,
                             type: 'link',
@@ -86,38 +189,24 @@ export class HttpScraperService {
                 }
             });
 
-            // --- SCRAPE NEWS ---
-            // Strategy 1: Sidebar/Table
-            // Look for "Notícias" section or table
-            // This depends on the specific layout. Let's try to find the table headers.
-
-            // Find table with "Título" and "Data"
-            $course('table').each((i, table) => {
-                const headers = $course(table).find('th').map((j, th) => $course(th).text().trim()).get();
+            // Scrape news
+            $course('table').each((_, table) => {
+                const headers = $course(table).find('th').map((__, th) => $course(th).text().trim()).get();
                 if (headers.includes('Título') && headers.includes('Data')) {
-                    // This is likely the news table
-                    $course(table).find('tr').each((j, row) => {
+                    $course(table).find('tr').each((__, row) => {
                         const cells = $course(row).find('td');
                         if (cells.length >= 2) {
                             const title = $(cells[0]).text().trim();
                             const date = $(cells[1]).text().trim();
-                            const notification = $(cells[2]).text().trim(); // Optional
+                            const notification = $(cells[2]).text().trim();
 
-                            // Find the ID/Link
                             const link = $(cells[0]).find('a');
                             const onclick = link.attr('onclick');
 
                             if (title && date && onclick) {
-                                // Extract ID from onclick
-                                // visualizarNoticia('form', '12345')
-                                const idMatch = onclick.match(/['"](\d+)['"]/); // Simple number match
+                                const idMatch = onclick.match(/['"](\\d+)['"]/);
                                 if (idMatch) {
-                                    news.push({
-                                        title,
-                                        date,
-                                        notification,
-                                        id: idMatch[1]
-                                    });
+                                    news.push({ title, date, notification, id: idMatch[1] });
                                 }
                             }
                         }
@@ -125,7 +214,7 @@ export class HttpScraperService {
                 }
             });
 
-            console.log(`[HttpScraper] Found ${files.length} files and ${news.length} news items for course ${courseId}.`);
+            console.log(`[HttpScraper] Found ${files.length} files and ${news.length} news items.`);
             return { success: true, files, news };
 
         } catch (error: any) {
@@ -136,63 +225,52 @@ export class HttpScraperService {
 
     async getNewsDetail(courseId: string, newsId: string): Promise<{ success: boolean; news?: any; error?: string }> {
         try {
-            // Step 1: Fetch Dashboard to get fresh session/ViewState
-            const dashboardResponse = await axios.get(`${this.baseUrl}/sigaa/portais/discente/discente.jsf`, {
+            const dashboardUrl = `${this.baseUrl}/sigaa/portais/discente/discente.jsf`;
+            const dashboardResponse = await axios.get(dashboardUrl, {
                 headers: {
-                    'Cookie': this.cookies,
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-                }
+                    'Cookie': this.getCookieHeader(dashboardUrl),
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                },
+                timeout: 10000
             });
 
-            if (dashboardResponse.request?.res?.responseUrl?.includes('login') || dashboardResponse.data.includes('verTelaLogin')) {
-                console.log('[HttpScraper] Session expired (redirected to login)');
-                return { success: false, error: 'Session expired (redirected to login)' };
-            }
+            this.updateCookies(dashboardResponse);
 
             const $ = cheerio.load(dashboardResponse.data);
-
-            // Debug: Log page title
-            const pageTitle = $('title').text().trim();
-            console.log(`[HttpScraper] Dashboard loaded. Title: "${pageTitle}"`);
-
-            // SIGAA uses 'idTurma' for the course ID in the form
             let input = $(`input[name="idTurma"][value="${courseId}"]`);
             if (input.length === 0) {
                 input = $(`input[name="id"][value="${courseId}"]`);
             }
 
             if (input.length === 0) {
-                console.log(`[HttpScraper] Course input not found for ID ${courseId} in getNewsDetail.`);
-                console.log('[HttpScraper] Available hidden inputs:', $('input[type="hidden"]').map((i, el) => `${$(el).attr('name')}=${$(el).attr('value')}`).get().join(', '));
                 return { success: false, error: 'Course not found on dashboard' };
             }
 
             const form = input.closest('form');
             const formData = new URLSearchParams();
-            form.find('input').each((i, el) => {
+            form.find('input').each((_, el) => {
                 const name = $(el).attr('name');
                 const value = $(el).attr('value');
                 if (name && value) formData.append(name, value);
             });
 
-            const coursePageResponse = await axios.post(`${this.baseUrl}/sigaa/portais/discente/discente.jsf`, formData, {
+            const coursePageResponse = await axios.post(dashboardUrl, formData.toString(), {
                 headers: {
-                    'Cookie': this.cookies,
+                    'Cookie': this.getCookieHeader(dashboardUrl),
                     'Content-Type': 'application/x-www-form-urlencoded',
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-                }
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                },
+                timeout: 10000
             });
+
+            this.updateCookies(coursePageResponse);
 
             const $course = cheerio.load(coursePageResponse.data);
 
-            // Step 2: Find the News Link/Form in the Course Page
             let targetForm: any = null;
-            let submitScript = '';
-
-            $course('a').each((i, el) => {
+            $course('a').each((_, el) => {
                 const onclick = $(el).attr('onclick');
                 if (onclick && onclick.includes(newsId)) {
-                    submitScript = onclick;
                     targetForm = $(el).closest('form');
                 }
             });
@@ -209,7 +287,7 @@ export class HttpScraperService {
             }
 
             const newsFormData = new URLSearchParams();
-            targetForm.find('input').each((i: any, el: any) => {
+            targetForm.find('input').each((_: any, el: any) => {
                 const name = $(el).attr('name');
                 const value = $(el).attr('value');
                 if (name && value) newsFormData.append(name, value);
@@ -217,26 +295,27 @@ export class HttpScraperService {
 
             newsFormData.set('id', newsId);
 
-            console.log(`[HttpScraper] Requesting news detail ${newsId}...`);
-            const newsResponse = await axios.post(`${this.baseUrl}/sigaa/portais/discente/discente.jsf`, newsFormData, {
+            const newsResponse = await axios.post(dashboardUrl, newsFormData.toString(), {
                 headers: {
-                    'Cookie': this.cookies,
+                    'Cookie': this.getCookieHeader(dashboardUrl),
                     'Content-Type': 'application/x-www-form-urlencoded',
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-                }
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                },
+                timeout: 10000
             });
+
+            this.updateCookies(newsResponse);
 
             const $news = cheerio.load(newsResponse.data);
 
-            // Step 3: Parse Detail
             const getTextAfterLabel = (label: string) => {
                 let result = '';
-                $news('td, th, label, span, div').each((i, el) => {
+                $news('td, th, label, span, div').each((_, el) => {
                     if ($news(el).text().trim().replace(':', '') === label) {
                         const parentTd = $news(el).closest('td');
                         if (parentTd.length && parentTd.next().length) {
                             result = parentTd.next().text().trim();
-                            return false; // break
+                            return false;
                         }
                         if ($news(el).next().length) {
                             result = $news(el).next().text().trim();
@@ -249,7 +328,7 @@ export class HttpScraperService {
 
             const getContent = () => {
                 let result = '';
-                $news('td, th, label, span, div').each((i, el) => {
+                $news('td, th, label, span, div').each((_, el) => {
                     if ($news(el).text().trim().replace(':', '') === 'Texto') {
                         const parentTd = $news(el).closest('td');
                         if (parentTd.length && parentTd.next().length) {

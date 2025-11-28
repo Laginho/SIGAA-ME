@@ -11978,14 +11978,7 @@ var _eval = EvalError;
 var range = RangeError;
 var ref = ReferenceError;
 var syntax = SyntaxError;
-var type;
-var hasRequiredType;
-function requireType() {
-  if (hasRequiredType) return type;
-  hasRequiredType = 1;
-  type = TypeError;
-  return type;
-}
+var type = TypeError;
 var uri = URIError;
 var abs$1 = Math.abs;
 var floor$1 = Math.floor;
@@ -12231,7 +12224,7 @@ function requireCallBindApplyHelpers() {
   if (hasRequiredCallBindApplyHelpers) return callBindApplyHelpers;
   hasRequiredCallBindApplyHelpers = 1;
   var bind3 = functionBind;
-  var $TypeError2 = requireType();
+  var $TypeError2 = type;
   var $call2 = requireFunctionCall();
   var $actualApply = requireActualApply();
   callBindApplyHelpers = function callBindBasic(args) {
@@ -12304,7 +12297,7 @@ var $EvalError = _eval;
 var $RangeError = range;
 var $ReferenceError = ref;
 var $SyntaxError = syntax;
-var $TypeError$1 = requireType();
+var $TypeError$1 = type;
 var $URIError = uri;
 var abs = abs$1;
 var floor = floor$1;
@@ -12635,7 +12628,7 @@ var GetIntrinsic2 = getIntrinsic;
 var $defineProperty = GetIntrinsic2("%Object.defineProperty%", true);
 var hasToStringTag = requireShams()();
 var hasOwn$2 = hasown;
-var $TypeError = requireType();
+var $TypeError = type;
 var toStringTag = hasToStringTag ? Symbol.toStringTag : null;
 var esSetTostringtag = function setToStringTag(object, value) {
   var overrideIfSet = arguments.length > 2 && !!arguments[2] && arguments[2].force;
@@ -24190,98 +24183,98 @@ function getTagID(tagName) {
   var _a3;
   return (_a3 = TAG_NAME_TO_ID.get(tagName)) !== null && _a3 !== void 0 ? _a3 : TAG_ID.UNKNOWN;
 }
-const $$1 = TAG_ID;
+const $ = TAG_ID;
 const SPECIAL_ELEMENTS = {
   [NS.HTML]: /* @__PURE__ */ new Set([
-    $$1.ADDRESS,
-    $$1.APPLET,
-    $$1.AREA,
-    $$1.ARTICLE,
-    $$1.ASIDE,
-    $$1.BASE,
-    $$1.BASEFONT,
-    $$1.BGSOUND,
-    $$1.BLOCKQUOTE,
-    $$1.BODY,
-    $$1.BR,
-    $$1.BUTTON,
-    $$1.CAPTION,
-    $$1.CENTER,
-    $$1.COL,
-    $$1.COLGROUP,
-    $$1.DD,
-    $$1.DETAILS,
-    $$1.DIR,
-    $$1.DIV,
-    $$1.DL,
-    $$1.DT,
-    $$1.EMBED,
-    $$1.FIELDSET,
-    $$1.FIGCAPTION,
-    $$1.FIGURE,
-    $$1.FOOTER,
-    $$1.FORM,
-    $$1.FRAME,
-    $$1.FRAMESET,
-    $$1.H1,
-    $$1.H2,
-    $$1.H3,
-    $$1.H4,
-    $$1.H5,
-    $$1.H6,
-    $$1.HEAD,
-    $$1.HEADER,
-    $$1.HGROUP,
-    $$1.HR,
-    $$1.HTML,
-    $$1.IFRAME,
-    $$1.IMG,
-    $$1.INPUT,
-    $$1.LI,
-    $$1.LINK,
-    $$1.LISTING,
-    $$1.MAIN,
-    $$1.MARQUEE,
-    $$1.MENU,
-    $$1.META,
-    $$1.NAV,
-    $$1.NOEMBED,
-    $$1.NOFRAMES,
-    $$1.NOSCRIPT,
-    $$1.OBJECT,
-    $$1.OL,
-    $$1.P,
-    $$1.PARAM,
-    $$1.PLAINTEXT,
-    $$1.PRE,
-    $$1.SCRIPT,
-    $$1.SECTION,
-    $$1.SELECT,
-    $$1.SOURCE,
-    $$1.STYLE,
-    $$1.SUMMARY,
-    $$1.TABLE,
-    $$1.TBODY,
-    $$1.TD,
-    $$1.TEMPLATE,
-    $$1.TEXTAREA,
-    $$1.TFOOT,
-    $$1.TH,
-    $$1.THEAD,
-    $$1.TITLE,
-    $$1.TR,
-    $$1.TRACK,
-    $$1.UL,
-    $$1.WBR,
-    $$1.XMP
+    $.ADDRESS,
+    $.APPLET,
+    $.AREA,
+    $.ARTICLE,
+    $.ASIDE,
+    $.BASE,
+    $.BASEFONT,
+    $.BGSOUND,
+    $.BLOCKQUOTE,
+    $.BODY,
+    $.BR,
+    $.BUTTON,
+    $.CAPTION,
+    $.CENTER,
+    $.COL,
+    $.COLGROUP,
+    $.DD,
+    $.DETAILS,
+    $.DIR,
+    $.DIV,
+    $.DL,
+    $.DT,
+    $.EMBED,
+    $.FIELDSET,
+    $.FIGCAPTION,
+    $.FIGURE,
+    $.FOOTER,
+    $.FORM,
+    $.FRAME,
+    $.FRAMESET,
+    $.H1,
+    $.H2,
+    $.H3,
+    $.H4,
+    $.H5,
+    $.H6,
+    $.HEAD,
+    $.HEADER,
+    $.HGROUP,
+    $.HR,
+    $.HTML,
+    $.IFRAME,
+    $.IMG,
+    $.INPUT,
+    $.LI,
+    $.LINK,
+    $.LISTING,
+    $.MAIN,
+    $.MARQUEE,
+    $.MENU,
+    $.META,
+    $.NAV,
+    $.NOEMBED,
+    $.NOFRAMES,
+    $.NOSCRIPT,
+    $.OBJECT,
+    $.OL,
+    $.P,
+    $.PARAM,
+    $.PLAINTEXT,
+    $.PRE,
+    $.SCRIPT,
+    $.SECTION,
+    $.SELECT,
+    $.SOURCE,
+    $.STYLE,
+    $.SUMMARY,
+    $.TABLE,
+    $.TBODY,
+    $.TD,
+    $.TEMPLATE,
+    $.TEXTAREA,
+    $.TFOOT,
+    $.TH,
+    $.THEAD,
+    $.TITLE,
+    $.TR,
+    $.TRACK,
+    $.UL,
+    $.WBR,
+    $.XMP
   ]),
-  [NS.MATHML]: /* @__PURE__ */ new Set([$$1.MI, $$1.MO, $$1.MN, $$1.MS, $$1.MTEXT, $$1.ANNOTATION_XML]),
-  [NS.SVG]: /* @__PURE__ */ new Set([$$1.TITLE, $$1.FOREIGN_OBJECT, $$1.DESC]),
+  [NS.MATHML]: /* @__PURE__ */ new Set([$.MI, $.MO, $.MN, $.MS, $.MTEXT, $.ANNOTATION_XML]),
+  [NS.SVG]: /* @__PURE__ */ new Set([$.TITLE, $.FOREIGN_OBJECT, $.DESC]),
   [NS.XLINK]: /* @__PURE__ */ new Set(),
   [NS.XML]: /* @__PURE__ */ new Set(),
   [NS.XMLNS]: /* @__PURE__ */ new Set()
 };
-const NUMBERED_HEADERS = /* @__PURE__ */ new Set([$$1.H1, $$1.H2, $$1.H3, $$1.H4, $$1.H5, $$1.H6]);
+const NUMBERED_HEADERS = /* @__PURE__ */ new Set([$.H1, $.H2, $.H3, $.H4, $.H5, $.H6]);
 const UNESCAPED_TEXT = /* @__PURE__ */ new Set([
   TAG_NAMES.STYLE,
   TAG_NAMES.SCRIPT,
@@ -64551,24 +64544,127 @@ undici.exports;
 })(undici);
 undici.exports;
 class HttpScraperService {
-  // Adjust if needed, or extract from Playwright
   constructor() {
-    __publicField(this, "cookies", "");
+    __publicField(this, "cookies", []);
     __publicField(this, "baseUrl", "https://sigaa.unifei.edu.br");
   }
   setCookies(cookies2) {
-    this.cookies = cookies2.map((c) => `${c.name}=${c.value}`).join("; ");
-    console.log("[HttpScraper] Cookies set. Length:", this.cookies.length);
+    this.cookies = cookies2.map((c) => ({
+      name: c.name,
+      value: c.value,
+      domain: c.domain || "sigaa.unifei.edu.br",
+      path: c.path || "/"
+    }));
+    console.log("[HttpScraper] Cookies set. Count:", this.cookies.length);
+  }
+  getCookieHeader(url2) {
+    const urlObj = new URL(url2);
+    const validCookies = this.cookies.filter((cookie) => {
+      if (cookie.path && !urlObj.pathname.startsWith(cookie.path)) {
+        return false;
+      }
+      const requestDomain = urlObj.hostname;
+      if (!requestDomain.endsWith(cookie.domain)) {
+        return false;
+      }
+      if (cookie.expires && cookie.expires < /* @__PURE__ */ new Date()) {
+        return false;
+      }
+      return true;
+    });
+    if (validCookies.length === 0) return "";
+    return validCookies.map((c) => `${c.name}=${c.value}`).join("; ");
+  }
+  updateCookies(response2) {
+    const setCookie = response2.headers["set-cookie"];
+    if (!setCookie) return;
+    const cookies2 = Array.isArray(setCookie) ? setCookie : [setCookie];
+    for (const cookieStr of cookies2) {
+      const parsed = this.parseCookie(cookieStr);
+      if (parsed) {
+        this.cookies = this.cookies.filter(
+          (c) => !(c.name === parsed.name && c.domain === parsed.domain)
+        );
+        this.cookies.unshift(parsed);
+      }
+    }
+  }
+  parseCookie(cookieStr) {
+    const nameMatch = cookieStr.match(/^[^()<>@,;:\\" \t\n/[\]?={}]+/);
+    if (!nameMatch) return null;
+    const name = nameMatch[0];
+    let remaining = cookieStr.substr(name.length);
+    const valueMatch = remaining.match(/^=([^; \t\n,\\]*)/);
+    if (!valueMatch) return null;
+    const value = valueMatch[1].replace(/^"|"$/g, "");
+    remaining = remaining.substr(valueMatch[0].length);
+    const cookie = {
+      name,
+      value,
+      domain: "sigaa.unifei.edu.br"
+    };
+    const flags = remaining.split("; ");
+    for (const flag of flags) {
+      if (flag.match(/^Path=/i)) {
+        cookie.path = flag.replace(/^Path=/i, "");
+      } else if (flag.match(/^Domain=/i)) {
+        cookie.domain = flag.replace(/^Domain=\.?/i, "");
+      } else if (flag.match(/^Max-Age=/i)) {
+        const maxAge = Number(flag.replace(/^Max-Age=/i, ""));
+        cookie.expires = new Date(Date.now() + maxAge * 1e3);
+      } else if (flag.match(/^Expires=/i)) {
+        cookie.expires = new Date(flag.replace(/^Expires=/i, ""));
+      }
+    }
+    return cookie;
   }
   async getCourseFiles(courseId, courseName) {
     try {
-      if (!this.cookies) {
+      if (this.cookies.length === 0) {
         return { success: false, error: "No session cookies. Please login first." };
       }
       console.log(`[HttpScraper] Fetching course page for ${courseName || courseId}...`);
+      const dashboardUrl = `${this.baseUrl}/sigaa/portais/discente/discente.jsf`;
+      const dashboardResponse = await axios.get(dashboardUrl, {
+        headers: {
+          "Cookie": this.getCookieHeader(dashboardUrl),
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9",
+          "Accept-Language": "pt-BR,pt;q=0.9"
+        },
+        timeout: 1e4
+      });
+      this.updateCookies(dashboardResponse);
+      console.log(`[HttpScraper] Dashboard response: ${dashboardResponse.status}`);
+      const $2 = load(dashboardResponse.data);
+      const pageTitle = $2("title").text().trim();
+      console.log(`[HttpScraper] Dashboard loaded. Title: "${pageTitle}"`);
+      const input = $2(`input[name="idTurma"][value="${courseId}"]`);
+      if (input.length === 0) {
+        console.log(`[HttpScraper] Course input not found for ID ${courseId}.`);
+        return { success: false, error: "Course link not found on dashboard" };
+      }
+      const form = input.closest("form");
+      const formData = new URLSearchParams();
+      form.find("input").each((_, el) => {
+        const name = $2(el).attr("name");
+        const value = $2(el).attr("value");
+        if (name && value) formData.append(name, value);
+      });
+      console.log(`[HttpScraper] Entering course ${courseId}...`);
+      const coursePageResponse = await axios.post(dashboardUrl, formData.toString(), {
+        headers: {
+          "Cookie": this.getCookieHeader(dashboardUrl),
+          "Content-Type": "application/x-www-form-urlencoded",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        },
+        timeout: 1e4
+      });
+      this.updateCookies(coursePageResponse);
+      const $course = load(coursePageResponse.data);
       const files = [];
       const news = [];
-      $course("a").each((i, el) => {
+      $course("a").each((_, el) => {
         const link = $course(el);
         const text2 = link.text().trim();
         const href = link.attr("href");
@@ -64582,7 +64678,6 @@ class HttpScraperService {
                 type: "file",
                 id: idMatch[1],
                 script: onclick
-                // Store the full script if needed
               });
             }
           } else if (href && !href.startsWith("#") && !href.startsWith("javascript")) {
@@ -64594,33 +64689,28 @@ class HttpScraperService {
           }
         }
       });
-      $course("table").each((i, table) => {
-        const headers2 = $course(table).find("th").map((j, th) => $course(th).text().trim()).get();
+      $course("table").each((_, table) => {
+        const headers2 = $course(table).find("th").map((__, th) => $course(th).text().trim()).get();
         if (headers2.includes("Título") && headers2.includes("Data")) {
-          $course(table).find("tr").each((j, row) => {
+          $course(table).find("tr").each((__, row) => {
             const cells = $course(row).find("td");
             if (cells.length >= 2) {
-              const title = $(cells[0]).text().trim();
-              const date2 = $(cells[1]).text().trim();
-              const notification = $(cells[2]).text().trim();
-              const link = $(cells[0]).find("a");
+              const title = $2(cells[0]).text().trim();
+              const date2 = $2(cells[1]).text().trim();
+              const notification = $2(cells[2]).text().trim();
+              const link = $2(cells[0]).find("a");
               const onclick = link.attr("onclick");
               if (title && date2 && onclick) {
-                const idMatch = onclick.match(/['"](\d+)['"]/);
+                const idMatch = onclick.match(/['"](\\d+)['"]/);
                 if (idMatch) {
-                  news.push({
-                    title,
-                    date: date2,
-                    notification,
-                    id: idMatch[1]
-                  });
+                  news.push({ title, date: date2, notification, id: idMatch[1] });
                 }
               }
             }
           });
         }
       });
-      console.log(`[HttpScraper] Found ${files.length} files and ${news.length} news items for course ${courseId}.`);
+      console.log(`[HttpScraper] Found ${files.length} files and ${news.length} news items.`);
       return { success: true, files, news };
     } catch (error) {
       console.error("[HttpScraper] Error fetching course files:", error);
@@ -64628,82 +64718,77 @@ class HttpScraperService {
     }
   }
   async getNewsDetail(courseId, newsId) {
-    var _a3, _b2, _c2;
     try {
-      const dashboardResponse = await axios.get(`${this.baseUrl}/sigaa/portais/discente/discente.jsf`, {
+      const dashboardUrl = `${this.baseUrl}/sigaa/portais/discente/discente.jsf`;
+      const dashboardResponse = await axios.get(dashboardUrl, {
         headers: {
-          "Cookie": this.cookies,
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        }
+          "Cookie": this.getCookieHeader(dashboardUrl),
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        },
+        timeout: 1e4
       });
-      if (((_c2 = (_b2 = (_a3 = dashboardResponse.request) == null ? void 0 : _a3.res) == null ? void 0 : _b2.responseUrl) == null ? void 0 : _c2.includes("login")) || dashboardResponse.data.includes("verTelaLogin")) {
-        console.log("[HttpScraper] Session expired (redirected to login)");
-        return { success: false, error: "Session expired (redirected to login)" };
-      }
+      this.updateCookies(dashboardResponse);
       const $2 = load(dashboardResponse.data);
-      const pageTitle = $2("title").text().trim();
-      console.log(`[HttpScraper] Dashboard loaded. Title: "${pageTitle}"`);
       let input = $2(`input[name="idTurma"][value="${courseId}"]`);
       if (input.length === 0) {
         input = $2(`input[name="id"][value="${courseId}"]`);
       }
       if (input.length === 0) {
-        console.log(`[HttpScraper] Course input not found for ID ${courseId} in getNewsDetail.`);
-        console.log("[HttpScraper] Available hidden inputs:", $2('input[type="hidden"]').map((i, el) => `${$2(el).attr("name")}=${$2(el).attr("value")}`).get().join(", "));
         return { success: false, error: "Course not found on dashboard" };
       }
       const form = input.closest("form");
       const formData = new URLSearchParams();
-      form.find("input").each((i, el) => {
+      form.find("input").each((_, el) => {
         const name = $2(el).attr("name");
         const value = $2(el).attr("value");
         if (name && value) formData.append(name, value);
       });
-      const coursePageResponse = await axios.post(`${this.baseUrl}/sigaa/portais/discente/discente.jsf`, formData, {
+      const coursePageResponse = await axios.post(dashboardUrl, formData.toString(), {
         headers: {
-          "Cookie": this.cookies,
+          "Cookie": this.getCookieHeader(dashboardUrl),
           "Content-Type": "application/x-www-form-urlencoded",
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        }
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        },
+        timeout: 1e4
       });
-      const $course2 = load(coursePageResponse.data);
+      this.updateCookies(coursePageResponse);
+      const $course = load(coursePageResponse.data);
       let targetForm = null;
-      let submitScript = "";
-      $course2("a").each((i, el) => {
+      $course("a").each((_, el) => {
         const onclick = $2(el).attr("onclick");
         if (onclick && onclick.includes(newsId)) {
-          submitScript = onclick;
           targetForm = $2(el).closest("form");
         }
       });
       if (!targetForm || targetForm.length === 0) {
-        const hiddenInput = $course2(`input[value="${newsId}"]`);
+        const hiddenInput = $course(`input[value="${newsId}"]`);
         if (hiddenInput.length > 0) {
           targetForm = hiddenInput.closest("form");
         }
       }
       if (!targetForm || targetForm.length === 0) {
-        targetForm = $course2("form").first();
+        targetForm = $course("form").first();
       }
       const newsFormData = new URLSearchParams();
-      targetForm.find("input").each((i, el) => {
+      targetForm.find("input").each((_, el) => {
         const name = $2(el).attr("name");
         const value = $2(el).attr("value");
         if (name && value) newsFormData.append(name, value);
       });
       newsFormData.set("id", newsId);
-      console.log(`[HttpScraper] Requesting news detail ${newsId}...`);
-      const newsResponse = await axios.post(`${this.baseUrl}/sigaa/portais/discente/discente.jsf`, newsFormData, {
+      const newsResponse = await axios.post(dashboardUrl, newsFormData.toString(), {
         headers: {
-          "Cookie": this.cookies,
+          "Cookie": this.getCookieHeader(dashboardUrl),
           "Content-Type": "application/x-www-form-urlencoded",
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        }
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        },
+        timeout: 1e4
       });
+      this.updateCookies(newsResponse);
       const $news = load(newsResponse.data);
       const getTextAfterLabel = (label) => {
         let result = "";
-        $news("td, th, label, span, div").each((i, el) => {
+        $news("td, th, label, span, div").each((_, el) => {
           if ($news(el).text().trim().replace(":", "") === label) {
             const parentTd = $news(el).closest("td");
             if (parentTd.length && parentTd.next().length) {
@@ -64720,7 +64805,7 @@ class HttpScraperService {
       };
       const getContent = () => {
         let result = "";
-        $news("td, th, label, span, div").each((i, el) => {
+        $news("td, th, label, span, div").each((_, el) => {
           if ($news(el).text().trim().replace(":", "") === "Texto") {
             const parentTd = $news(el).closest("td");
             if (parentTd.length && parentTd.next().length) {
