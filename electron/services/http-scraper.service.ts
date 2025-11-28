@@ -130,55 +130,140 @@ export class HttpScraperService {
             const pageTitle = $('title').text().trim();
             console.log(`[HttpScraper] Dashboard loaded. Title: "${pageTitle}"`);
 
+            // 1. Enter the course (if not already in it)
             const input = $(`input[name="idTurma"][value="${courseId}"]`);
-            if (input.length === 0) {
-                console.log(`[HttpScraper] Course input not found for ID ${courseId}.`);
-                return { success: false, error: 'Course link not found on dashboard' };
+
+            let coursePageData = dashboardResponse.data;
+            let currentUrl = dashboardUrl;
+
+            if (input.length > 0) {
+                const form = input.closest('form');
+                const formData = new URLSearchParams();
+                form.find('input').each((_, el) => {
+                    const name = $(el).attr('name');
+                    const value = $(el).attr('value');
+                    if (name && value) formData.append(name, value);
+                });
+
+                console.log(`[HttpScraper] Entering course ${courseId}...`);
+                const coursePageResponse = await axios.post(dashboardUrl, formData.toString(), {
+                    headers: {
+                        'Cookie': this.getCookieHeader(dashboardUrl),
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                        'Referer': dashboardUrl,
+                        'Connection': 'keep-alive'
+                    },
+                    timeout: 10000
+                });
+                this.updateCookies(coursePageResponse);
+                coursePageData = coursePageResponse.data;
+                currentUrl = `${this.baseUrl}/sigaa/ava/index.jsf`;
+
+                // DEBUG: Check where we are
+                const $debug = cheerio.load(coursePageData);
+                const debugTitle = $debug('title').text().trim();
+                console.log(`[HttpScraper] Post-entry Title: "${debugTitle}"`);
+                console.log(`[HttpScraper] Post-entry HTML length: ${coursePageData.length}`);
+                const menuItems = $debug('.itemMenu');
+                console.log(`[HttpScraper] Found ${menuItems.length} .itemMenu elements.`);
+                if (menuItems.length > 0) {
+                    console.log(`[HttpScraper] First menu item: "${menuItems.first().text().trim()}"`);
+                } else {
+                    console.log('[HttpScraper] No menu items found. Possible login/session issue or wrong page.');
+                }
             }
 
-            const form = input.closest('form');
-            const formData = new URLSearchParams();
-            form.find('input').each((_, el) => {
-                const name = $(el).attr('name');
-                const value = $(el).attr('value');
-                if (name && value) formData.append(name, value);
+
+            // 2. Find "Conteúdo" link in the sidebar
+            const $course = cheerio.load(coursePageData);
+            let filesPageData = coursePageData;
+
+            let conteudoLink: any = null;
+
+            // Strategy 1: Direct text search (robust against encoding)
+            $course('.itemMenu').each((_, el) => {
+                const text = $course(el).text().trim();
+                // Match "Conteúdo", "Conteudo", "Conte" (safe substring)
+                if (text.includes('Conte') || text.includes('nteudo')) {
+                    console.log(`[HttpScraper] Found potential link: "${text}"`);
+                    conteudoLink = $course(el).parent('a');
+                    return false; // break
+                }
             });
 
-            console.log(`[HttpScraper] Entering course ${courseId}...`);
-            const coursePageResponse = await axios.post(dashboardUrl, formData.toString(), {
-                headers: {
-                    'Cookie': this.getCookieHeader(dashboardUrl),
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                    'Referer': dashboardUrl,
-                    'Connection': 'keep-alive'
-                },
-                timeout: 10000
-            });
+            // Strategy 2: Look for "Materiais" header and traverse
+            if (!conteudoLink) {
+                console.log('[HttpScraper] Strategy 1 failed. Trying Strategy 2 (Materiais header)...');
+                const materiaisHeader = $course('.itemMenuHeaderMateriais');
+                if (materiaisHeader.length > 0) {
+                    const contentExterior = materiaisHeader.parent().find('.rich-panelbar-content-exterior');
+                    const firstLink = contentExterior.find('a').first();
+                    if (firstLink.length > 0) {
+                        console.log('[HttpScraper] Found first link under Materiais.');
+                        conteudoLink = firstLink;
+                    }
+                }
+            }
 
-            this.updateCookies(coursePageResponse);
+            if (conteudoLink) {
+                console.log('[HttpScraper] Found "Conteúdo" link in sidebar. Navigating to files...');
+                const onclick = conteudoLink.attr('onclick');
+                const match = onclick?.match(/jsfcljs\(document\.forms\['([^']+)'\],'([^']+)'/);
 
-            // Debug: Log a snippet of the HTML to check structure
-            console.log('[HttpScraper] Course page loaded. Data length:', coursePageResponse.data.length);
-            console.log('[HttpScraper] HTML snippet:', coursePageResponse.data.substring(0, 500));
-            const $debug = cheerio.load(coursePageResponse.data);
-            console.log('[HttpScraper] Found "a" tags:', $debug('a').length);
+                if (match) {
+                    const formName = match[1];
+                    const paramsStr = match[2];
 
-            const $course = cheerio.load(coursePageResponse.data);
+                    const form = $course(`form[name="${formName}"]`);
+                    const formData = new URLSearchParams();
 
+                    // Add existing form hidden inputs
+                    form.find('input').each((_, el) => {
+                        const name = $(el).attr('name');
+                        const value = $(el).attr('value');
+                        if (name && value) formData.append(name, value);
+                    });
+
+                    // Add JSF params
+                    const params = paramsStr.split(',');
+                    for (let i = 0; i < params.length; i += 2) {
+                        if (params[i] && params[i + 1]) {
+                            formData.append(params[i], params[i + 1]);
+                        }
+                    }
+
+                    const filesResponse = await axios.post(`${this.baseUrl}/sigaa/ava/index.jsf`, formData.toString(), {
+                        headers: {
+                            'Cookie': this.getCookieHeader(`${this.baseUrl}/sigaa/ava/index.jsf`),
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                            'Referer': currentUrl,
+                            'Connection': 'keep-alive'
+                        },
+                        timeout: 10000
+                    });
+                    this.updateCookies(filesResponse);
+                    filesPageData = filesResponse.data;
+                    console.log('[HttpScraper] Files page loaded.');
+                } else {
+                    console.log('[HttpScraper] Could not parse onclick for "Conteúdo" link.');
+                }
+            } else {
+                console.log('[HttpScraper] "Conteúdo" link not found in sidebar. Scanning current page...');
+            }
+
+            // 3. Scrape files from the loaded page (filesPageData)
+            const $files = cheerio.load(filesPageData);
             const files: any[] = [];
             const news: any[] = [];
 
-            // Scrape files
             console.log('[HttpScraper] Scanning for files...');
-            $course('a').each((_, el) => {
-                const link = $course(el);
+            $files('a').each((_, el) => {
+                const link = $files(el);
                 const text = link.text().trim();
                 const href = link.attr('href');
                 const onclick = link.attr('onclick');
-
-                // Debug: Log every link found to see what we're missing
-                // console.log(`[HttpScraper] Link found: Text="${text}", Href="${href}", Onclick="${onclick}"`);
 
                 if (text) {
                     // Check for file extensions or keywords
@@ -211,11 +296,12 @@ export class HttpScraperService {
             });
 
             // Scrape news
-            $course('table').each((_, table) => {
-                const headers = $course(table).find('th').map((__, th) => $course(th).text().trim()).get();
+            const $newsPage = cheerio.load(coursePageData);
+            $newsPage('table').each((_, table) => {
+                const headers = $newsPage(table).find('th').map((__, th) => $newsPage(th).text().trim()).get();
                 if (headers.includes('Título') && headers.includes('Data')) {
-                    $course(table).find('tr').each((__, row) => {
-                        const cells = $course(row).find('td');
+                    $newsPage(table).find('tr').each((__, row) => {
+                        const cells = $newsPage(row).find('td');
                         if (cells.length >= 2) {
                             const title = $(cells[0]).text().trim();
                             const date = $(cells[1]).text().trim();
