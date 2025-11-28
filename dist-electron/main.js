@@ -12693,9 +12693,9 @@ var asynckit = asynckit$1;
 var setToStringTag2 = esSetTostringtag;
 var hasOwn$1 = hasown;
 var populate = populate$1;
-function FormData$1(options) {
-  if (!(this instanceof FormData$1)) {
-    return new FormData$1(options);
+function FormData$2(options) {
+  if (!(this instanceof FormData$2)) {
+    return new FormData$2(options);
   }
   this._overheadLength = 0;
   this._valueLength = 0;
@@ -12706,10 +12706,10 @@ function FormData$1(options) {
     this[option] = options[option];
   }
 }
-util$n.inherits(FormData$1, CombinedStream);
-FormData$1.LINE_BREAK = "\r\n";
-FormData$1.DEFAULT_CONTENT_TYPE = "application/octet-stream";
-FormData$1.prototype.append = function(field, value, options) {
+util$n.inherits(FormData$2, CombinedStream);
+FormData$2.LINE_BREAK = "\r\n";
+FormData$2.DEFAULT_CONTENT_TYPE = "application/octet-stream";
+FormData$2.prototype.append = function(field, value, options) {
   options = options || {};
   if (typeof options === "string") {
     options = { filename: options };
@@ -12729,7 +12729,7 @@ FormData$1.prototype.append = function(field, value, options) {
   append3(footer);
   this._trackLength(header, value, options);
 };
-FormData$1.prototype._trackLength = function(header, value, options) {
+FormData$2.prototype._trackLength = function(header, value, options) {
   var valueLength = 0;
   if (options.knownLength != null) {
     valueLength += Number(options.knownLength);
@@ -12739,7 +12739,7 @@ FormData$1.prototype._trackLength = function(header, value, options) {
     valueLength = Buffer.byteLength(value);
   }
   this._valueLength += valueLength;
-  this._overheadLength += Buffer.byteLength(header) + FormData$1.LINE_BREAK.length;
+  this._overheadLength += Buffer.byteLength(header) + FormData$2.LINE_BREAK.length;
   if (!value || !value.path && !(value.readable && hasOwn$1(value, "httpVersion")) && !(value instanceof Stream)) {
     return;
   }
@@ -12747,7 +12747,7 @@ FormData$1.prototype._trackLength = function(header, value, options) {
     this._valuesToMeasure.push(value);
   }
 };
-FormData$1.prototype._lengthRetriever = function(value, callback) {
+FormData$2.prototype._lengthRetriever = function(value, callback) {
   if (hasOwn$1(value, "fd")) {
     if (value.end != void 0 && value.end != Infinity && value.start != void 0) {
       callback(null, value.end + 1 - (value.start ? value.start : 0));
@@ -12773,7 +12773,7 @@ FormData$1.prototype._lengthRetriever = function(value, callback) {
     callback("Unknown stream");
   }
 };
-FormData$1.prototype._multiPartHeader = function(field, value, options) {
+FormData$2.prototype._multiPartHeader = function(field, value, options) {
   if (typeof options.header === "string") {
     return options.header;
   }
@@ -12800,13 +12800,13 @@ FormData$1.prototype._multiPartHeader = function(field, value, options) {
         header = [header];
       }
       if (header.length) {
-        contents2 += prop2 + ": " + header.join("; ") + FormData$1.LINE_BREAK;
+        contents2 += prop2 + ": " + header.join("; ") + FormData$2.LINE_BREAK;
       }
     }
   }
-  return "--" + this.getBoundary() + FormData$1.LINE_BREAK + contents2 + FormData$1.LINE_BREAK;
+  return "--" + this.getBoundary() + FormData$2.LINE_BREAK + contents2 + FormData$2.LINE_BREAK;
 };
-FormData$1.prototype._getContentDisposition = function(value, options) {
+FormData$2.prototype._getContentDisposition = function(value, options) {
   var filename;
   if (typeof options.filepath === "string") {
     filename = path.normalize(options.filepath).replace(/\\/g, "/");
@@ -12819,7 +12819,7 @@ FormData$1.prototype._getContentDisposition = function(value, options) {
     return 'filename="' + filename + '"';
   }
 };
-FormData$1.prototype._getContentType = function(value, options) {
+FormData$2.prototype._getContentType = function(value, options) {
   var contentType = options.contentType;
   if (!contentType && value && value.name) {
     contentType = mime.lookup(value.name);
@@ -12834,13 +12834,13 @@ FormData$1.prototype._getContentType = function(value, options) {
     contentType = mime.lookup(options.filepath || options.filename);
   }
   if (!contentType && value && typeof value === "object") {
-    contentType = FormData$1.DEFAULT_CONTENT_TYPE;
+    contentType = FormData$2.DEFAULT_CONTENT_TYPE;
   }
   return contentType;
 };
-FormData$1.prototype._multiPartFooter = function() {
+FormData$2.prototype._multiPartFooter = function() {
   return (function(next2) {
-    var footer = FormData$1.LINE_BREAK;
+    var footer = FormData$2.LINE_BREAK;
     var lastPart = this._streams.length === 0;
     if (lastPart) {
       footer += this._lastBoundary();
@@ -12848,10 +12848,10 @@ FormData$1.prototype._multiPartFooter = function() {
     next2(footer);
   }).bind(this);
 };
-FormData$1.prototype._lastBoundary = function() {
-  return "--" + this.getBoundary() + "--" + FormData$1.LINE_BREAK;
+FormData$2.prototype._lastBoundary = function() {
+  return "--" + this.getBoundary() + "--" + FormData$2.LINE_BREAK;
 };
-FormData$1.prototype.getHeaders = function(userHeaders) {
+FormData$2.prototype.getHeaders = function(userHeaders) {
   var header;
   var formHeaders = {
     "content-type": "multipart/form-data; boundary=" + this.getBoundary()
@@ -12863,19 +12863,19 @@ FormData$1.prototype.getHeaders = function(userHeaders) {
   }
   return formHeaders;
 };
-FormData$1.prototype.setBoundary = function(boundary) {
+FormData$2.prototype.setBoundary = function(boundary) {
   if (typeof boundary !== "string") {
     throw new TypeError("FormData boundary must be a string");
   }
   this._boundary = boundary;
 };
-FormData$1.prototype.getBoundary = function() {
+FormData$2.prototype.getBoundary = function() {
   if (!this._boundary) {
     this._generateBoundary();
   }
   return this._boundary;
 };
-FormData$1.prototype.getBuffer = function() {
+FormData$2.prototype.getBuffer = function() {
   var dataBuffer = new Buffer.alloc(0);
   var boundary = this.getBoundary();
   for (var i = 0, len = this._streams.length; i < len; i++) {
@@ -12886,16 +12886,16 @@ FormData$1.prototype.getBuffer = function() {
         dataBuffer = Buffer.concat([dataBuffer, Buffer.from(this._streams[i])]);
       }
       if (typeof this._streams[i] !== "string" || this._streams[i].substring(2, boundary.length + 2) !== boundary) {
-        dataBuffer = Buffer.concat([dataBuffer, Buffer.from(FormData$1.LINE_BREAK)]);
+        dataBuffer = Buffer.concat([dataBuffer, Buffer.from(FormData$2.LINE_BREAK)]);
       }
     }
   }
   return Buffer.concat([dataBuffer, Buffer.from(this._lastBoundary())]);
 };
-FormData$1.prototype._generateBoundary = function() {
+FormData$2.prototype._generateBoundary = function() {
   this._boundary = "--------------------------" + crypto$1.randomBytes(12).toString("hex");
 };
-FormData$1.prototype.getLengthSync = function() {
+FormData$2.prototype.getLengthSync = function() {
   var knownLength = this._overheadLength + this._valueLength;
   if (this._streams.length) {
     knownLength += this._lastBoundary().length;
@@ -12905,14 +12905,14 @@ FormData$1.prototype.getLengthSync = function() {
   }
   return knownLength;
 };
-FormData$1.prototype.hasKnownLength = function() {
+FormData$2.prototype.hasKnownLength = function() {
   var hasKnownLength = true;
   if (this._valuesToMeasure.length) {
     hasKnownLength = false;
   }
   return hasKnownLength;
 };
-FormData$1.prototype.getLength = function(cb) {
+FormData$2.prototype.getLength = function(cb) {
   var knownLength = this._overheadLength + this._valueLength;
   if (this._streams.length) {
     knownLength += this._lastBoundary().length;
@@ -12932,7 +12932,7 @@ FormData$1.prototype.getLength = function(cb) {
     cb(null, knownLength);
   });
 };
-FormData$1.prototype.submit = function(params, cb) {
+FormData$2.prototype.submit = function(params, cb) {
   var request2;
   var options;
   var defaults2 = { method: "post" };
@@ -12979,19 +12979,19 @@ FormData$1.prototype.submit = function(params, cb) {
   }).bind(this));
   return request2;
 };
-FormData$1.prototype._error = function(err) {
+FormData$2.prototype._error = function(err) {
   if (!this.error) {
     this.error = err;
     this.pause();
     this.emit("error", err);
   }
 };
-FormData$1.prototype.toString = function() {
+FormData$2.prototype.toString = function() {
   return "[object FormData]";
 };
-setToStringTag2(FormData$1.prototype, "FormData");
-var form_data = FormData$1;
-const FormData$2 = /* @__PURE__ */ getDefaultExportFromCjs(form_data);
+setToStringTag2(FormData$2.prototype, "FormData");
+var form_data = FormData$2;
+const FormData$1 = /* @__PURE__ */ getDefaultExportFromCjs(form_data);
 function isVisitable(thing) {
   return utils$2.isPlainObject(thing) || utils$2.isArray(thing);
 }
@@ -13015,7 +13015,7 @@ function toFormData$1(obj, formData, options) {
   if (!utils$2.isObject(obj)) {
     throw new TypeError("target must be an object");
   }
-  formData = formData || new (FormData$2 || FormData)();
+  formData = formData || new (FormData$1 || FormData)();
   options = utils$2.toFlatObject(options, {
     metaTokens: true,
     dots: false,
@@ -13251,7 +13251,7 @@ const platform$1 = {
   isNode: true,
   classes: {
     URLSearchParams: URLSearchParams$1,
-    FormData: FormData$2,
+    FormData: FormData$1,
     Blob: typeof Blob !== "undefined" && Blob || null
   },
   ALPHABET,
@@ -17796,7 +17796,7 @@ function encodeXML(str) {
   return ret + str.substr(lastIdx);
 }
 function getEscaper$1(regex, map2) {
-  return function escape(data2) {
+  return function escape2(data2) {
     let match;
     let lastIdx = 0;
     let result = "";
@@ -21044,7 +21044,7 @@ function parseSelector(subselects2, selector, selectorIndex) {
   finalizeSubselector();
   return selectorIndex;
 }
-var boolbase = {
+var boolbase$1 = {
   trueFunc: function trueFunc() {
     return true;
   },
@@ -21052,7 +21052,7 @@ var boolbase = {
     return false;
   }
 };
-const boolbase$1 = /* @__PURE__ */ getDefaultExportFromCjs(boolbase);
+const boolbase = /* @__PURE__ */ getDefaultExportFromCjs(boolbase$1);
 const procedure = /* @__PURE__ */ new Map([
   [SelectorType.Universal, 50],
   [SelectorType.Tag, 30],
@@ -21202,7 +21202,7 @@ const attributeRules = {
     const { adapter: adapter2 } = options;
     const { name, value } = data2;
     if (/\s/.test(value)) {
-      return boolbase$1.falseFunc;
+      return boolbase.falseFunc;
     }
     const regex = new RegExp(`(?:^|\\s)${escapeRegex(value)}(?:$|\\s)`, shouldIgnoreCase(data2, options) ? "i" : "");
     return function element(elem) {
@@ -21219,7 +21219,7 @@ const attributeRules = {
     let { value } = data2;
     const len = value.length;
     if (len === 0) {
-      return boolbase$1.falseFunc;
+      return boolbase.falseFunc;
     }
     if (shouldIgnoreCase(data2, options)) {
       value = value.toLowerCase();
@@ -21239,7 +21239,7 @@ const attributeRules = {
     let { value } = data2;
     const len = -value.length;
     if (len === 0) {
-      return boolbase$1.falseFunc;
+      return boolbase.falseFunc;
     }
     if (shouldIgnoreCase(data2, options)) {
       value = value.toLowerCase();
@@ -21257,7 +21257,7 @@ const attributeRules = {
     const { adapter: adapter2 } = options;
     const { name, value } = data2;
     if (value === "") {
-      return boolbase$1.falseFunc;
+      return boolbase.falseFunc;
     }
     if (shouldIgnoreCase(data2, options)) {
       const regex = new RegExp(escapeRegex(value), "i");
@@ -21346,13 +21346,13 @@ function compile(parsed) {
   const a = parsed[0];
   const b = parsed[1] - 1;
   if (b < 0 && a <= 0)
-    return boolbase$1.falseFunc;
+    return boolbase.falseFunc;
   if (a === -1)
     return (index2) => index2 <= b;
   if (a === 0)
     return (index2) => index2 === b;
   if (a === 1)
-    return b < 0 ? boolbase$1.trueFunc : (index2) => index2 >= b;
+    return b < 0 ? boolbase.trueFunc : (index2) => index2 >= b;
   const absA = Math.abs(a);
   const bMod = (b % absA + absA) % absA;
   return a > 1 ? (index2) => index2 >= b && index2 % absA === bMod : (index2) => index2 <= b && index2 % absA === bMod;
@@ -21381,9 +21381,9 @@ const filters = {
   // Location specific methods
   "nth-child"(next2, rule, { adapter: adapter2, equals }) {
     const func = nthCheck(rule);
-    if (func === boolbase$1.falseFunc)
-      return boolbase$1.falseFunc;
-    if (func === boolbase$1.trueFunc)
+    if (func === boolbase.falseFunc)
+      return boolbase.falseFunc;
+    if (func === boolbase.trueFunc)
       return getChildFunc(next2, adapter2);
     return function nthChild(elem) {
       const siblings2 = adapter2.getSiblings(elem);
@@ -21400,9 +21400,9 @@ const filters = {
   },
   "nth-last-child"(next2, rule, { adapter: adapter2, equals }) {
     const func = nthCheck(rule);
-    if (func === boolbase$1.falseFunc)
-      return boolbase$1.falseFunc;
-    if (func === boolbase$1.trueFunc)
+    if (func === boolbase.falseFunc)
+      return boolbase.falseFunc;
+    if (func === boolbase.trueFunc)
       return getChildFunc(next2, adapter2);
     return function nthLastChild(elem) {
       const siblings2 = adapter2.getSiblings(elem);
@@ -21419,9 +21419,9 @@ const filters = {
   },
   "nth-of-type"(next2, rule, { adapter: adapter2, equals }) {
     const func = nthCheck(rule);
-    if (func === boolbase$1.falseFunc)
-      return boolbase$1.falseFunc;
-    if (func === boolbase$1.trueFunc)
+    if (func === boolbase.falseFunc)
+      return boolbase.falseFunc;
+    if (func === boolbase.trueFunc)
       return getChildFunc(next2, adapter2);
     return function nthOfType(elem) {
       const siblings2 = adapter2.getSiblings(elem);
@@ -21439,9 +21439,9 @@ const filters = {
   },
   "nth-last-of-type"(next2, rule, { adapter: adapter2, equals }) {
     const func = nthCheck(rule);
-    if (func === boolbase$1.falseFunc)
-      return boolbase$1.falseFunc;
-    if (func === boolbase$1.trueFunc)
+    if (func === boolbase.falseFunc)
+      return boolbase.falseFunc;
+    if (func === boolbase.trueFunc)
       return getChildFunc(next2, adapter2);
     return function nthLastOfType(elem) {
       const siblings2 = adapter2.getSiblings(elem);
@@ -21482,7 +21482,7 @@ function dynamicStatePseudo(name) {
   return function dynamicPseudo(next2, _rule, { adapter: adapter2 }) {
     const func = adapter2[name];
     if (typeof func !== "function") {
-      return boolbase$1.falseFunc;
+      return boolbase.falseFunc;
     }
     return function active(elem) {
       return func(elem) && next2(elem);
@@ -21589,8 +21589,8 @@ const aliases = {
 };
 const PLACEHOLDER_ELEMENT = {};
 function ensureIsTag(next2, adapter2) {
-  if (next2 === boolbase$1.falseFunc)
-    return boolbase$1.falseFunc;
+  if (next2 === boolbase.falseFunc)
+    return boolbase.falseFunc;
   return (elem) => adapter2.isTag(elem) && next2(elem);
 }
 function getNextSiblings(elem, adapter2) {
@@ -21616,7 +21616,7 @@ function copyOptions(options) {
 }
 const is$2 = (next2, token, options, context, compileToken2) => {
   const func = compileToken2(token, copyOptions(options), context);
-  return func === boolbase$1.trueFunc ? next2 : func === boolbase$1.falseFunc ? boolbase$1.falseFunc : (elem) => func(elem) && next2(elem);
+  return func === boolbase.trueFunc ? next2 : func === boolbase.falseFunc ? boolbase.falseFunc : (elem) => func(elem) && next2(elem);
 };
 const subselects = {
   is: is$2,
@@ -21627,7 +21627,7 @@ const subselects = {
   where: is$2,
   not(next2, token, options, context, compileToken2) {
     const func = compileToken2(token, copyOptions(options), context);
-    return func === boolbase$1.falseFunc ? next2 : func === boolbase$1.trueFunc ? boolbase$1.falseFunc : (elem) => !func(elem) && next2(elem);
+    return func === boolbase.falseFunc ? next2 : func === boolbase.trueFunc ? boolbase.falseFunc : (elem) => !func(elem) && next2(elem);
   },
   has(next2, subselect, options, _context2, compileToken2) {
     const { adapter: adapter2 } = options;
@@ -21638,10 +21638,10 @@ const subselects = {
       [PLACEHOLDER_ELEMENT]
     ) : void 0;
     const compiled = compileToken2(subselect, opts, context);
-    if (compiled === boolbase$1.falseFunc)
-      return boolbase$1.falseFunc;
+    if (compiled === boolbase.falseFunc)
+      return boolbase.falseFunc;
     const hasElement = ensureIsTag(compiled, adapter2);
-    if (context && compiled !== boolbase$1.trueFunc) {
+    if (context && compiled !== boolbase.trueFunc) {
       const { shouldTestNextSiblings = false } = compiled;
       return (elem) => {
         if (!next2(elem))
@@ -21867,19 +21867,19 @@ function compileToken(token, options, context) {
       }
     }
     return compileRules(rules, options, finalContext);
-  }).reduce(reduceRules, boolbase$1.falseFunc);
+  }).reduce(reduceRules, boolbase.falseFunc);
   query.shouldTestNextSiblings = shouldTestNextSiblings;
   return query;
 }
 function compileRules(rules, options, context) {
   var _a3;
-  return rules.reduce((previous, rule) => previous === boolbase$1.falseFunc ? boolbase$1.falseFunc : compileGeneralSelector(previous, rule, options, context, compileToken), (_a3 = options.rootFunc) !== null && _a3 !== void 0 ? _a3 : boolbase$1.trueFunc);
+  return rules.reduce((previous, rule) => previous === boolbase.falseFunc ? boolbase.falseFunc : compileGeneralSelector(previous, rule, options, context, compileToken), (_a3 = options.rootFunc) !== null && _a3 !== void 0 ? _a3 : boolbase.trueFunc);
 }
 function reduceRules(a, b) {
-  if (b === boolbase$1.falseFunc || a === boolbase$1.trueFunc) {
+  if (b === boolbase.falseFunc || a === boolbase.trueFunc) {
     return a;
   }
-  if (a === boolbase$1.falseFunc || b === boolbase$1.trueFunc) {
+  if (a === boolbase.falseFunc || b === boolbase.trueFunc) {
     return b;
   }
   return function combine(elem) {
@@ -22119,8 +22119,8 @@ function findFilterElements(root2, selector, options, queryForSelector, totalLim
        */
       rootFunc: (el) => result.includes(el)
     };
-  } else if (options.rootFunc && options.rootFunc !== boolbase.trueFunc) {
-    options = { ...options, rootFunc: boolbase.trueFunc };
+  } else if (options.rootFunc && options.rootFunc !== boolbase$1.trueFunc) {
+    options = { ...options, rootFunc: boolbase$1.trueFunc };
   }
   return remainingSelector.some(isFilter) ? findFilterElements(result, remainingSelector, options, false, totalLimit) : remainingHasTraversal ? (
     // Query existing elements to resolve traversal.
@@ -22143,7 +22143,7 @@ function filterElements(elements, sel, options) {
   if (els.length === 0)
     return els;
   const query = _compileToken(sel, options);
-  return query === boolbase.trueFunc ? els : els.filter(query);
+  return query === boolbase$1.trueFunc ? els : els.filter(query);
 }
 const reSiblingSelector = /^\s*[+~]/;
 function find(selectorOrHaystack) {
@@ -30843,7 +30843,7 @@ function endTagInForeignContent(p, token) {
   }
 }
 function getEscaper(regex, map2) {
-  return function escape(data2) {
+  return function escape2(data2) {
     let match;
     let lastIndex = 0;
     let result = "";
@@ -64580,6 +64580,7 @@ class HttpScraperService {
       path: c.path || "/"
     }));
     console.log("[HttpScraper] Cookies set. Count:", this.cookies.length);
+    console.log("[HttpScraper] Cookie names:", this.cookies.map((c) => c.name).join(", "));
   }
   getCookieHeader(url2) {
     const urlObj = new URL(url2);
@@ -64670,26 +64671,78 @@ class HttpScraperService {
       let currentUrl = dashboardUrl;
       if (input.length > 0) {
         const form = input.closest("form");
-        const formData = new URLSearchParams();
-        form.find("input").each((_, el) => {
-          const name = $2(el).attr("name");
-          const value = $2(el).attr("value");
-          if (name && value) formData.append(name, value);
-        });
-        console.log(`[HttpScraper] Entering course ${courseId}...`);
-        const coursePageResponse = await axios.post(dashboardUrl, formData.toString(), {
-          headers: {
-            "Cookie": this.getCookieHeader(dashboardUrl),
-            "Content-Type": "application/x-www-form-urlencoded",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Referer": dashboardUrl,
-            "Connection": "keep-alive"
-          },
-          timeout: 1e4
-        });
-        this.updateCookies(coursePageResponse);
-        coursePageData = coursePageResponse.data;
+        let action = form.attr("action");
+        if (action && !action.startsWith("http")) {
+          if (action.startsWith("/")) {
+            action = `${this.baseUrl}${action}`;
+          } else {
+            const lastSlash = dashboardUrl.lastIndexOf("/");
+            action = `${dashboardUrl.substring(0, lastSlash + 1)}${action}`;
+          }
+        }
+        const formId = form.attr("id");
+        const isFormTurma = formId === "formTurma" || action && action.includes("entrarTurma");
+        if (isFormTurma) {
+          console.log('[HttpScraper] Detected "formTurma" (GET request).');
+          const targetUrl = `${this.baseUrl}/sigaa/ava/entrarTurma.jsf`;
+          console.log(`[HttpScraper] GET URL: ${targetUrl}?idTurma=${courseId}`);
+          const coursePageResponse = await axios.get(targetUrl, {
+            params: { idTurma: courseId },
+            headers: {
+              "Cookie": this.getCookieHeader(targetUrl),
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+              "Referer": dashboardUrl,
+              "Connection": "keep-alive"
+            },
+            timeout: 1e4
+          });
+          this.updateCookies(coursePageResponse);
+          coursePageData = coursePageResponse.data;
+        } else {
+          console.log('[HttpScraper] Form is not "formTurma". Falling back to POST.');
+          const postUrl = action || dashboardUrl;
+          const encodeSigaa = (str) => {
+            return escape(str).replace(/\+/g, "%2B").replace(/%20/g, "+");
+          };
+          const formDataParts = [];
+          form.find("input").each((_, el) => {
+            const name = $2(el).attr("name");
+            const value = $2(el).attr("value");
+            if (name && value) {
+              formDataParts.push(`${encodeSigaa(name)}=${encodeSigaa(value)}`);
+            }
+          });
+          if (!formDataParts.some((p) => p.startsWith("javax.faces.ViewState="))) {
+            const viewState = $2('input[name="javax.faces.ViewState"]').val();
+            if (viewState) formDataParts.push(`javax.faces.ViewState=${encodeSigaa(viewState)}`);
+          }
+          const body2 = formDataParts.join("&");
+          console.log(`[HttpScraper] Entering course ${courseId} via POST...`);
+          const coursePageResponse = await axios.post(postUrl, body2, {
+            headers: {
+              "Cookie": this.getCookieHeader(postUrl),
+              "Content-Type": "application/x-www-form-urlencoded",
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+              "Referer": dashboardUrl,
+              "Connection": "keep-alive"
+            },
+            timeout: 1e4
+          });
+          this.updateCookies(coursePageResponse);
+          coursePageData = coursePageResponse.data;
+        }
         currentUrl = `${this.baseUrl}/sigaa/ava/index.jsf`;
+        const $debug = load(coursePageData);
+        const debugTitle = $debug("title").text().trim();
+        console.log(`[HttpScraper] Post-entry Title: "${debugTitle}"`);
+        console.log(`[HttpScraper] Post-entry HTML length: ${coursePageData.length}`);
+        const menuItems = $debug(".itemMenu");
+        console.log(`[HttpScraper] Found ${menuItems.length} .itemMenu elements.`);
+        if (menuItems.length > 0) {
+          console.log(`[HttpScraper] First menu item: "${menuItems.first().text().trim()}"`);
+        } else {
+          console.log("[HttpScraper] No menu items found. Possible login/session issue or wrong page.");
+        }
       }
       const $course = load(coursePageData);
       let filesPageData = coursePageData;
