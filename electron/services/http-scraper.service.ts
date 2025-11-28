@@ -271,7 +271,7 @@ export class HttpScraperService {
 
                             if (idMatch) {
                                 files.push({
-                                    title: text,
+                                    name: text,
                                     type: 'file',
                                     id: idMatch[1],
                                     key: keyMatch ? keyMatch[1] : undefined,
@@ -280,7 +280,7 @@ export class HttpScraperService {
                             }
                         } else if (href && !href.startsWith('#') && !href.startsWith('javascript')) {
                             files.push({
-                                title: text,
+                                name: text,
                                 type: 'link',
                                 url: href.startsWith('http') ? href : this.baseUrl + href
                             });
