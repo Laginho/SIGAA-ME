@@ -64666,39 +64666,99 @@ class HttpScraperService {
       const pageTitle = $2("title").text().trim();
       console.log(`[HttpScraper] Dashboard loaded. Title: "${pageTitle}"`);
       const input = $2(`input[name="idTurma"][value="${courseId}"]`);
-      if (input.length === 0) {
-        console.log(`[HttpScraper] Course input not found for ID ${courseId}.`);
-        return { success: false, error: "Course link not found on dashboard" };
+      let coursePageData = dashboardResponse.data;
+      let currentUrl = dashboardUrl;
+      if (input.length > 0) {
+        const form = input.closest("form");
+        const formData = new URLSearchParams();
+        form.find("input").each((_, el) => {
+          const name = $2(el).attr("name");
+          const value = $2(el).attr("value");
+          if (name && value) formData.append(name, value);
+        });
+        console.log(`[HttpScraper] Entering course ${courseId}...`);
+        const coursePageResponse = await axios.post(dashboardUrl, formData.toString(), {
+          headers: {
+            "Cookie": this.getCookieHeader(dashboardUrl),
+            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Referer": dashboardUrl,
+            "Connection": "keep-alive"
+          },
+          timeout: 1e4
+        });
+        this.updateCookies(coursePageResponse);
+        coursePageData = coursePageResponse.data;
+        currentUrl = `${this.baseUrl}/sigaa/ava/index.jsf`;
       }
-      const form = input.closest("form");
-      const formData = new URLSearchParams();
-      form.find("input").each((_, el) => {
-        const name = $2(el).attr("name");
-        const value = $2(el).attr("value");
-        if (name && value) formData.append(name, value);
+      const $course = load(coursePageData);
+      let filesPageData = coursePageData;
+      let conteudoLink = null;
+      $course(".itemMenu").each((_, el) => {
+        const text2 = $course(el).text().trim();
+        if (text2.includes("Conte") || text2.includes("nteudo")) {
+          console.log(`[HttpScraper] Found potential link: "${text2}"`);
+          conteudoLink = $course(el).parent("a");
+          return false;
+        }
       });
-      console.log(`[HttpScraper] Entering course ${courseId}...`);
-      const coursePageResponse = await axios.post(dashboardUrl, formData.toString(), {
-        headers: {
-          "Cookie": this.getCookieHeader(dashboardUrl),
-          "Content-Type": "application/x-www-form-urlencoded",
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-          "Referer": dashboardUrl,
-          "Connection": "keep-alive"
-        },
-        timeout: 1e4
-      });
-      this.updateCookies(coursePageResponse);
-      console.log("[HttpScraper] Course page loaded. Data length:", coursePageResponse.data.length);
-      console.log("[HttpScraper] HTML snippet:", coursePageResponse.data.substring(0, 500));
-      const $debug = load(coursePageResponse.data);
-      console.log('[HttpScraper] Found "a" tags:', $debug("a").length);
-      const $course = load(coursePageResponse.data);
+      if (!conteudoLink) {
+        console.log("[HttpScraper] Strategy 1 failed. Trying Strategy 2 (Materiais header)...");
+        const materiaisHeader = $course(".itemMenuHeaderMateriais");
+        if (materiaisHeader.length > 0) {
+          const contentExterior = materiaisHeader.parent().find(".rich-panelbar-content-exterior");
+          const firstLink = contentExterior.find("a").first();
+          if (firstLink.length > 0) {
+            console.log("[HttpScraper] Found first link under Materiais.");
+            conteudoLink = firstLink;
+          }
+        }
+      }
+      if (conteudoLink) {
+        console.log('[HttpScraper] Found "Conteúdo" link in sidebar. Navigating to files...');
+        const onclick = conteudoLink.attr("onclick");
+        const match = onclick == null ? void 0 : onclick.match(/jsfcljs\(document\.forms\['([^']+)'\],'([^']+)'/);
+        if (match) {
+          const formName = match[1];
+          const paramsStr = match[2];
+          const form = $course(`form[name="${formName}"]`);
+          const formData = new URLSearchParams();
+          form.find("input").each((_, el) => {
+            const name = $2(el).attr("name");
+            const value = $2(el).attr("value");
+            if (name && value) formData.append(name, value);
+          });
+          const params = paramsStr.split(",");
+          for (let i = 0; i < params.length; i += 2) {
+            if (params[i] && params[i + 1]) {
+              formData.append(params[i], params[i + 1]);
+            }
+          }
+          const filesResponse = await axios.post(`${this.baseUrl}/sigaa/ava/index.jsf`, formData.toString(), {
+            headers: {
+              "Cookie": this.getCookieHeader(`${this.baseUrl}/sigaa/ava/index.jsf`),
+              "Content-Type": "application/x-www-form-urlencoded",
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+              "Referer": currentUrl,
+              "Connection": "keep-alive"
+            },
+            timeout: 1e4
+          });
+          this.updateCookies(filesResponse);
+          filesPageData = filesResponse.data;
+          console.log("[HttpScraper] Files page loaded.");
+        } else {
+          console.log('[HttpScraper] Could not parse onclick for "Conteúdo" link.');
+        }
+      } else {
+        console.log('[HttpScraper] "Conteúdo" link not found in sidebar. Scanning current page...');
+      }
+      const $files = load(filesPageData);
       const files = [];
       const news = [];
       console.log("[HttpScraper] Scanning for files...");
-      $course("a").each((_, el) => {
-        const link = $course(el);
+      $files("a").each((_, el) => {
+        const link = $files(el);
         const text2 = link.text().trim();
         const href = link.attr("href");
         const onclick = link.attr("onclick");
@@ -64725,11 +64785,12 @@ class HttpScraperService {
           }
         }
       });
-      $course("table").each((_, table) => {
-        const headers2 = $course(table).find("th").map((__, th) => $course(th).text().trim()).get();
+      const $newsPage = load(coursePageData);
+      $newsPage("table").each((_, table) => {
+        const headers2 = $newsPage(table).find("th").map((__, th) => $newsPage(th).text().trim()).get();
         if (headers2.includes("Título") && headers2.includes("Data")) {
-          $course(table).find("tr").each((__, row) => {
-            const cells = $course(row).find("td");
+          $newsPage(table).find("tr").each((__, row) => {
+            const cells = $newsPage(row).find("td");
             if (cells.length >= 2) {
               const title = $2(cells[0]).text().trim();
               const date2 = $2(cells[1]).text().trim();
