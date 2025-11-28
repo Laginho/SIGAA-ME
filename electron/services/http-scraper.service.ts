@@ -265,7 +265,13 @@ export class HttpScraperService {
 
                     if (isFile) {
                         if (onclick && onclick.includes('id')) {
-                            const idMatch = onclick.match(/'id':'([^']+)'/);
+                            // Try to match standard SIGAA jsfcljs format: id,12345,key,...
+                        let idMatch = onclick.match(/,id,([^,]+)/);
+                        
+                        // Fallback to JSON-like format if that fails
+                        if (!idMatch) {
+                            idMatch = onclick.match(/'id':'([^']+)'/);
+                        }
                             if (idMatch) {
                                 files.push({
                                     title: text,

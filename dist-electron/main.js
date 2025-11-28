@@ -64754,7 +64754,7 @@ class HttpScraperService {
       let conteudoLink = null;
       if (preFetchedHtml) {
         try {
-          fs$1.writeFileSync("debug_playwright.html", preFetchedHtml);
+          fs$1.writeFileSync(`debug_playwright_${courseId}.html`, preFetchedHtml);
           this.log("[HttpScraper] Saved Playwright HTML to debug_playwright.html");
         } catch (e) {
           this.log("[HttpScraper] Failed to save debug file");
