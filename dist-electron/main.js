@@ -64570,13 +64570,13 @@ undici.exports;
 class HttpScraperService {
   constructor() {
     __publicField(this, "cookies", []);
-    __publicField(this, "baseUrl", "https://sigaa.unifei.edu.br");
+    __publicField(this, "baseUrl", "https://si3.ufc.br");
   }
   setCookies(cookies2) {
     this.cookies = cookies2.map((c) => ({
       name: c.name,
       value: c.value,
-      domain: c.domain || "sigaa.unifei.edu.br",
+      domain: c.domain || new URL(this.baseUrl).hostname,
       path: c.path || "/"
     }));
     console.log("[HttpScraper] Cookies set. Count:", this.cookies.length);
@@ -64625,7 +64625,7 @@ class HttpScraperService {
     const cookie = {
       name,
       value,
-      domain: "sigaa.unifei.edu.br"
+      domain: new URL(this.baseUrl).hostname
     };
     const flags = remaining.split("; ");
     for (const flag of flags) {
@@ -64689,31 +64689,39 @@ class HttpScraperService {
         timeout: 1e4
       });
       this.updateCookies(coursePageResponse);
+      console.log("[HttpScraper] Course page loaded. Data length:", coursePageResponse.data.length);
+      console.log("[HttpScraper] HTML snippet:", coursePageResponse.data.substring(0, 500));
+      const $debug = load(coursePageResponse.data);
+      console.log('[HttpScraper] Found "a" tags:', $debug("a").length);
       const $course = load(coursePageResponse.data);
       const files = [];
       const news = [];
+      console.log("[HttpScraper] Scanning for files...");
       $course("a").each((_, el) => {
         const link = $course(el);
         const text2 = link.text().trim();
         const href = link.attr("href");
         const onclick = link.attr("onclick");
-        if (text2 && (text2.match(/\.(pdf|doc|docx|ppt|pptx|xls|xlsx|zip|rar|txt|png|jpg|jpeg)$/i) || text2.toLowerCase().includes("lista") || text2.toLowerCase().includes("exerc"))) {
-          if (onclick && onclick.includes("id")) {
-            const idMatch = onclick.match(/'id':'([^']+)'/);
-            if (idMatch) {
+        if (text2) {
+          const isFile2 = text2.match(/\.(pdf|doc|docx|ppt|pptx|xls|xlsx|zip|rar|txt|png|jpg|jpeg)$/i) || text2.toLowerCase().includes("lista") || text2.toLowerCase().includes("exerc") || text2.toLowerCase().includes("arquivo") || text2.toLowerCase().includes("material");
+          if (isFile2) {
+            if (onclick && onclick.includes("id")) {
+              const idMatch = onclick.match(/'id':'([^']+)'/);
+              if (idMatch) {
+                files.push({
+                  title: text2,
+                  type: "file",
+                  id: idMatch[1],
+                  script: onclick
+                });
+              }
+            } else if (href && !href.startsWith("#") && !href.startsWith("javascript")) {
               files.push({
                 title: text2,
-                type: "file",
-                id: idMatch[1],
-                script: onclick
+                type: "link",
+                url: href.startsWith("http") ? href : this.baseUrl + href
               });
             }
-          } else if (href && !href.startsWith("#") && !href.startsWith("javascript")) {
-            files.push({
-              title: text2,
-              type: "link",
-              url: href.startsWith("http") ? href : this.baseUrl + href
-            });
           }
         }
       });

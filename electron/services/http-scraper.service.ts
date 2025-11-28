@@ -11,7 +11,7 @@ interface Cookie {
 
 export class HttpScraperService {
     private cookies: Cookie[] = [];
-    private baseUrl: string = 'https://sigaa.unifei.edu.br';
+    private baseUrl: string = 'https://si3.ufc.br';
 
     constructor() { }
 
@@ -19,7 +19,7 @@ export class HttpScraperService {
         this.cookies = cookies.map(c => ({
             name: c.name,
             value: c.value,
-            domain: c.domain || 'sigaa.unifei.edu.br',
+            domain: c.domain || new URL(this.baseUrl).hostname,
             path: c.path || '/'
         }));
         console.log('[HttpScraper] Cookies set. Count:', this.cookies.length);
@@ -81,7 +81,7 @@ export class HttpScraperService {
         const cookie: Cookie = {
             name,
             value,
-            domain: 'sigaa.unifei.edu.br'
+            domain: new URL(this.baseUrl).hostname
         };
 
         const flags = remaining.split('; ');
@@ -158,37 +158,54 @@ export class HttpScraperService {
 
             this.updateCookies(coursePageResponse);
 
+            // Debug: Log a snippet of the HTML to check structure
+            console.log('[HttpScraper] Course page loaded. Data length:', coursePageResponse.data.length);
+            console.log('[HttpScraper] HTML snippet:', coursePageResponse.data.substring(0, 500));
+            const $debug = cheerio.load(coursePageResponse.data);
+            console.log('[HttpScraper] Found "a" tags:', $debug('a').length);
+
             const $course = cheerio.load(coursePageResponse.data);
 
             const files: any[] = [];
             const news: any[] = [];
 
             // Scrape files
+            console.log('[HttpScraper] Scanning for files...');
             $course('a').each((_, el) => {
                 const link = $course(el);
                 const text = link.text().trim();
                 const href = link.attr('href');
                 const onclick = link.attr('onclick');
 
-                if (text && (text.match(/\.(pdf|doc|docx|ppt|pptx|xls|xlsx|zip|rar|txt|png|jpg|jpeg)$/i) ||
-                    text.toLowerCase().includes('lista') ||
-                    text.toLowerCase().includes('exerc'))) {
-                    if (onclick && onclick.includes('id')) {
-                        const idMatch = onclick.match(/'id':'([^']+)'/);
-                        if (idMatch) {
+                // Debug: Log every link found to see what we're missing
+                // console.log(`[HttpScraper] Link found: Text="${text}", Href="${href}", Onclick="${onclick}"`);
+
+                if (text) {
+                    // Check for file extensions or keywords
+                    const isFile = text.match(/\.(pdf|doc|docx|ppt|pptx|xls|xlsx|zip|rar|txt|png|jpg|jpeg)$/i) ||
+                        text.toLowerCase().includes('lista') ||
+                        text.toLowerCase().includes('exerc') ||
+                        text.toLowerCase().includes('arquivo') ||
+                        text.toLowerCase().includes('material');
+
+                    if (isFile) {
+                        if (onclick && onclick.includes('id')) {
+                            const idMatch = onclick.match(/'id':'([^']+)'/);
+                            if (idMatch) {
+                                files.push({
+                                    title: text,
+                                    type: 'file',
+                                    id: idMatch[1],
+                                    script: onclick
+                                });
+                            }
+                        } else if (href && !href.startsWith('#') && !href.startsWith('javascript')) {
                             files.push({
                                 title: text,
-                                type: 'file',
-                                id: idMatch[1],
-                                script: onclick
+                                type: 'link',
+                                url: href.startsWith('http') ? href : this.baseUrl + href
                             });
                         }
-                    } else if (href && !href.startsWith('#') && !href.startsWith('javascript')) {
-                        files.push({
-                            title: text,
-                            type: 'link',
-                            url: href.startsWith('http') ? href : this.baseUrl + href
-                        });
                     }
                 }
             });
