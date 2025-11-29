@@ -15,7 +15,7 @@ export class HttpScraperService {
     private cookies: Cookie[] = [];
     private baseUrl: string = 'https://si3.ufc.br';
     private logPath = path.join(process.cwd(), 'scraper.log');
-    private courseData: Map<string, { viewState: string; action: string; formName: string }> = new Map();
+    private courseData: Map<string, { viewState: string; action: string; formName: string; inputs: Record<string, string> }> = new Map();
 
     constructor() {
         // Clear log file on startup
@@ -237,13 +237,24 @@ export class HttpScraperService {
                         const formAction = filesForm.attr('action') || '/sigaa/ava/index.jsf';
                         const formNameStr = filesForm.attr('name') || 'formAva';
 
+                        // Extract ALL hidden inputs
+                        const inputs: Record<string, string> = {};
+                        filesForm.find('input').each((_, el) => {
+                            const name = $files(el).attr('name');
+                            const value = $files(el).attr('value');
+                            if (name && value !== undefined) {
+                                inputs[name] = value;
+                            }
+                        });
+
                         if (viewState) {
                             this.courseData.set(courseId, {
                                 viewState,
                                 action: formAction,
-                                formName: formNameStr
+                                formName: formNameStr,
+                                inputs
                             });
-                            this.log(`[HttpScraper] Stored ViewState for course ${courseId}`);
+                            this.log(`[HttpScraper] Stored ViewState and ${Object.keys(inputs).length} inputs for course ${courseId}`);
                         } else {
                             this.log(`[HttpScraper] WARNING: Could not extract ViewState for course ${courseId}`);
                         }
@@ -488,17 +499,31 @@ export class HttpScraperService {
             if (!match) {
                 return { success: false, error: 'Invalid download script format' };
             }
-
             const paramsStr = match[1];
             const params = paramsStr.split(',');
             const componentId = params[0]; // The first item is the source
 
             const formData = new URLSearchParams();
-            formData.append(courseInfo.formName, courseInfo.formName);
-            formData.append('javax.faces.ViewState', courseInfo.viewState);
-            formData.append(componentId, componentId); // Source parameter
 
-            // Add other parameters (id, key)
+            // 1. Add all hidden inputs from the form
+            if (courseInfo.inputs) {
+                Object.entries(courseInfo.inputs).forEach(([key, value]) => {
+                    formData.append(key, value);
+                });
+            }
+
+            // 2. Add/Overwrite ViewState (just in case it wasn't in inputs or needs update)
+            formData.set('javax.faces.ViewState', courseInfo.viewState);
+
+            // 3. Add form name (if not in inputs)
+            if (!formData.has(courseInfo.formName)) {
+                formData.append(courseInfo.formName, courseInfo.formName);
+            }
+
+            // 4. Add the component ID (Source)
+            formData.append(componentId, componentId);
+
+            // 5. Add other parameters from script (id, key)
             for (let i = 0; i < params.length; i += 2) {
                 if (params[i] && params[i + 1]) {
                     formData.append(params[i], params[i + 1]);
