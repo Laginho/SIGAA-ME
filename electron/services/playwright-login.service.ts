@@ -396,6 +396,9 @@ export class PlaywrightLoginService {
                 return { success: false, error: 'Failed to navigate to course page' };
             }
 
+            console.log(`Playwright: Downloading file ${fileName}`);
+            console.log(`Playwright: Script present: ${!!script}`);
+
             const result = await downloadService.downloadFile(
                 page,
                 fileUrl,

@@ -39,6 +39,8 @@ export class DownloadService {
             }
 
             console.log(`Starting download for "${fileName}"`);
+            console.log(`DownloadService: Script provided: ${!!script}`);
+            if (script) console.log(`DownloadService: Script content (start): ${script.substring(0, 50)}...`);
 
             // Setup listeners
             const downloadPromise = page.waitForEvent('download', { timeout: 60000 });
