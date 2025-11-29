@@ -18,8 +18,10 @@ async function askQuestion(query: string): Promise<string> {
 async function main() {
     console.log('--- SIGAA Scraper Verification ---');
 
-    const username = process.env.SIGAA_USER || await askQuestion('Enter SIGAA Username: ');
-    const password = process.env.SIGAA_PASS || await askQuestion('Enter SIGAA Password: ');
+
+    // hardcoded for debugging, make sure to remove before release
+    const username = process.env.SIGAA_USER || 'lage041';
+    const password = process.env.SIGAA_PASS || '18bq0041';
 
     if (!username || !password) {
         console.error('Credentials required.');
@@ -44,25 +46,49 @@ async function main() {
         console.error('Failed to get courses:', coursesResult.message);
         return;
     }
-    console.log(`Found ${coursesResult.courses.length} courses.`);
 
-    // Select first course
-    const course = coursesResult.courses[0];
-    console.log(`Selected course: ${course.code} - ${course.name}`);
+    // Find a course with files
+    let courseWithFiles = null;
+    let filesForCourse = null;
 
-    // 3. Get Files
-    console.log('\n[3/4] Fetching files...');
-    const filesResult = await sigaa.getCourseFiles(course.id, course.name);
-    if (!filesResult.success) {
-        console.error('Failed to get files:', filesResult.message);
-        return;
+    console.log('\n[3/4] Searching for course "FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO"...');
+
+    // Prioritize the specific course
+    courseWithFiles = coursesResult.courses.find((c: any) => c.name.includes('FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO'));
+
+    if (courseWithFiles) {
+        console.log(`Found target course: ${courseWithFiles.code} - ${courseWithFiles.name}`);
+        const result = await sigaa.getCourseFiles(courseWithFiles.id, courseWithFiles.name);
+        if (result.success && result.files && result.files.length > 0) {
+            console.log(`Found ${result.files.length} files in this course.`);
+            filesForCourse = result.files;
+        } else {
+            console.log('Target course found but has no files. Searching others...');
+            courseWithFiles = null; // Reset to trigger fallback search
+        }
     }
 
-    console.log(`Found ${filesResult.files?.length || 0} files and ${filesResult.news?.length || 0} news items.`);
+    // Fallback search if target not found or has no files
+    if (!courseWithFiles) {
+        console.log('Searching other courses for files...');
+        for (const course of coursesResult.courses) {
+            console.log(`Checking course: ${course.code} - ${course.name}...`);
+            const result = await sigaa.getCourseFiles(course.id, course.name);
 
-    if (filesResult.files && filesResult.files.length > 0) {
+            if (result.success && result.files && result.files.length > 0) {
+                console.log(`Found ${result.files.length} files in this course.`);
+                courseWithFiles = course;
+                filesForCourse = result.files;
+                break;
+            } else {
+                console.log('No files found.');
+            }
+        }
+    }
+
+    if (courseWithFiles && filesForCourse) {
         // 4. Download first file
-        const fileToDownload = filesResult.files.find(f => f.type === 'file');
+        const fileToDownload = filesForCourse.find((f: any) => f.type === 'file');
 
         if (fileToDownload) {
             console.log(`\n[4/4] Attempting to download: ${fileToDownload.name}`);
@@ -70,12 +96,12 @@ async function main() {
             if (!fs.existsSync(downloadDir)) fs.mkdirSync(downloadDir);
 
             const downloadResult = await sigaa.downloadFile(
-                course.id,
-                course.name,
+                courseWithFiles.id,
+                courseWithFiles.name,
                 fileToDownload.name,
-                fileToDownload.url || '', // URL might be empty for script-based downloads
+                fileToDownload.url || '',
                 downloadDir,
-                {}, // No previously downloaded files
+                {},
                 fileToDownload.script
             );
 
@@ -114,10 +140,10 @@ async function main() {
                 console.error('Download failed:', downloadResult.message);
             }
         } else {
-            console.log('No downloadable files found in this course.');
+            console.log('No downloadable files found in the selected course.');
         }
     } else {
-        console.log('No files found in this course.');
+        console.log('No files found in ANY course.');
     }
 
     console.log('\nVerification complete.');

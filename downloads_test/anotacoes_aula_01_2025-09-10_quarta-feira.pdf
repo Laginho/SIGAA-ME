@@ -1,0 +1,6 @@
+<script>
+document.cookie = 'JSESSIONID' + '=invalido;expires=Thu, 01 Jan 1970 23:59:59 GMT;path=/';
+alert('Sua sessão foi expirada. É necessário autenticar-se novamente!');
+document.location.href = '/sigaa';
+</script>
+

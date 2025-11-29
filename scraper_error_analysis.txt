@@ -1,0 +1,10 @@
+[2025-11-29T01:46:45.642Z] [HttpScraper] Cookies set. Count: 1
+[2025-11-29T01:46:56.352Z] [HttpScraper] Cookies set. Count: 1
+[2025-11-29T01:46:56.356Z] [HttpScraper] Fetching course page for ÁLGEBRA APLICADA I...
+[2025-11-29T01:46:56.356Z] [HttpScraper] Using pre-fetched HTML from Playwright. Length: 60667
+[2025-11-29T01:46:56.444Z] [HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[2025-11-29T01:46:56.473Z] [HttpScraper] Saved Playwright HTML to debug_playwright.html
+[2025-11-29T01:46:56.473Z] [HttpScraper] Using Playwright HTML directly.
+[2025-11-29T01:46:56.496Z] [HttpScraper] Stored ViewState and 1 inputs for course 509238
+[2025-11-29T01:46:56.497Z] [HttpScraper] Scanning for files...
+[2025-11-29T01:46:56.515Z] [HttpScraper] Found 0 files and 0 news items.
