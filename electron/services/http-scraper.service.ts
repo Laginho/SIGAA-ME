@@ -276,6 +276,33 @@ export class HttpScraperService {
             }
 
             const $files = cheerio.load(filesPageData);
+
+            // Extract ViewState and Inputs (moved here to support both Axios and Playwright paths)
+            const viewState = $files('input[name="javax.faces.ViewState"]').val() as string;
+            const filesForm = $files('form').first();
+            const formAction = filesForm.attr('action') || '/sigaa/ava/index.jsf';
+            const formNameStr = filesForm.attr('name') || 'formAva';
+
+            const inputs: Record<string, string> = {};
+            filesForm.find('input').each((_, el) => {
+                const name = $files(el).attr('name');
+                const value = $files(el).attr('value');
+                if (name && value !== undefined) {
+                    inputs[name] = value;
+                }
+            });
+
+            if (viewState) {
+                this.courseData.set(courseId, {
+                    viewState,
+                    action: formAction,
+                    formName: formNameStr,
+                    inputs
+                });
+                this.log(`[HttpScraper] Stored ViewState and ${Object.keys(inputs).length} inputs for course ${courseId}`);
+            } else {
+                this.log(`[HttpScraper] WARNING: Could not extract ViewState for course ${courseId}`);
+            }
             const files: any[] = [];
             const news: any[] = [];
 
