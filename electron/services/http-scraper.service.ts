@@ -15,6 +15,7 @@ export class HttpScraperService {
     private cookies: Cookie[] = [];
     private baseUrl: string = 'https://si3.ufc.br';
     private logPath = path.join(process.cwd(), 'scraper.log');
+    private courseData: Map<string, { viewState: string; action: string; formName: string }> = new Map();
 
     constructor() {
         // Clear log file on startup
@@ -228,6 +229,24 @@ export class HttpScraperService {
                         });
                         this.updateCookies(filesResponse);
                         filesPageData = filesResponse.data;
+
+                        // Store ViewState and Form info for downloads
+                        const $files = cheerio.load(filesPageData);
+                        const viewState = $files('input[name="javax.faces.ViewState"]').val() as string;
+                        const filesForm = $files('form').first();
+                        const formAction = filesForm.attr('action') || '/sigaa/ava/index.jsf';
+                        const formNameStr = filesForm.attr('name') || 'formAva';
+
+                        if (viewState) {
+                            this.courseData.set(courseId, {
+                                viewState,
+                                action: formAction,
+                                formName: formNameStr
+                            });
+                            this.log(`[HttpScraper] Stored ViewState for course ${courseId}`);
+                        } else {
+                            this.log(`[HttpScraper] WARNING: Could not extract ViewState for course ${courseId}`);
+                        }
 
                         const $filesDebug = cheerio.load(filesPageData);
                         const pageTitle = $filesDebug('title').text().trim();
@@ -449,12 +468,104 @@ export class HttpScraperService {
     }
 
     async downloadFile(
-        _courseId: string,
-        _fileId: string,
-        _fileName: string,
-        _basePath: string,
-        _onProgress?: (progress: number) => void
+        courseId: string,
+        fileId: string,
+        fileName: string,
+        basePath: string,
+        script: string,
+        onProgress?: (progress: number) => void
     ): Promise<{ success: boolean; filePath?: string; error?: string }> {
-        return { success: false, error: 'Not implemented yet' };
+        try {
+            this.log(`[HttpScraper] Downloading file "${fileName}" (ID: ${fileId}) for course ${courseId}`);
+
+            const courseInfo = this.courseData.get(courseId);
+            if (!courseInfo) {
+                return { success: false, error: 'Course session data not found. Please refresh the course list.' };
+            }
+
+            // Extract component ID from script
+            const match = script.match(/jsfcljs\([^,]+,'([^']+)'/);
+            if (!match) {
+                return { success: false, error: 'Invalid download script format' };
+            }
+
+            const paramsStr = match[1];
+            const params = paramsStr.split(',');
+            const componentId = params[0]; // The first item is the source
+
+            const formData = new URLSearchParams();
+            formData.append(courseInfo.formName, courseInfo.formName);
+            formData.append('javax.faces.ViewState', courseInfo.viewState);
+            formData.append(componentId, componentId); // Source parameter
+
+            // Add other parameters (id, key)
+            for (let i = 0; i < params.length; i += 2) {
+                if (params[i] && params[i + 1]) {
+                    formData.append(params[i], params[i + 1]);
+                }
+            }
+
+            this.log(`[HttpScraper] Sending download request. ComponentID: ${componentId}`);
+
+            const response = await axios.post(`${this.baseUrl}${courseInfo.action}`, formData.toString(), {
+                headers: {
+                    'Cookie': this.getCookieHeader(`${this.baseUrl}${courseInfo.action}`),
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'Referer': `${this.baseUrl}${courseInfo.action}`,
+                    'Connection': 'keep-alive'
+                },
+                responseType: 'stream',
+                timeout: 60000 // 60s timeout for downloads
+            });
+
+            this.updateCookies(response);
+
+            // Determine filename
+            let finalFileName = fileName;
+            const contentDisposition = response.headers['content-disposition'];
+            if (contentDisposition) {
+                const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+                if (filenameMatch) {
+                    finalFileName = filenameMatch[1];
+                }
+            }
+
+            // Ensure extension
+            if (!path.extname(finalFileName)) {
+                // If no extension, try to guess from content-type or keep as is
+                // For now, trust the provided fileName or content-disposition
+            }
+
+            const filePath = path.join(basePath, finalFileName);
+            const writer = fs.createWriteStream(filePath);
+
+            const totalLength = parseInt(response.headers['content-length'] || '0', 10);
+            let downloadedLength = 0;
+
+            response.data.on('data', (chunk: any) => {
+                downloadedLength += chunk.length;
+                if (onProgress && totalLength > 0) {
+                    onProgress(Math.round((downloadedLength / totalLength) * 100));
+                }
+            });
+
+            response.data.pipe(writer);
+
+            return new Promise((resolve, reject) => {
+                writer.on('finish', () => {
+                    this.log(`[HttpScraper] Download complete: ${filePath}`);
+                    resolve({ success: true, filePath });
+                });
+                writer.on('error', (err) => {
+                    this.log(`[HttpScraper] File write error: ${err.message}`);
+                    reject({ success: false, error: err.message });
+                });
+            });
+
+        } catch (error: any) {
+            this.log(`[HttpScraper] Download error: ${error.message}`);
+            return { success: false, error: error.message };
+        }
     }
 }
