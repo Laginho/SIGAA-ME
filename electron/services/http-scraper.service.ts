@@ -606,8 +606,24 @@ export class HttpScraperService {
 
             return new Promise((resolve, reject) => {
                 writer.on('finish', () => {
-                    this.log(`[HttpScraper] Download complete: ${filePath}`);
-                    resolve({ success: true, filePath });
+                    // Check if file is too small (likely error page)
+                    fs.stat(filePath, (err, stats) => {
+                        if (!err && stats.size < 2000) {
+                            // Read file content to check for error
+                            fs.readFile(filePath, 'utf8', (readErr, content) => {
+                                if (!readErr && (content.includes('<html') || content.includes('<!DOCTYPE'))) {
+                                    this.log(`[HttpScraper] ERROR: Downloaded file appears to be an HTML error page. Content:\n${content}`);
+                                    resolve({ success: false, error: 'Downloaded file is an HTML error page. Check logs for details.' });
+                                } else {
+                                    this.log(`[HttpScraper] Download complete: ${filePath}`);
+                                    resolve({ success: true, filePath });
+                                }
+                            });
+                        } else {
+                            this.log(`[HttpScraper] Download complete: ${filePath}`);
+                            resolve({ success: true, filePath });
+                        }
+                    });
                 });
                 writer.on('error', (err) => {
                     this.log(`[HttpScraper] File write error: ${err.message}`);

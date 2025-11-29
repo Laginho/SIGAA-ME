@@ -79,8 +79,37 @@ async function main() {
                 fileToDownload.script
             );
 
-            if (downloadResult.success) {
+            if (downloadResult.success && downloadResult.filePath) {
                 console.log('Download successful!', downloadResult.filePath);
+
+                // Verify file integrity
+                try {
+                    const stats = fs.statSync(downloadResult.filePath);
+                    console.log(`File size: ${stats.size} bytes`);
+
+                    if (stats.size < 1000) {
+                        console.warn('WARNING: File is very small, might be an empty file or error page.');
+                    }
+
+                    const buffer = Buffer.alloc(5);
+                    const fd = fs.openSync(downloadResult.filePath, 'r');
+                    fs.readSync(fd, buffer, 0, 5, 0);
+                    fs.closeSync(fd);
+
+                    const header = buffer.toString('utf8');
+                    console.log(`File header (first 5 bytes): ${header}`);
+
+                    if (header.startsWith('%PDF')) {
+                        console.log('Verified: File is a PDF.');
+                    } else if (header.toLowerCase().startsWith('<html') || header.toLowerCase().startsWith('<!doc')) {
+                        console.error('ERROR: File appears to be an HTML page (likely an error page saved as file).');
+                    } else {
+                        console.log('File type unknown (not PDF or HTML).');
+                    }
+                } catch (e) {
+                    console.error('Error verifying file:', e);
+                }
+
             } else {
                 console.error('Download failed:', downloadResult.message);
             }
