@@ -103,11 +103,11 @@ export class SigaaService {
 
     async downloadFile(
         courseId: string,
-        _courseName: string,
+        courseName: string,
         fileName: string,
-        _fileUrl: string,
+        fileUrl: string,
         basePath: string,
-        _downloadedFiles: Record<string, any>,
+        downloadedFiles: Record<string, any>,
         script?: string
     ): Promise<{ success: boolean; filePath?: string; message?: string }> {
         try {
@@ -121,7 +121,8 @@ export class SigaaService {
             const idMatch = script.match(/,id,([^,]+)/);
             const fileId = idMatch ? idMatch[1] : 'unknown';
 
-            const result = await this.httpScraper.downloadFile(
+            console.log(`SIGAA: Attempting fast HTTP download for file ${fileId}...`);
+            const httpResult = await this.httpScraper.downloadFile(
                 courseId,
                 fileId,
                 fileName,
@@ -129,11 +130,29 @@ export class SigaaService {
                 script
             );
 
-            if (!result.success) {
-                return { success: false, message: result.error || 'Download failed' };
+            if (httpResult.success) {
+                console.log('SIGAA: HTTP download successful!');
+                return { success: true, filePath: httpResult.filePath };
             }
 
-            return { success: true, filePath: result.filePath };
+            console.warn(`SIGAA: HTTP download failed (${httpResult.error}). Falling back to Playwright...`);
+
+            // Fallback to Playwright
+            const pwResult = await this.playwrightLogin.downloadFile(
+                courseId,
+                courseName,
+                fileName,
+                fileUrl,
+                basePath,
+                downloadedFiles,
+                script
+            );
+
+            if (!pwResult.success) {
+                return { success: false, message: pwResult.error || 'Download failed (both HTTP and Playwright)' };
+            }
+
+            return { success: true, filePath: pwResult.filePath };
         } catch (error: any) {
             console.error('SIGAA: Error downloading file:', error);
             return { success: false, message: error.message || 'Download failed' };
