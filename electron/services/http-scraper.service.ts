@@ -268,372 +268,355 @@ export class HttpScraperService {
                         this.log('[HttpScraper] Could not parse onclick for "Conteúdo" link.');
                     }
                 } else {
-                    this.log('[HttpScraper] "Conteúdo" link not found in sidebar. Scanning current page...');
-                }
-
-            } else {
-                this.log('[HttpScraper] Using Playwright HTML directly.');
-            }
-
-            const $files = cheerio.load(filesPageData);
-
-            // Extract ViewState and Inputs (moved here to support both Axios and Playwright paths)
-            const viewState = $files('input[name="javax.faces.ViewState"]').val() as string;
-            const filesForm = $files('form').first();
-            const formAction = filesForm.attr('action') || '/sigaa/ava/index.jsf';
-            const formNameStr = filesForm.attr('name') || 'formAva';
-
-            const inputs: Record<string, string> = {};
-            filesForm.find('input').each((_, el) => {
-                const name = $files(el).attr('name');
-                const value = $files(el).attr('value');
-                if (name && value !== undefined) {
-                    inputs[name] = value;
-                }
-            });
-
-            if (viewState) {
-                this.courseData.set(courseId, {
-                    viewState,
-                    action: formAction,
-                    formName: formNameStr,
-                    inputs
+                    const name = $files(el).attr('name');
+                    const value = $files(el).attr('value');
+                    if (name && value !== undefined) {
+                        inputs[name] = value;
+                    }
                 });
-                this.log(`[HttpScraper] Stored ViewState and ${Object.keys(inputs).length} inputs for course ${courseId}`);
-            } else {
-                this.log(`[HttpScraper] WARNING: Could not extract ViewState for course ${courseId}`);
-            }
-            const files: any[] = [];
-            const news: any[] = [];
 
-            this.log('[HttpScraper] Scanning for files...');
-            $files('a').each((_, el) => {
-                const link = $files(el);
-                const text = link.text().trim();
-                const href = link.attr('href');
-                const onclick = link.attr('onclick');
+                if (viewState) {
+                    this.courseData.set(courseId, {
+                        viewState,
+                        action: formAction,
+                        formName: formNameStr,
+                        inputs
+                    });
+                    this.log(`[HttpScraper] Stored ViewState and ${Object.keys(inputs).length} inputs for course ${courseId}`);
+                } else {
+                    this.log(`[HttpScraper] WARNING: Could not extract ViewState for course ${courseId}`);
+                }
+                const files: any[] = [];
+                const news: any[] = [];
 
-                if (text) {
-                    const isFile = text.match(/\.(pdf|doc|docx|ppt|pptx|xls|xlsx|zip|rar|txt|png|jpg|jpeg)$/i) ||
-                        text.toLowerCase().includes('lista') ||
-                        text.toLowerCase().includes('exerc') ||
-                        text.toLowerCase().includes('arquivo') ||
-                        text.toLowerCase().includes('material');
+                this.log('[HttpScraper] Scanning for files...');
+                $files('a').each((_, el) => {
+                    const link = $files(el);
+                    const text = link.text().trim();
+                    const href = link.attr('href');
+                    const onclick = link.attr('onclick');
 
-                    if (isFile) {
-                        if (onclick && onclick.includes('id')) {
-                            // Extract id and key from jsfcljs format: id,12345,key,abc123
-                            const idMatch = onclick.match(/,id,([^,]+)/);
-                            const keyMatch = onclick.match(/,key,([^,'"]+)/);
+                    if (text) {
+                        const isFile = text.match(/\.(pdf|doc|docx|ppt|pptx|xls|xlsx|zip|rar|txt|png|jpg|jpeg)$/i) ||
+                            text.toLowerCase().includes('lista') ||
+                            text.toLowerCase().includes('exerc') ||
+                            text.toLowerCase().includes('arquivo') ||
+                            text.toLowerCase().includes('material');
 
-                            if (idMatch) {
+                        if (isFile) {
+                            if (onclick && onclick.includes('id')) {
+                                // Extract id and key from jsfcljs format: id,12345,key,abc123
+                                const idMatch = onclick.match(/,id,([^,]+)/);
+                                const keyMatch = onclick.match(/,key,([^,'"]+)/);
+
+                                if (idMatch) {
+                                    files.push({
+                                        name: text,
+                                        type: 'file',
+                                        id: idMatch[1],
+                                        key: keyMatch ? keyMatch[1] : undefined,
+                                        script: onclick
+                                    });
+                                }
+                            } else if (href && !href.startsWith('#') && !href.startsWith('javascript')) {
                                 files.push({
                                     name: text,
-                                    type: 'file',
-                                    id: idMatch[1],
-                                    key: keyMatch ? keyMatch[1] : undefined,
-                                    script: onclick
+                                    type: 'link',
+                                    url: href.startsWith('http') ? href : this.baseUrl + href
                                 });
                             }
-                        } else if (href && !href.startsWith('#') && !href.startsWith('javascript')) {
-                            files.push({
-                                name: text,
-                                type: 'link',
-                                url: href.startsWith('http') ? href : this.baseUrl + href
-                            });
                         }
                     }
-                }
-            });
+                });
 
-            const $newsPage = cheerio.load(coursePageData);
-            $newsPage('table').each((_, table) => {
-                const headers = $newsPage(table).find('th').map((__, th) => $newsPage(th).text().trim()).get();
-                if (headers.includes('Título') && headers.includes('Data')) {
-                    $newsPage(table).find('tr').each((__, row) => {
-                        const cells = $newsPage(row).find('td');
-                        if (cells.length >= 2) {
-                            const title = $(cells[0]).text().trim();
-                            const date = $(cells[1]).text().trim();
-                            const notification = $(cells[2]).text().trim();
+                const $newsPage = cheerio.load(coursePageData);
+                $newsPage('table').each((_, table) => {
+                    const headers = $newsPage(table).find('th').map((__, th) => $newsPage(th).text().trim()).get();
+                    if (headers.includes('Título') && headers.includes('Data')) {
+                        $newsPage(table).find('tr').each((__, row) => {
+                            const cells = $newsPage(row).find('td');
+                            if (cells.length >= 2) {
+                                const title = $(cells[0]).text().trim();
+                                const date = $(cells[1]).text().trim();
+                                const notification = $(cells[2]).text().trim();
 
-                            const link = $(cells[0]).find('a');
-                            const onclick = link.attr('onclick');
+                                const link = $(cells[0]).find('a');
+                                const onclick = link.attr('onclick');
 
-                            if (title && date && onclick) {
-                                const idMatch = onclick.match(/['"](\\d+)['"]/);
-                                if (idMatch) {
-                                    news.push({ title, date, notification, id: idMatch[1] });
+                                if (title && date && onclick) {
+                                    const idMatch = onclick.match(/['"](\\d+)['"]/);
+                                    if (idMatch) {
+                                        news.push({ title, date, notification, id: idMatch[1] });
+                                    }
                                 }
                             }
-                        }
-                    });
+                        });
+                    }
+                });
+
+                this.log(`[HttpScraper] Found ${files.length} files and ${news.length} news items.`);
+                return { success: true, files, news };
+
+            } catch (error: any) {
+                console.error('[HttpScraper] Error fetching course files:', error);
+                this.log(`[HttpScraper] Error fetching course files: ${error.message}`);
+                return { success: false, error: error.message };
+            }
+        }
+
+    async getNewsDetail(courseId: string, newsId: string): Promise < { success: boolean; news?: any; error?: string } > {
+            try {
+                const dashboardUrl = `${this.baseUrl}/sigaa/portais/discente/discente.jsf`;
+                const dashboardResponse = await axios.get(dashboardUrl, {
+                    headers: {
+                        'Cookie': this.getCookieHeader(dashboardUrl),
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                        'Referer': `${this.baseUrl}/sigaa/verPortalDiscente.do`,
+                        'Connection': 'keep-alive'
+                    },
+                    timeout: 10000
+                });
+
+                this.updateCookies(dashboardResponse);
+
+                const $ = cheerio.load(dashboardResponse.data);
+                let input = $(`input[name="idTurma"][value="${courseId}"]`);
+                if(input.length === 0) input = $(`input[name="id"][value="${courseId}"]`);
+
+                if(input.length === 0) return { success: false, error: 'Course not found on dashboard' };
+
+                const form = input.closest('form');
+                const formData = new URLSearchParams();
+                form.find('input').each((_, el) => {
+                    const name = $(el).attr('name');
+                    const value = $(el).attr('value');
+                    if (name && value) formData.append(name, value);
+                });
+
+                const coursePageResponse = await axios.post(dashboardUrl, formData.toString(), {
+                    headers: {
+                        'Cookie': this.getCookieHeader(dashboardUrl),
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                    },
+                    timeout: 10000
+                });
+
+                this.updateCookies(coursePageResponse);
+
+                const $course = cheerio.load(coursePageResponse.data);
+                let targetForm: any = null;
+                $course('a').each((_, el) => {
+                    const onclick = $(el).attr('onclick');
+                    if (onclick && onclick.includes(newsId)) targetForm = $(el).closest('form');
+                });
+
+                if(!targetForm || targetForm.length === 0) {
+            const hiddenInput = $course(`input[value="${newsId}"]`);
+            if (hiddenInput.length > 0) targetForm = hiddenInput.closest('form');
+        }
+
+        if (!targetForm || targetForm.length === 0) targetForm = $course('form').first();
+
+        const newsFormData = new URLSearchParams();
+        targetForm.find('input').each((_: any, el: any) => {
+            const name = $(el).attr('name');
+            const value = $(el).attr('value');
+            if (name && value) newsFormData.append(name, value);
+        });
+
+        newsFormData.set('id', newsId);
+
+        const newsResponse = await axios.post(dashboardUrl, newsFormData.toString(), {
+            headers: {
+                'Cookie': this.getCookieHeader(dashboardUrl),
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Referer': dashboardUrl,
+                'Connection': 'keep-alive'
+            },
+            timeout: 10000
+        });
+
+        this.updateCookies(newsResponse);
+        const $news = cheerio.load(newsResponse.data);
+
+        const getTextAfterLabel = (label: string) => {
+            let result = '';
+            $news('td, th, label, span, div').each((_, el) => {
+                if ($news(el).text().trim().replace(':', '') === label) {
+                    const parentTd = $news(el).closest('td');
+                    if (parentTd.length && parentTd.next().length) {
+                        result = parentTd.next().text().trim();
+                        return false;
+                    }
+                    if ($news(el).next().length) {
+                        result = $news(el).next().text().trim();
+                        return false;
+                    }
                 }
             });
+            return result;
+        };
 
-            this.log(`[HttpScraper] Found ${files.length} files and ${news.length} news items.`);
-            return { success: true, files, news };
-
-        } catch (error: any) {
-            console.error('[HttpScraper] Error fetching course files:', error);
-            this.log(`[HttpScraper] Error fetching course files: ${error.message}`);
-            return { success: false, error: error.message };
-        }
-    }
-
-    async getNewsDetail(courseId: string, newsId: string): Promise<{ success: boolean; news?: any; error?: string }> {
-        try {
-            const dashboardUrl = `${this.baseUrl}/sigaa/portais/discente/discente.jsf`;
-            const dashboardResponse = await axios.get(dashboardUrl, {
-                headers: {
-                    'Cookie': this.getCookieHeader(dashboardUrl),
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                    'Referer': `${this.baseUrl}/sigaa/verPortalDiscente.do`,
-                    'Connection': 'keep-alive'
-                },
-                timeout: 10000
-            });
-
-            this.updateCookies(dashboardResponse);
-
-            const $ = cheerio.load(dashboardResponse.data);
-            let input = $(`input[name="idTurma"][value="${courseId}"]`);
-            if (input.length === 0) input = $(`input[name="id"][value="${courseId}"]`);
-
-            if (input.length === 0) return { success: false, error: 'Course not found on dashboard' };
-
-            const form = input.closest('form');
-            const formData = new URLSearchParams();
-            form.find('input').each((_, el) => {
-                const name = $(el).attr('name');
-                const value = $(el).attr('value');
-                if (name && value) formData.append(name, value);
-            });
-
-            const coursePageResponse = await axios.post(dashboardUrl, formData.toString(), {
-                headers: {
-                    'Cookie': this.getCookieHeader(dashboardUrl),
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                },
-                timeout: 10000
-            });
-
-            this.updateCookies(coursePageResponse);
-
-            const $course = cheerio.load(coursePageResponse.data);
-            let targetForm: any = null;
-            $course('a').each((_, el) => {
-                const onclick = $(el).attr('onclick');
-                if (onclick && onclick.includes(newsId)) targetForm = $(el).closest('form');
-            });
-
-            if (!targetForm || targetForm.length === 0) {
-                const hiddenInput = $course(`input[value="${newsId}"]`);
-                if (hiddenInput.length > 0) targetForm = hiddenInput.closest('form');
-            }
-
-            if (!targetForm || targetForm.length === 0) targetForm = $course('form').first();
-
-            const newsFormData = new URLSearchParams();
-            targetForm.find('input').each((_: any, el: any) => {
-                const name = $(el).attr('name');
-                const value = $(el).attr('value');
-                if (name && value) newsFormData.append(name, value);
-            });
-
-            newsFormData.set('id', newsId);
-
-            const newsResponse = await axios.post(dashboardUrl, newsFormData.toString(), {
-                headers: {
-                    'Cookie': this.getCookieHeader(dashboardUrl),
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                    'Referer': dashboardUrl,
-                    'Connection': 'keep-alive'
-                },
-                timeout: 10000
-            });
-
-            this.updateCookies(newsResponse);
-            const $news = cheerio.load(newsResponse.data);
-
-            const getTextAfterLabel = (label: string) => {
-                let result = '';
-                $news('td, th, label, span, div').each((_, el) => {
-                    if ($news(el).text().trim().replace(':', '') === label) {
-                        const parentTd = $news(el).closest('td');
-                        if (parentTd.length && parentTd.next().length) {
-                            result = parentTd.next().text().trim();
-                            return false;
-                        }
-                        if ($news(el).next().length) {
-                            result = $news(el).next().text().trim();
-                            return false;
-                        }
+        const getContent = () => {
+            let result = '';
+            $news('td, th, label, span, div').each((_, el) => {
+                if ($news(el).text().trim().replace(':', '') === 'Texto') {
+                    const parentTd = $news(el).closest('td');
+                    if (parentTd.length && parentTd.next().length) {
+                        result = parentTd.next().html() || '';
+                        return false;
                     }
-                });
-                return result;
-            };
+                }
+            });
+            return result;
+        };
 
-            const getContent = () => {
-                let result = '';
-                $news('td, th, label, span, div').each((_, el) => {
-                    if ($news(el).text().trim().replace(':', '') === 'Texto') {
-                        const parentTd = $news(el).closest('td');
-                        if (parentTd.length && parentTd.next().length) {
-                            result = parentTd.next().html() || '';
-                            return false;
-                        }
-                    }
-                });
-                return result;
-            };
+        const newsDetail = {
+            title: getTextAfterLabel('Título') || getTextAfterLabel('Assunto'),
+            date: getTextAfterLabel('Data'),
+            content: getContent(),
+            notification: getTextAfterLabel('Notificação')
+        };
 
-            const newsDetail = {
-                title: getTextAfterLabel('Título') || getTextAfterLabel('Assunto'),
-                date: getTextAfterLabel('Data'),
-                content: getContent(),
-                notification: getTextAfterLabel('Notificação')
-            };
+        return { success: true, news: newsDetail };
 
-            return { success: true, news: newsDetail };
-
-        } catch (error: any) {
-            console.error('[HttpScraper] Error fetching news detail:', error);
-            return { success: false, error: error.message };
-        }
+    } catch(error: any) {
+        console.error('[HttpScraper] Error fetching news detail:', error);
+        return { success: false, error: error.message };
     }
+}
 
     async downloadFile(
-        courseId: string,
-        fileId: string,
-        fileName: string,
-        basePath: string,
-        script: string,
-        onProgress?: (progress: number) => void
-    ): Promise<{ success: boolean; filePath?: string; error?: string }> {
-        try {
-            this.log(`[HttpScraper] Downloading file "${fileName}" (ID: ${fileId}) for course ${courseId}`);
+    courseId: string,
+    fileId: string,
+    fileName: string,
+    basePath: string,
+    script: string,
+    onProgress ?: (progress: number) => void
+    ): Promise < { success: boolean; filePath?: string; error?: string } > {
+    try {
+        this.log(`[HttpScraper] Downloading file "${fileName}" (ID: ${fileId}) for course ${courseId}`);
 
-            const courseInfo = this.courseData.get(courseId);
-            if (!courseInfo) {
-                return { success: false, error: 'Course session data not found. Please refresh the course list.' };
-            }
+        const courseInfo = this.courseData.get(courseId);
+        if(!courseInfo) {
+            return { success: false, error: 'Course session data not found. Please refresh the course list.' };
+        }
 
             // Extract component ID from script
             const match = script.match(/jsfcljs\([^,]+,'([^']+)'/);
-            if (!match) {
-                return { success: false, error: 'Invalid download script format' };
-            }
+        if(!match) {
+            return { success: false, error: 'Invalid download script format' };
+        }
             const paramsStr = match[1];
-            const params = paramsStr.split(',');
-            const componentId = params[0]; // The first item is the source
+        const params = paramsStr.split(',');
+        const componentId = params[0]; // The first item is the source
 
-            const formData = new URLSearchParams();
+        const formData = new URLSearchParams();
 
-            // 1. Add all hidden inputs from the form
-            if (courseInfo.inputs) {
-                Object.entries(courseInfo.inputs).forEach(([key, value]) => {
-                    formData.append(key, value);
+        // 1. Add all hidden inputs from the form
+        if(courseInfo.inputs) {
+    Object.entries(courseInfo.inputs).forEach(([key, value]) => {
+        formData.append(key, value);
+    });
+}
+
+// 2. Add/Overwrite ViewState (just in case it wasn't in inputs or needs update)
+formData.set('javax.faces.ViewState', courseInfo.viewState);
+
+// 3. Add form name (if not in inputs)
+if (!formData.has(courseInfo.formName)) {
+    formData.append(courseInfo.formName, courseInfo.formName);
+}
+
+// 4. Add the component ID (Source)
+formData.append(componentId, componentId);
+
+// 5. Add other parameters from script (id, key)
+for (let i = 0; i < params.length; i += 2) {
+    if (params[i] && params[i + 1]) {
+        formData.append(params[i], params[i + 1]);
+    }
+}
+
+this.log(`[HttpScraper] Sending download request. ComponentID: ${componentId}`);
+
+const response = await axios.post(`${this.baseUrl}${courseInfo.action}`, formData.toString(), {
+    headers: {
+        'Cookie': this.getCookieHeader(`${this.baseUrl}${courseInfo.action}`),
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Referer': `${this.baseUrl}${courseInfo.action}`,
+        'Connection': 'keep-alive'
+    },
+    responseType: 'stream',
+    timeout: 60000 // 60s timeout for downloads
+});
+
+this.updateCookies(response);
+
+// Determine filename
+let finalFileName = fileName;
+const contentDisposition = response.headers['content-disposition'];
+if (contentDisposition) {
+    const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+    if (filenameMatch) {
+        finalFileName = filenameMatch[1];
+    }
+}
+
+// Ensure extension
+if (!path.extname(finalFileName)) {
+    // If no extension, try to guess from content-type or keep as is
+    // For now, trust the provided fileName or content-disposition
+}
+
+const filePath = path.join(basePath, finalFileName);
+const writer = fs.createWriteStream(filePath);
+
+const totalLength = parseInt(response.headers['content-length'] || '0', 10);
+let downloadedLength = 0;
+
+response.data.on('data', (chunk: any) => {
+    downloadedLength += chunk.length;
+    if (onProgress && totalLength > 0) {
+        onProgress(Math.round((downloadedLength / totalLength) * 100));
+    }
+});
+
+response.data.pipe(writer);
+
+return new Promise((resolve, reject) => {
+    writer.on('finish', () => {
+        // Check if file is too small (likely error page)
+        fs.stat(filePath, (err, stats) => {
+            if (!err && stats.size < 2000) {
+                // Read file content to check for error
+                fs.readFile(filePath, 'utf8', (readErr, content) => {
+                    if (!readErr && (content.includes('<html') || content.includes('<!DOCTYPE'))) {
+                        this.log(`[HttpScraper] ERROR: Downloaded file appears to be an HTML error page. Content:\n${content}`);
+                        resolve({ success: false, error: 'Downloaded file is an HTML error page. Check logs for details.' });
+                    } else {
+                        this.log(`[HttpScraper] Download complete: ${filePath}`);
+                        resolve({ success: true, filePath });
+                    }
                 });
+            } else {
+                this.log(`[HttpScraper] Download complete: ${filePath}`);
+                resolve({ success: true, filePath });
             }
-
-            // 2. Add/Overwrite ViewState (just in case it wasn't in inputs or needs update)
-            formData.set('javax.faces.ViewState', courseInfo.viewState);
-
-            // 3. Add form name (if not in inputs)
-            if (!formData.has(courseInfo.formName)) {
-                formData.append(courseInfo.formName, courseInfo.formName);
-            }
-
-            // 4. Add the component ID (Source)
-            formData.append(componentId, componentId);
-
-            // 5. Add other parameters from script (id, key)
-            for (let i = 0; i < params.length; i += 2) {
-                if (params[i] && params[i + 1]) {
-                    formData.append(params[i], params[i + 1]);
-                }
-            }
-
-            this.log(`[HttpScraper] Sending download request. ComponentID: ${componentId}`);
-
-            const response = await axios.post(`${this.baseUrl}${courseInfo.action}`, formData.toString(), {
-                headers: {
-                    'Cookie': this.getCookieHeader(`${this.baseUrl}${courseInfo.action}`),
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                    'Referer': `${this.baseUrl}${courseInfo.action}`,
-                    'Connection': 'keep-alive'
-                },
-                responseType: 'stream',
-                timeout: 60000 // 60s timeout for downloads
-            });
-
-            this.updateCookies(response);
-
-            // Determine filename
-            let finalFileName = fileName;
-            const contentDisposition = response.headers['content-disposition'];
-            if (contentDisposition) {
-                const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
-                if (filenameMatch) {
-                    finalFileName = filenameMatch[1];
-                }
-            }
-
-            // Ensure extension
-            if (!path.extname(finalFileName)) {
-                // If no extension, try to guess from content-type or keep as is
-                // For now, trust the provided fileName or content-disposition
-            }
-
-            const filePath = path.join(basePath, finalFileName);
-            const writer = fs.createWriteStream(filePath);
-
-            const totalLength = parseInt(response.headers['content-length'] || '0', 10);
-            let downloadedLength = 0;
-
-            response.data.on('data', (chunk: any) => {
-                downloadedLength += chunk.length;
-                if (onProgress && totalLength > 0) {
-                    onProgress(Math.round((downloadedLength / totalLength) * 100));
-                }
-            });
-
-            response.data.pipe(writer);
-
-            return new Promise((resolve, reject) => {
-                writer.on('finish', () => {
-                    // Check if file is too small (likely error page)
-                    fs.stat(filePath, (err, stats) => {
-                        if (!err && stats.size < 2000) {
-                            // Read file content to check for error
-                            fs.readFile(filePath, 'utf8', (readErr, content) => {
-                                if (!readErr && (content.includes('<html') || content.includes('<!DOCTYPE'))) {
-                                    this.log(`[HttpScraper] ERROR: Downloaded file appears to be an HTML error page. Content:\n${content}`);
-                                    resolve({ success: false, error: 'Downloaded file is an HTML error page. Check logs for details.' });
-                                } else {
-                                    this.log(`[HttpScraper] Download complete: ${filePath}`);
-                                    resolve({ success: true, filePath });
-                                }
-                            });
-                        } else {
-                            this.log(`[HttpScraper] Download complete: ${filePath}`);
-                            resolve({ success: true, filePath });
-                        }
-                    });
-                });
-                writer.on('error', (err) => {
-                    this.log(`[HttpScraper] File write error: ${err.message}`);
-                    reject({ success: false, error: err.message });
-                });
-            });
+        });
+    });
+    writer.on('error', (err) => {
+        this.log(`[HttpScraper] File write error: ${err.message}`);
+        reject({ success: false, error: err.message });
+    });
+});
 
         } catch (error: any) {
-            this.log(`[HttpScraper] Download error: ${error.message}`);
-            return { success: false, error: error.message };
-        }
+    this.log(`[HttpScraper] Download error: ${error.message}`);
+    return { success: false, error: error.message };
+}
     }
 }
