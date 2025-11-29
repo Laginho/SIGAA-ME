@@ -103,25 +103,31 @@ export class SigaaService {
 
     async downloadFile(
         courseId: string,
-        courseName: string,
+        _courseName: string,
         fileName: string,
-        fileUrl: string,
+        _fileUrl: string,
         basePath: string,
-        downloadedFiles: Record<string, any>,
+        _downloadedFiles: Record<string, any>,
         script?: string
     ): Promise<{ success: boolean; filePath?: string; message?: string }> {
         try {
             console.log(`SIGAA: Downloading file ${fileName}...`);
-            // Keep Playwright for downloads for now as HTTP download is not fully implemented
-            const result = await this.playwrightLogin.downloadFile(
-            courseId,
-            courseName,
-            fileName,
-            fileUrl,
-            basePath,
-            downloadedFiles,
-            script
-        );
+            if (!script) {
+                return { success: false, message: 'Script not provided for download' };
+            }
+
+            // Use HTTP Scraper for fast download
+            // Extract ID from script for logging if possible
+            const idMatch = script.match(/,id,([^,]+)/);
+            const fileId = idMatch ? idMatch[1] : 'unknown';
+
+            const result = await this.httpScraper.downloadFile(
+                courseId,
+                fileId,
+                fileName,
+                basePath,
+                script
+            );
 
             if (!result.success) {
                 return { success: false, message: result.error || 'Download failed' };
