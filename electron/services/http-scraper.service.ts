@@ -357,11 +357,11 @@ export class HttpScraperService {
                                 }
                             }
                             // Check for title in italics
-                            else if (element.tagName === 'i') {
+                            else if (element.type === 'tag' && element.tagName === 'i') {
                                 currentTitle = $(element).text().trim();
                             }
                             // Check for form with ID
-                            else if (element.tagName === 'form') {
+                            else if (element.type === 'tag' && element.tagName === 'form') {
                                 const form = $(element);
                                 const idInput = form.find('input[name="id"]').val();
 
@@ -372,9 +372,6 @@ export class HttpScraperService {
                                         id: String(idInput),
                                         notification: ''
                                     });
-                                    // Reset for next item (though date/title usually precede form immediately)
-                                    // currentDate = ''; 
-                                    // currentTitle = '';
                                 }
                             }
                         });
@@ -584,6 +581,16 @@ export class HttpScraperService {
 
             this.updateCookies(response);
 
+            this.log(`[HttpScraper] Response headers: Content-Type=${response.headers['content-type']}, Content-Length=${response.headers['content-length']}`);
+
+            // Check if content-type indicates HTML (error page)
+            const contentType = response.headers['content-type'];
+            if (contentType && (contentType.includes('text/html') || contentType.includes('application/xhtml'))) {
+                this.log('[HttpScraper] WARNING: Response Content-Type is HTML. Likely an error page.');
+                // We can't easily read the stream here without consuming it, but the file writer will save it.
+                // We will check the file content after writing.
+            }
+
             // Determine filename
             let finalFileName = fileName;
             const contentDisposition = response.headers['content-disposition'];
@@ -619,14 +626,14 @@ export class HttpScraperService {
                 writer.on('finish', () => {
                     // Check if file is too small (likely error page)
                     fs.stat(filePath, (err, stats) => {
-                        if (!err && stats.size < 2000) {
+                        if (!err && stats.size < 10240) { // Increased to 10KB to catch larger error pages
                             // Read file content to check for error
                             fs.readFile(filePath, 'utf8', (readErr, content) => {
-                                if (!readErr && (content.includes('<html') || content.includes('<!DOCTYPE'))) {
-                                    this.log(`[HttpScraper] ERROR: Downloaded file appears to be an HTML error page. Content:\n${content}`);
-                                    resolve({ success: false, error: 'Downloaded file is an HTML error page. Check logs for details.' });
+                                if (!readErr && (content.includes('<html') || content.includes('<!DOCTYPE') || content.includes('Login'))) {
+                                    this.log(`[HttpScraper] ERROR: Downloaded file appears to be an HTML error page. Size: ${stats.size} bytes. Content preview:\n${content.substring(0, 500)}...`);
+                                    resolve({ success: false, error: 'Downloaded file is an HTML error page (Session likely expired).' });
                                 } else {
-                                    this.log(`[HttpScraper] Download complete: ${filePath}`);
+                                    this.log(`[HttpScraper] Download complete: ${filePath} (Size: ${stats.size} bytes)`);
                                     resolve({ success: true, filePath });
                                 }
                             });

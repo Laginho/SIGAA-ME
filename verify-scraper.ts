@@ -51,10 +51,10 @@ async function main() {
     let courseWithFiles = null;
     let filesForCourse = null;
 
-    console.log('\n[3/4] Searching for course "FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO"...');
+    console.log('\n[3/4] Searching for course "CÁLCULO FUNDAMENTAL II"...');
 
     // Prioritize the specific course
-    courseWithFiles = coursesResult.courses.find((c: any) => c.name.includes('FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO'));
+    courseWithFiles = coursesResult.courses.find((c: any) => c.name.includes('CÁLCULO FUNDAMENTAL II'));
 
     if (courseWithFiles) {
         console.log(`Found target course: ${courseWithFiles.code} - ${courseWithFiles.name}`);
@@ -87,22 +87,27 @@ async function main() {
     }
 
     if (courseWithFiles && filesForCourse) {
-        // 4. Download first file
-        const fileToDownload = filesForCourse.find((f: any) => f.type === 'file');
+        // 4. Download ALL files
+        console.log(`\n[4/4] Attempting to download ALL ${filesForCourse.length} files...`);
+        const downloadDir = path.join(process.cwd(), 'downloads_test');
+        if (!fs.existsSync(downloadDir)) fs.mkdirSync(downloadDir);
 
-        if (fileToDownload) {
-            console.log(`\n[4/4] Attempting to download: ${fileToDownload.name}`);
-            const downloadDir = path.join(process.cwd(), 'downloads_test');
-            if (!fs.existsSync(downloadDir)) fs.mkdirSync(downloadDir);
+        let successCount = 0;
+        let failCount = 0;
+
+        for (const file of filesForCourse) {
+            if (file.type !== 'file') continue;
+
+            console.log(`\nDownloading: ${file.name}`);
 
             const downloadResult = await sigaa.downloadFile(
                 courseWithFiles.id,
                 courseWithFiles.name,
-                fileToDownload.name,
-                fileToDownload.url || '',
+                file.name,
+                file.url || '',
                 downloadDir,
                 {},
-                fileToDownload.script
+                file.script
             );
 
             if (downloadResult.success && downloadResult.filePath) {
@@ -113,8 +118,16 @@ async function main() {
                     const stats = fs.statSync(downloadResult.filePath);
                     console.log(`File size: ${stats.size} bytes`);
 
-                    if (stats.size < 1000) {
-                        console.warn('WARNING: File is very small, might be an empty file or error page.');
+                    if (stats.size < 2000) { // Increased threshold slightly
+                        console.warn('WARNING: File is very small (< 2KB), likely an error page.');
+
+                        // Read content to see if it's HTML
+                        const content = fs.readFileSync(downloadResult.filePath, 'utf8');
+                        if (content.includes('<html') || content.includes('<!DOCTYPE')) {
+                            console.error('ERROR: File is an HTML page!');
+                            failCount++;
+                            continue;
+                        }
                     }
 
                     const buffer = Buffer.alloc(5);
@@ -123,27 +136,23 @@ async function main() {
                     fs.closeSync(fd);
 
                     const header = buffer.toString('utf8');
-                    console.log(`File header (first 5 bytes): ${header}`);
+                    console.log(`File header: ${header}`);
+                    successCount++;
 
-                    if (header.startsWith('%PDF')) {
-                        console.log('Verified: File is a PDF.');
-                    } else if (header.toLowerCase().startsWith('<html') || header.toLowerCase().startsWith('<!doc')) {
-                        console.error('ERROR: File appears to be an HTML page (likely an error page saved as file).');
-                    } else {
-                        console.log('File type unknown (not PDF or HTML).');
-                    }
                 } catch (e) {
                     console.error('Error verifying file:', e);
+                    failCount++;
                 }
 
             } else {
                 console.error('Download failed:', downloadResult.message);
+                failCount++;
             }
-        } else {
-            console.log('No downloadable files found in the selected course.');
         }
+
+        console.log(`\nDownload Summary: ${successCount} successful, ${failCount} failed.`);
     } else {
-        console.log('No files found in ANY course.');
+        console.log('No downloadable files found in the selected course.');
     }
 
     // 5. Test News Fetching

@@ -30,3 +30,14 @@ dist-electron/
 # Debug files
 debug_playwright_*.html
 *.py
+
+# Downloads and Test Output
+downloads_test/
+verification_output*.txt
+*.pdf
+*.zip
+*.docx
+*.pptx
+*.xlsx
+*.rar
+*.txt
