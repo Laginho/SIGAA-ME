@@ -214,7 +214,7 @@ export class PlaywrightLoginService {
         }
     }
 
-    async enterCourseAndGetHTML(courseId: string): Promise<{ success: boolean; html?: string; cookies?: any[]; error?: string }> {
+    async enterCourseAndGetHTML(courseId: string, courseName: string): Promise<{ success: boolean; html?: string; cookies?: any[]; error?: string }> {
         try {
             if (!this.browser || !this.context) {
                 // If browser is closed, relaunch it
@@ -228,15 +228,13 @@ export class PlaywrightLoginService {
 
             const page = this.page!;
 
-            // Ensure we are on the portal
-            if (!page.url().includes('verPortalDiscente')) {
-                console.log('Playwright: Navigating to portal...');
-                await page.goto('https://si3.ufc.br/sigaa/verPortalDiscente.do');
-                await page.waitForLoadState('networkidle');
-            }
+            // Always force navigation to portal to ensure clean state
+            console.log('Playwright: Navigating to portal...');
+            await page.goto('https://si3.ufc.br/sigaa/verPortalDiscente.do');
+            await page.waitForLoadState('networkidle');
 
             // Enter the course
-            console.log(`Playwright: Entering course ${courseId}...`);
+            console.log(`Playwright: Entering course ${courseId} (${courseName})...`);
             const entered = await page.evaluate((id: string) => {
                 const inputs = Array.from(document.querySelectorAll('input[name="idTurma"]'));
                 const targetInput = inputs.find(input => (input as HTMLInputElement).value === id);
@@ -266,12 +264,36 @@ export class PlaywrightLoginService {
             // Navigate to AVA to ensure we are in the course context
             // Note: Clicking the link usually redirects to AVA, but we ensure it here
             if (!page.url().includes('ava/index.jsf')) {
+                console.log('Playwright: URL not AVA after click, forcing navigation...');
                 await page.goto('https://si3.ufc.br/sigaa/ava/index.jsf');
                 await page.waitForLoadState('networkidle');
             }
 
             // Wait for dynamic content
             await page.waitForTimeout(1000);
+
+            // VERIFY: Check if we are actually in the correct course
+            const pageContent = await page.content();
+            // Normalize strings for comparison (remove special chars, case insensitive)
+            const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const normalizedContent = normalize(pageContent);
+            const normalizedName = normalize(courseName);
+
+            // We check if the course name (or a significant part of it) is present
+            // This is a heuristic; exact match might fail due to formatting
+            if (!normalizedContent.includes(normalizedName.substring(0, 20))) {
+                console.warn(`Playwright: WARNING - Course name "${courseName}" not found in page content! Possible contamination.`);
+                // We could retry or throw error. For now, let's log heavily.
+                // If we are definitely in the wrong course, we should probably fail.
+                // Let's try to find the currently active course name in the page to confirm.
+                const currentCourseElement = await page.$('.turma');
+                if (currentCourseElement) {
+                    const currentText = await currentCourseElement.textContent();
+                    console.log(`Playwright: Page says current course is: "${currentText}"`);
+                }
+            } else {
+                console.log(`Playwright: Verified we are in course "${courseName}"`);
+            }
 
             // Click on "Conteúdo" link to load files section
             console.log('Playwright: Attempting to click "Conteúdo" link using native locator...');
