@@ -295,44 +295,8 @@ export class PlaywrightLoginService {
                 console.log(`Playwright: Verified we are in course "${courseName}"`);
             }
 
-            // Click on "Conteúdo" link to load files section
-            console.log('Playwright: Attempting to click "Conteúdo" link using native locator...');
-            try {
-                // "Conteúdo" is often inside the "Materiais" menu, which might be collapsed.
-                const conteudoLink = page.locator('.itemMenu').filter({ hasText: 'Conteúdo' }).first();
-
-                if (!await conteudoLink.isVisible()) {
-                    console.log('Playwright: "Conteúdo" link not visible, attempting to expand "Materiais" menu...');
-                    const materiaisHeader = page.locator('.itemMenuHeaderMateriais, .rich-panelbar-header:has-text("Materiais")').first();
-                    if (await materiaisHeader.isVisible()) {
-                        await materiaisHeader.click();
-                        // Wait for animation/expansion
-                        await page.waitForTimeout(500);
-                    }
-                }
-
-                if (await conteudoLink.isVisible()) {
-                    console.log('Playwright: Clicking "Conteúdo" to load files...');
-                    await conteudoLink.click();
-
-                    // CRITICAL: Wait for JSF form submission to complete and page to reload
-                    console.log('Playwright: Waiting for navigation after Conteúdo click...');
-                    await page.waitForLoadState('networkidle');
-                    await page.waitForTimeout(1000); // Extra safety for JSF dynamic content
-
-                    // Verify we landed on the files page
-                    const hasFileTable = await page.locator('.lista-arquivo, .tabelaRelatorio').count() > 0;
-                    if (hasFileTable) {
-                        console.log('Playwright: Successfully navigated to files page.');
-                    } else {
-                        console.log('Playwright: Warning - Files table not found (course may have no files)');
-                    }
-                } else {
-                    console.log('Playwright: Warning - "Conteúdo" link still not visible.');
-                }
-            } catch (e) {
-                console.error('Playwright: Error clicking Conteúdo:', e);
-            }
+            // Files are located on the "Principal" (Main) page, so we don't need to navigate anywhere else.
+            console.log('Playwright: Files are on the main page. Skipping navigation to "Conteúdo".');
 
             // Get HTML and Cookies
             const html = await page.content();
@@ -348,6 +312,7 @@ export class PlaywrightLoginService {
             return { success: false, error: error.message };
         }
     }
+
 
     // Kept for backward compatibility but now unused by the new flow
     private async navigateToCourse(page: any, courseId: string): Promise<boolean> {
