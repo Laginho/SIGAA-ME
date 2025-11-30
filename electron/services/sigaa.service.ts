@@ -116,7 +116,23 @@ export class SigaaService {
                 return { success: false, message: 'Script not provided for download' };
             }
 
-            // Use HTTP Scraper for fast download
+            // 1. Re-enter course to ensure fresh ViewState (Critical for avoiding 1KB error pages)
+            console.log(`SIGAA: Re-entering course ${courseId} to refresh session before download...`);
+            const entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, _courseName || 'Unknown Course');
+
+            if (!entryResult.success || !entryResult.html) {
+                return { success: false, message: entryResult.error || 'Failed to enter course for download' };
+            }
+
+            // 2. Update HttpScraper with fresh state
+            if (entryResult.cookies) {
+                this.httpScraper.setCookies(entryResult.cookies);
+            }
+            // We must parse the new HTML to update the ViewState in HttpScraper
+            // We use getCourseFiles but ignore the result, just to update the internal state
+            await this.httpScraper.getCourseFiles(courseId, _courseName, entryResult.html);
+
+            // 3. Use HTTP Scraper for fast download
             // Extract ID from script for logging if possible
             const idMatch = script.match(/,id,([^,]+)/);
             const fileId = idMatch ? idMatch[1] : 'unknown';
@@ -177,6 +193,21 @@ export class SigaaService {
             });
 
             console.log(`SIGAA: Processing ${queue.length} files...`);
+
+            // 1. Re-enter course ONCE before the batch to ensure fresh ViewState
+            console.log(`SIGAA: Re-entering course ${courseId} to refresh session before batch download...`);
+            const entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
+
+            if (!entryResult.success || !entryResult.html) {
+                return { success: false, message: entryResult.error || 'Failed to enter course for batch download' };
+            }
+
+            // 2. Update HttpScraper with fresh state
+            if (entryResult.cookies) {
+                this.httpScraper.setCookies(entryResult.cookies);
+            }
+            // We must parse the new HTML to update the ViewState in HttpScraper
+            await this.httpScraper.getCourseFiles(courseId, courseName, entryResult.html);
 
             for (const file of queue) {
                 if (!file.script) {
