@@ -280,34 +280,65 @@ export class HttpScraperService {
                 const onclick = link.attr('onclick');
                 const href = link.attr('href');
 
-                if (text) {
-                    const isFile = text.match(/\.(pdf|doc|docx|ppt|pptx|xls|xlsx|zip|rar|txt|png|jpg|jpeg)$/i) ||
-                        text.toLowerCase().includes('lista') ||
-                        text.toLowerCase().includes('exerc') ||
-                        text.toLowerCase().includes('arquivo') ||
-                        text.toLowerCase().includes('material');
+                // Strategy 1: Detect files by onclick pattern (jsfcljs with id parameter)
+                if (onclick && onclick.includes('jsfcljs') && onclick.includes(',id,')) {
+                    const idMatch = onclick.match(/,id,([^,]+)/);
+                    const keyMatch = onclick.match(/,key,([^,'"]+)/);
 
-                    if (isFile) {
-                        if (onclick && onclick.includes('id')) {
-                            const idMatch = onclick.match(/,id,([^,]+)/);
-                            const keyMatch = onclick.match(/,key,([^,'"]+)/);
-
-                            if (idMatch) {
-                                files.push({
-                                    name: text,
-                                    type: 'file',
-                                    id: idMatch[1],
-                                    key: keyMatch ? keyMatch[1] : undefined,
-                                    script: onclick
-                                });
-                            }
-                        } else if (href && !href.startsWith('#') && !href.startsWith('javascript')) {
-                            files.push({
-                                name: text,
-                                type: 'link',
-                                url: href.startsWith('http') ? href : this.baseUrl + href
+                    if (idMatch) {
+                        // Try to find the actual filename in the surrounding context
+                        // Files are typically in a table row where the filename is in a previous cell
+                        let fileName = text;
+                        const row = link.closest('tr');
+                        if (row.length > 0) {
+                            // Look for filename in table cells
+                            const cells = $files(row).find('td');
+                            cells.each((_, cell) => {
+                                const cellText = $files(cell).text().trim();
+                                // If the cell contains a file extension, it's likely the filename
+                                if (cellText.match(/\.(pdf|doc|docx|ppt|pptx|xls|xlsx|zip|rar|txt|png|jpg|jpeg)$/i)) {
+                                    fileName = cellText;
+                                    return false; // break
+                                }
                             });
                         }
+
+                        this.log(`[HttpScraper] Found file: "${fileName}" (ID: ${idMatch[1]})`);
+                        files.push({
+                            name: fileName,
+                            type: 'file',
+                            id: idMatch[1],
+                            key: keyMatch ? keyMatch[1] : undefined,
+                            script: onclick
+                        });
+                    }
+                }
+                // Strategy 2: Detect files by explicit filename patterns (legacy)
+                else if (text && (text.match(/\.(pdf|doc|docx|ppt|pptx|xls|xlsx|zip|rar|txt|png|jpg|jpeg)$/i) ||
+                    text.toLowerCase().includes('lista') ||
+                    text.toLowerCase().includes('exerc') ||
+                    text.toLowerCase().includes('arquivo') ||
+                    text.toLowerCase().includes('material'))) {
+
+                    if (onclick && onclick.includes('id')) {
+                        const idMatch = onclick.match(/,id,([^,]+)/);
+                        const keyMatch = onclick.match(/,key,([^,'"]+)/);
+
+                        if (idMatch) {
+                            files.push({
+                                name: text,
+                                type: 'file',
+                                id: idMatch[1],
+                                key: keyMatch ? keyMatch[1] : undefined,
+                                script: onclick
+                            });
+                        }
+                    } else if (href && !href.startsWith('#') && !href.startsWith('javascript')) {
+                        files.push({
+                            name: text,
+                            type: 'link',
+                            url: href.startsWith('http') ? href : this.baseUrl + href
+                        });
                     }
                 }
             });
