@@ -1,18 +1,11 @@
-import { SigaaService } from './electron/services/sigaa.service';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as readline from 'readline';
-
-async function askQuestion(query: string): Promise<string> {
-    const rl = readline.createInterface({
-        input: process.stdin,
-        output: process.stdout,
+input: process.stdin,
+    output: process.stdout,
     });
 
-    return new Promise(resolve => rl.question(query, ans => {
-        rl.close();
-        resolve(ans);
-    }));
+return new Promise(resolve => rl.question(query, ans => {
+    rl.close();
+    resolve(ans);
+}));
 }
 
 async function main() {

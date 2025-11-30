@@ -297,17 +297,42 @@ export class PlaywrightLoginService {
 
             // Click on "Conteúdo" link to load files section
             console.log('Playwright: Attempting to click "Conteúdo" link using native locator...');
-            console.log('Playwright: "Conteúdo" link not visible');
-        }
-            } catch(e) {
-        console.error('Playwright: Error clicking Conteúdo:', e);
-    }
+            try {
+                // "Conteúdo" is often inside the "Materiais" menu, which might be collapsed.
+                const conteudoLink = page.locator('.itemMenu').filter({ hasText: 'Conteúdo' }).first();
 
-    // Get HTML and Cookies
-    const html = await page.content();
-    const cookies = await this.context!.cookies();
+                if (!await conteudoLink.isVisible()) {
+                    console.log('Playwright: "Conteúdo" link not visible, attempting to expand "Materiais" menu...');
+                    const materiaisHeader = page.locator('.itemMenuHeaderMateriais, .rich-panelbar-header:has-text("Materiais")').first();
+                    if (await materiaisHeader.isVisible()) {
+                        await materiaisHeader.click();
+                        // Wait for animation/expansion
+                        await page.waitForTimeout(500);
+                    }
+                }
 
-            console.log(`Playwright: Captured HTML for course ${courseId} (${ html.length } bytes)`);
+                if (await conteudoLink.isVisible()) {
+                    console.log('Playwright: Clicking "Conteúdo" to load files...');
+                    await conteudoLink.click();
+
+                    // Wait for the files page to load
+                    try {
+                        await page.waitForSelector('.lista-arquivo, .tabelaRelatorio', { timeout: 5000 });
+                    } catch (e) {
+                        console.log('Playwright: Warning - Files table not found after clicking Conteúdo (might be empty)');
+                    }
+                } else {
+                    console.log('Playwright: Warning - "Conteúdo" link still not visible.');
+                }
+            } catch (e) {
+                console.error('Playwright: Error clicking Conteúdo:', e);
+            }
+
+            // Get HTML and Cookies
+            const html = await page.content();
+            const cookies = await this.context!.cookies();
+
+            console.log(`Playwright: Captured HTML for course ${courseId} (${html.length} bytes)`);
 
             return { success: true, html, cookies };
 
@@ -326,7 +351,7 @@ export class PlaywrightLoginService {
             await page.waitForLoadState('networkidle');
 
             // Enter the course
-            console.log(`Playwright: Entering course ${ courseId }...`);
+            console.log(`Playwright: Entering course ${courseId}...`);
             const entered = await page.evaluate((id: string) => {
                 const inputs = Array.from(document.querySelectorAll('input[name="idTurma"]'));
                 const targetInput = inputs.find(input => (input as HTMLInputElement).value === id);
@@ -398,8 +423,8 @@ export class PlaywrightLoginService {
                 return { success: false, error: 'Failed to navigate to course page' };
             }
 
-            console.log(`Playwright: Downloading file ${ fileName } `);
-            console.log(`Playwright: Script present: ${ !!script } `);
+            console.log(`Playwright: Downloading file ${fileName} `);
+            console.log(`Playwright: Script present: ${!!script} `);
 
             const result = await downloadService.downloadFile(
                 page,

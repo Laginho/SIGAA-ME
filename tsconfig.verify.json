@@ -1,0 +1,14 @@
+{
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "module": "commonjs",
+        "moduleResolution": "node",
+        "noEmit": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true
+    },
+    "include": [
+        "verify-scraper.ts",
+        "electron/**/*.ts"
+    ]
+}
