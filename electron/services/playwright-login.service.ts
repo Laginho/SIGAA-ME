@@ -315,11 +315,17 @@ export class PlaywrightLoginService {
                     console.log('Playwright: Clicking "Conteúdo" to load files...');
                     await conteudoLink.click();
 
-                    // Wait for the files page to load
-                    try {
-                        await page.waitForSelector('.lista-arquivo, .tabelaRelatorio', { timeout: 5000 });
-                    } catch (e) {
-                        console.log('Playwright: Warning - Files table not found after clicking Conteúdo (might be empty)');
+                    // CRITICAL: Wait for JSF form submission to complete and page to reload
+                    console.log('Playwright: Waiting for navigation after Conteúdo click...');
+                    await page.waitForLoadState('networkidle');
+                    await page.waitForTimeout(1000); // Extra safety for JSF dynamic content
+
+                    // Verify we landed on the files page
+                    const hasFileTable = await page.locator('.lista-arquivo, .tabelaRelatorio').count() > 0;
+                    if (hasFileTable) {
+                        console.log('Playwright: Successfully navigated to files page.');
+                    } else {
+                        console.log('Playwright: Warning - Files table not found (course may have no files)');
                     }
                 } else {
                     console.log('Playwright: Warning - "Conteúdo" link still not visible.');
