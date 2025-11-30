@@ -337,6 +337,51 @@ export class HttpScraperService {
                 }
             });
 
+            // Strategy 2: Parse sidebar news (rich-stglpanel)
+            if (news.length === 0) {
+                $newsPage('.rich-stglpanel').each((_, panel) => {
+                    const header = $newsPage(panel).find('.rich-stglpanel-header').text().trim();
+                    if (header.includes('Notícias')) {
+                        const body = $newsPage(panel).find('.rich-stglpanel-body');
+
+                        let currentDate = '';
+                        let currentTitle = '';
+
+                        body.contents().each((__, element) => {
+                            // Check for text node containing date
+                            if (element.type === 'text') {
+                                const text = $(element).text().trim();
+                                // Match date format dd/mm/yyyy hh:mm or just dd/mm/yyyy
+                                if (text.match(/\d{2}\/\d{2}\/\d{4}/)) {
+                                    currentDate = text;
+                                }
+                            }
+                            // Check for title in italics
+                            else if (element.tagName === 'i') {
+                                currentTitle = $(element).text().trim();
+                            }
+                            // Check for form with ID
+                            else if (element.tagName === 'form') {
+                                const form = $(element);
+                                const idInput = form.find('input[name="id"]').val();
+
+                                if (idInput && currentDate && currentTitle) {
+                                    news.push({
+                                        title: currentTitle,
+                                        date: currentDate,
+                                        id: String(idInput),
+                                        notification: ''
+                                    });
+                                    // Reset for next item (though date/title usually precede form immediately)
+                                    // currentDate = ''; 
+                                    // currentTitle = '';
+                                }
+                            }
+                        });
+                    }
+                });
+            }
+
             this.log(`[HttpScraper] Found ${files.length} files and ${news.length} news items.`);
             return { success: true, files, news };
 

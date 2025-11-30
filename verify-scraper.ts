@@ -146,6 +146,56 @@ async function main() {
         console.log('No files found in ANY course.');
     }
 
+    // 5. Test News Fetching
+    console.log('\n[5/5] Testing News Fetching...');
+
+    let courseWithNews = null;
+    let newsItems = null;
+
+    // First check the current course
+    if (courseWithFiles) {
+        const result = await sigaa.getCourseFiles(courseWithFiles.id, courseWithFiles.name);
+        if (result.success && result.news && result.news.length > 0) {
+            courseWithNews = courseWithFiles;
+            newsItems = result.news;
+        }
+    }
+
+    // If not found, search other courses
+    if (!courseWithNews) {
+        console.log('Target course has no news. Searching others...');
+        for (const course of coursesResult.courses) {
+            if (course.id === courseWithFiles?.id) continue; // Skip already checked
+
+            console.log(`Checking for news in: ${course.code} - ${course.name}...`);
+            const result = await sigaa.getCourseFiles(course.id, course.name);
+            if (result.success && result.news && result.news.length > 0) {
+                console.log(`Found ${result.news.length} news items in this course.`);
+                courseWithNews = course;
+                newsItems = result.news;
+                break;
+            }
+        }
+    }
+
+    if (courseWithNews && newsItems && newsItems.length > 0) {
+        console.log(`\nTesting news fetch for course: ${courseWithNews.name}`);
+        const newsItem = newsItems[0];
+        console.log(`Attempting to fetch details for news: "${newsItem.title}" (ID: ${newsItem.id})`);
+
+        const newsResult = await sigaa.getNewsDetail(courseWithNews.id, newsItem.id);
+        if (newsResult.success && newsResult.news) {
+            console.log('News detail fetched successfully!');
+            console.log('Title:', newsResult.news.title);
+            console.log('Date:', newsResult.news.date);
+            console.log('Content Preview:', newsResult.news.content?.substring(0, 100) + '...');
+        } else {
+            console.error('Failed to fetch news detail:', newsResult.message);
+        }
+    } else {
+        console.log('No news items found in ANY course.');
+    }
+
     console.log('\nVerification complete.');
     process.exit(0);
 }
