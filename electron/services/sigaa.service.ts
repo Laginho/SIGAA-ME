@@ -75,7 +75,7 @@ export class SigaaService {
 
             // 1. Use Playwright to enter the course and capture HTML (Hybrid Approach)
             console.log('SIGAA: Entering course via Playwright to ensure session validity...');
-            const entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId);
+            const entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
 
             if (!entryResult.success || !entryResult.html) {
                 console.error('SIGAA: Failed to enter course via Playwright:', entryResult.error);

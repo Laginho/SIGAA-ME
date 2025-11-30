@@ -33,22 +33,6 @@ async function main() {
     // 1. Login
     console.log('\n[1/4] Logging in...');
     const loginResult = await sigaa.login(username, password);
-    if (!loginResult.success) {
-        console.error('Login failed:', loginResult.message);
-        return;
-    }
-    console.log('Login successful! User:', loginResult.account?.name);
-
-    // 2. Get Courses
-    console.log('\n[2/4] Fetching courses...');
-    const coursesResult = await sigaa.getCourses();
-    if (!coursesResult.success || !coursesResult.courses || coursesResult.courses.length === 0) {
-        console.error('Failed to get courses:', coursesResult.message);
-        return;
-    }
-
-    // Find a course with files
-    let courseWithFiles = null;
     let filesForCourse = null;
 
     console.log('\n[3/4] Searching for course "CÁLCULO FUNDAMENTAL II"...');
