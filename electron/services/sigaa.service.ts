@@ -129,12 +129,22 @@ export class SigaaService {
                 this.httpScraper.setCookies(entryResult.cookies);
             }
             // We must parse the new HTML to update the ViewState in HttpScraper
-            // We use getCourseFiles but ignore the result, just to update the internal state
-            await this.httpScraper.getCourseFiles(courseId, _courseName, entryResult.html);
+            const parseResult = await this.httpScraper.getCourseFiles(courseId, _courseName, entryResult.html);
+
+            let targetScript = script;
+            if (parseResult.success && parseResult.files) {
+                const freshFile = parseResult.files.find(f => f.name === fileName);
+                if (freshFile && freshFile.script) {
+                    console.log(`SIGAA: Found fresh script for file ${fileName}`);
+                    targetScript = freshFile.script;
+                } else {
+                    console.warn(`SIGAA: Could not find file ${fileName} in fresh page scan. Using original script.`);
+                }
+            }
 
             // 3. Use HTTP Scraper for fast download
             // Extract ID from script for logging if possible
-            const idMatch = script.match(/,id,([^,]+)/);
+            const idMatch = targetScript.match(/,id,([^,]+)/);
             const fileId = idMatch ? idMatch[1] : 'unknown';
 
             console.log(`SIGAA: Attempting fast HTTP download for file ${fileId}...`);
@@ -143,7 +153,7 @@ export class SigaaService {
                 fileId,
                 fileName,
                 basePath,
-                script
+                targetScript
             );
 
             if (httpResult.success) {
@@ -207,7 +217,17 @@ export class SigaaService {
                 this.httpScraper.setCookies(entryResult.cookies);
             }
             // We must parse the new HTML to update the ViewState in HttpScraper
-            await this.httpScraper.getCourseFiles(courseId, courseName, entryResult.html);
+            const parseResult = await this.httpScraper.getCourseFiles(courseId, courseName, entryResult.html);
+
+            const freshFilesMap = new Map<string, string>();
+            if (parseResult.success && parseResult.files) {
+                parseResult.files.forEach(f => {
+                    if (f.name && f.script) {
+                        freshFilesMap.set(f.name, f.script);
+                    }
+                });
+                console.log(`SIGAA: Mapped ${freshFilesMap.size} fresh file scripts.`);
+            }
 
             for (const file of queue) {
                 if (!file.script) {
@@ -218,8 +238,15 @@ export class SigaaService {
                     continue;
                 }
 
+                let targetScript = file.script;
+                if (freshFilesMap.has(file.name)) {
+                    targetScript = freshFilesMap.get(file.name)!;
+                } else {
+                    console.warn(`SIGAA: Using original script for ${file.name} (not found in fresh scan)`);
+                }
+
                 // Extract ID from script
-                const idMatch = file.script.match(/,id,([^,]+)/);
+                const idMatch = targetScript.match(/,id,([^,]+)/);
                 const fileId = idMatch ? idMatch[1] : 'unknown';
 
                 const result = await this.httpScraper.downloadFile(
@@ -227,7 +254,7 @@ export class SigaaService {
                     fileId,
                     file.name,
                     basePath,
-                    file.script
+                    targetScript
                 );
 
                 if (result.success) {

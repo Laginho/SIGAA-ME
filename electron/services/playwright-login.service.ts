@@ -297,37 +297,17 @@ export class PlaywrightLoginService {
 
             // Click on "Conteúdo" link to load files section
             console.log('Playwright: Attempting to click "Conteúdo" link using native locator...');
+            console.log('Playwright: "Conteúdo" link not visible');
+        }
+            } catch(e) {
+        console.error('Playwright: Error clicking Conteúdo:', e);
+    }
 
-            try {
-                // Wait for the menu to be visible
-                await page.waitForSelector('.itemMenu', { timeout: 5000 });
+    // Get HTML and Cookies
+    const html = await page.content();
+    const cookies = await this.context!.cookies();
 
-                // Find the link containing "Conteúdo"
-                // We use a broad locator and filter by text to be safe
-                const conteudoLink = page.locator('.itemMenu').filter({ hasText: 'Conteúdo' }).first();
-
-                if (await conteudoLink.isVisible()) {
-                    console.log('Playwright: Found "Conteúdo" link, clicking...');
-                    await conteudoLink.click();
-
-                    // Wait for navigation/reload
-                    // JSF usually reloads the page or updates a large part of it
-                    await page.waitForLoadState('networkidle');
-                    await page.waitForTimeout(2000); // Extra safety wait for JSF
-
-                    console.log('Playwright: Click processed, current URL:', page.url());
-                } else {
-                    console.log('Playwright: "Conteúdo" link not visible');
-                }
-            } catch (e) {
-                console.error('Playwright: Error clicking Conteúdo:', e);
-            }
-
-            // Get HTML and Cookies
-            const html = await page.content();
-            const cookies = await this.context!.cookies();
-
-            console.log(`Playwright: Captured HTML for course ${courseId} (${html.length} bytes)`);
+            console.log(`Playwright: Captured HTML for course ${courseId} (${ html.length } bytes)`);
 
             return { success: true, html, cookies };
 
@@ -346,7 +326,7 @@ export class PlaywrightLoginService {
             await page.waitForLoadState('networkidle');
 
             // Enter the course
-            console.log(`Playwright: Entering course ${courseId}...`);
+            console.log(`Playwright: Entering course ${ courseId }...`);
             const entered = await page.evaluate((id: string) => {
                 const inputs = Array.from(document.querySelectorAll('input[name="idTurma"]'));
                 const targetInput = inputs.find(input => (input as HTMLInputElement).value === id);
@@ -418,8 +398,8 @@ export class PlaywrightLoginService {
                 return { success: false, error: 'Failed to navigate to course page' };
             }
 
-            console.log(`Playwright: Downloading file ${fileName}`);
-            console.log(`Playwright: Script present: ${!!script}`);
+            console.log(`Playwright: Downloading file ${ fileName } `);
+            console.log(`Playwright: Script present: ${ !!script } `);
 
             const result = await downloadService.downloadFile(
                 page,
