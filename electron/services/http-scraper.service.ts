@@ -80,6 +80,38 @@ export class HttpScraperService {
         }
     }
 
+    private parseCookie(cookieStr: string): Cookie | null {
+        const nameMatch = cookieStr.match(/^[^()<>@,;:\\" \t\n/[\]?={}]+/);
+        if (!nameMatch) return null;
+
+        const name = nameMatch[0];
+        let remaining = cookieStr.substr(name.length);
+
+        const valueMatch = remaining.match(/^=([^; \t\n,\\]*)/);
+        if (!valueMatch) return null;
+
+        const value = valueMatch[1].replace(/^"|"$/g, '');
+        remaining = remaining.substr(valueMatch[0].length);
+
+        const cookie: Cookie = {
+            name,
+            value,
+            domain: new URL(this.baseUrl).hostname
+        };
+
+        const flags = remaining.split('; ');
+        for (const flag of flags) {
+            if (flag.match(/^Path=/i)) cookie.path = flag.replace(/^Path=/i, '');
+            else if (flag.match(/^Domain=/i)) cookie.domain = flag.replace(/^Domain=\.?/i, '');
+            else if (flag.match(/^Max-Age=/i)) {
+                const maxAge = Number(flag.replace(/^Max-Age=/i, ''));
+                cookie.expires = new Date(Date.now() + maxAge * 1000);
+            } else if (flag.match(/^Expires=/i)) cookie.expires = new Date(flag.replace(/^Expires=/i, ''));
+        }
+
+        return cookie;
+    }
+
     async enterCourseHTTP(courseId: string): Promise<{ success: boolean; html?: string; error?: string }> {
         try {
             this.log(`[HttpScraper] Entering course ${courseId} via HTTP...`);
