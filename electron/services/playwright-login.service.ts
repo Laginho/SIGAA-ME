@@ -389,12 +389,32 @@ export class PlaywrightLoginService {
             }, courseId);
 
             if (!entered.success) {
+                // Get debug info about what courses ARE on the portal
+                const debugInfo = await page.evaluate(() => {
+                    const inputs = Array.from(document.querySelectorAll('input[name="idTurma"]'));
+                    return {
+                        courseIds: inputs.map(input => (input as HTMLInputElement).value),
+                        pageTitle: document.title,
+                        bodyText: document.body.innerText.substring(0, 500)
+                    };
+                });
+
                 console.error(`Playwright: Course ${courseId} not found in portal. Current URL: ${page.url()}`);
-                // Optional: Save debug HTML
-                // const html = await page.content();
-                // fs.writeFileSync(`debug_portal_fail_${courseId}.html`, html);
+                console.error(`Playwright: Available course IDs: ${debugInfo.courseIds.join(', ')}`);
+                console.error(`Playwright: Page title: ${debugInfo.pageTitle}`);
+
+                // Save debug HTML
+                const html = await page.content();
+                try {
+                    const debugPath = path.join(process.cwd(), `debug_portal_fail_${courseId}.html`);
+                    fs.writeFileSync(debugPath, html);
+                    console.log(`Playwright: Saved debug HTML to ${debugPath}`);
+                } catch (e) {
+                    console.error('Failed to save debug HTML:', e);
+                }
+
                 await page.close();
-                return { success: false, error: 'Course link not found in portal' };
+                return { success: false, error: `Course link not found in portal. Available IDs: ${debugInfo.courseIds.join(', ')}` };
             }
 
             await page.waitForLoadState('networkidle');
