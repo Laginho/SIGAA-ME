@@ -108,7 +108,7 @@ export class PlaywrightLoginService {
 
     async getCourses(): Promise<{ success: boolean; courses?: any[]; error?: string }> {
         try {
-            console.log('Playwright: Launching browser to fetch courses...');
+            logger.info('Playwright: Launching browser to fetch courses...');
 
             // Check if we have stored cookies
             if (!this.storedCookies || this.storedCookies.length === 0) {
@@ -122,7 +122,7 @@ export class PlaywrightLoginService {
             const context = await this.browser.newContext();
 
             // Inject stored cookies
-            console.log('Playwright: Injecting stored session cookies...');
+            logger.info('Playwright: Injecting stored session cookies...');
             await context.addCookies(this.storedCookies);
 
             const page = await context.newPage();
@@ -131,7 +131,7 @@ export class PlaywrightLoginService {
             page.on('console', msg => console.log('Playwright Browser Log:', msg.text()));
 
             // Start at home page
-            console.log('Playwright: Navigating to home page...');
+            logger.info('Playwright: Navigating to home page...');
             await page.goto('https://si3.ufc.br/sigaa/paginaInicial.do');
             await page.waitForLoadState('networkidle');
 
