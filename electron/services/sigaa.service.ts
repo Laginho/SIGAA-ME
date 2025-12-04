@@ -1,82 +1,64 @@
-import { PlaywrightLoginService } from './playwright-login.service';
 import { HttpScraperService } from './http-scraper.service';
-import * as fs from 'fs';
-import * as path from 'path';
+import { PlaywrightLoginService } from './playwright-login.service';
+import { logger } from './logger.service';
 
-// This class will handle all the logic for talking to SIGAA using Playwright and HTTP.
-// We keep it here in the "Backend" (Electron Main Process) so it's secure.
 export class SigaaService {
     private playwrightLogin: PlaywrightLoginService;
     private httpScraper: HttpScraperService;
 
     constructor() {
-        // Initialize services
         this.playwrightLogin = new PlaywrightLoginService();
         this.httpScraper = new HttpScraperService();
-
-        console.log('SIGAA: Service initialized with Playwright and HttpScraper');
     }
 
     async login(username: string, password: string): Promise<{ success: boolean; message?: string; account?: { name: string; photoUrl?: string } }> {
         try {
-            // Use Playwright to login and get user data
-            console.log('SIGAA: Starting Playwright login...');
+            logger.info('SIGAA: Attempting login...');
             const result = await this.playwrightLogin.login(username, password);
 
-            if (!result.success) {
-                return { success: false, message: result.error || 'Login failed' };
-            }
-
-            console.log('SIGAA: Login successful!');
-
-            // Pass cookies to HttpScraper
-            if (result.cookies) {
+            if (result.success && result.cookies) {
+                logger.info('SIGAA: Login successful, setting cookies for HTTP scraper');
                 this.httpScraper.setCookies(result.cookies);
+            } else {
+                logger.error('SIGAA: Login failed', result.error);
             }
 
-            // Return the user data extracted by Playwright
             return {
-                success: true,
-                account: {
+                success: result.success,
+                message: result.error,
+                account: result.success ? {
                     name: result.userName || 'User',
-                    photoUrl: undefined // We can extract this later if needed
-                }
+                    photoUrl: undefined
+                } : undefined
             };
         } catch (error: any) {
-            console.error('Login error:', error);
-            return { success: false, message: error.message || 'Unknown error occurred.' };
+            logger.error('SIGAA: Login error', error);
+            return { success: false, message: error.message };
         }
     }
 
     async getCourses(): Promise<{ success: boolean; courses?: any[]; message?: string }> {
         try {
-            console.log('SIGAA: Fetching courses using Playwright...');
-
-            // Use Playwright to scrape courses from the page (keep this for now as it's the entry point)
+            logger.info('SIGAA: Fetching courses using Playwright...');
             const result = await this.playwrightLogin.getCourses();
-
-            if (!result.success) {
-                return { success: false, message: result.error || 'Failed to fetch courses' };
+            if (result.success) {
+                logger.info(`SIGAA: Found ${result.courses?.length || 0} courses`);
+            } else {
+                logger.error('SIGAA: Failed to fetch courses', result.error);
             }
-
-            console.log('SIGAA: Found courses:', result.courses?.length || 0);
-
-            return {
-                success: true,
-                courses: result.courses
-            };
+            return { success: result.success, courses: result.courses, message: result.error };
         } catch (error: any) {
-            console.error('SIGAA: Error fetching courses:', error);
+            logger.error('SIGAA: Error fetching courses', error);
             return { success: false, message: error.message || 'Failed to fetch courses' };
         }
     }
 
     async getCourseFiles(courseId: string, courseName?: string): Promise<{ success: boolean; files?: any[]; news?: any[]; message?: string }> {
         try {
-            console.log(`SIGAA: Fetching files for course ${courseName || courseId}...`);
+            logger.info(`SIGAA: Fetching files for course ${courseName || courseId}...`);
 
             // 1. Try Fast HTTP Entry first
-            console.log('SIGAA: Attempting Fast HTTP Entry...');
+            logger.info('SIGAA: Attempting Fast HTTP Entry...');
 
             // Ensure we have cookies from login
             const cookies = await this.playwrightLogin.getCookies();
@@ -86,20 +68,20 @@ export class SigaaService {
 
             let html = '';
             if (httpEntry.success && httpEntry.html) {
-                console.log('SIGAA: Fast HTTP Entry successful!');
+                logger.info('SIGAA: Fast HTTP Entry successful!');
                 html = httpEntry.html;
             } else {
-                console.error('SIGAA: Fast HTTP Entry failed:', httpEntry.error);
+                logger.error('SIGAA: Fast HTTP Entry failed:', httpEntry.error);
                 return { success: false, message: `HTTP Entry failed: ${httpEntry.error}` };
 
                 // Fallback DISABLED for testing
                 /*
-                console.warn('SIGAA: Fast HTTP Entry failed, falling back to Playwright:', httpEntry.error);
+                logger.warn('SIGAA: Fast HTTP Entry failed, falling back to Playwright:', httpEntry.error);
                 
                 // Fallback to Playwright
                 const entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
                 if (!entryResult.success || !entryResult.html) {
-                    console.error('SIGAA: Failed to enter course via Playwright:', entryResult.error);
+                    logger.error('SIGAA: Failed to enter course via Playwright:', entryResult.error);
                     return { success: false, message: entryResult.error || 'Failed to enter course' };
                 }
                 html = entryResult.html;
@@ -110,7 +92,7 @@ export class SigaaService {
             }
 
             // 2. Parse files
-            console.log('SIGAA: Parsing course files...');
+            logger.info('SIGAA: Parsing course files...');
             const result = await this.httpScraper.getCourseFiles(courseId, courseName, html);
 
             if (!result.success) {
@@ -119,7 +101,7 @@ export class SigaaService {
 
             return { success: true, files: result.files, news: result.news };
         } catch (error: any) {
-            console.error('SIGAA: Error fetching files:', error);
+            logger.error('SIGAA: Error fetching files:', error);
             return { success: false, message: error.message || 'Failed to fetch files' };
         }
     }
