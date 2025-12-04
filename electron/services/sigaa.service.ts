@@ -244,11 +244,11 @@ export class SigaaService {
         onProgress?: (fileName: string, status: 'downloaded' | 'skipped' | 'failed') => void
     ): Promise<{ success: boolean; downloaded?: number; skipped?: number; failed?: number; results?: any[]; message?: string }> {
         try {
-            console.log(`SIGAA: =====================================`);
-            console.log(`SIGAA: downloadAllFiles called for course ${courseName}`);
-            console.log(`SIGAA: Files received: ${files.length}`);
-            console.log(`SIGAA: First 3 files:`, files.slice(0, 3).map(f => ({ name: f.name, hasScript: !!f.script, scriptPreview: f.script?.substring(0, 50) })));
-            console.log(`SIGAA: basePath: ${basePath}`);
+            logger.info(`SIGAA: =====================================`);
+            logger.info(`SIGAA: downloadAllFiles called for course ${courseName}`);
+            logger.info(`SIGAA: Files received: ${files.length}`);
+            logger.info(`SIGAA: First 3 files: ${JSON.stringify(files.slice(0, 3).map(f => ({ name: f.name, hasScript: !!f.script, scriptLen: f.script?.length || 0 })))}`);
+            logger.info(`SIGAA: basePath: ${basePath}`);
 
             // Create course subdirectory
             const safeCourseName = this.sanitizeFolderName(courseName || 'Unknown Course');
@@ -278,7 +278,7 @@ export class SigaaService {
                 return true;
             });
 
-            console.log(`SIGAA: Queue after filtering: ${queue.length} files to download`);
+            logger.info(`SIGAA: Queue after filtering: ${queue.length} files to download`);
 
             // 1. Use the existing session (from when getCourseFiles was called)
             // DO NOT re-enter the course here - it causes failures
@@ -287,7 +287,7 @@ export class SigaaService {
 
             // Ensure httpScraper has fresh cookies from the existing Playwright session
             const freshCookies = await this.playwrightLogin.getCookies();
-            console.log(`SIGAA: Got ${freshCookies?.length || 0} cookies from Playwright`);
+            logger.info(`SIGAA: Got ${freshCookies?.length || 0} cookies from Playwright`);
             if (freshCookies && freshCookies.length > 0) {
                 this.httpScraper.setCookies(freshCookies);
             }
