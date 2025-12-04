@@ -215,21 +215,19 @@ export class PlaywrightLoginService {
     }
 
     async enterCourseAndGetHTML(courseId: string, courseName: string): Promise<{ success: boolean; html?: string; cookies?: any[]; error?: string }> {
+        let page: Page | null = null;
         try {
             if (!this.browser || !this.context) {
                 // If browser is closed, relaunch it
                 console.log('Playwright: Browser not active, relaunching...');
-                await this.getCourses(); // This will relaunch and set this.context/this.page
+                await this.getCourses(); // This will relaunch and set this.context
             }
 
-            if (!this.page) {
-                this.page = await this.context!.newPage();
-            }
-
-            const page = this.page!;
+            // Create a NEW page for this specific request to allow parallelism
+            page = await this.context!.newPage();
 
             // Always force navigation to portal to ensure clean state
-            console.log('Playwright: Navigating to portal...');
+            console.log(`Playwright: Navigating to portal for ${courseName}...`);
             await page.goto('https://si3.ufc.br/sigaa/verPortalDiscente.do');
             await page.waitForLoadState('networkidle');
 
@@ -254,6 +252,7 @@ export class PlaywrightLoginService {
             }, courseId);
 
             if (!entered.success) {
+                await page.close();
                 return { success: false, error: 'Course link not found in portal' };
             }
 
@@ -283,14 +282,6 @@ export class PlaywrightLoginService {
             // This is a heuristic; exact match might fail due to formatting
             if (!normalizedContent.includes(normalizedName.substring(0, 20))) {
                 console.warn(`Playwright: WARNING - Course name "${courseName}" not found in page content! Possible contamination.`);
-                // We could retry or throw error. For now, let's log heavily.
-                // If we are definitely in the wrong course, we should probably fail.
-                // Let's try to find the currently active course name in the page to confirm.
-                const currentCourseElement = await page.$('.turma');
-                if (currentCourseElement) {
-                    const currentText = await currentCourseElement.textContent();
-                    console.log(`Playwright: Page says current course is: "${currentText}"`);
-                }
             } else {
                 console.log(`Playwright: Verified we are in course "${courseName}"`);
             }
@@ -298,14 +289,14 @@ export class PlaywrightLoginService {
             // HYBRID NAVIGATION STRATEGY:
             // 1. Check if files are present on the Main Page (e.g., Calculus).
             // 2. If not, navigate to "Conteúdo" (e.g., FMC).
-            
+
             const hasFilesOnMainPage = await page.evaluate(() => {
                 const contentDiv = document.getElementById('conteudo');
                 if (!contentDiv) return false;
-                
+
                 // Look for jsfcljs links in the main content area
                 const links = Array.from(contentDiv.querySelectorAll('a[onclick*="jsfcljs"]'));
-                
+
                 // Filter out "Visualizar" links (usually News/Evaluations) and check for actual file links
                 const hasFileLinks = links.some(link => {
                     const text = link.textContent?.trim() || '';
@@ -314,7 +305,7 @@ export class PlaywrightLoginService {
 
                 // Check for the specific "No topics" message
                 const noTopicsMessage = document.body.innerText.includes('O Sistema detectou que até agora seu professor não criou nenhum tópico de aula');
-                
+
                 return hasFileLinks && !noTopicsMessage;
             });
 
@@ -327,11 +318,11 @@ export class PlaywrightLoginService {
                     const navigated = await page.evaluate(() => {
                         // Helper to find text in elements
                         const containsText = (el: Element, text: string) => el.textContent?.trim() === text;
-                        
+
                         // 1. Try to find "Conteúdo" directly
                         const menuItems = Array.from(document.querySelectorAll('.itemMenu'));
                         let conteudoItem = menuItems.find(item => containsText(item, 'Conteúdo'));
-                        
+
                         if (conteudoItem) {
                             const link = conteudoItem.closest('a');
                             if (link) {
@@ -339,7 +330,7 @@ export class PlaywrightLoginService {
                                 return true;
                             }
                         }
-                        
+
                         // 2. If not visible, maybe we need to expand "Materiais"
                         // (This part is tricky purely via JS without UI interaction, but click() on hidden elements often works in JSF)
                         return false;
@@ -363,11 +354,16 @@ export class PlaywrightLoginService {
 
             console.log(`Playwright: Captured HTML for course ${courseId} (${html.length} bytes)`);
 
+            // Close the page to free resources
+            await page.close();
+
             return { success: true, html, cookies };
 
         } catch (error: any) {
             console.error('Playwright: Error entering course:', error);
-            // Don't close browser on single course error, try to recover
+            if (page) {
+                await page.close().catch(() => { });
+            }
             return { success: false, error: error.message };
         }
     }
