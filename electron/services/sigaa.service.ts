@@ -64,10 +64,12 @@ export class SigaaService {
 
             // Ensure we have cookies from login
             const cookies = await this.playwrightLogin.getCookies();
+            logger.info(`SIGAA: Got ${cookies.length} cookies from Playwright`);
             this.httpScraper.setCookies(cookies);
 
             // Sync User-Agent
             const ua = await this.playwrightLogin.getUserAgent();
+            logger.info(`SIGAA: Syncing User-Agent: ${ua}`);
             this.httpScraper.setUserAgent(ua);
 
             const httpEntry = await this.httpScraper.enterCourseHTTP(courseId);
