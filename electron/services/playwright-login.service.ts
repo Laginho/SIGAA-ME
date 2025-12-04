@@ -345,7 +345,6 @@ export class PlaywrightLoginService {
     }
 
     async enterCourseAndGetHTML(courseId: string, courseName: string): Promise<{ success: boolean; html?: string; cookies?: any[]; error?: string }> {
-        let page: Page | null = null;
         try {
             if (!this.browser || !this.context) {
                 // If browser is closed, relaunch it
@@ -353,8 +352,15 @@ export class PlaywrightLoginService {
                 await this.getCourses(); // This will relaunch and set this.context
             }
 
-            // Create a NEW page for this specific request to allow parallelism
-            page = await this.context!.newPage();
+            // IMPORTANT: Reuse the existing page instead of creating a new one
+            // Creating a new page causes "Acesso Negado" (Access Denied) errors
+            // because the portal requires the same page/session state
+            if (!this.page || this.page.isClosed()) {
+                console.log('Playwright: No existing page, creating new one from context...');
+                this.page = await this.context!.newPage();
+            }
+
+            const page = this.page;
 
             // Always force navigation to portal to ensure clean state
             console.log(`Playwright: Navigating to portal for ${courseName}...`);
@@ -364,7 +370,8 @@ export class PlaywrightLoginService {
             // Check if we were redirected to login
             if (page.url().includes('verTelaLogin') || page.url().includes('logar.do')) {
                 console.warn('Playwright: Redirected to login page. Session expired.');
-                await page.close();
+                // Don't close page - we might need to re-login and reuse it
+                this.page = null;
                 return { success: false, error: 'Session expired - please login again' };
             }
 
@@ -413,7 +420,7 @@ export class PlaywrightLoginService {
                     console.error('Failed to save debug HTML:', e);
                 }
 
-                await page.close();
+                // Don't close page - keep it for potential retry
                 return { success: false, error: `Course link not found in portal. Available IDs: ${debugInfo.courseIds.join(', ')}` };
             }
 
@@ -515,16 +522,13 @@ export class PlaywrightLoginService {
 
             console.log(`Playwright: Captured HTML for course ${courseId} (${html.length} bytes)`);
 
-            // Close the page to free resources
-            await page.close();
+            // Keep the page alive for future operations - don't close it
 
             return { success: true, html, cookies };
 
         } catch (error: any) {
             console.error('Playwright: Error entering course:', error);
-            if (page) {
-                await page.close().catch(() => { });
-            }
+            // Don't close the page - it's the shared instance
             return { success: false, error: error.message };
         }
     }
