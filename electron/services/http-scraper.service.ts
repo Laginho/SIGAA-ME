@@ -112,6 +112,13 @@ export class HttpScraperService {
         return cookie;
     }
 
+    private userAgent: string = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'; // Default
+
+    setUserAgent(ua: string) {
+        this.userAgent = ua;
+        this.log(`[HttpScraper] User-Agent set to: ${ua}`);
+    }
+
     async enterCourseHTTP(courseId: string): Promise<{ success: boolean; html?: string; error?: string }> {
         try {
             this.log(`[HttpScraper] Entering course ${courseId} via HTTP...`);
@@ -121,7 +128,7 @@ export class HttpScraperService {
             const portalResponse = await axios.get(portalUrl, {
                 headers: {
                     'Cookie': this.getCookieHeader(portalUrl),
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                    'User-Agent': this.userAgent
                 }
             });
             this.updateCookies(portalResponse);
