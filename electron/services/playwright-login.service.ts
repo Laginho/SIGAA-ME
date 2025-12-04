@@ -1,4 +1,6 @@
 import { chromium, Browser, BrowserContext, Page } from 'playwright';
+import * as fs from 'fs';
+import * as path from 'path';
 
 /**
  * Uses Playwright to automate a real browser for UFC SIGAA login.
@@ -174,6 +176,7 @@ export class PlaywrightLoginService {
                     if (idInput && nameLink && nameLink.textContent) {
                         const fullText = nameLink.textContent.trim();
                         const id = idInput.value;
+                        console.log(`[Debug] Course ${fullText} Link: href="${nameLink.getAttribute('href')}", onclick="${nameLink.getAttribute('onclick')}"`);
 
                         // Course codes follow pattern: 2 letters + 4 digits (e.g., CB0699, CK0181)
                         // Format usually: "CODE - NAME"
@@ -184,7 +187,9 @@ export class PlaywrightLoginService {
                                 id: id,
                                 code: parts[0].trim(),
                                 name: parts.slice(1).join(' - ').trim(),
-                                period: periodCell ? (periodCell as HTMLElement).innerText.split('\n')[0] : '' // Try to get first line of period info
+                                period: periodCell ? (periodCell as HTMLElement).innerText.split('\n')[0] : '',
+                                href: nameLink.getAttribute('href'),
+                                onclick: nameLink.getAttribute('onclick')
                             });
                         }
                     }
@@ -194,6 +199,16 @@ export class PlaywrightLoginService {
             });
 
             console.log('Playwright: Found courses:', courses.length);
+
+            // Save to debug file for analysis
+            try {
+                const debugPath = path.join(process.cwd(), 'debug_courses.json');
+                fs.writeFileSync(debugPath, JSON.stringify(courses, null, 2));
+                console.log(`Playwright: Saved course debug info to ${debugPath}`);
+            } catch (err) {
+                console.error('Playwright: Failed to save debug info:', err);
+            }
+
             if (courses.length > 0) {
                 console.log('Playwright: Sample courses:', courses.slice(0, 3));
             }
