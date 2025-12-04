@@ -1,0 +1,2535 @@
+--- SIGAA Scraper Verification ---
+SIGAA: Service initialized with Playwright and HttpScraper
+
+[1/4] Logging in...
+SIGAA: Starting Playwright login...
+Playwright: Launching browser...
+Playwright: Navigating to login page...
+Playwright: Filling in credentials...
+Playwright: Clicking login button...
+Playwright: Waiting for navigation...
+Playwright: Current URL after login: https://si3.ufc.br/sigaa/telaAvisoLogon.jsf
+Playwright: Login successful! Extracting user data...
+Playwright: Extracted user name: 
+						 BRUNO DELUIZ LAGE
+					
+Playwright: Found cookies: JSESSIONID
+Playwright: Keeping session alive for cookie refresh
+SIGAA: Login successful!
+[HttpScraper] Cookies set. Count: 1
+
+[2/4] Fetching courses...
+SIGAA: Fetching courses using Playwright...
+Playwright: Launching browser to fetch courses...
+Playwright: Injecting stored session cookies...
+Playwright: Navigating to home page...
+Playwright: Looking for "Menu Discente" link...
+Playwright: Clicked Menu Discente, current URL: https://si3.ufc.br/sigaa/portais/discente/discente.jsf
+Playwright: Extracting courses from page...
+Playwright: Found courses: 8
+Playwright: Sample courses: [
+  {
+    id: '509238',
+    code: 'CB0699',
+    name: 'ÁLGEBRA APLICADA I',
+    period: 'TER 18:00-20:00'
+  },
+  {
+    id: '510158',
+    code: 'CB0706',
+    name: 'ÁLGEBRA LINEAR',
+    period: 'SEG 10:00-12:00'
+  },
+  {
+    id: '510144',
+    code: 'CB0705',
+    name: 'CÁLCULO FUNDAMENTAL II',
+    period: 'SEG 08:00-10:00'
+  }
+]
+SIGAA: Found courses: 8
+Found 8 courses.
+
+[3/4] Searching for course "FUNDAMENTOS MATEMÁTICOS"...
+Found target course: CK0181 - FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO
+SIGAA: Fetching files for course FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO...
+SIGAA: Entering course via Playwright to ensure session validity...
+Playwright: Navigating to portal...
+Playwright Browser Log: A parser-blocking, cross site (i.e. different eTLD+1) script, https://vlibras.gov.br/app/vlibras-plugin.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.
+Playwright: Entering course 513209 (FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO)...
+Playwright Browser Log: Clicking course: CK0181 - FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO
+Playwright: URL not AVA after click, forcing navigation...
+Playwright: Verified we are in course "FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO"
+Playwright: Files detected on Main Page. Skipping navigation.
+Playwright: Captured HTML for course 513209 (94973 bytes)
+SIGAA: Passing captured HTML to HttpScraper...
+[HttpScraper] Cookies set. Count: 1
+[HttpScraper] Fetching course page for FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO...
+[HttpScraper] Using pre-fetched HTML from Playwright. Length: 94973
+[HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[HttpScraper] Saved Playwright HTML to debug_playwright.html
+[HttpScraper] Using Playwright HTML directly.
+[HttpScraper] Stored ViewState and 3 inputs for course 513209
+[HttpScraper] Scanning for files...
+[HttpScraper] Found file: "anotacoes_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627310)
+[HttpScraper] Found file: "fotos_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627323)
+[HttpScraper] Found file: "anotacoes_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627661)
+[HttpScraper] Found file: "fotos_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627680)
+[HttpScraper] Found file: "anotacoes_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633194)
+[HttpScraper] Found file: "fotos_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633220)
+[HttpScraper] Found file: "anotacoes_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3635645)
+[HttpScraper] Found file: "fotos_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3638719)
+[HttpScraper] Found file: "fotos_tira-duvidas_01_2025-09-18_quinta-feira.pdf" (ID: 3638752)
+[HttpScraper] Found file: "anotacoes_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642838)
+[HttpScraper] Found file: "fotos_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642845)
+[HttpScraper] Found file: "fotos_tira-duvidas_02_2025-09-25_quinta-feira.pdf" (ID: 3644716)
+[HttpScraper] Found file: "anotacoes_aula_06_2025-09-26_sexta-feira.pdf" (ID: 3645976)
+[HttpScraper] Found file: "Lista de Exercícios 01 — Monitoria" (ID: 3653135)
+[HttpScraper] Found file: "anotacoes_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3654421)
+[HttpScraper] Found file: "fotos_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3657214)
+[HttpScraper] Found file: "fotos_tira-duvidas_03_2025-10-02_quinta-feira.pdf" (ID: 3657222)
+[HttpScraper] Found file: "anotacoes_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3658227)
+[HttpScraper] Found file: "fotos_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3659010)
+[HttpScraper] Found file: "anotacoes_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670009)
+[HttpScraper] Found file: "fotos_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670041)
+[HttpScraper] Found file: "Lista de Exercícios 02 — Monitoria" (ID: 3671150)
+[HttpScraper] Found file: "fotos_aula_10_2025-10-10_sexta-feira.pdf" (ID: 3683689)
+[HttpScraper] Found file: "anotacoes_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3685869)
+[HttpScraper] Found file: "fotos_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3686249)
+[HttpScraper] Found file: "anotacoes_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687844)
+[HttpScraper] Found file: "fotos_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687859)
+[HttpScraper] Found file: "anotacoes_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697755)
+[HttpScraper] Found file: "fotos_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697756)
+[HttpScraper] Found file: "fotos_tira-duvidas_06_2025-10-23_quinta-feira.pdf" (ID: 3697757)
+[HttpScraper] Found file: "Lista de Exercícios 03 — Monitoria" (ID: 3700393)
+[HttpScraper] Found file: "fotos_aula_14_2025-10-24_sexta-feira.pdf" (ID: 3706586)
+[HttpScraper] Found file: "fotos_tira-duvidas_07_2025-10-30_quinta-feira.pdf" (ID: 3706608)
+[HttpScraper] Found file: "fotos_aula_15_2025-10-31_sexta-feira.pdf" (ID: 3706629)
+[HttpScraper] Found file: "fotos_aula_16_2025-11-12_quarta-feira.pdf" (ID: 3718766)
+[HttpScraper] Found file: "fotos_tira-duvidas_08_2025-11-13_quinta-feira.pdf" (ID: 3719802)
+[HttpScraper] Found file: "fotos_aula_17_2025-11-19_quarta-feira.pdf" (ID: 3726246)
+[HttpScraper] Found file: "anotacoes_aula_18_2025-11-28_sexta-feira.pdf" (ID: 3741046)
+[HttpScraper] Found 38 files and 5 news items.
+Found 38 files in this course.
+
+[4/4] Attempting to download ALL 38 files...
+
+Downloading: anotacoes_aula_01_2025-09-10_quarta-feira.pdf
+SIGAA: Downloading file anotacoes_aula_01_2025-09-10_quarta-feira.pdf...
+SIGAA: Re-entering course 513209 to refresh session before download...
+Playwright: Navigating to portal...
+Playwright Browser Log: A parser-blocking, cross site (i.e. different eTLD+1) script, https://vlibras.gov.br/app/vlibras-plugin.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.
+Playwright: Entering course 513209 (FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO)...
+Playwright Browser Log: Clicking course: CK0181 - FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO
+Playwright: URL not AVA after click, forcing navigation...
+Playwright: Verified we are in course "FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO"
+Playwright: Files detected on Main Page. Skipping navigation.
+Playwright: Captured HTML for course 513209 (94973 bytes)
+[HttpScraper] Cookies set. Count: 1
+[HttpScraper] Fetching course page for FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO...
+[HttpScraper] Using pre-fetched HTML from Playwright. Length: 94973
+[HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[HttpScraper] Saved Playwright HTML to debug_playwright.html
+[HttpScraper] Using Playwright HTML directly.
+[HttpScraper] Stored ViewState and 3 inputs for course 513209
+[HttpScraper] Scanning for files...
+[HttpScraper] Found file: "anotacoes_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627310)
+[HttpScraper] Found file: "fotos_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627323)
+[HttpScraper] Found file: "anotacoes_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627661)
+[HttpScraper] Found file: "fotos_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627680)
+[HttpScraper] Found file: "anotacoes_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633194)
+[HttpScraper] Found file: "fotos_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633220)
+[HttpScraper] Found file: "anotacoes_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3635645)
+[HttpScraper] Found file: "fotos_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3638719)
+[HttpScraper] Found file: "fotos_tira-duvidas_01_2025-09-18_quinta-feira.pdf" (ID: 3638752)
+[HttpScraper] Found file: "anotacoes_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642838)
+[HttpScraper] Found file: "fotos_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642845)
+[HttpScraper] Found file: "fotos_tira-duvidas_02_2025-09-25_quinta-feira.pdf" (ID: 3644716)
+[HttpScraper] Found file: "anotacoes_aula_06_2025-09-26_sexta-feira.pdf" (ID: 3645976)
+[HttpScraper] Found file: "Lista de Exercícios 01 — Monitoria" (ID: 3653135)
+[HttpScraper] Found file: "anotacoes_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3654421)
+[HttpScraper] Found file: "fotos_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3657214)
+[HttpScraper] Found file: "fotos_tira-duvidas_03_2025-10-02_quinta-feira.pdf" (ID: 3657222)
+[HttpScraper] Found file: "anotacoes_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3658227)
+[HttpScraper] Found file: "fotos_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3659010)
+[HttpScraper] Found file: "anotacoes_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670009)
+[HttpScraper] Found file: "fotos_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670041)
+[HttpScraper] Found file: "Lista de Exercícios 02 — Monitoria" (ID: 3671150)
+[HttpScraper] Found file: "fotos_aula_10_2025-10-10_sexta-feira.pdf" (ID: 3683689)
+[HttpScraper] Found file: "anotacoes_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3685869)
+[HttpScraper] Found file: "fotos_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3686249)
+[HttpScraper] Found file: "anotacoes_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687844)
+[HttpScraper] Found file: "fotos_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687859)
+[HttpScraper] Found file: "anotacoes_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697755)
+[HttpScraper] Found file: "fotos_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697756)
+[HttpScraper] Found file: "fotos_tira-duvidas_06_2025-10-23_quinta-feira.pdf" (ID: 3697757)
+[HttpScraper] Found file: "Lista de Exercícios 03 — Monitoria" (ID: 3700393)
+[HttpScraper] Found file: "fotos_aula_14_2025-10-24_sexta-feira.pdf" (ID: 3706586)
+[HttpScraper] Found file: "fotos_tira-duvidas_07_2025-10-30_quinta-feira.pdf" (ID: 3706608)
+[HttpScraper] Found file: "fotos_aula_15_2025-10-31_sexta-feira.pdf" (ID: 3706629)
+[HttpScraper] Found file: "fotos_aula_16_2025-11-12_quarta-feira.pdf" (ID: 3718766)
+[HttpScraper] Found file: "fotos_tira-duvidas_08_2025-11-13_quinta-feira.pdf" (ID: 3719802)
+[HttpScraper] Found file: "fotos_aula_17_2025-11-19_quarta-feira.pdf" (ID: 3726246)
+[HttpScraper] Found file: "anotacoes_aula_18_2025-11-28_sexta-feira.pdf" (ID: 3741046)
+[HttpScraper] Found 38 files and 5 news items.
+SIGAA: Found fresh script for file anotacoes_aula_01_2025-09-10_quarta-feira.pdf
+SIGAA: Attempting fast HTTP download for file 3627310...
+[HttpScraper] Downloading file "anotacoes_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627310) for course 513209
+[HttpScraper] Sending download request. ComponentID: formAva:j_id_jsp_1287906063_105:0:j_id_jsp_1287906063_165:0:idInserirMaterialArquivo
+[HttpScraper] Response headers: Content-Type=application/pdf, Content-Length=undefined
+[HttpScraper] Download complete: C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\anotacoes_aula_01_2025-09-10_quarta-feira.pdf
+SIGAA: HTTP download successful!
+Download successful! C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\anotacoes_aula_01_2025-09-10_quarta-feira.pdf
+File size: 224260 bytes
+File header: %PDF-
+
+Downloading: fotos_aula_01_2025-09-10_quarta-feira.pdf
+SIGAA: Downloading file fotos_aula_01_2025-09-10_quarta-feira.pdf...
+SIGAA: Re-entering course 513209 to refresh session before download...
+Playwright: Navigating to portal...
+Playwright: Entering course 513209 (FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO)...
+Playwright Browser Log: Clicking course: CK0181 - FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO
+Playwright: URL not AVA after click, forcing navigation...
+Playwright: Verified we are in course "FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO"
+Playwright: Files detected on Main Page. Skipping navigation.
+Playwright: Captured HTML for course 513209 (94984 bytes)
+[HttpScraper] Cookies set. Count: 1
+[HttpScraper] Fetching course page for FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO...
+[HttpScraper] Using pre-fetched HTML from Playwright. Length: 94984
+[HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[HttpScraper] Saved Playwright HTML to debug_playwright.html
+[HttpScraper] Using Playwright HTML directly.
+[HttpScraper] Stored ViewState and 3 inputs for course 513209
+[HttpScraper] Scanning for files...
+[HttpScraper] Found file: "anotacoes_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627310)
+[HttpScraper] Found file: "fotos_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627323)
+[HttpScraper] Found file: "anotacoes_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627661)
+[HttpScraper] Found file: "fotos_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627680)
+[HttpScraper] Found file: "anotacoes_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633194)
+[HttpScraper] Found file: "fotos_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633220)
+[HttpScraper] Found file: "anotacoes_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3635645)
+[HttpScraper] Found file: "fotos_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3638719)
+[HttpScraper] Found file: "fotos_tira-duvidas_01_2025-09-18_quinta-feira.pdf" (ID: 3638752)
+[HttpScraper] Found file: "anotacoes_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642838)
+[HttpScraper] Found file: "fotos_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642845)
+[HttpScraper] Found file: "fotos_tira-duvidas_02_2025-09-25_quinta-feira.pdf" (ID: 3644716)
+[HttpScraper] Found file: "anotacoes_aula_06_2025-09-26_sexta-feira.pdf" (ID: 3645976)
+[HttpScraper] Found file: "Lista de Exercícios 01 — Monitoria" (ID: 3653135)
+[HttpScraper] Found file: "anotacoes_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3654421)
+[HttpScraper] Found file: "fotos_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3657214)
+[HttpScraper] Found file: "fotos_tira-duvidas_03_2025-10-02_quinta-feira.pdf" (ID: 3657222)
+[HttpScraper] Found file: "anotacoes_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3658227)
+[HttpScraper] Found file: "fotos_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3659010)
+[HttpScraper] Found file: "anotacoes_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670009)
+[HttpScraper] Found file: "fotos_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670041)
+[HttpScraper] Found file: "Lista de Exercícios 02 — Monitoria" (ID: 3671150)
+[HttpScraper] Found file: "fotos_aula_10_2025-10-10_sexta-feira.pdf" (ID: 3683689)
+[HttpScraper] Found file: "anotacoes_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3685869)
+[HttpScraper] Found file: "fotos_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3686249)
+[HttpScraper] Found file: "anotacoes_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687844)
+[HttpScraper] Found file: "fotos_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687859)
+[HttpScraper] Found file: "anotacoes_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697755)
+[HttpScraper] Found file: "fotos_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697756)
+[HttpScraper] Found file: "fotos_tira-duvidas_06_2025-10-23_quinta-feira.pdf" (ID: 3697757)
+[HttpScraper] Found file: "Lista de Exercícios 03 — Monitoria" (ID: 3700393)
+[HttpScraper] Found file: "fotos_aula_14_2025-10-24_sexta-feira.pdf" (ID: 3706586)
+[HttpScraper] Found file: "fotos_tira-duvidas_07_2025-10-30_quinta-feira.pdf" (ID: 3706608)
+[HttpScraper] Found file: "fotos_aula_15_2025-10-31_sexta-feira.pdf" (ID: 3706629)
+[HttpScraper] Found file: "fotos_aula_16_2025-11-12_quarta-feira.pdf" (ID: 3718766)
+[HttpScraper] Found file: "fotos_tira-duvidas_08_2025-11-13_quinta-feira.pdf" (ID: 3719802)
+[HttpScraper] Found file: "fotos_aula_17_2025-11-19_quarta-feira.pdf" (ID: 3726246)
+[HttpScraper] Found file: "anotacoes_aula_18_2025-11-28_sexta-feira.pdf" (ID: 3741046)
+[HttpScraper] Found 38 files and 5 news items.
+SIGAA: Found fresh script for file fotos_aula_01_2025-09-10_quarta-feira.pdf
+SIGAA: Attempting fast HTTP download for file 3627323...
+[HttpScraper] Downloading file "fotos_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627323) for course 513209
+[HttpScraper] Sending download request. ComponentID: formAva:j_id_jsp_1287906063_105:0:j_id_jsp_1287906063_165:1:idInserirMaterialArquivo
+[HttpScraper] Response headers: Content-Type=application/pdf, Content-Length=undefined
+[HttpScraper] Download complete: C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\fotos_aula_01_2025-09-10_quarta-feira.pdf
+SIGAA: HTTP download successful!
+Download successful! C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\fotos_aula_01_2025-09-10_quarta-feira.pdf
+File size: 228711 bytes
+File header: %PDF-
+
+Downloading: anotacoes_aula_02_2025-09-12_sexta-feira.pdf
+SIGAA: Downloading file anotacoes_aula_02_2025-09-12_sexta-feira.pdf...
+SIGAA: Re-entering course 513209 to refresh session before download...
+Playwright: Navigating to portal...
+Playwright Browser Log: A parser-blocking, cross site (i.e. different eTLD+1) script, https://vlibras.gov.br/app/vlibras-plugin.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.
+Playwright: Entering course 513209 (FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO)...
+Playwright Browser Log: Clicking course: CK0181 - FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO
+Playwright: URL not AVA after click, forcing navigation...
+Playwright: Verified we are in course "FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO"
+Playwright: Files detected on Main Page. Skipping navigation.
+Playwright: Captured HTML for course 513209 (94984 bytes)
+[HttpScraper] Cookies set. Count: 1
+[HttpScraper] Fetching course page for FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO...
+[HttpScraper] Using pre-fetched HTML from Playwright. Length: 94984
+[HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[HttpScraper] Saved Playwright HTML to debug_playwright.html
+[HttpScraper] Using Playwright HTML directly.
+[HttpScraper] Stored ViewState and 3 inputs for course 513209
+[HttpScraper] Scanning for files...
+[HttpScraper] Found file: "anotacoes_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627310)
+[HttpScraper] Found file: "fotos_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627323)
+[HttpScraper] Found file: "anotacoes_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627661)
+[HttpScraper] Found file: "fotos_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627680)
+[HttpScraper] Found file: "anotacoes_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633194)
+[HttpScraper] Found file: "fotos_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633220)
+[HttpScraper] Found file: "anotacoes_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3635645)
+[HttpScraper] Found file: "fotos_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3638719)
+[HttpScraper] Found file: "fotos_tira-duvidas_01_2025-09-18_quinta-feira.pdf" (ID: 3638752)
+[HttpScraper] Found file: "anotacoes_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642838)
+[HttpScraper] Found file: "fotos_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642845)
+[HttpScraper] Found file: "fotos_tira-duvidas_02_2025-09-25_quinta-feira.pdf" (ID: 3644716)
+[HttpScraper] Found file: "anotacoes_aula_06_2025-09-26_sexta-feira.pdf" (ID: 3645976)
+[HttpScraper] Found file: "Lista de Exercícios 01 — Monitoria" (ID: 3653135)
+[HttpScraper] Found file: "anotacoes_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3654421)
+[HttpScraper] Found file: "fotos_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3657214)
+[HttpScraper] Found file: "fotos_tira-duvidas_03_2025-10-02_quinta-feira.pdf" (ID: 3657222)
+[HttpScraper] Found file: "anotacoes_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3658227)
+[HttpScraper] Found file: "fotos_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3659010)
+[HttpScraper] Found file: "anotacoes_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670009)
+[HttpScraper] Found file: "fotos_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670041)
+[HttpScraper] Found file: "Lista de Exercícios 02 — Monitoria" (ID: 3671150)
+[HttpScraper] Found file: "fotos_aula_10_2025-10-10_sexta-feira.pdf" (ID: 3683689)
+[HttpScraper] Found file: "anotacoes_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3685869)
+[HttpScraper] Found file: "fotos_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3686249)
+[HttpScraper] Found file: "anotacoes_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687844)
+[HttpScraper] Found file: "fotos_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687859)
+[HttpScraper] Found file: "anotacoes_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697755)
+[HttpScraper] Found file: "fotos_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697756)
+[HttpScraper] Found file: "fotos_tira-duvidas_06_2025-10-23_quinta-feira.pdf" (ID: 3697757)
+[HttpScraper] Found file: "Lista de Exercícios 03 — Monitoria" (ID: 3700393)
+[HttpScraper] Found file: "fotos_aula_14_2025-10-24_sexta-feira.pdf" (ID: 3706586)
+[HttpScraper] Found file: "fotos_tira-duvidas_07_2025-10-30_quinta-feira.pdf" (ID: 3706608)
+[HttpScraper] Found file: "fotos_aula_15_2025-10-31_sexta-feira.pdf" (ID: 3706629)
+[HttpScraper] Found file: "fotos_aula_16_2025-11-12_quarta-feira.pdf" (ID: 3718766)
+[HttpScraper] Found file: "fotos_tira-duvidas_08_2025-11-13_quinta-feira.pdf" (ID: 3719802)
+[HttpScraper] Found file: "fotos_aula_17_2025-11-19_quarta-feira.pdf" (ID: 3726246)
+[HttpScraper] Found file: "anotacoes_aula_18_2025-11-28_sexta-feira.pdf" (ID: 3741046)
+[HttpScraper] Found 38 files and 5 news items.
+SIGAA: Found fresh script for file anotacoes_aula_02_2025-09-12_sexta-feira.pdf
+SIGAA: Attempting fast HTTP download for file 3627661...
+[HttpScraper] Downloading file "anotacoes_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627661) for course 513209
+[HttpScraper] Sending download request. ComponentID: formAva:j_id_jsp_1287906063_105:0:j_id_jsp_1287906063_165:2:idInserirMaterialArquivo
+[HttpScraper] Response headers: Content-Type=application/pdf, Content-Length=undefined
+[HttpScraper] Download complete: C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\anotacoes_aula_02_2025-09-12_sexta-feira.pdf
+SIGAA: HTTP download successful!
+Download successful! C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\anotacoes_aula_02_2025-09-12_sexta-feira.pdf
+File size: 246160 bytes
+File header: %PDF-
+
+Downloading: fotos_aula_02_2025-09-12_sexta-feira.pdf
+SIGAA: Downloading file fotos_aula_02_2025-09-12_sexta-feira.pdf...
+SIGAA: Re-entering course 513209 to refresh session before download...
+Playwright: Navigating to portal...
+Playwright Browser Log: A parser-blocking, cross site (i.e. different eTLD+1) script, https://vlibras.gov.br/app/vlibras-plugin.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.
+Playwright: Entering course 513209 (FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO)...
+Playwright Browser Log: Clicking course: CK0181 - FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO
+Playwright: URL not AVA after click, forcing navigation...
+Playwright: Verified we are in course "FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO"
+Playwright: Files detected on Main Page. Skipping navigation.
+Playwright: Captured HTML for course 513209 (94984 bytes)
+[HttpScraper] Cookies set. Count: 1
+[HttpScraper] Fetching course page for FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO...
+[HttpScraper] Using pre-fetched HTML from Playwright. Length: 94984
+[HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[HttpScraper] Saved Playwright HTML to debug_playwright.html
+[HttpScraper] Using Playwright HTML directly.
+[HttpScraper] Stored ViewState and 3 inputs for course 513209
+[HttpScraper] Scanning for files...
+[HttpScraper] Found file: "anotacoes_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627310)
+[HttpScraper] Found file: "fotos_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627323)
+[HttpScraper] Found file: "anotacoes_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627661)
+[HttpScraper] Found file: "fotos_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627680)
+[HttpScraper] Found file: "anotacoes_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633194)
+[HttpScraper] Found file: "fotos_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633220)
+[HttpScraper] Found file: "anotacoes_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3635645)
+[HttpScraper] Found file: "fotos_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3638719)
+[HttpScraper] Found file: "fotos_tira-duvidas_01_2025-09-18_quinta-feira.pdf" (ID: 3638752)
+[HttpScraper] Found file: "anotacoes_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642838)
+[HttpScraper] Found file: "fotos_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642845)
+[HttpScraper] Found file: "fotos_tira-duvidas_02_2025-09-25_quinta-feira.pdf" (ID: 3644716)
+[HttpScraper] Found file: "anotacoes_aula_06_2025-09-26_sexta-feira.pdf" (ID: 3645976)
+[HttpScraper] Found file: "Lista de Exercícios 01 — Monitoria" (ID: 3653135)
+[HttpScraper] Found file: "anotacoes_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3654421)
+[HttpScraper] Found file: "fotos_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3657214)
+[HttpScraper] Found file: "fotos_tira-duvidas_03_2025-10-02_quinta-feira.pdf" (ID: 3657222)
+[HttpScraper] Found file: "anotacoes_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3658227)
+[HttpScraper] Found file: "fotos_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3659010)
+[HttpScraper] Found file: "anotacoes_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670009)
+[HttpScraper] Found file: "fotos_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670041)
+[HttpScraper] Found file: "Lista de Exercícios 02 — Monitoria" (ID: 3671150)
+[HttpScraper] Found file: "fotos_aula_10_2025-10-10_sexta-feira.pdf" (ID: 3683689)
+[HttpScraper] Found file: "anotacoes_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3685869)
+[HttpScraper] Found file: "fotos_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3686249)
+[HttpScraper] Found file: "anotacoes_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687844)
+[HttpScraper] Found file: "fotos_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687859)
+[HttpScraper] Found file: "anotacoes_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697755)
+[HttpScraper] Found file: "fotos_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697756)
+[HttpScraper] Found file: "fotos_tira-duvidas_06_2025-10-23_quinta-feira.pdf" (ID: 3697757)
+[HttpScraper] Found file: "Lista de Exercícios 03 — Monitoria" (ID: 3700393)
+[HttpScraper] Found file: "fotos_aula_14_2025-10-24_sexta-feira.pdf" (ID: 3706586)
+[HttpScraper] Found file: "fotos_tira-duvidas_07_2025-10-30_quinta-feira.pdf" (ID: 3706608)
+[HttpScraper] Found file: "fotos_aula_15_2025-10-31_sexta-feira.pdf" (ID: 3706629)
+[HttpScraper] Found file: "fotos_aula_16_2025-11-12_quarta-feira.pdf" (ID: 3718766)
+[HttpScraper] Found file: "fotos_tira-duvidas_08_2025-11-13_quinta-feira.pdf" (ID: 3719802)
+[HttpScraper] Found file: "fotos_aula_17_2025-11-19_quarta-feira.pdf" (ID: 3726246)
+[HttpScraper] Found file: "anotacoes_aula_18_2025-11-28_sexta-feira.pdf" (ID: 3741046)
+[HttpScraper] Found 38 files and 5 news items.
+SIGAA: Found fresh script for file fotos_aula_02_2025-09-12_sexta-feira.pdf
+SIGAA: Attempting fast HTTP download for file 3627680...
+[HttpScraper] Downloading file "fotos_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627680) for course 513209
+[HttpScraper] Sending download request. ComponentID: formAva:j_id_jsp_1287906063_105:0:j_id_jsp_1287906063_165:3:idInserirMaterialArquivo
+[HttpScraper] Response headers: Content-Type=application/pdf, Content-Length=undefined
+[HttpScraper] Download complete: C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\fotos_aula_02_2025-09-12_sexta-feira.pdf
+SIGAA: HTTP download successful!
+Download successful! C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\fotos_aula_02_2025-09-12_sexta-feira.pdf
+File size: 798332 bytes
+File header: %PDF-
+
+Downloading: anotacoes_aula_03_2025-09-17_quarta-feira.pdf
+SIGAA: Downloading file anotacoes_aula_03_2025-09-17_quarta-feira.pdf...
+SIGAA: Re-entering course 513209 to refresh session before download...
+Playwright: Navigating to portal...
+Playwright Browser Log: A parser-blocking, cross site (i.e. different eTLD+1) script, https://vlibras.gov.br/app/vlibras-plugin.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.
+Playwright: Entering course 513209 (FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO)...
+Playwright Browser Log: Clicking course: CK0181 - FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO
+Playwright: URL not AVA after click, forcing navigation...
+Playwright: Verified we are in course "FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO"
+Playwright: Files detected on Main Page. Skipping navigation.
+Playwright: Captured HTML for course 513209 (94984 bytes)
+[HttpScraper] Cookies set. Count: 1
+[HttpScraper] Fetching course page for FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO...
+[HttpScraper] Using pre-fetched HTML from Playwright. Length: 94984
+[HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[HttpScraper] Saved Playwright HTML to debug_playwright.html
+[HttpScraper] Using Playwright HTML directly.
+[HttpScraper] Stored ViewState and 3 inputs for course 513209
+[HttpScraper] Scanning for files...
+[HttpScraper] Found file: "anotacoes_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627310)
+[HttpScraper] Found file: "fotos_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627323)
+[HttpScraper] Found file: "anotacoes_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627661)
+[HttpScraper] Found file: "fotos_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627680)
+[HttpScraper] Found file: "anotacoes_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633194)
+[HttpScraper] Found file: "fotos_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633220)
+[HttpScraper] Found file: "anotacoes_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3635645)
+[HttpScraper] Found file: "fotos_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3638719)
+[HttpScraper] Found file: "fotos_tira-duvidas_01_2025-09-18_quinta-feira.pdf" (ID: 3638752)
+[HttpScraper] Found file: "anotacoes_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642838)
+[HttpScraper] Found file: "fotos_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642845)
+[HttpScraper] Found file: "fotos_tira-duvidas_02_2025-09-25_quinta-feira.pdf" (ID: 3644716)
+[HttpScraper] Found file: "anotacoes_aula_06_2025-09-26_sexta-feira.pdf" (ID: 3645976)
+[HttpScraper] Found file: "Lista de Exercícios 01 — Monitoria" (ID: 3653135)
+[HttpScraper] Found file: "anotacoes_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3654421)
+[HttpScraper] Found file: "fotos_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3657214)
+[HttpScraper] Found file: "fotos_tira-duvidas_03_2025-10-02_quinta-feira.pdf" (ID: 3657222)
+[HttpScraper] Found file: "anotacoes_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3658227)
+[HttpScraper] Found file: "fotos_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3659010)
+[HttpScraper] Found file: "anotacoes_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670009)
+[HttpScraper] Found file: "fotos_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670041)
+[HttpScraper] Found file: "Lista de Exercícios 02 — Monitoria" (ID: 3671150)
+[HttpScraper] Found file: "fotos_aula_10_2025-10-10_sexta-feira.pdf" (ID: 3683689)
+[HttpScraper] Found file: "anotacoes_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3685869)
+[HttpScraper] Found file: "fotos_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3686249)
+[HttpScraper] Found file: "anotacoes_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687844)
+[HttpScraper] Found file: "fotos_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687859)
+[HttpScraper] Found file: "anotacoes_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697755)
+[HttpScraper] Found file: "fotos_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697756)
+[HttpScraper] Found file: "fotos_tira-duvidas_06_2025-10-23_quinta-feira.pdf" (ID: 3697757)
+[HttpScraper] Found file: "Lista de Exercícios 03 — Monitoria" (ID: 3700393)
+[HttpScraper] Found file: "fotos_aula_14_2025-10-24_sexta-feira.pdf" (ID: 3706586)
+[HttpScraper] Found file: "fotos_tira-duvidas_07_2025-10-30_quinta-feira.pdf" (ID: 3706608)
+[HttpScraper] Found file: "fotos_aula_15_2025-10-31_sexta-feira.pdf" (ID: 3706629)
+[HttpScraper] Found file: "fotos_aula_16_2025-11-12_quarta-feira.pdf" (ID: 3718766)
+[HttpScraper] Found file: "fotos_tira-duvidas_08_2025-11-13_quinta-feira.pdf" (ID: 3719802)
+[HttpScraper] Found file: "fotos_aula_17_2025-11-19_quarta-feira.pdf" (ID: 3726246)
+[HttpScraper] Found file: "anotacoes_aula_18_2025-11-28_sexta-feira.pdf" (ID: 3741046)
+[HttpScraper] Found 38 files and 5 news items.
+SIGAA: Found fresh script for file anotacoes_aula_03_2025-09-17_quarta-feira.pdf
+SIGAA: Attempting fast HTTP download for file 3633194...
+[HttpScraper] Downloading file "anotacoes_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633194) for course 513209
+[HttpScraper] Sending download request. ComponentID: formAva:j_id_jsp_1287906063_105:0:j_id_jsp_1287906063_165:4:idInserirMaterialArquivo
+[HttpScraper] Response headers: Content-Type=application/pdf, Content-Length=undefined
+[HttpScraper] Download complete: C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\anotacoes_aula_03_2025-09-17_quarta-feira.pdf
+SIGAA: HTTP download successful!
+Download successful! C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\anotacoes_aula_03_2025-09-17_quarta-feira.pdf
+File size: 264284 bytes
+File header: %PDF-
+
+Downloading: fotos_aula_03_2025-09-17_quarta-feira.pdf
+SIGAA: Downloading file fotos_aula_03_2025-09-17_quarta-feira.pdf...
+SIGAA: Re-entering course 513209 to refresh session before download...
+Playwright: Navigating to portal...
+Playwright Browser Log: A parser-blocking, cross site (i.e. different eTLD+1) script, https://vlibras.gov.br/app/vlibras-plugin.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.
+Playwright: Entering course 513209 (FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO)...
+Playwright Browser Log: Clicking course: CK0181 - FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO
+Playwright: URL not AVA after click, forcing navigation...
+Playwright: Verified we are in course "FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO"
+Playwright: Files detected on Main Page. Skipping navigation.
+Playwright: Captured HTML for course 513209 (94984 bytes)
+[HttpScraper] Cookies set. Count: 1
+[HttpScraper] Fetching course page for FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO...
+[HttpScraper] Using pre-fetched HTML from Playwright. Length: 94984
+[HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[HttpScraper] Saved Playwright HTML to debug_playwright.html
+[HttpScraper] Using Playwright HTML directly.
+[HttpScraper] Stored ViewState and 3 inputs for course 513209
+[HttpScraper] Scanning for files...
+[HttpScraper] Found file: "anotacoes_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627310)
+[HttpScraper] Found file: "fotos_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627323)
+[HttpScraper] Found file: "anotacoes_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627661)
+[HttpScraper] Found file: "fotos_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627680)
+[HttpScraper] Found file: "anotacoes_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633194)
+[HttpScraper] Found file: "fotos_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633220)
+[HttpScraper] Found file: "anotacoes_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3635645)
+[HttpScraper] Found file: "fotos_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3638719)
+[HttpScraper] Found file: "fotos_tira-duvidas_01_2025-09-18_quinta-feira.pdf" (ID: 3638752)
+[HttpScraper] Found file: "anotacoes_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642838)
+[HttpScraper] Found file: "fotos_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642845)
+[HttpScraper] Found file: "fotos_tira-duvidas_02_2025-09-25_quinta-feira.pdf" (ID: 3644716)
+[HttpScraper] Found file: "anotacoes_aula_06_2025-09-26_sexta-feira.pdf" (ID: 3645976)
+[HttpScraper] Found file: "Lista de Exercícios 01 — Monitoria" (ID: 3653135)
+[HttpScraper] Found file: "anotacoes_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3654421)
+[HttpScraper] Found file: "fotos_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3657214)
+[HttpScraper] Found file: "fotos_tira-duvidas_03_2025-10-02_quinta-feira.pdf" (ID: 3657222)
+[HttpScraper] Found file: "anotacoes_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3658227)
+[HttpScraper] Found file: "fotos_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3659010)
+[HttpScraper] Found file: "anotacoes_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670009)
+[HttpScraper] Found file: "fotos_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670041)
+[HttpScraper] Found file: "Lista de Exercícios 02 — Monitoria" (ID: 3671150)
+[HttpScraper] Found file: "fotos_aula_10_2025-10-10_sexta-feira.pdf" (ID: 3683689)
+[HttpScraper] Found file: "anotacoes_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3685869)
+[HttpScraper] Found file: "fotos_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3686249)
+[HttpScraper] Found file: "anotacoes_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687844)
+[HttpScraper] Found file: "fotos_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687859)
+[HttpScraper] Found file: "anotacoes_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697755)
+[HttpScraper] Found file: "fotos_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697756)
+[HttpScraper] Found file: "fotos_tira-duvidas_06_2025-10-23_quinta-feira.pdf" (ID: 3697757)
+[HttpScraper] Found file: "Lista de Exercícios 03 — Monitoria" (ID: 3700393)
+[HttpScraper] Found file: "fotos_aula_14_2025-10-24_sexta-feira.pdf" (ID: 3706586)
+[HttpScraper] Found file: "fotos_tira-duvidas_07_2025-10-30_quinta-feira.pdf" (ID: 3706608)
+[HttpScraper] Found file: "fotos_aula_15_2025-10-31_sexta-feira.pdf" (ID: 3706629)
+[HttpScraper] Found file: "fotos_aula_16_2025-11-12_quarta-feira.pdf" (ID: 3718766)
+[HttpScraper] Found file: "fotos_tira-duvidas_08_2025-11-13_quinta-feira.pdf" (ID: 3719802)
+[HttpScraper] Found file: "fotos_aula_17_2025-11-19_quarta-feira.pdf" (ID: 3726246)
+[HttpScraper] Found file: "anotacoes_aula_18_2025-11-28_sexta-feira.pdf" (ID: 3741046)
+[HttpScraper] Found 38 files and 5 news items.
+SIGAA: Found fresh script for file fotos_aula_03_2025-09-17_quarta-feira.pdf
+SIGAA: Attempting fast HTTP download for file 3633220...
+[HttpScraper] Downloading file "fotos_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633220) for course 513209
+[HttpScraper] Sending download request. ComponentID: formAva:j_id_jsp_1287906063_105:0:j_id_jsp_1287906063_165:5:idInserirMaterialArquivo
+[HttpScraper] Response headers: Content-Type=application/pdf, Content-Length=undefined
+[HttpScraper] Download complete: C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\fotos_aula_03_2025-09-17_quarta-feira.pdf
+SIGAA: HTTP download successful!
+Download successful! C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\fotos_aula_03_2025-09-17_quarta-feira.pdf
+File size: 587203 bytes
+File header: %PDF-
+
+Downloading: anotacoes_aula_04_2025-09-19_sexta-feira.pdf
+SIGAA: Downloading file anotacoes_aula_04_2025-09-19_sexta-feira.pdf...
+SIGAA: Re-entering course 513209 to refresh session before download...
+Playwright: Navigating to portal...
+Playwright Browser Log: A parser-blocking, cross site (i.e. different eTLD+1) script, https://vlibras.gov.br/app/vlibras-plugin.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.
+Playwright: Entering course 513209 (FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO)...
+Playwright Browser Log: Clicking course: CK0181 - FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO
+Playwright: URL not AVA after click, forcing navigation...
+Playwright: Verified we are in course "FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO"
+Playwright: Files detected on Main Page. Skipping navigation.
+Playwright: Captured HTML for course 513209 (94984 bytes)
+[HttpScraper] Cookies set. Count: 1
+[HttpScraper] Fetching course page for FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO...
+[HttpScraper] Using pre-fetched HTML from Playwright. Length: 94984
+[HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[HttpScraper] Saved Playwright HTML to debug_playwright.html
+[HttpScraper] Using Playwright HTML directly.
+[HttpScraper] Stored ViewState and 3 inputs for course 513209
+[HttpScraper] Scanning for files...
+[HttpScraper] Found file: "anotacoes_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627310)
+[HttpScraper] Found file: "fotos_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627323)
+[HttpScraper] Found file: "anotacoes_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627661)
+[HttpScraper] Found file: "fotos_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627680)
+[HttpScraper] Found file: "anotacoes_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633194)
+[HttpScraper] Found file: "fotos_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633220)
+[HttpScraper] Found file: "anotacoes_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3635645)
+[HttpScraper] Found file: "fotos_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3638719)
+[HttpScraper] Found file: "fotos_tira-duvidas_01_2025-09-18_quinta-feira.pdf" (ID: 3638752)
+[HttpScraper] Found file: "anotacoes_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642838)
+[HttpScraper] Found file: "fotos_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642845)
+[HttpScraper] Found file: "fotos_tira-duvidas_02_2025-09-25_quinta-feira.pdf" (ID: 3644716)
+[HttpScraper] Found file: "anotacoes_aula_06_2025-09-26_sexta-feira.pdf" (ID: 3645976)
+[HttpScraper] Found file: "Lista de Exercícios 01 — Monitoria" (ID: 3653135)
+[HttpScraper] Found file: "anotacoes_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3654421)
+[HttpScraper] Found file: "fotos_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3657214)
+[HttpScraper] Found file: "fotos_tira-duvidas_03_2025-10-02_quinta-feira.pdf" (ID: 3657222)
+[HttpScraper] Found file: "anotacoes_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3658227)
+[HttpScraper] Found file: "fotos_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3659010)
+[HttpScraper] Found file: "anotacoes_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670009)
+[HttpScraper] Found file: "fotos_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670041)
+[HttpScraper] Found file: "Lista de Exercícios 02 — Monitoria" (ID: 3671150)
+[HttpScraper] Found file: "fotos_aula_10_2025-10-10_sexta-feira.pdf" (ID: 3683689)
+[HttpScraper] Found file: "anotacoes_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3685869)
+[HttpScraper] Found file: "fotos_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3686249)
+[HttpScraper] Found file: "anotacoes_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687844)
+[HttpScraper] Found file: "fotos_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687859)
+[HttpScraper] Found file: "anotacoes_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697755)
+[HttpScraper] Found file: "fotos_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697756)
+[HttpScraper] Found file: "fotos_tira-duvidas_06_2025-10-23_quinta-feira.pdf" (ID: 3697757)
+[HttpScraper] Found file: "Lista de Exercícios 03 — Monitoria" (ID: 3700393)
+[HttpScraper] Found file: "fotos_aula_14_2025-10-24_sexta-feira.pdf" (ID: 3706586)
+[HttpScraper] Found file: "fotos_tira-duvidas_07_2025-10-30_quinta-feira.pdf" (ID: 3706608)
+[HttpScraper] Found file: "fotos_aula_15_2025-10-31_sexta-feira.pdf" (ID: 3706629)
+[HttpScraper] Found file: "fotos_aula_16_2025-11-12_quarta-feira.pdf" (ID: 3718766)
+[HttpScraper] Found file: "fotos_tira-duvidas_08_2025-11-13_quinta-feira.pdf" (ID: 3719802)
+[HttpScraper] Found file: "fotos_aula_17_2025-11-19_quarta-feira.pdf" (ID: 3726246)
+[HttpScraper] Found file: "anotacoes_aula_18_2025-11-28_sexta-feira.pdf" (ID: 3741046)
+[HttpScraper] Found 38 files and 5 news items.
+SIGAA: Found fresh script for file anotacoes_aula_04_2025-09-19_sexta-feira.pdf
+SIGAA: Attempting fast HTTP download for file 3635645...
+[HttpScraper] Downloading file "anotacoes_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3635645) for course 513209
+[HttpScraper] Sending download request. ComponentID: formAva:j_id_jsp_1287906063_105:0:j_id_jsp_1287906063_165:6:idInserirMaterialArquivo
+[HttpScraper] Response headers: Content-Type=application/pdf, Content-Length=undefined
+[HttpScraper] Download complete: C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\anotacoes_aula_04_2025-09-19_sexta-feira.pdf
+SIGAA: HTTP download successful!
+Download successful! C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\anotacoes_aula_04_2025-09-19_sexta-feira.pdf
+File size: 283739 bytes
+File header: %PDF-
+
+Downloading: fotos_aula_04_2025-09-19_sexta-feira.pdf
+SIGAA: Downloading file fotos_aula_04_2025-09-19_sexta-feira.pdf...
+SIGAA: Re-entering course 513209 to refresh session before download...
+Playwright: Navigating to portal...
+Playwright Browser Log: A parser-blocking, cross site (i.e. different eTLD+1) script, https://vlibras.gov.br/app/vlibras-plugin.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.
+Playwright: Entering course 513209 (FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO)...
+Playwright Browser Log: Clicking course: CK0181 - FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO
+Playwright: URL not AVA after click, forcing navigation...
+Playwright: Verified we are in course "FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO"
+Playwright: Files detected on Main Page. Skipping navigation.
+Playwright: Captured HTML for course 513209 (94984 bytes)
+[HttpScraper] Cookies set. Count: 1
+[HttpScraper] Fetching course page for FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO...
+[HttpScraper] Using pre-fetched HTML from Playwright. Length: 94984
+[HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[HttpScraper] Saved Playwright HTML to debug_playwright.html
+[HttpScraper] Using Playwright HTML directly.
+[HttpScraper] Stored ViewState and 3 inputs for course 513209
+[HttpScraper] Scanning for files...
+[HttpScraper] Found file: "anotacoes_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627310)
+[HttpScraper] Found file: "fotos_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627323)
+[HttpScraper] Found file: "anotacoes_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627661)
+[HttpScraper] Found file: "fotos_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627680)
+[HttpScraper] Found file: "anotacoes_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633194)
+[HttpScraper] Found file: "fotos_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633220)
+[HttpScraper] Found file: "anotacoes_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3635645)
+[HttpScraper] Found file: "fotos_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3638719)
+[HttpScraper] Found file: "fotos_tira-duvidas_01_2025-09-18_quinta-feira.pdf" (ID: 3638752)
+[HttpScraper] Found file: "anotacoes_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642838)
+[HttpScraper] Found file: "fotos_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642845)
+[HttpScraper] Found file: "fotos_tira-duvidas_02_2025-09-25_quinta-feira.pdf" (ID: 3644716)
+[HttpScraper] Found file: "anotacoes_aula_06_2025-09-26_sexta-feira.pdf" (ID: 3645976)
+[HttpScraper] Found file: "Lista de Exercícios 01 — Monitoria" (ID: 3653135)
+[HttpScraper] Found file: "anotacoes_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3654421)
+[HttpScraper] Found file: "fotos_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3657214)
+[HttpScraper] Found file: "fotos_tira-duvidas_03_2025-10-02_quinta-feira.pdf" (ID: 3657222)
+[HttpScraper] Found file: "anotacoes_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3658227)
+[HttpScraper] Found file: "fotos_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3659010)
+[HttpScraper] Found file: "anotacoes_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670009)
+[HttpScraper] Found file: "fotos_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670041)
+[HttpScraper] Found file: "Lista de Exercícios 02 — Monitoria" (ID: 3671150)
+[HttpScraper] Found file: "fotos_aula_10_2025-10-10_sexta-feira.pdf" (ID: 3683689)
+[HttpScraper] Found file: "anotacoes_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3685869)
+[HttpScraper] Found file: "fotos_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3686249)
+[HttpScraper] Found file: "anotacoes_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687844)
+[HttpScraper] Found file: "fotos_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687859)
+[HttpScraper] Found file: "anotacoes_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697755)
+[HttpScraper] Found file: "fotos_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697756)
+[HttpScraper] Found file: "fotos_tira-duvidas_06_2025-10-23_quinta-feira.pdf" (ID: 3697757)
+[HttpScraper] Found file: "Lista de Exercícios 03 — Monitoria" (ID: 3700393)
+[HttpScraper] Found file: "fotos_aula_14_2025-10-24_sexta-feira.pdf" (ID: 3706586)
+[HttpScraper] Found file: "fotos_tira-duvidas_07_2025-10-30_quinta-feira.pdf" (ID: 3706608)
+[HttpScraper] Found file: "fotos_aula_15_2025-10-31_sexta-feira.pdf" (ID: 3706629)
+[HttpScraper] Found file: "fotos_aula_16_2025-11-12_quarta-feira.pdf" (ID: 3718766)
+[HttpScraper] Found file: "fotos_tira-duvidas_08_2025-11-13_quinta-feira.pdf" (ID: 3719802)
+[HttpScraper] Found file: "fotos_aula_17_2025-11-19_quarta-feira.pdf" (ID: 3726246)
+[HttpScraper] Found file: "anotacoes_aula_18_2025-11-28_sexta-feira.pdf" (ID: 3741046)
+[HttpScraper] Found 38 files and 5 news items.
+SIGAA: Found fresh script for file fotos_aula_04_2025-09-19_sexta-feira.pdf
+SIGAA: Attempting fast HTTP download for file 3638719...
+[HttpScraper] Downloading file "fotos_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3638719) for course 513209
+[HttpScraper] Sending download request. ComponentID: formAva:j_id_jsp_1287906063_105:0:j_id_jsp_1287906063_165:7:idInserirMaterialArquivo
+[HttpScraper] Response headers: Content-Type=application/pdf, Content-Length=undefined
+[HttpScraper] Download complete: C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\fotos_aula_04_2025-09-19_sexta-feira.pdf
+SIGAA: HTTP download successful!
+Download successful! C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\fotos_aula_04_2025-09-19_sexta-feira.pdf
+File size: 457292 bytes
+File header: %PDF-
+
+Downloading: fotos_tira-duvidas_01_2025-09-18_quinta-feira.pdf
+SIGAA: Downloading file fotos_tira-duvidas_01_2025-09-18_quinta-feira.pdf...
+SIGAA: Re-entering course 513209 to refresh session before download...
+Playwright: Navigating to portal...
+Playwright Browser Log: A parser-blocking, cross site (i.e. different eTLD+1) script, https://vlibras.gov.br/app/vlibras-plugin.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.
+Playwright: Entering course 513209 (FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO)...
+Playwright Browser Log: Clicking course: CK0181 - FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO
+Playwright: URL not AVA after click, forcing navigation...
+Playwright: Verified we are in course "FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO"
+Playwright: Files detected on Main Page. Skipping navigation.
+Playwright: Captured HTML for course 513209 (94984 bytes)
+[HttpScraper] Cookies set. Count: 1
+[HttpScraper] Fetching course page for FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO...
+[HttpScraper] Using pre-fetched HTML from Playwright. Length: 94984
+[HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[HttpScraper] Saved Playwright HTML to debug_playwright.html
+[HttpScraper] Using Playwright HTML directly.
+[HttpScraper] Stored ViewState and 3 inputs for course 513209
+[HttpScraper] Scanning for files...
+[HttpScraper] Found file: "anotacoes_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627310)
+[HttpScraper] Found file: "fotos_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627323)
+[HttpScraper] Found file: "anotacoes_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627661)
+[HttpScraper] Found file: "fotos_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627680)
+[HttpScraper] Found file: "anotacoes_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633194)
+[HttpScraper] Found file: "fotos_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633220)
+[HttpScraper] Found file: "anotacoes_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3635645)
+[HttpScraper] Found file: "fotos_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3638719)
+[HttpScraper] Found file: "fotos_tira-duvidas_01_2025-09-18_quinta-feira.pdf" (ID: 3638752)
+[HttpScraper] Found file: "anotacoes_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642838)
+[HttpScraper] Found file: "fotos_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642845)
+[HttpScraper] Found file: "fotos_tira-duvidas_02_2025-09-25_quinta-feira.pdf" (ID: 3644716)
+[HttpScraper] Found file: "anotacoes_aula_06_2025-09-26_sexta-feira.pdf" (ID: 3645976)
+[HttpScraper] Found file: "Lista de Exercícios 01 — Monitoria" (ID: 3653135)
+[HttpScraper] Found file: "anotacoes_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3654421)
+[HttpScraper] Found file: "fotos_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3657214)
+[HttpScraper] Found file: "fotos_tira-duvidas_03_2025-10-02_quinta-feira.pdf" (ID: 3657222)
+[HttpScraper] Found file: "anotacoes_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3658227)
+[HttpScraper] Found file: "fotos_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3659010)
+[HttpScraper] Found file: "anotacoes_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670009)
+[HttpScraper] Found file: "fotos_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670041)
+[HttpScraper] Found file: "Lista de Exercícios 02 — Monitoria" (ID: 3671150)
+[HttpScraper] Found file: "fotos_aula_10_2025-10-10_sexta-feira.pdf" (ID: 3683689)
+[HttpScraper] Found file: "anotacoes_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3685869)
+[HttpScraper] Found file: "fotos_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3686249)
+[HttpScraper] Found file: "anotacoes_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687844)
+[HttpScraper] Found file: "fotos_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687859)
+[HttpScraper] Found file: "anotacoes_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697755)
+[HttpScraper] Found file: "fotos_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697756)
+[HttpScraper] Found file: "fotos_tira-duvidas_06_2025-10-23_quinta-feira.pdf" (ID: 3697757)
+[HttpScraper] Found file: "Lista de Exercícios 03 — Monitoria" (ID: 3700393)
+[HttpScraper] Found file: "fotos_aula_14_2025-10-24_sexta-feira.pdf" (ID: 3706586)
+[HttpScraper] Found file: "fotos_tira-duvidas_07_2025-10-30_quinta-feira.pdf" (ID: 3706608)
+[HttpScraper] Found file: "fotos_aula_15_2025-10-31_sexta-feira.pdf" (ID: 3706629)
+[HttpScraper] Found file: "fotos_aula_16_2025-11-12_quarta-feira.pdf" (ID: 3718766)
+[HttpScraper] Found file: "fotos_tira-duvidas_08_2025-11-13_quinta-feira.pdf" (ID: 3719802)
+[HttpScraper] Found file: "fotos_aula_17_2025-11-19_quarta-feira.pdf" (ID: 3726246)
+[HttpScraper] Found file: "anotacoes_aula_18_2025-11-28_sexta-feira.pdf" (ID: 3741046)
+[HttpScraper] Found 38 files and 5 news items.
+SIGAA: Found fresh script for file fotos_tira-duvidas_01_2025-09-18_quinta-feira.pdf
+SIGAA: Attempting fast HTTP download for file 3638752...
+[HttpScraper] Downloading file "fotos_tira-duvidas_01_2025-09-18_quinta-feira.pdf" (ID: 3638752) for course 513209
+[HttpScraper] Sending download request. ComponentID: formAva:j_id_jsp_1287906063_105:0:j_id_jsp_1287906063_165:8:idInserirMaterialArquivo
+[HttpScraper] Response headers: Content-Type=application/pdf, Content-Length=undefined
+[HttpScraper] Download complete: C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\fotos_tira-duvidas_01_2025-09-18_quinta-feira.pdf
+SIGAA: HTTP download successful!
+Download successful! C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\fotos_tira-duvidas_01_2025-09-18_quinta-feira.pdf
+File size: 860372 bytes
+File header: %PDF-
+
+Downloading: anotacoes_aula_05_2025-09-24_quarta-feira.pdf
+SIGAA: Downloading file anotacoes_aula_05_2025-09-24_quarta-feira.pdf...
+SIGAA: Re-entering course 513209 to refresh session before download...
+Playwright: Navigating to portal...
+Playwright Browser Log: A parser-blocking, cross site (i.e. different eTLD+1) script, https://vlibras.gov.br/app/vlibras-plugin.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.
+Playwright: Entering course 513209 (FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO)...
+Playwright Browser Log: Clicking course: CK0181 - FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO
+Playwright: URL not AVA after click, forcing navigation...
+Playwright: Verified we are in course "FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO"
+Playwright: Files detected on Main Page. Skipping navigation.
+Playwright: Captured HTML for course 513209 (94984 bytes)
+[HttpScraper] Cookies set. Count: 1
+[HttpScraper] Fetching course page for FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO...
+[HttpScraper] Using pre-fetched HTML from Playwright. Length: 94984
+[HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[HttpScraper] Saved Playwright HTML to debug_playwright.html
+[HttpScraper] Using Playwright HTML directly.
+[HttpScraper] Stored ViewState and 3 inputs for course 513209
+[HttpScraper] Scanning for files...
+[HttpScraper] Found file: "anotacoes_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627310)
+[HttpScraper] Found file: "fotos_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627323)
+[HttpScraper] Found file: "anotacoes_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627661)
+[HttpScraper] Found file: "fotos_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627680)
+[HttpScraper] Found file: "anotacoes_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633194)
+[HttpScraper] Found file: "fotos_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633220)
+[HttpScraper] Found file: "anotacoes_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3635645)
+[HttpScraper] Found file: "fotos_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3638719)
+[HttpScraper] Found file: "fotos_tira-duvidas_01_2025-09-18_quinta-feira.pdf" (ID: 3638752)
+[HttpScraper] Found file: "anotacoes_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642838)
+[HttpScraper] Found file: "fotos_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642845)
+[HttpScraper] Found file: "fotos_tira-duvidas_02_2025-09-25_quinta-feira.pdf" (ID: 3644716)
+[HttpScraper] Found file: "anotacoes_aula_06_2025-09-26_sexta-feira.pdf" (ID: 3645976)
+[HttpScraper] Found file: "Lista de Exercícios 01 — Monitoria" (ID: 3653135)
+[HttpScraper] Found file: "anotacoes_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3654421)
+[HttpScraper] Found file: "fotos_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3657214)
+[HttpScraper] Found file: "fotos_tira-duvidas_03_2025-10-02_quinta-feira.pdf" (ID: 3657222)
+[HttpScraper] Found file: "anotacoes_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3658227)
+[HttpScraper] Found file: "fotos_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3659010)
+[HttpScraper] Found file: "anotacoes_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670009)
+[HttpScraper] Found file: "fotos_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670041)
+[HttpScraper] Found file: "Lista de Exercícios 02 — Monitoria" (ID: 3671150)
+[HttpScraper] Found file: "fotos_aula_10_2025-10-10_sexta-feira.pdf" (ID: 3683689)
+[HttpScraper] Found file: "anotacoes_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3685869)
+[HttpScraper] Found file: "fotos_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3686249)
+[HttpScraper] Found file: "anotacoes_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687844)
+[HttpScraper] Found file: "fotos_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687859)
+[HttpScraper] Found file: "anotacoes_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697755)
+[HttpScraper] Found file: "fotos_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697756)
+[HttpScraper] Found file: "fotos_tira-duvidas_06_2025-10-23_quinta-feira.pdf" (ID: 3697757)
+[HttpScraper] Found file: "Lista de Exercícios 03 — Monitoria" (ID: 3700393)
+[HttpScraper] Found file: "fotos_aula_14_2025-10-24_sexta-feira.pdf" (ID: 3706586)
+[HttpScraper] Found file: "fotos_tira-duvidas_07_2025-10-30_quinta-feira.pdf" (ID: 3706608)
+[HttpScraper] Found file: "fotos_aula_15_2025-10-31_sexta-feira.pdf" (ID: 3706629)
+[HttpScraper] Found file: "fotos_aula_16_2025-11-12_quarta-feira.pdf" (ID: 3718766)
+[HttpScraper] Found file: "fotos_tira-duvidas_08_2025-11-13_quinta-feira.pdf" (ID: 3719802)
+[HttpScraper] Found file: "fotos_aula_17_2025-11-19_quarta-feira.pdf" (ID: 3726246)
+[HttpScraper] Found file: "anotacoes_aula_18_2025-11-28_sexta-feira.pdf" (ID: 3741046)
+[HttpScraper] Found 38 files and 5 news items.
+SIGAA: Found fresh script for file anotacoes_aula_05_2025-09-24_quarta-feira.pdf
+SIGAA: Attempting fast HTTP download for file 3642838...
+[HttpScraper] Downloading file "anotacoes_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642838) for course 513209
+[HttpScraper] Sending download request. ComponentID: formAva:j_id_jsp_1287906063_105:0:j_id_jsp_1287906063_165:9:idInserirMaterialArquivo
+[HttpScraper] Response headers: Content-Type=application/pdf, Content-Length=undefined
+[HttpScraper] Download complete: C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\anotacoes_aula_05_2025-09-24_quarta-feira.pdf
+SIGAA: HTTP download successful!
+Download successful! C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\anotacoes_aula_05_2025-09-24_quarta-feira.pdf
+File size: 286418 bytes
+File header: %PDF-
+
+Downloading: fotos_aula_05_2025-09-24_quarta-feira.pdf
+SIGAA: Downloading file fotos_aula_05_2025-09-24_quarta-feira.pdf...
+SIGAA: Re-entering course 513209 to refresh session before download...
+Playwright: Navigating to portal...
+Playwright Browser Log: A parser-blocking, cross site (i.e. different eTLD+1) script, https://vlibras.gov.br/app/vlibras-plugin.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.
+Playwright: Entering course 513209 (FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO)...
+Playwright Browser Log: Clicking course: CK0181 - FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO
+Playwright: URL not AVA after click, forcing navigation...
+Playwright: Verified we are in course "FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO"
+Playwright: Files detected on Main Page. Skipping navigation.
+Playwright: Captured HTML for course 513209 (94984 bytes)
+[HttpScraper] Cookies set. Count: 1
+[HttpScraper] Fetching course page for FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO...
+[HttpScraper] Using pre-fetched HTML from Playwright. Length: 94984
+[HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[HttpScraper] Saved Playwright HTML to debug_playwright.html
+[HttpScraper] Using Playwright HTML directly.
+[HttpScraper] Stored ViewState and 3 inputs for course 513209
+[HttpScraper] Scanning for files...
+[HttpScraper] Found file: "anotacoes_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627310)
+[HttpScraper] Found file: "fotos_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627323)
+[HttpScraper] Found file: "anotacoes_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627661)
+[HttpScraper] Found file: "fotos_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627680)
+[HttpScraper] Found file: "anotacoes_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633194)
+[HttpScraper] Found file: "fotos_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633220)
+[HttpScraper] Found file: "anotacoes_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3635645)
+[HttpScraper] Found file: "fotos_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3638719)
+[HttpScraper] Found file: "fotos_tira-duvidas_01_2025-09-18_quinta-feira.pdf" (ID: 3638752)
+[HttpScraper] Found file: "anotacoes_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642838)
+[HttpScraper] Found file: "fotos_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642845)
+[HttpScraper] Found file: "fotos_tira-duvidas_02_2025-09-25_quinta-feira.pdf" (ID: 3644716)
+[HttpScraper] Found file: "anotacoes_aula_06_2025-09-26_sexta-feira.pdf" (ID: 3645976)
+[HttpScraper] Found file: "Lista de Exercícios 01 — Monitoria" (ID: 3653135)
+[HttpScraper] Found file: "anotacoes_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3654421)
+[HttpScraper] Found file: "fotos_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3657214)
+[HttpScraper] Found file: "fotos_tira-duvidas_03_2025-10-02_quinta-feira.pdf" (ID: 3657222)
+[HttpScraper] Found file: "anotacoes_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3658227)
+[HttpScraper] Found file: "fotos_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3659010)
+[HttpScraper] Found file: "anotacoes_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670009)
+[HttpScraper] Found file: "fotos_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670041)
+[HttpScraper] Found file: "Lista de Exercícios 02 — Monitoria" (ID: 3671150)
+[HttpScraper] Found file: "fotos_aula_10_2025-10-10_sexta-feira.pdf" (ID: 3683689)
+[HttpScraper] Found file: "anotacoes_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3685869)
+[HttpScraper] Found file: "fotos_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3686249)
+[HttpScraper] Found file: "anotacoes_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687844)
+[HttpScraper] Found file: "fotos_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687859)
+[HttpScraper] Found file: "anotacoes_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697755)
+[HttpScraper] Found file: "fotos_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697756)
+[HttpScraper] Found file: "fotos_tira-duvidas_06_2025-10-23_quinta-feira.pdf" (ID: 3697757)
+[HttpScraper] Found file: "Lista de Exercícios 03 — Monitoria" (ID: 3700393)
+[HttpScraper] Found file: "fotos_aula_14_2025-10-24_sexta-feira.pdf" (ID: 3706586)
+[HttpScraper] Found file: "fotos_tira-duvidas_07_2025-10-30_quinta-feira.pdf" (ID: 3706608)
+[HttpScraper] Found file: "fotos_aula_15_2025-10-31_sexta-feira.pdf" (ID: 3706629)
+[HttpScraper] Found file: "fotos_aula_16_2025-11-12_quarta-feira.pdf" (ID: 3718766)
+[HttpScraper] Found file: "fotos_tira-duvidas_08_2025-11-13_quinta-feira.pdf" (ID: 3719802)
+[HttpScraper] Found file: "fotos_aula_17_2025-11-19_quarta-feira.pdf" (ID: 3726246)
+[HttpScraper] Found file: "anotacoes_aula_18_2025-11-28_sexta-feira.pdf" (ID: 3741046)
+[HttpScraper] Found 38 files and 5 news items.
+SIGAA: Found fresh script for file fotos_aula_05_2025-09-24_quarta-feira.pdf
+SIGAA: Attempting fast HTTP download for file 3642845...
+[HttpScraper] Downloading file "fotos_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642845) for course 513209
+[HttpScraper] Sending download request. ComponentID: formAva:j_id_jsp_1287906063_105:0:j_id_jsp_1287906063_165:10:idInserirMaterialArquivo
+[HttpScraper] Response headers: Content-Type=application/pdf, Content-Length=undefined
+[HttpScraper] Download complete: C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\fotos_aula_05_2025-09-24_quarta-feira.pdf
+SIGAA: HTTP download successful!
+Download successful! C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\fotos_aula_05_2025-09-24_quarta-feira.pdf
+File size: 1155960 bytes
+File header: %PDF-
+
+Downloading: fotos_tira-duvidas_02_2025-09-25_quinta-feira.pdf
+SIGAA: Downloading file fotos_tira-duvidas_02_2025-09-25_quinta-feira.pdf...
+SIGAA: Re-entering course 513209 to refresh session before download...
+Playwright: Navigating to portal...
+Playwright Browser Log: A parser-blocking, cross site (i.e. different eTLD+1) script, https://vlibras.gov.br/app/vlibras-plugin.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.
+Playwright: Entering course 513209 (FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO)...
+Playwright Browser Log: Clicking course: CK0181 - FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO
+Playwright: URL not AVA after click, forcing navigation...
+Playwright: Verified we are in course "FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO"
+Playwright: Files detected on Main Page. Skipping navigation.
+Playwright: Captured HTML for course 513209 (94984 bytes)
+[HttpScraper] Cookies set. Count: 1
+[HttpScraper] Fetching course page for FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO...
+[HttpScraper] Using pre-fetched HTML from Playwright. Length: 94984
+[HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[HttpScraper] Saved Playwright HTML to debug_playwright.html
+[HttpScraper] Using Playwright HTML directly.
+[HttpScraper] Stored ViewState and 3 inputs for course 513209
+[HttpScraper] Scanning for files...
+[HttpScraper] Found file: "anotacoes_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627310)
+[HttpScraper] Found file: "fotos_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627323)
+[HttpScraper] Found file: "anotacoes_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627661)
+[HttpScraper] Found file: "fotos_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627680)
+[HttpScraper] Found file: "anotacoes_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633194)
+[HttpScraper] Found file: "fotos_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633220)
+[HttpScraper] Found file: "anotacoes_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3635645)
+[HttpScraper] Found file: "fotos_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3638719)
+[HttpScraper] Found file: "fotos_tira-duvidas_01_2025-09-18_quinta-feira.pdf" (ID: 3638752)
+[HttpScraper] Found file: "anotacoes_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642838)
+[HttpScraper] Found file: "fotos_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642845)
+[HttpScraper] Found file: "fotos_tira-duvidas_02_2025-09-25_quinta-feira.pdf" (ID: 3644716)
+[HttpScraper] Found file: "anotacoes_aula_06_2025-09-26_sexta-feira.pdf" (ID: 3645976)
+[HttpScraper] Found file: "Lista de Exercícios 01 — Monitoria" (ID: 3653135)
+[HttpScraper] Found file: "anotacoes_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3654421)
+[HttpScraper] Found file: "fotos_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3657214)
+[HttpScraper] Found file: "fotos_tira-duvidas_03_2025-10-02_quinta-feira.pdf" (ID: 3657222)
+[HttpScraper] Found file: "anotacoes_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3658227)
+[HttpScraper] Found file: "fotos_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3659010)
+[HttpScraper] Found file: "anotacoes_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670009)
+[HttpScraper] Found file: "fotos_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670041)
+[HttpScraper] Found file: "Lista de Exercícios 02 — Monitoria" (ID: 3671150)
+[HttpScraper] Found file: "fotos_aula_10_2025-10-10_sexta-feira.pdf" (ID: 3683689)
+[HttpScraper] Found file: "anotacoes_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3685869)
+[HttpScraper] Found file: "fotos_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3686249)
+[HttpScraper] Found file: "anotacoes_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687844)
+[HttpScraper] Found file: "fotos_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687859)
+[HttpScraper] Found file: "anotacoes_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697755)
+[HttpScraper] Found file: "fotos_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697756)
+[HttpScraper] Found file: "fotos_tira-duvidas_06_2025-10-23_quinta-feira.pdf" (ID: 3697757)
+[HttpScraper] Found file: "Lista de Exercícios 03 — Monitoria" (ID: 3700393)
+[HttpScraper] Found file: "fotos_aula_14_2025-10-24_sexta-feira.pdf" (ID: 3706586)
+[HttpScraper] Found file: "fotos_tira-duvidas_07_2025-10-30_quinta-feira.pdf" (ID: 3706608)
+[HttpScraper] Found file: "fotos_aula_15_2025-10-31_sexta-feira.pdf" (ID: 3706629)
+[HttpScraper] Found file: "fotos_aula_16_2025-11-12_quarta-feira.pdf" (ID: 3718766)
+[HttpScraper] Found file: "fotos_tira-duvidas_08_2025-11-13_quinta-feira.pdf" (ID: 3719802)
+[HttpScraper] Found file: "fotos_aula_17_2025-11-19_quarta-feira.pdf" (ID: 3726246)
+[HttpScraper] Found file: "anotacoes_aula_18_2025-11-28_sexta-feira.pdf" (ID: 3741046)
+[HttpScraper] Found 38 files and 5 news items.
+SIGAA: Found fresh script for file fotos_tira-duvidas_02_2025-09-25_quinta-feira.pdf
+SIGAA: Attempting fast HTTP download for file 3644716...
+[HttpScraper] Downloading file "fotos_tira-duvidas_02_2025-09-25_quinta-feira.pdf" (ID: 3644716) for course 513209
+[HttpScraper] Sending download request. ComponentID: formAva:j_id_jsp_1287906063_105:0:j_id_jsp_1287906063_165:11:idInserirMaterialArquivo
+[HttpScraper] Response headers: Content-Type=application/pdf, Content-Length=undefined
+[HttpScraper] Download complete: C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\fotos_tira-duvidas_02_2025-09-25_quinta-feira.pdf
+SIGAA: HTTP download successful!
+Download successful! C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\fotos_tira-duvidas_02_2025-09-25_quinta-feira.pdf
+File size: 1361046 bytes
+File header: %PDF-
+
+Downloading: anotacoes_aula_06_2025-09-26_sexta-feira.pdf
+SIGAA: Downloading file anotacoes_aula_06_2025-09-26_sexta-feira.pdf...
+SIGAA: Re-entering course 513209 to refresh session before download...
+Playwright: Navigating to portal...
+Playwright Browser Log: A parser-blocking, cross site (i.e. different eTLD+1) script, https://vlibras.gov.br/app/vlibras-plugin.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.
+Playwright: Entering course 513209 (FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO)...
+Playwright Browser Log: Clicking course: CK0181 - FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO
+Playwright: URL not AVA after click, forcing navigation...
+Playwright: Verified we are in course "FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO"
+Playwright: Files detected on Main Page. Skipping navigation.
+Playwright: Captured HTML for course 513209 (94984 bytes)
+[HttpScraper] Cookies set. Count: 1
+[HttpScraper] Fetching course page for FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO...
+[HttpScraper] Using pre-fetched HTML from Playwright. Length: 94984
+[HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[HttpScraper] Saved Playwright HTML to debug_playwright.html
+[HttpScraper] Using Playwright HTML directly.
+[HttpScraper] Stored ViewState and 3 inputs for course 513209
+[HttpScraper] Scanning for files...
+[HttpScraper] Found file: "anotacoes_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627310)
+[HttpScraper] Found file: "fotos_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627323)
+[HttpScraper] Found file: "anotacoes_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627661)
+[HttpScraper] Found file: "fotos_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627680)
+[HttpScraper] Found file: "anotacoes_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633194)
+[HttpScraper] Found file: "fotos_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633220)
+[HttpScraper] Found file: "anotacoes_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3635645)
+[HttpScraper] Found file: "fotos_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3638719)
+[HttpScraper] Found file: "fotos_tira-duvidas_01_2025-09-18_quinta-feira.pdf" (ID: 3638752)
+[HttpScraper] Found file: "anotacoes_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642838)
+[HttpScraper] Found file: "fotos_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642845)
+[HttpScraper] Found file: "fotos_tira-duvidas_02_2025-09-25_quinta-feira.pdf" (ID: 3644716)
+[HttpScraper] Found file: "anotacoes_aula_06_2025-09-26_sexta-feira.pdf" (ID: 3645976)
+[HttpScraper] Found file: "Lista de Exercícios 01 — Monitoria" (ID: 3653135)
+[HttpScraper] Found file: "anotacoes_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3654421)
+[HttpScraper] Found file: "fotos_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3657214)
+[HttpScraper] Found file: "fotos_tira-duvidas_03_2025-10-02_quinta-feira.pdf" (ID: 3657222)
+[HttpScraper] Found file: "anotacoes_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3658227)
+[HttpScraper] Found file: "fotos_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3659010)
+[HttpScraper] Found file: "anotacoes_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670009)
+[HttpScraper] Found file: "fotos_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670041)
+[HttpScraper] Found file: "Lista de Exercícios 02 — Monitoria" (ID: 3671150)
+[HttpScraper] Found file: "fotos_aula_10_2025-10-10_sexta-feira.pdf" (ID: 3683689)
+[HttpScraper] Found file: "anotacoes_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3685869)
+[HttpScraper] Found file: "fotos_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3686249)
+[HttpScraper] Found file: "anotacoes_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687844)
+[HttpScraper] Found file: "fotos_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687859)
+[HttpScraper] Found file: "anotacoes_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697755)
+[HttpScraper] Found file: "fotos_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697756)
+[HttpScraper] Found file: "fotos_tira-duvidas_06_2025-10-23_quinta-feira.pdf" (ID: 3697757)
+[HttpScraper] Found file: "Lista de Exercícios 03 — Monitoria" (ID: 3700393)
+[HttpScraper] Found file: "fotos_aula_14_2025-10-24_sexta-feira.pdf" (ID: 3706586)
+[HttpScraper] Found file: "fotos_tira-duvidas_07_2025-10-30_quinta-feira.pdf" (ID: 3706608)
+[HttpScraper] Found file: "fotos_aula_15_2025-10-31_sexta-feira.pdf" (ID: 3706629)
+[HttpScraper] Found file: "fotos_aula_16_2025-11-12_quarta-feira.pdf" (ID: 3718766)
+[HttpScraper] Found file: "fotos_tira-duvidas_08_2025-11-13_quinta-feira.pdf" (ID: 3719802)
+[HttpScraper] Found file: "fotos_aula_17_2025-11-19_quarta-feira.pdf" (ID: 3726246)
+[HttpScraper] Found file: "anotacoes_aula_18_2025-11-28_sexta-feira.pdf" (ID: 3741046)
+[HttpScraper] Found 38 files and 5 news items.
+SIGAA: Found fresh script for file anotacoes_aula_06_2025-09-26_sexta-feira.pdf
+SIGAA: Attempting fast HTTP download for file 3645976...
+[HttpScraper] Downloading file "anotacoes_aula_06_2025-09-26_sexta-feira.pdf" (ID: 3645976) for course 513209
+[HttpScraper] Sending download request. ComponentID: formAva:j_id_jsp_1287906063_105:0:j_id_jsp_1287906063_165:12:idInserirMaterialArquivo
+[HttpScraper] Response headers: Content-Type=application/pdf, Content-Length=undefined
+[HttpScraper] Download complete: C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\anotacoes_aula_06_2025-09-26_sexta-feira.pdf
+SIGAA: HTTP download successful!
+Download successful! C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\anotacoes_aula_06_2025-09-26_sexta-feira.pdf
+File size: 294998 bytes
+File header: %PDF-
+
+Downloading: Lista de Exercícios 01 — Monitoria
+SIGAA: Downloading file Lista de Exercícios 01 — Monitoria...
+SIGAA: Re-entering course 513209 to refresh session before download...
+Playwright: Navigating to portal...
+Playwright Browser Log: A parser-blocking, cross site (i.e. different eTLD+1) script, https://vlibras.gov.br/app/vlibras-plugin.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.
+Playwright: Entering course 513209 (FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO)...
+Playwright Browser Log: Clicking course: CK0181 - FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO
+Playwright: URL not AVA after click, forcing navigation...
+Playwright: Verified we are in course "FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO"
+Playwright: Files detected on Main Page. Skipping navigation.
+Playwright: Captured HTML for course 513209 (94984 bytes)
+[HttpScraper] Cookies set. Count: 1
+[HttpScraper] Fetching course page for FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO...
+[HttpScraper] Using pre-fetched HTML from Playwright. Length: 94984
+[HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[HttpScraper] Saved Playwright HTML to debug_playwright.html
+[HttpScraper] Using Playwright HTML directly.
+[HttpScraper] Stored ViewState and 3 inputs for course 513209
+[HttpScraper] Scanning for files...
+[HttpScraper] Found file: "anotacoes_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627310)
+[HttpScraper] Found file: "fotos_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627323)
+[HttpScraper] Found file: "anotacoes_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627661)
+[HttpScraper] Found file: "fotos_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627680)
+[HttpScraper] Found file: "anotacoes_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633194)
+[HttpScraper] Found file: "fotos_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633220)
+[HttpScraper] Found file: "anotacoes_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3635645)
+[HttpScraper] Found file: "fotos_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3638719)
+[HttpScraper] Found file: "fotos_tira-duvidas_01_2025-09-18_quinta-feira.pdf" (ID: 3638752)
+[HttpScraper] Found file: "anotacoes_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642838)
+[HttpScraper] Found file: "fotos_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642845)
+[HttpScraper] Found file: "fotos_tira-duvidas_02_2025-09-25_quinta-feira.pdf" (ID: 3644716)
+[HttpScraper] Found file: "anotacoes_aula_06_2025-09-26_sexta-feira.pdf" (ID: 3645976)
+[HttpScraper] Found file: "Lista de Exercícios 01 — Monitoria" (ID: 3653135)
+[HttpScraper] Found file: "anotacoes_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3654421)
+[HttpScraper] Found file: "fotos_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3657214)
+[HttpScraper] Found file: "fotos_tira-duvidas_03_2025-10-02_quinta-feira.pdf" (ID: 3657222)
+[HttpScraper] Found file: "anotacoes_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3658227)
+[HttpScraper] Found file: "fotos_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3659010)
+[HttpScraper] Found file: "anotacoes_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670009)
+[HttpScraper] Found file: "fotos_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670041)
+[HttpScraper] Found file: "Lista de Exercícios 02 — Monitoria" (ID: 3671150)
+[HttpScraper] Found file: "fotos_aula_10_2025-10-10_sexta-feira.pdf" (ID: 3683689)
+[HttpScraper] Found file: "anotacoes_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3685869)
+[HttpScraper] Found file: "fotos_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3686249)
+[HttpScraper] Found file: "anotacoes_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687844)
+[HttpScraper] Found file: "fotos_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687859)
+[HttpScraper] Found file: "anotacoes_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697755)
+[HttpScraper] Found file: "fotos_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697756)
+[HttpScraper] Found file: "fotos_tira-duvidas_06_2025-10-23_quinta-feira.pdf" (ID: 3697757)
+[HttpScraper] Found file: "Lista de Exercícios 03 — Monitoria" (ID: 3700393)
+[HttpScraper] Found file: "fotos_aula_14_2025-10-24_sexta-feira.pdf" (ID: 3706586)
+[HttpScraper] Found file: "fotos_tira-duvidas_07_2025-10-30_quinta-feira.pdf" (ID: 3706608)
+[HttpScraper] Found file: "fotos_aula_15_2025-10-31_sexta-feira.pdf" (ID: 3706629)
+[HttpScraper] Found file: "fotos_aula_16_2025-11-12_quarta-feira.pdf" (ID: 3718766)
+[HttpScraper] Found file: "fotos_tira-duvidas_08_2025-11-13_quinta-feira.pdf" (ID: 3719802)
+[HttpScraper] Found file: "fotos_aula_17_2025-11-19_quarta-feira.pdf" (ID: 3726246)
+[HttpScraper] Found file: "anotacoes_aula_18_2025-11-28_sexta-feira.pdf" (ID: 3741046)
+[HttpScraper] Found 38 files and 5 news items.
+SIGAA: Found fresh script for file Lista de Exercícios 01 — Monitoria
+SIGAA: Attempting fast HTTP download for file 3653135...
+[HttpScraper] Downloading file "Lista de Exercícios 01 — Monitoria" (ID: 3653135) for course 513209
+[HttpScraper] Sending download request. ComponentID: formAva:j_id_jsp_1287906063_105:0:j_id_jsp_1287906063_165:13:idInserirMaterialArquivo
+[HttpScraper] Response headers: Content-Type=application/pdf, Content-Length=undefined
+[HttpScraper] Download complete: C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\lista01_fmc.pdf
+SIGAA: HTTP download successful!
+Download successful! C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\lista01_fmc.pdf
+File size: 350629 bytes
+File header: %PDF-
+
+Downloading: anotacoes_aula_07_2025-10-01_quarta-feira.pdf
+SIGAA: Downloading file anotacoes_aula_07_2025-10-01_quarta-feira.pdf...
+SIGAA: Re-entering course 513209 to refresh session before download...
+Playwright: Navigating to portal...
+Playwright Browser Log: A parser-blocking, cross site (i.e. different eTLD+1) script, https://vlibras.gov.br/app/vlibras-plugin.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.
+Playwright: Entering course 513209 (FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO)...
+Playwright Browser Log: Clicking course: CK0181 - FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO
+Playwright: URL not AVA after click, forcing navigation...
+Playwright: Verified we are in course "FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO"
+Playwright: Files detected on Main Page. Skipping navigation.
+Playwright: Captured HTML for course 513209 (94984 bytes)
+[HttpScraper] Cookies set. Count: 1
+[HttpScraper] Fetching course page for FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO...
+[HttpScraper] Using pre-fetched HTML from Playwright. Length: 94984
+[HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[HttpScraper] Saved Playwright HTML to debug_playwright.html
+[HttpScraper] Using Playwright HTML directly.
+[HttpScraper] Stored ViewState and 3 inputs for course 513209
+[HttpScraper] Scanning for files...
+[HttpScraper] Found file: "anotacoes_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627310)
+[HttpScraper] Found file: "fotos_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627323)
+[HttpScraper] Found file: "anotacoes_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627661)
+[HttpScraper] Found file: "fotos_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627680)
+[HttpScraper] Found file: "anotacoes_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633194)
+[HttpScraper] Found file: "fotos_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633220)
+[HttpScraper] Found file: "anotacoes_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3635645)
+[HttpScraper] Found file: "fotos_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3638719)
+[HttpScraper] Found file: "fotos_tira-duvidas_01_2025-09-18_quinta-feira.pdf" (ID: 3638752)
+[HttpScraper] Found file: "anotacoes_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642838)
+[HttpScraper] Found file: "fotos_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642845)
+[HttpScraper] Found file: "fotos_tira-duvidas_02_2025-09-25_quinta-feira.pdf" (ID: 3644716)
+[HttpScraper] Found file: "anotacoes_aula_06_2025-09-26_sexta-feira.pdf" (ID: 3645976)
+[HttpScraper] Found file: "Lista de Exercícios 01 — Monitoria" (ID: 3653135)
+[HttpScraper] Found file: "anotacoes_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3654421)
+[HttpScraper] Found file: "fotos_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3657214)
+[HttpScraper] Found file: "fotos_tira-duvidas_03_2025-10-02_quinta-feira.pdf" (ID: 3657222)
+[HttpScraper] Found file: "anotacoes_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3658227)
+[HttpScraper] Found file: "fotos_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3659010)
+[HttpScraper] Found file: "anotacoes_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670009)
+[HttpScraper] Found file: "fotos_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670041)
+[HttpScraper] Found file: "Lista de Exercícios 02 — Monitoria" (ID: 3671150)
+[HttpScraper] Found file: "fotos_aula_10_2025-10-10_sexta-feira.pdf" (ID: 3683689)
+[HttpScraper] Found file: "anotacoes_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3685869)
+[HttpScraper] Found file: "fotos_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3686249)
+[HttpScraper] Found file: "anotacoes_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687844)
+[HttpScraper] Found file: "fotos_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687859)
+[HttpScraper] Found file: "anotacoes_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697755)
+[HttpScraper] Found file: "fotos_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697756)
+[HttpScraper] Found file: "fotos_tira-duvidas_06_2025-10-23_quinta-feira.pdf" (ID: 3697757)
+[HttpScraper] Found file: "Lista de Exercícios 03 — Monitoria" (ID: 3700393)
+[HttpScraper] Found file: "fotos_aula_14_2025-10-24_sexta-feira.pdf" (ID: 3706586)
+[HttpScraper] Found file: "fotos_tira-duvidas_07_2025-10-30_quinta-feira.pdf" (ID: 3706608)
+[HttpScraper] Found file: "fotos_aula_15_2025-10-31_sexta-feira.pdf" (ID: 3706629)
+[HttpScraper] Found file: "fotos_aula_16_2025-11-12_quarta-feira.pdf" (ID: 3718766)
+[HttpScraper] Found file: "fotos_tira-duvidas_08_2025-11-13_quinta-feira.pdf" (ID: 3719802)
+[HttpScraper] Found file: "fotos_aula_17_2025-11-19_quarta-feira.pdf" (ID: 3726246)
+[HttpScraper] Found file: "anotacoes_aula_18_2025-11-28_sexta-feira.pdf" (ID: 3741046)
+[HttpScraper] Found 38 files and 5 news items.
+SIGAA: Found fresh script for file anotacoes_aula_07_2025-10-01_quarta-feira.pdf
+SIGAA: Attempting fast HTTP download for file 3654421...
+[HttpScraper] Downloading file "anotacoes_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3654421) for course 513209
+[HttpScraper] Sending download request. ComponentID: formAva:j_id_jsp_1287906063_105:0:j_id_jsp_1287906063_165:14:idInserirMaterialArquivo
+[HttpScraper] Response headers: Content-Type=application/pdf, Content-Length=undefined
+[HttpScraper] Download complete: C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\anotacoes_aula_07_2025-10-01_quarta-feira.pdf
+SIGAA: HTTP download successful!
+Download successful! C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\anotacoes_aula_07_2025-10-01_quarta-feira.pdf
+File size: 310397 bytes
+File header: %PDF-
+
+Downloading: fotos_aula_07_2025-10-01_quarta-feira.pdf
+SIGAA: Downloading file fotos_aula_07_2025-10-01_quarta-feira.pdf...
+SIGAA: Re-entering course 513209 to refresh session before download...
+Playwright: Navigating to portal...
+Playwright Browser Log: A parser-blocking, cross site (i.e. different eTLD+1) script, https://vlibras.gov.br/app/vlibras-plugin.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.
+Playwright: Entering course 513209 (FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO)...
+Playwright Browser Log: Clicking course: CK0181 - FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO
+Playwright: URL not AVA after click, forcing navigation...
+Playwright: Verified we are in course "FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO"
+Playwright: Files detected on Main Page. Skipping navigation.
+Playwright: Captured HTML for course 513209 (94984 bytes)
+[HttpScraper] Cookies set. Count: 1
+[HttpScraper] Fetching course page for FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO...
+[HttpScraper] Using pre-fetched HTML from Playwright. Length: 94984
+[HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[HttpScraper] Saved Playwright HTML to debug_playwright.html
+[HttpScraper] Using Playwright HTML directly.
+[HttpScraper] Stored ViewState and 3 inputs for course 513209
+[HttpScraper] Scanning for files...
+[HttpScraper] Found file: "anotacoes_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627310)
+[HttpScraper] Found file: "fotos_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627323)
+[HttpScraper] Found file: "anotacoes_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627661)
+[HttpScraper] Found file: "fotos_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627680)
+[HttpScraper] Found file: "anotacoes_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633194)
+[HttpScraper] Found file: "fotos_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633220)
+[HttpScraper] Found file: "anotacoes_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3635645)
+[HttpScraper] Found file: "fotos_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3638719)
+[HttpScraper] Found file: "fotos_tira-duvidas_01_2025-09-18_quinta-feira.pdf" (ID: 3638752)
+[HttpScraper] Found file: "anotacoes_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642838)
+[HttpScraper] Found file: "fotos_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642845)
+[HttpScraper] Found file: "fotos_tira-duvidas_02_2025-09-25_quinta-feira.pdf" (ID: 3644716)
+[HttpScraper] Found file: "anotacoes_aula_06_2025-09-26_sexta-feira.pdf" (ID: 3645976)
+[HttpScraper] Found file: "Lista de Exercícios 01 — Monitoria" (ID: 3653135)
+[HttpScraper] Found file: "anotacoes_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3654421)
+[HttpScraper] Found file: "fotos_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3657214)
+[HttpScraper] Found file: "fotos_tira-duvidas_03_2025-10-02_quinta-feira.pdf" (ID: 3657222)
+[HttpScraper] Found file: "anotacoes_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3658227)
+[HttpScraper] Found file: "fotos_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3659010)
+[HttpScraper] Found file: "anotacoes_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670009)
+[HttpScraper] Found file: "fotos_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670041)
+[HttpScraper] Found file: "Lista de Exercícios 02 — Monitoria" (ID: 3671150)
+[HttpScraper] Found file: "fotos_aula_10_2025-10-10_sexta-feira.pdf" (ID: 3683689)
+[HttpScraper] Found file: "anotacoes_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3685869)
+[HttpScraper] Found file: "fotos_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3686249)
+[HttpScraper] Found file: "anotacoes_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687844)
+[HttpScraper] Found file: "fotos_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687859)
+[HttpScraper] Found file: "anotacoes_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697755)
+[HttpScraper] Found file: "fotos_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697756)
+[HttpScraper] Found file: "fotos_tira-duvidas_06_2025-10-23_quinta-feira.pdf" (ID: 3697757)
+[HttpScraper] Found file: "Lista de Exercícios 03 — Monitoria" (ID: 3700393)
+[HttpScraper] Found file: "fotos_aula_14_2025-10-24_sexta-feira.pdf" (ID: 3706586)
+[HttpScraper] Found file: "fotos_tira-duvidas_07_2025-10-30_quinta-feira.pdf" (ID: 3706608)
+[HttpScraper] Found file: "fotos_aula_15_2025-10-31_sexta-feira.pdf" (ID: 3706629)
+[HttpScraper] Found file: "fotos_aula_16_2025-11-12_quarta-feira.pdf" (ID: 3718766)
+[HttpScraper] Found file: "fotos_tira-duvidas_08_2025-11-13_quinta-feira.pdf" (ID: 3719802)
+[HttpScraper] Found file: "fotos_aula_17_2025-11-19_quarta-feira.pdf" (ID: 3726246)
+[HttpScraper] Found file: "anotacoes_aula_18_2025-11-28_sexta-feira.pdf" (ID: 3741046)
+[HttpScraper] Found 38 files and 5 news items.
+SIGAA: Found fresh script for file fotos_aula_07_2025-10-01_quarta-feira.pdf
+SIGAA: Attempting fast HTTP download for file 3657214...
+[HttpScraper] Downloading file "fotos_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3657214) for course 513209
+[HttpScraper] Sending download request. ComponentID: formAva:j_id_jsp_1287906063_105:0:j_id_jsp_1287906063_165:15:idInserirMaterialArquivo
+[HttpScraper] Response headers: Content-Type=application/pdf, Content-Length=undefined
+[HttpScraper] Download complete: C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\fotos_aula_07_2025-10-01_quarta-feira.pdf
+SIGAA: HTTP download successful!
+Download successful! C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\fotos_aula_07_2025-10-01_quarta-feira.pdf
+File size: 845725 bytes
+File header: %PDF-
+
+Downloading: fotos_tira-duvidas_03_2025-10-02_quinta-feira.pdf
+SIGAA: Downloading file fotos_tira-duvidas_03_2025-10-02_quinta-feira.pdf...
+SIGAA: Re-entering course 513209 to refresh session before download...
+Playwright: Navigating to portal...
+Playwright Browser Log: A parser-blocking, cross site (i.e. different eTLD+1) script, https://vlibras.gov.br/app/vlibras-plugin.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.
+Playwright: Entering course 513209 (FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO)...
+Playwright Browser Log: Clicking course: CK0181 - FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO
+Playwright: URL not AVA after click, forcing navigation...
+Playwright: Verified we are in course "FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO"
+Playwright: Files detected on Main Page. Skipping navigation.
+Playwright: Captured HTML for course 513209 (94984 bytes)
+[HttpScraper] Cookies set. Count: 1
+[HttpScraper] Fetching course page for FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO...
+[HttpScraper] Using pre-fetched HTML from Playwright. Length: 94984
+[HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[HttpScraper] Saved Playwright HTML to debug_playwright.html
+[HttpScraper] Using Playwright HTML directly.
+[HttpScraper] Stored ViewState and 3 inputs for course 513209
+[HttpScraper] Scanning for files...
+[HttpScraper] Found file: "anotacoes_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627310)
+[HttpScraper] Found file: "fotos_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627323)
+[HttpScraper] Found file: "anotacoes_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627661)
+[HttpScraper] Found file: "fotos_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627680)
+[HttpScraper] Found file: "anotacoes_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633194)
+[HttpScraper] Found file: "fotos_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633220)
+[HttpScraper] Found file: "anotacoes_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3635645)
+[HttpScraper] Found file: "fotos_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3638719)
+[HttpScraper] Found file: "fotos_tira-duvidas_01_2025-09-18_quinta-feira.pdf" (ID: 3638752)
+[HttpScraper] Found file: "anotacoes_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642838)
+[HttpScraper] Found file: "fotos_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642845)
+[HttpScraper] Found file: "fotos_tira-duvidas_02_2025-09-25_quinta-feira.pdf" (ID: 3644716)
+[HttpScraper] Found file: "anotacoes_aula_06_2025-09-26_sexta-feira.pdf" (ID: 3645976)
+[HttpScraper] Found file: "Lista de Exercícios 01 — Monitoria" (ID: 3653135)
+[HttpScraper] Found file: "anotacoes_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3654421)
+[HttpScraper] Found file: "fotos_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3657214)
+[HttpScraper] Found file: "fotos_tira-duvidas_03_2025-10-02_quinta-feira.pdf" (ID: 3657222)
+[HttpScraper] Found file: "anotacoes_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3658227)
+[HttpScraper] Found file: "fotos_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3659010)
+[HttpScraper] Found file: "anotacoes_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670009)
+[HttpScraper] Found file: "fotos_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670041)
+[HttpScraper] Found file: "Lista de Exercícios 02 — Monitoria" (ID: 3671150)
+[HttpScraper] Found file: "fotos_aula_10_2025-10-10_sexta-feira.pdf" (ID: 3683689)
+[HttpScraper] Found file: "anotacoes_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3685869)
+[HttpScraper] Found file: "fotos_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3686249)
+[HttpScraper] Found file: "anotacoes_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687844)
+[HttpScraper] Found file: "fotos_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687859)
+[HttpScraper] Found file: "anotacoes_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697755)
+[HttpScraper] Found file: "fotos_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697756)
+[HttpScraper] Found file: "fotos_tira-duvidas_06_2025-10-23_quinta-feira.pdf" (ID: 3697757)
+[HttpScraper] Found file: "Lista de Exercícios 03 — Monitoria" (ID: 3700393)
+[HttpScraper] Found file: "fotos_aula_14_2025-10-24_sexta-feira.pdf" (ID: 3706586)
+[HttpScraper] Found file: "fotos_tira-duvidas_07_2025-10-30_quinta-feira.pdf" (ID: 3706608)
+[HttpScraper] Found file: "fotos_aula_15_2025-10-31_sexta-feira.pdf" (ID: 3706629)
+[HttpScraper] Found file: "fotos_aula_16_2025-11-12_quarta-feira.pdf" (ID: 3718766)
+[HttpScraper] Found file: "fotos_tira-duvidas_08_2025-11-13_quinta-feira.pdf" (ID: 3719802)
+[HttpScraper] Found file: "fotos_aula_17_2025-11-19_quarta-feira.pdf" (ID: 3726246)
+[HttpScraper] Found file: "anotacoes_aula_18_2025-11-28_sexta-feira.pdf" (ID: 3741046)
+[HttpScraper] Found 38 files and 5 news items.
+SIGAA: Found fresh script for file fotos_tira-duvidas_03_2025-10-02_quinta-feira.pdf
+SIGAA: Attempting fast HTTP download for file 3657222...
+[HttpScraper] Downloading file "fotos_tira-duvidas_03_2025-10-02_quinta-feira.pdf" (ID: 3657222) for course 513209
+[HttpScraper] Sending download request. ComponentID: formAva:j_id_jsp_1287906063_105:0:j_id_jsp_1287906063_165:16:idInserirMaterialArquivo
+[HttpScraper] Response headers: Content-Type=application/pdf, Content-Length=undefined
+[HttpScraper] Download complete: C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\fotos_tira-duvidas_03_2025-10-02_quinta-feira.pdf
+SIGAA: HTTP download successful!
+Download successful! C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\fotos_tira-duvidas_03_2025-10-02_quinta-feira.pdf
+File size: 443447 bytes
+File header: %PDF-
+
+Downloading: anotacoes_aula_08_2025-10-03_sexta-feira.pdf
+SIGAA: Downloading file anotacoes_aula_08_2025-10-03_sexta-feira.pdf...
+SIGAA: Re-entering course 513209 to refresh session before download...
+Playwright: Navigating to portal...
+Playwright Browser Log: A parser-blocking, cross site (i.e. different eTLD+1) script, https://vlibras.gov.br/app/vlibras-plugin.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.
+Playwright: Entering course 513209 (FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO)...
+Playwright Browser Log: Clicking course: CK0181 - FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO
+Playwright: URL not AVA after click, forcing navigation...
+Playwright: Verified we are in course "FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO"
+Playwright: Files detected on Main Page. Skipping navigation.
+Playwright: Captured HTML for course 513209 (94984 bytes)
+[HttpScraper] Cookies set. Count: 1
+[HttpScraper] Fetching course page for FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO...
+[HttpScraper] Using pre-fetched HTML from Playwright. Length: 94984
+[HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[HttpScraper] Saved Playwright HTML to debug_playwright.html
+[HttpScraper] Using Playwright HTML directly.
+[HttpScraper] Stored ViewState and 3 inputs for course 513209
+[HttpScraper] Scanning for files...
+[HttpScraper] Found file: "anotacoes_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627310)
+[HttpScraper] Found file: "fotos_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627323)
+[HttpScraper] Found file: "anotacoes_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627661)
+[HttpScraper] Found file: "fotos_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627680)
+[HttpScraper] Found file: "anotacoes_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633194)
+[HttpScraper] Found file: "fotos_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633220)
+[HttpScraper] Found file: "anotacoes_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3635645)
+[HttpScraper] Found file: "fotos_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3638719)
+[HttpScraper] Found file: "fotos_tira-duvidas_01_2025-09-18_quinta-feira.pdf" (ID: 3638752)
+[HttpScraper] Found file: "anotacoes_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642838)
+[HttpScraper] Found file: "fotos_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642845)
+[HttpScraper] Found file: "fotos_tira-duvidas_02_2025-09-25_quinta-feira.pdf" (ID: 3644716)
+[HttpScraper] Found file: "anotacoes_aula_06_2025-09-26_sexta-feira.pdf" (ID: 3645976)
+[HttpScraper] Found file: "Lista de Exercícios 01 — Monitoria" (ID: 3653135)
+[HttpScraper] Found file: "anotacoes_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3654421)
+[HttpScraper] Found file: "fotos_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3657214)
+[HttpScraper] Found file: "fotos_tira-duvidas_03_2025-10-02_quinta-feira.pdf" (ID: 3657222)
+[HttpScraper] Found file: "anotacoes_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3658227)
+[HttpScraper] Found file: "fotos_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3659010)
+[HttpScraper] Found file: "anotacoes_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670009)
+[HttpScraper] Found file: "fotos_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670041)
+[HttpScraper] Found file: "Lista de Exercícios 02 — Monitoria" (ID: 3671150)
+[HttpScraper] Found file: "fotos_aula_10_2025-10-10_sexta-feira.pdf" (ID: 3683689)
+[HttpScraper] Found file: "anotacoes_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3685869)
+[HttpScraper] Found file: "fotos_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3686249)
+[HttpScraper] Found file: "anotacoes_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687844)
+[HttpScraper] Found file: "fotos_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687859)
+[HttpScraper] Found file: "anotacoes_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697755)
+[HttpScraper] Found file: "fotos_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697756)
+[HttpScraper] Found file: "fotos_tira-duvidas_06_2025-10-23_quinta-feira.pdf" (ID: 3697757)
+[HttpScraper] Found file: "Lista de Exercícios 03 — Monitoria" (ID: 3700393)
+[HttpScraper] Found file: "fotos_aula_14_2025-10-24_sexta-feira.pdf" (ID: 3706586)
+[HttpScraper] Found file: "fotos_tira-duvidas_07_2025-10-30_quinta-feira.pdf" (ID: 3706608)
+[HttpScraper] Found file: "fotos_aula_15_2025-10-31_sexta-feira.pdf" (ID: 3706629)
+[HttpScraper] Found file: "fotos_aula_16_2025-11-12_quarta-feira.pdf" (ID: 3718766)
+[HttpScraper] Found file: "fotos_tira-duvidas_08_2025-11-13_quinta-feira.pdf" (ID: 3719802)
+[HttpScraper] Found file: "fotos_aula_17_2025-11-19_quarta-feira.pdf" (ID: 3726246)
+[HttpScraper] Found file: "anotacoes_aula_18_2025-11-28_sexta-feira.pdf" (ID: 3741046)
+[HttpScraper] Found 38 files and 5 news items.
+SIGAA: Found fresh script for file anotacoes_aula_08_2025-10-03_sexta-feira.pdf
+SIGAA: Attempting fast HTTP download for file 3658227...
+[HttpScraper] Downloading file "anotacoes_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3658227) for course 513209
+[HttpScraper] Sending download request. ComponentID: formAva:j_id_jsp_1287906063_105:0:j_id_jsp_1287906063_165:17:idInserirMaterialArquivo
+[HttpScraper] Response headers: Content-Type=application/pdf, Content-Length=undefined
+[HttpScraper] Download complete: C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\anotacoes_aula_08_2025-10-03_sexta-feira.pdf
+SIGAA: HTTP download successful!
+Download successful! C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\anotacoes_aula_08_2025-10-03_sexta-feira.pdf
+File size: 367607 bytes
+File header: %PDF-
+
+Downloading: fotos_aula_08_2025-10-03_sexta-feira.pdf
+SIGAA: Downloading file fotos_aula_08_2025-10-03_sexta-feira.pdf...
+SIGAA: Re-entering course 513209 to refresh session before download...
+Playwright: Navigating to portal...
+Playwright: Entering course 513209 (FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO)...
+Playwright Browser Log: Clicking course: CK0181 - FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO
+Playwright Browser Log: A parser-blocking, cross site (i.e. different eTLD+1) script, https://vlibras.gov.br/app/vlibras-plugin.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.
+Playwright: URL not AVA after click, forcing navigation...
+Playwright: Verified we are in course "FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO"
+Playwright: Files detected on Main Page. Skipping navigation.
+Playwright: Captured HTML for course 513209 (94984 bytes)
+[HttpScraper] Cookies set. Count: 1
+[HttpScraper] Fetching course page for FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO...
+[HttpScraper] Using pre-fetched HTML from Playwright. Length: 94984
+[HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[HttpScraper] Saved Playwright HTML to debug_playwright.html
+[HttpScraper] Using Playwright HTML directly.
+[HttpScraper] Stored ViewState and 3 inputs for course 513209
+[HttpScraper] Scanning for files...
+[HttpScraper] Found file: "anotacoes_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627310)
+[HttpScraper] Found file: "fotos_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627323)
+[HttpScraper] Found file: "anotacoes_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627661)
+[HttpScraper] Found file: "fotos_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627680)
+[HttpScraper] Found file: "anotacoes_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633194)
+[HttpScraper] Found file: "fotos_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633220)
+[HttpScraper] Found file: "anotacoes_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3635645)
+[HttpScraper] Found file: "fotos_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3638719)
+[HttpScraper] Found file: "fotos_tira-duvidas_01_2025-09-18_quinta-feira.pdf" (ID: 3638752)
+[HttpScraper] Found file: "anotacoes_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642838)
+[HttpScraper] Found file: "fotos_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642845)
+[HttpScraper] Found file: "fotos_tira-duvidas_02_2025-09-25_quinta-feira.pdf" (ID: 3644716)
+[HttpScraper] Found file: "anotacoes_aula_06_2025-09-26_sexta-feira.pdf" (ID: 3645976)
+[HttpScraper] Found file: "Lista de Exercícios 01 — Monitoria" (ID: 3653135)
+[HttpScraper] Found file: "anotacoes_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3654421)
+[HttpScraper] Found file: "fotos_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3657214)
+[HttpScraper] Found file: "fotos_tira-duvidas_03_2025-10-02_quinta-feira.pdf" (ID: 3657222)
+[HttpScraper] Found file: "anotacoes_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3658227)
+[HttpScraper] Found file: "fotos_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3659010)
+[HttpScraper] Found file: "anotacoes_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670009)
+[HttpScraper] Found file: "fotos_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670041)
+[HttpScraper] Found file: "Lista de Exercícios 02 — Monitoria" (ID: 3671150)
+[HttpScraper] Found file: "fotos_aula_10_2025-10-10_sexta-feira.pdf" (ID: 3683689)
+[HttpScraper] Found file: "anotacoes_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3685869)
+[HttpScraper] Found file: "fotos_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3686249)
+[HttpScraper] Found file: "anotacoes_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687844)
+[HttpScraper] Found file: "fotos_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687859)
+[HttpScraper] Found file: "anotacoes_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697755)
+[HttpScraper] Found file: "fotos_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697756)
+[HttpScraper] Found file: "fotos_tira-duvidas_06_2025-10-23_quinta-feira.pdf" (ID: 3697757)
+[HttpScraper] Found file: "Lista de Exercícios 03 — Monitoria" (ID: 3700393)
+[HttpScraper] Found file: "fotos_aula_14_2025-10-24_sexta-feira.pdf" (ID: 3706586)
+[HttpScraper] Found file: "fotos_tira-duvidas_07_2025-10-30_quinta-feira.pdf" (ID: 3706608)
+[HttpScraper] Found file: "fotos_aula_15_2025-10-31_sexta-feira.pdf" (ID: 3706629)
+[HttpScraper] Found file: "fotos_aula_16_2025-11-12_quarta-feira.pdf" (ID: 3718766)
+[HttpScraper] Found file: "fotos_tira-duvidas_08_2025-11-13_quinta-feira.pdf" (ID: 3719802)
+[HttpScraper] Found file: "fotos_aula_17_2025-11-19_quarta-feira.pdf" (ID: 3726246)
+[HttpScraper] Found file: "anotacoes_aula_18_2025-11-28_sexta-feira.pdf" (ID: 3741046)
+[HttpScraper] Found 38 files and 5 news items.
+SIGAA: Found fresh script for file fotos_aula_08_2025-10-03_sexta-feira.pdf
+SIGAA: Attempting fast HTTP download for file 3659010...
+[HttpScraper] Downloading file "fotos_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3659010) for course 513209
+[HttpScraper] Sending download request. ComponentID: formAva:j_id_jsp_1287906063_105:0:j_id_jsp_1287906063_165:18:idInserirMaterialArquivo
+[HttpScraper] Response headers: Content-Type=application/pdf, Content-Length=undefined
+[HttpScraper] Download complete: C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\fotos_aula_08_2025-10-03_sexta-feira.pdf
+SIGAA: HTTP download successful!
+Download successful! C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\fotos_aula_08_2025-10-03_sexta-feira.pdf
+File size: 606179 bytes
+File header: %PDF-
+
+Downloading: anotacoes_aula_09_2025-10-08_quarta-feira.pdf
+SIGAA: Downloading file anotacoes_aula_09_2025-10-08_quarta-feira.pdf...
+SIGAA: Re-entering course 513209 to refresh session before download...
+Playwright: Navigating to portal...
+Playwright Browser Log: A parser-blocking, cross site (i.e. different eTLD+1) script, https://vlibras.gov.br/app/vlibras-plugin.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.
+Playwright: Entering course 513209 (FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO)...
+Playwright Browser Log: Clicking course: CK0181 - FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO
+Playwright: URL not AVA after click, forcing navigation...
+Playwright: Verified we are in course "FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO"
+Playwright: Files detected on Main Page. Skipping navigation.
+Playwright: Captured HTML for course 513209 (94984 bytes)
+[HttpScraper] Cookies set. Count: 1
+[HttpScraper] Fetching course page for FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO...
+[HttpScraper] Using pre-fetched HTML from Playwright. Length: 94984
+[HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[HttpScraper] Saved Playwright HTML to debug_playwright.html
+[HttpScraper] Using Playwright HTML directly.
+[HttpScraper] Stored ViewState and 3 inputs for course 513209
+[HttpScraper] Scanning for files...
+[HttpScraper] Found file: "anotacoes_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627310)
+[HttpScraper] Found file: "fotos_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627323)
+[HttpScraper] Found file: "anotacoes_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627661)
+[HttpScraper] Found file: "fotos_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627680)
+[HttpScraper] Found file: "anotacoes_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633194)
+[HttpScraper] Found file: "fotos_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633220)
+[HttpScraper] Found file: "anotacoes_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3635645)
+[HttpScraper] Found file: "fotos_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3638719)
+[HttpScraper] Found file: "fotos_tira-duvidas_01_2025-09-18_quinta-feira.pdf" (ID: 3638752)
+[HttpScraper] Found file: "anotacoes_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642838)
+[HttpScraper] Found file: "fotos_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642845)
+[HttpScraper] Found file: "fotos_tira-duvidas_02_2025-09-25_quinta-feira.pdf" (ID: 3644716)
+[HttpScraper] Found file: "anotacoes_aula_06_2025-09-26_sexta-feira.pdf" (ID: 3645976)
+[HttpScraper] Found file: "Lista de Exercícios 01 — Monitoria" (ID: 3653135)
+[HttpScraper] Found file: "anotacoes_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3654421)
+[HttpScraper] Found file: "fotos_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3657214)
+[HttpScraper] Found file: "fotos_tira-duvidas_03_2025-10-02_quinta-feira.pdf" (ID: 3657222)
+[HttpScraper] Found file: "anotacoes_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3658227)
+[HttpScraper] Found file: "fotos_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3659010)
+[HttpScraper] Found file: "anotacoes_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670009)
+[HttpScraper] Found file: "fotos_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670041)
+[HttpScraper] Found file: "Lista de Exercícios 02 — Monitoria" (ID: 3671150)
+[HttpScraper] Found file: "fotos_aula_10_2025-10-10_sexta-feira.pdf" (ID: 3683689)
+[HttpScraper] Found file: "anotacoes_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3685869)
+[HttpScraper] Found file: "fotos_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3686249)
+[HttpScraper] Found file: "anotacoes_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687844)
+[HttpScraper] Found file: "fotos_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687859)
+[HttpScraper] Found file: "anotacoes_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697755)
+[HttpScraper] Found file: "fotos_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697756)
+[HttpScraper] Found file: "fotos_tira-duvidas_06_2025-10-23_quinta-feira.pdf" (ID: 3697757)
+[HttpScraper] Found file: "Lista de Exercícios 03 — Monitoria" (ID: 3700393)
+[HttpScraper] Found file: "fotos_aula_14_2025-10-24_sexta-feira.pdf" (ID: 3706586)
+[HttpScraper] Found file: "fotos_tira-duvidas_07_2025-10-30_quinta-feira.pdf" (ID: 3706608)
+[HttpScraper] Found file: "fotos_aula_15_2025-10-31_sexta-feira.pdf" (ID: 3706629)
+[HttpScraper] Found file: "fotos_aula_16_2025-11-12_quarta-feira.pdf" (ID: 3718766)
+[HttpScraper] Found file: "fotos_tira-duvidas_08_2025-11-13_quinta-feira.pdf" (ID: 3719802)
+[HttpScraper] Found file: "fotos_aula_17_2025-11-19_quarta-feira.pdf" (ID: 3726246)
+[HttpScraper] Found file: "anotacoes_aula_18_2025-11-28_sexta-feira.pdf" (ID: 3741046)
+[HttpScraper] Found 38 files and 5 news items.
+SIGAA: Found fresh script for file anotacoes_aula_09_2025-10-08_quarta-feira.pdf
+SIGAA: Attempting fast HTTP download for file 3670009...
+[HttpScraper] Downloading file "anotacoes_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670009) for course 513209
+[HttpScraper] Sending download request. ComponentID: formAva:j_id_jsp_1287906063_105:0:j_id_jsp_1287906063_165:19:idInserirMaterialArquivo
+[HttpScraper] Response headers: Content-Type=application/pdf, Content-Length=undefined
+[HttpScraper] Download complete: C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\anotacoes_aula_09_2025-10-08_quarta-feira.pdf
+SIGAA: HTTP download successful!
+Download successful! C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\anotacoes_aula_09_2025-10-08_quarta-feira.pdf
+File size: 375475 bytes
+File header: %PDF-
+
+Downloading: fotos_aula_09_2025-10-08_quarta-feira.pdf
+SIGAA: Downloading file fotos_aula_09_2025-10-08_quarta-feira.pdf...
+SIGAA: Re-entering course 513209 to refresh session before download...
+Playwright: Navigating to portal...
+Playwright Browser Log: A parser-blocking, cross site (i.e. different eTLD+1) script, https://vlibras.gov.br/app/vlibras-plugin.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.
+Playwright: Entering course 513209 (FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO)...
+Playwright Browser Log: Clicking course: CK0181 - FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO
+Playwright: URL not AVA after click, forcing navigation...
+Playwright: Verified we are in course "FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO"
+Playwright: Files detected on Main Page. Skipping navigation.
+Playwright: Captured HTML for course 513209 (94984 bytes)
+[HttpScraper] Cookies set. Count: 1
+[HttpScraper] Fetching course page for FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO...
+[HttpScraper] Using pre-fetched HTML from Playwright. Length: 94984
+[HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[HttpScraper] Saved Playwright HTML to debug_playwright.html
+[HttpScraper] Using Playwright HTML directly.
+[HttpScraper] Stored ViewState and 3 inputs for course 513209
+[HttpScraper] Scanning for files...
+[HttpScraper] Found file: "anotacoes_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627310)
+[HttpScraper] Found file: "fotos_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627323)
+[HttpScraper] Found file: "anotacoes_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627661)
+[HttpScraper] Found file: "fotos_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627680)
+[HttpScraper] Found file: "anotacoes_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633194)
+[HttpScraper] Found file: "fotos_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633220)
+[HttpScraper] Found file: "anotacoes_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3635645)
+[HttpScraper] Found file: "fotos_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3638719)
+[HttpScraper] Found file: "fotos_tira-duvidas_01_2025-09-18_quinta-feira.pdf" (ID: 3638752)
+[HttpScraper] Found file: "anotacoes_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642838)
+[HttpScraper] Found file: "fotos_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642845)
+[HttpScraper] Found file: "fotos_tira-duvidas_02_2025-09-25_quinta-feira.pdf" (ID: 3644716)
+[HttpScraper] Found file: "anotacoes_aula_06_2025-09-26_sexta-feira.pdf" (ID: 3645976)
+[HttpScraper] Found file: "Lista de Exercícios 01 — Monitoria" (ID: 3653135)
+[HttpScraper] Found file: "anotacoes_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3654421)
+[HttpScraper] Found file: "fotos_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3657214)
+[HttpScraper] Found file: "fotos_tira-duvidas_03_2025-10-02_quinta-feira.pdf" (ID: 3657222)
+[HttpScraper] Found file: "anotacoes_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3658227)
+[HttpScraper] Found file: "fotos_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3659010)
+[HttpScraper] Found file: "anotacoes_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670009)
+[HttpScraper] Found file: "fotos_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670041)
+[HttpScraper] Found file: "Lista de Exercícios 02 — Monitoria" (ID: 3671150)
+[HttpScraper] Found file: "fotos_aula_10_2025-10-10_sexta-feira.pdf" (ID: 3683689)
+[HttpScraper] Found file: "anotacoes_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3685869)
+[HttpScraper] Found file: "fotos_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3686249)
+[HttpScraper] Found file: "anotacoes_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687844)
+[HttpScraper] Found file: "fotos_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687859)
+[HttpScraper] Found file: "anotacoes_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697755)
+[HttpScraper] Found file: "fotos_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697756)
+[HttpScraper] Found file: "fotos_tira-duvidas_06_2025-10-23_quinta-feira.pdf" (ID: 3697757)
+[HttpScraper] Found file: "Lista de Exercícios 03 — Monitoria" (ID: 3700393)
+[HttpScraper] Found file: "fotos_aula_14_2025-10-24_sexta-feira.pdf" (ID: 3706586)
+[HttpScraper] Found file: "fotos_tira-duvidas_07_2025-10-30_quinta-feira.pdf" (ID: 3706608)
+[HttpScraper] Found file: "fotos_aula_15_2025-10-31_sexta-feira.pdf" (ID: 3706629)
+[HttpScraper] Found file: "fotos_aula_16_2025-11-12_quarta-feira.pdf" (ID: 3718766)
+[HttpScraper] Found file: "fotos_tira-duvidas_08_2025-11-13_quinta-feira.pdf" (ID: 3719802)
+[HttpScraper] Found file: "fotos_aula_17_2025-11-19_quarta-feira.pdf" (ID: 3726246)
+[HttpScraper] Found file: "anotacoes_aula_18_2025-11-28_sexta-feira.pdf" (ID: 3741046)
+[HttpScraper] Found 38 files and 5 news items.
+SIGAA: Found fresh script for file fotos_aula_09_2025-10-08_quarta-feira.pdf
+SIGAA: Attempting fast HTTP download for file 3670041...
+[HttpScraper] Downloading file "fotos_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670041) for course 513209
+[HttpScraper] Sending download request. ComponentID: formAva:j_id_jsp_1287906063_105:0:j_id_jsp_1287906063_165:20:idInserirMaterialArquivo
+[HttpScraper] Response headers: Content-Type=application/pdf, Content-Length=undefined
+[HttpScraper] Download complete: C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\fotos_aula_09_2025-10-08_quarta-feira.pdf
+SIGAA: HTTP download successful!
+Download successful! C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\fotos_aula_09_2025-10-08_quarta-feira.pdf
+File size: 964649 bytes
+File header: %PDF-
+
+Downloading: Lista de Exercícios 02 — Monitoria
+SIGAA: Downloading file Lista de Exercícios 02 — Monitoria...
+SIGAA: Re-entering course 513209 to refresh session before download...
+Playwright: Navigating to portal...
+Playwright Browser Log: A parser-blocking, cross site (i.e. different eTLD+1) script, https://vlibras.gov.br/app/vlibras-plugin.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.
+Playwright: Entering course 513209 (FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO)...
+Playwright Browser Log: Clicking course: CK0181 - FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO
+Playwright: URL not AVA after click, forcing navigation...
+Playwright Browser Log: A parser-blocking, cross site (i.e. different eTLD+1) script, https://vlibras.gov.br/app/vlibras-plugin.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.
+Playwright: Verified we are in course "FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO"
+Playwright: Files detected on Main Page. Skipping navigation.
+Playwright: Captured HTML for course 513209 (94984 bytes)
+[HttpScraper] Cookies set. Count: 1
+[HttpScraper] Fetching course page for FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO...
+[HttpScraper] Using pre-fetched HTML from Playwright. Length: 94984
+[HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[HttpScraper] Saved Playwright HTML to debug_playwright.html
+[HttpScraper] Using Playwright HTML directly.
+[HttpScraper] Stored ViewState and 3 inputs for course 513209
+[HttpScraper] Scanning for files...
+[HttpScraper] Found file: "anotacoes_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627310)
+[HttpScraper] Found file: "fotos_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627323)
+[HttpScraper] Found file: "anotacoes_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627661)
+[HttpScraper] Found file: "fotos_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627680)
+[HttpScraper] Found file: "anotacoes_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633194)
+[HttpScraper] Found file: "fotos_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633220)
+[HttpScraper] Found file: "anotacoes_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3635645)
+[HttpScraper] Found file: "fotos_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3638719)
+[HttpScraper] Found file: "fotos_tira-duvidas_01_2025-09-18_quinta-feira.pdf" (ID: 3638752)
+[HttpScraper] Found file: "anotacoes_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642838)
+[HttpScraper] Found file: "fotos_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642845)
+[HttpScraper] Found file: "fotos_tira-duvidas_02_2025-09-25_quinta-feira.pdf" (ID: 3644716)
+[HttpScraper] Found file: "anotacoes_aula_06_2025-09-26_sexta-feira.pdf" (ID: 3645976)
+[HttpScraper] Found file: "Lista de Exercícios 01 — Monitoria" (ID: 3653135)
+[HttpScraper] Found file: "anotacoes_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3654421)
+[HttpScraper] Found file: "fotos_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3657214)
+[HttpScraper] Found file: "fotos_tira-duvidas_03_2025-10-02_quinta-feira.pdf" (ID: 3657222)
+[HttpScraper] Found file: "anotacoes_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3658227)
+[HttpScraper] Found file: "fotos_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3659010)
+[HttpScraper] Found file: "anotacoes_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670009)
+[HttpScraper] Found file: "fotos_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670041)
+[HttpScraper] Found file: "Lista de Exercícios 02 — Monitoria" (ID: 3671150)
+[HttpScraper] Found file: "fotos_aula_10_2025-10-10_sexta-feira.pdf" (ID: 3683689)
+[HttpScraper] Found file: "anotacoes_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3685869)
+[HttpScraper] Found file: "fotos_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3686249)
+[HttpScraper] Found file: "anotacoes_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687844)
+[HttpScraper] Found file: "fotos_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687859)
+[HttpScraper] Found file: "anotacoes_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697755)
+[HttpScraper] Found file: "fotos_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697756)
+[HttpScraper] Found file: "fotos_tira-duvidas_06_2025-10-23_quinta-feira.pdf" (ID: 3697757)
+[HttpScraper] Found file: "Lista de Exercícios 03 — Monitoria" (ID: 3700393)
+[HttpScraper] Found file: "fotos_aula_14_2025-10-24_sexta-feira.pdf" (ID: 3706586)
+[HttpScraper] Found file: "fotos_tira-duvidas_07_2025-10-30_quinta-feira.pdf" (ID: 3706608)
+[HttpScraper] Found file: "fotos_aula_15_2025-10-31_sexta-feira.pdf" (ID: 3706629)
+[HttpScraper] Found file: "fotos_aula_16_2025-11-12_quarta-feira.pdf" (ID: 3718766)
+[HttpScraper] Found file: "fotos_tira-duvidas_08_2025-11-13_quinta-feira.pdf" (ID: 3719802)
+[HttpScraper] Found file: "fotos_aula_17_2025-11-19_quarta-feira.pdf" (ID: 3726246)
+[HttpScraper] Found file: "anotacoes_aula_18_2025-11-28_sexta-feira.pdf" (ID: 3741046)
+[HttpScraper] Found 38 files and 5 news items.
+SIGAA: Found fresh script for file Lista de Exercícios 02 — Monitoria
+SIGAA: Attempting fast HTTP download for file 3671150...
+[HttpScraper] Downloading file "Lista de Exercícios 02 — Monitoria" (ID: 3671150) for course 513209
+[HttpScraper] Sending download request. ComponentID: formAva:j_id_jsp_1287906063_105:0:j_id_jsp_1287906063_165:21:idInserirMaterialArquivo
+[HttpScraper] Response headers: Content-Type=application/pdf, Content-Length=undefined
+[HttpScraper] Download complete: C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\Lista02_FMC.pdf
+SIGAA: HTTP download successful!
+Download successful! C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\Lista02_FMC.pdf
+File size: 385471 bytes
+File header: %PDF-
+
+Downloading: fotos_aula_10_2025-10-10_sexta-feira.pdf
+SIGAA: Downloading file fotos_aula_10_2025-10-10_sexta-feira.pdf...
+SIGAA: Re-entering course 513209 to refresh session before download...
+Playwright: Navigating to portal...
+Playwright Browser Log: A parser-blocking, cross site (i.e. different eTLD+1) script, https://vlibras.gov.br/app/vlibras-plugin.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.
+Playwright: Entering course 513209 (FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO)...
+Playwright Browser Log: Clicking course: CK0181 - FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO
+Playwright: URL not AVA after click, forcing navigation...
+Playwright: Verified we are in course "FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO"
+Playwright: Files detected on Main Page. Skipping navigation.
+Playwright: Captured HTML for course 513209 (94984 bytes)
+[HttpScraper] Cookies set. Count: 1
+[HttpScraper] Fetching course page for FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO...
+[HttpScraper] Using pre-fetched HTML from Playwright. Length: 94984
+[HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[HttpScraper] Saved Playwright HTML to debug_playwright.html
+[HttpScraper] Using Playwright HTML directly.
+[HttpScraper] Stored ViewState and 3 inputs for course 513209
+[HttpScraper] Scanning for files...
+[HttpScraper] Found file: "anotacoes_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627310)
+[HttpScraper] Found file: "fotos_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627323)
+[HttpScraper] Found file: "anotacoes_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627661)
+[HttpScraper] Found file: "fotos_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627680)
+[HttpScraper] Found file: "anotacoes_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633194)
+[HttpScraper] Found file: "fotos_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633220)
+[HttpScraper] Found file: "anotacoes_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3635645)
+[HttpScraper] Found file: "fotos_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3638719)
+[HttpScraper] Found file: "fotos_tira-duvidas_01_2025-09-18_quinta-feira.pdf" (ID: 3638752)
+[HttpScraper] Found file: "anotacoes_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642838)
+[HttpScraper] Found file: "fotos_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642845)
+[HttpScraper] Found file: "fotos_tira-duvidas_02_2025-09-25_quinta-feira.pdf" (ID: 3644716)
+[HttpScraper] Found file: "anotacoes_aula_06_2025-09-26_sexta-feira.pdf" (ID: 3645976)
+[HttpScraper] Found file: "Lista de Exercícios 01 — Monitoria" (ID: 3653135)
+[HttpScraper] Found file: "anotacoes_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3654421)
+[HttpScraper] Found file: "fotos_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3657214)
+[HttpScraper] Found file: "fotos_tira-duvidas_03_2025-10-02_quinta-feira.pdf" (ID: 3657222)
+[HttpScraper] Found file: "anotacoes_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3658227)
+[HttpScraper] Found file: "fotos_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3659010)
+[HttpScraper] Found file: "anotacoes_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670009)
+[HttpScraper] Found file: "fotos_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670041)
+[HttpScraper] Found file: "Lista de Exercícios 02 — Monitoria" (ID: 3671150)
+[HttpScraper] Found file: "fotos_aula_10_2025-10-10_sexta-feira.pdf" (ID: 3683689)
+[HttpScraper] Found file: "anotacoes_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3685869)
+[HttpScraper] Found file: "fotos_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3686249)
+[HttpScraper] Found file: "anotacoes_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687844)
+[HttpScraper] Found file: "fotos_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687859)
+[HttpScraper] Found file: "anotacoes_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697755)
+[HttpScraper] Found file: "fotos_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697756)
+[HttpScraper] Found file: "fotos_tira-duvidas_06_2025-10-23_quinta-feira.pdf" (ID: 3697757)
+[HttpScraper] Found file: "Lista de Exercícios 03 — Monitoria" (ID: 3700393)
+[HttpScraper] Found file: "fotos_aula_14_2025-10-24_sexta-feira.pdf" (ID: 3706586)
+[HttpScraper] Found file: "fotos_tira-duvidas_07_2025-10-30_quinta-feira.pdf" (ID: 3706608)
+[HttpScraper] Found file: "fotos_aula_15_2025-10-31_sexta-feira.pdf" (ID: 3706629)
+[HttpScraper] Found file: "fotos_aula_16_2025-11-12_quarta-feira.pdf" (ID: 3718766)
+[HttpScraper] Found file: "fotos_tira-duvidas_08_2025-11-13_quinta-feira.pdf" (ID: 3719802)
+[HttpScraper] Found file: "fotos_aula_17_2025-11-19_quarta-feira.pdf" (ID: 3726246)
+[HttpScraper] Found file: "anotacoes_aula_18_2025-11-28_sexta-feira.pdf" (ID: 3741046)
+[HttpScraper] Found 38 files and 5 news items.
+SIGAA: Found fresh script for file fotos_aula_10_2025-10-10_sexta-feira.pdf
+SIGAA: Attempting fast HTTP download for file 3683689...
+[HttpScraper] Downloading file "fotos_aula_10_2025-10-10_sexta-feira.pdf" (ID: 3683689) for course 513209
+[HttpScraper] Sending download request. ComponentID: formAva:j_id_jsp_1287906063_105:0:j_id_jsp_1287906063_165:22:idInserirMaterialArquivo
+[HttpScraper] Response headers: Content-Type=application/pdf, Content-Length=undefined
+[HttpScraper] Download complete: C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\fotos_aula_10_2025-10-10_sexta-feira.pdf
+SIGAA: HTTP download successful!
+Download successful! C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\fotos_aula_10_2025-10-10_sexta-feira.pdf
+File size: 593866 bytes
+File header: %PDF-
+
+Downloading: anotacoes_aula_11_2025-10-15_quarta-feira.pdf
+SIGAA: Downloading file anotacoes_aula_11_2025-10-15_quarta-feira.pdf...
+SIGAA: Re-entering course 513209 to refresh session before download...
+Playwright: Navigating to portal...
+Playwright Browser Log: A parser-blocking, cross site (i.e. different eTLD+1) script, https://vlibras.gov.br/app/vlibras-plugin.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.
+Playwright: Entering course 513209 (FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO)...
+Playwright Browser Log: Clicking course: CK0181 - FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO
+Playwright: URL not AVA after click, forcing navigation...
+Playwright: Verified we are in course "FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO"
+Playwright: Files detected on Main Page. Skipping navigation.
+Playwright: Captured HTML for course 513209 (94984 bytes)
+[HttpScraper] Cookies set. Count: 1
+[HttpScraper] Fetching course page for FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO...
+[HttpScraper] Using pre-fetched HTML from Playwright. Length: 94984
+[HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[HttpScraper] Saved Playwright HTML to debug_playwright.html
+[HttpScraper] Using Playwright HTML directly.
+[HttpScraper] Stored ViewState and 3 inputs for course 513209
+[HttpScraper] Scanning for files...
+[HttpScraper] Found file: "anotacoes_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627310)
+[HttpScraper] Found file: "fotos_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627323)
+[HttpScraper] Found file: "anotacoes_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627661)
+[HttpScraper] Found file: "fotos_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627680)
+[HttpScraper] Found file: "anotacoes_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633194)
+[HttpScraper] Found file: "fotos_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633220)
+[HttpScraper] Found file: "anotacoes_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3635645)
+[HttpScraper] Found file: "fotos_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3638719)
+[HttpScraper] Found file: "fotos_tira-duvidas_01_2025-09-18_quinta-feira.pdf" (ID: 3638752)
+[HttpScraper] Found file: "anotacoes_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642838)
+[HttpScraper] Found file: "fotos_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642845)
+[HttpScraper] Found file: "fotos_tira-duvidas_02_2025-09-25_quinta-feira.pdf" (ID: 3644716)
+[HttpScraper] Found file: "anotacoes_aula_06_2025-09-26_sexta-feira.pdf" (ID: 3645976)
+[HttpScraper] Found file: "Lista de Exercícios 01 — Monitoria" (ID: 3653135)
+[HttpScraper] Found file: "anotacoes_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3654421)
+[HttpScraper] Found file: "fotos_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3657214)
+[HttpScraper] Found file: "fotos_tira-duvidas_03_2025-10-02_quinta-feira.pdf" (ID: 3657222)
+[HttpScraper] Found file: "anotacoes_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3658227)
+[HttpScraper] Found file: "fotos_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3659010)
+[HttpScraper] Found file: "anotacoes_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670009)
+[HttpScraper] Found file: "fotos_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670041)
+[HttpScraper] Found file: "Lista de Exercícios 02 — Monitoria" (ID: 3671150)
+[HttpScraper] Found file: "fotos_aula_10_2025-10-10_sexta-feira.pdf" (ID: 3683689)
+[HttpScraper] Found file: "anotacoes_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3685869)
+[HttpScraper] Found file: "fotos_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3686249)
+[HttpScraper] Found file: "anotacoes_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687844)
+[HttpScraper] Found file: "fotos_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687859)
+[HttpScraper] Found file: "anotacoes_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697755)
+[HttpScraper] Found file: "fotos_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697756)
+[HttpScraper] Found file: "fotos_tira-duvidas_06_2025-10-23_quinta-feira.pdf" (ID: 3697757)
+[HttpScraper] Found file: "Lista de Exercícios 03 — Monitoria" (ID: 3700393)
+[HttpScraper] Found file: "fotos_aula_14_2025-10-24_sexta-feira.pdf" (ID: 3706586)
+[HttpScraper] Found file: "fotos_tira-duvidas_07_2025-10-30_quinta-feira.pdf" (ID: 3706608)
+[HttpScraper] Found file: "fotos_aula_15_2025-10-31_sexta-feira.pdf" (ID: 3706629)
+[HttpScraper] Found file: "fotos_aula_16_2025-11-12_quarta-feira.pdf" (ID: 3718766)
+[HttpScraper] Found file: "fotos_tira-duvidas_08_2025-11-13_quinta-feira.pdf" (ID: 3719802)
+[HttpScraper] Found file: "fotos_aula_17_2025-11-19_quarta-feira.pdf" (ID: 3726246)
+[HttpScraper] Found file: "anotacoes_aula_18_2025-11-28_sexta-feira.pdf" (ID: 3741046)
+[HttpScraper] Found 38 files and 5 news items.
+SIGAA: Found fresh script for file anotacoes_aula_11_2025-10-15_quarta-feira.pdf
+SIGAA: Attempting fast HTTP download for file 3685869...
+[HttpScraper] Downloading file "anotacoes_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3685869) for course 513209
+[HttpScraper] Sending download request. ComponentID: formAva:j_id_jsp_1287906063_105:0:j_id_jsp_1287906063_165:23:idInserirMaterialArquivo
+[HttpScraper] Response headers: Content-Type=application/pdf, Content-Length=undefined
+[HttpScraper] Download complete: C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\anotacoes_aula_11_2025-10-15_quarta-feira.pdf
+SIGAA: HTTP download successful!
+Download successful! C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\anotacoes_aula_11_2025-10-15_quarta-feira.pdf
+File size: 383592 bytes
+File header: %PDF-
+
+Downloading: fotos_aula_11_2025-10-15_quarta-feira.pdf
+SIGAA: Downloading file fotos_aula_11_2025-10-15_quarta-feira.pdf...
+SIGAA: Re-entering course 513209 to refresh session before download...
+Playwright: Navigating to portal...
+Playwright Browser Log: A parser-blocking, cross site (i.e. different eTLD+1) script, https://vlibras.gov.br/app/vlibras-plugin.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.
+Playwright: Entering course 513209 (FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO)...
+Playwright Browser Log: Clicking course: CK0181 - FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO
+Playwright: URL not AVA after click, forcing navigation...
+Playwright: Verified we are in course "FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO"
+Playwright: Files detected on Main Page. Skipping navigation.
+Playwright: Captured HTML for course 513209 (94984 bytes)
+[HttpScraper] Cookies set. Count: 1
+[HttpScraper] Fetching course page for FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO...
+[HttpScraper] Using pre-fetched HTML from Playwright. Length: 94984
+[HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[HttpScraper] Saved Playwright HTML to debug_playwright.html
+[HttpScraper] Using Playwright HTML directly.
+[HttpScraper] Stored ViewState and 3 inputs for course 513209
+[HttpScraper] Scanning for files...
+[HttpScraper] Found file: "anotacoes_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627310)
+[HttpScraper] Found file: "fotos_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627323)
+[HttpScraper] Found file: "anotacoes_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627661)
+[HttpScraper] Found file: "fotos_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627680)
+[HttpScraper] Found file: "anotacoes_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633194)
+[HttpScraper] Found file: "fotos_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633220)
+[HttpScraper] Found file: "anotacoes_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3635645)
+[HttpScraper] Found file: "fotos_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3638719)
+[HttpScraper] Found file: "fotos_tira-duvidas_01_2025-09-18_quinta-feira.pdf" (ID: 3638752)
+[HttpScraper] Found file: "anotacoes_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642838)
+[HttpScraper] Found file: "fotos_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642845)
+[HttpScraper] Found file: "fotos_tira-duvidas_02_2025-09-25_quinta-feira.pdf" (ID: 3644716)
+[HttpScraper] Found file: "anotacoes_aula_06_2025-09-26_sexta-feira.pdf" (ID: 3645976)
+[HttpScraper] Found file: "Lista de Exercícios 01 — Monitoria" (ID: 3653135)
+[HttpScraper] Found file: "anotacoes_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3654421)
+[HttpScraper] Found file: "fotos_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3657214)
+[HttpScraper] Found file: "fotos_tira-duvidas_03_2025-10-02_quinta-feira.pdf" (ID: 3657222)
+[HttpScraper] Found file: "anotacoes_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3658227)
+[HttpScraper] Found file: "fotos_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3659010)
+[HttpScraper] Found file: "anotacoes_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670009)
+[HttpScraper] Found file: "fotos_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670041)
+[HttpScraper] Found file: "Lista de Exercícios 02 — Monitoria" (ID: 3671150)
+[HttpScraper] Found file: "fotos_aula_10_2025-10-10_sexta-feira.pdf" (ID: 3683689)
+[HttpScraper] Found file: "anotacoes_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3685869)
+[HttpScraper] Found file: "fotos_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3686249)
+[HttpScraper] Found file: "anotacoes_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687844)
+[HttpScraper] Found file: "fotos_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687859)
+[HttpScraper] Found file: "anotacoes_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697755)
+[HttpScraper] Found file: "fotos_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697756)
+[HttpScraper] Found file: "fotos_tira-duvidas_06_2025-10-23_quinta-feira.pdf" (ID: 3697757)
+[HttpScraper] Found file: "Lista de Exercícios 03 — Monitoria" (ID: 3700393)
+[HttpScraper] Found file: "fotos_aula_14_2025-10-24_sexta-feira.pdf" (ID: 3706586)
+[HttpScraper] Found file: "fotos_tira-duvidas_07_2025-10-30_quinta-feira.pdf" (ID: 3706608)
+[HttpScraper] Found file: "fotos_aula_15_2025-10-31_sexta-feira.pdf" (ID: 3706629)
+[HttpScraper] Found file: "fotos_aula_16_2025-11-12_quarta-feira.pdf" (ID: 3718766)
+[HttpScraper] Found file: "fotos_tira-duvidas_08_2025-11-13_quinta-feira.pdf" (ID: 3719802)
+[HttpScraper] Found file: "fotos_aula_17_2025-11-19_quarta-feira.pdf" (ID: 3726246)
+[HttpScraper] Found file: "anotacoes_aula_18_2025-11-28_sexta-feira.pdf" (ID: 3741046)
+[HttpScraper] Found 38 files and 5 news items.
+SIGAA: Found fresh script for file fotos_aula_11_2025-10-15_quarta-feira.pdf
+SIGAA: Attempting fast HTTP download for file 3686249...
+[HttpScraper] Downloading file "fotos_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3686249) for course 513209
+[HttpScraper] Sending download request. ComponentID: formAva:j_id_jsp_1287906063_105:0:j_id_jsp_1287906063_165:24:idInserirMaterialArquivo
+[HttpScraper] Response headers: Content-Type=application/pdf, Content-Length=undefined
+[HttpScraper] Download complete: C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\fotos_aula_11_2025-10-15_quarta-feira.pdf
+SIGAA: HTTP download successful!
+Download successful! C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\fotos_aula_11_2025-10-15_quarta-feira.pdf
+File size: 1003571 bytes
+File header: %PDF-
+
+Downloading: anotacoes_aula_12_2025-10-17_sexta-feira.pdf
+SIGAA: Downloading file anotacoes_aula_12_2025-10-17_sexta-feira.pdf...
+SIGAA: Re-entering course 513209 to refresh session before download...
+Playwright: Navigating to portal...
+Playwright Browser Log: A parser-blocking, cross site (i.e. different eTLD+1) script, https://vlibras.gov.br/app/vlibras-plugin.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.
+Playwright: Entering course 513209 (FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO)...
+Playwright Browser Log: Clicking course: CK0181 - FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO
+Playwright Browser Log: A parser-blocking, cross site (i.e. different eTLD+1) script, https://vlibras.gov.br/app/vlibras-plugin.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.
+Playwright: URL not AVA after click, forcing navigation...
+Playwright: Verified we are in course "FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO"
+Playwright: Files detected on Main Page. Skipping navigation.
+Playwright: Captured HTML for course 513209 (94984 bytes)
+[HttpScraper] Cookies set. Count: 1
+[HttpScraper] Fetching course page for FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO...
+[HttpScraper] Using pre-fetched HTML from Playwright. Length: 94984
+[HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[HttpScraper] Saved Playwright HTML to debug_playwright.html
+[HttpScraper] Using Playwright HTML directly.
+[HttpScraper] Stored ViewState and 3 inputs for course 513209
+[HttpScraper] Scanning for files...
+[HttpScraper] Found file: "anotacoes_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627310)
+[HttpScraper] Found file: "fotos_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627323)
+[HttpScraper] Found file: "anotacoes_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627661)
+[HttpScraper] Found file: "fotos_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627680)
+[HttpScraper] Found file: "anotacoes_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633194)
+[HttpScraper] Found file: "fotos_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633220)
+[HttpScraper] Found file: "anotacoes_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3635645)
+[HttpScraper] Found file: "fotos_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3638719)
+[HttpScraper] Found file: "fotos_tira-duvidas_01_2025-09-18_quinta-feira.pdf" (ID: 3638752)
+[HttpScraper] Found file: "anotacoes_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642838)
+[HttpScraper] Found file: "fotos_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642845)
+[HttpScraper] Found file: "fotos_tira-duvidas_02_2025-09-25_quinta-feira.pdf" (ID: 3644716)
+[HttpScraper] Found file: "anotacoes_aula_06_2025-09-26_sexta-feira.pdf" (ID: 3645976)
+[HttpScraper] Found file: "Lista de Exercícios 01 — Monitoria" (ID: 3653135)
+[HttpScraper] Found file: "anotacoes_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3654421)
+[HttpScraper] Found file: "fotos_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3657214)
+[HttpScraper] Found file: "fotos_tira-duvidas_03_2025-10-02_quinta-feira.pdf" (ID: 3657222)
+[HttpScraper] Found file: "anotacoes_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3658227)
+[HttpScraper] Found file: "fotos_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3659010)
+[HttpScraper] Found file: "anotacoes_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670009)
+[HttpScraper] Found file: "fotos_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670041)
+[HttpScraper] Found file: "Lista de Exercícios 02 — Monitoria" (ID: 3671150)
+[HttpScraper] Found file: "fotos_aula_10_2025-10-10_sexta-feira.pdf" (ID: 3683689)
+[HttpScraper] Found file: "anotacoes_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3685869)
+[HttpScraper] Found file: "fotos_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3686249)
+[HttpScraper] Found file: "anotacoes_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687844)
+[HttpScraper] Found file: "fotos_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687859)
+[HttpScraper] Found file: "anotacoes_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697755)
+[HttpScraper] Found file: "fotos_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697756)
+[HttpScraper] Found file: "fotos_tira-duvidas_06_2025-10-23_quinta-feira.pdf" (ID: 3697757)
+[HttpScraper] Found file: "Lista de Exercícios 03 — Monitoria" (ID: 3700393)
+[HttpScraper] Found file: "fotos_aula_14_2025-10-24_sexta-feira.pdf" (ID: 3706586)
+[HttpScraper] Found file: "fotos_tira-duvidas_07_2025-10-30_quinta-feira.pdf" (ID: 3706608)
+[HttpScraper] Found file: "fotos_aula_15_2025-10-31_sexta-feira.pdf" (ID: 3706629)
+[HttpScraper] Found file: "fotos_aula_16_2025-11-12_quarta-feira.pdf" (ID: 3718766)
+[HttpScraper] Found file: "fotos_tira-duvidas_08_2025-11-13_quinta-feira.pdf" (ID: 3719802)
+[HttpScraper] Found file: "fotos_aula_17_2025-11-19_quarta-feira.pdf" (ID: 3726246)
+[HttpScraper] Found file: "anotacoes_aula_18_2025-11-28_sexta-feira.pdf" (ID: 3741046)
+[HttpScraper] Found 38 files and 5 news items.
+SIGAA: Found fresh script for file anotacoes_aula_12_2025-10-17_sexta-feira.pdf
+SIGAA: Attempting fast HTTP download for file 3687844...
+[HttpScraper] Downloading file "anotacoes_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687844) for course 513209
+[HttpScraper] Sending download request. ComponentID: formAva:j_id_jsp_1287906063_105:0:j_id_jsp_1287906063_165:25:idInserirMaterialArquivo
+[HttpScraper] Response headers: Content-Type=application/pdf, Content-Length=undefined
+[HttpScraper] Download complete: C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\anotacoes_aula_12_2025-10-17_sexta-feira.pdf
+SIGAA: HTTP download successful!
+Download successful! C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\anotacoes_aula_12_2025-10-17_sexta-feira.pdf
+File size: 415511 bytes
+File header: %PDF-
+
+Downloading: fotos_aula_12_2025-10-17_sexta-feira.pdf
+SIGAA: Downloading file fotos_aula_12_2025-10-17_sexta-feira.pdf...
+SIGAA: Re-entering course 513209 to refresh session before download...
+Playwright: Navigating to portal...
+Playwright Browser Log: A parser-blocking, cross site (i.e. different eTLD+1) script, https://vlibras.gov.br/app/vlibras-plugin.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.
+Playwright: Entering course 513209 (FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO)...
+Playwright Browser Log: Clicking course: CK0181 - FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO
+Playwright: URL not AVA after click, forcing navigation...
+Playwright: Verified we are in course "FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO"
+Playwright: Files detected on Main Page. Skipping navigation.
+Playwright: Captured HTML for course 513209 (94984 bytes)
+[HttpScraper] Cookies set. Count: 1
+[HttpScraper] Fetching course page for FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO...
+[HttpScraper] Using pre-fetched HTML from Playwright. Length: 94984
+[HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[HttpScraper] Saved Playwright HTML to debug_playwright.html
+[HttpScraper] Using Playwright HTML directly.
+[HttpScraper] Stored ViewState and 3 inputs for course 513209
+[HttpScraper] Scanning for files...
+[HttpScraper] Found file: "anotacoes_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627310)
+[HttpScraper] Found file: "fotos_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627323)
+[HttpScraper] Found file: "anotacoes_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627661)
+[HttpScraper] Found file: "fotos_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627680)
+[HttpScraper] Found file: "anotacoes_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633194)
+[HttpScraper] Found file: "fotos_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633220)
+[HttpScraper] Found file: "anotacoes_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3635645)
+[HttpScraper] Found file: "fotos_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3638719)
+[HttpScraper] Found file: "fotos_tira-duvidas_01_2025-09-18_quinta-feira.pdf" (ID: 3638752)
+[HttpScraper] Found file: "anotacoes_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642838)
+[HttpScraper] Found file: "fotos_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642845)
+[HttpScraper] Found file: "fotos_tira-duvidas_02_2025-09-25_quinta-feira.pdf" (ID: 3644716)
+[HttpScraper] Found file: "anotacoes_aula_06_2025-09-26_sexta-feira.pdf" (ID: 3645976)
+[HttpScraper] Found file: "Lista de Exercícios 01 — Monitoria" (ID: 3653135)
+[HttpScraper] Found file: "anotacoes_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3654421)
+[HttpScraper] Found file: "fotos_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3657214)
+[HttpScraper] Found file: "fotos_tira-duvidas_03_2025-10-02_quinta-feira.pdf" (ID: 3657222)
+[HttpScraper] Found file: "anotacoes_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3658227)
+[HttpScraper] Found file: "fotos_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3659010)
+[HttpScraper] Found file: "anotacoes_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670009)
+[HttpScraper] Found file: "fotos_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670041)
+[HttpScraper] Found file: "Lista de Exercícios 02 — Monitoria" (ID: 3671150)
+[HttpScraper] Found file: "fotos_aula_10_2025-10-10_sexta-feira.pdf" (ID: 3683689)
+[HttpScraper] Found file: "anotacoes_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3685869)
+[HttpScraper] Found file: "fotos_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3686249)
+[HttpScraper] Found file: "anotacoes_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687844)
+[HttpScraper] Found file: "fotos_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687859)
+[HttpScraper] Found file: "anotacoes_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697755)
+[HttpScraper] Found file: "fotos_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697756)
+[HttpScraper] Found file: "fotos_tira-duvidas_06_2025-10-23_quinta-feira.pdf" (ID: 3697757)
+[HttpScraper] Found file: "Lista de Exercícios 03 — Monitoria" (ID: 3700393)
+[HttpScraper] Found file: "fotos_aula_14_2025-10-24_sexta-feira.pdf" (ID: 3706586)
+[HttpScraper] Found file: "fotos_tira-duvidas_07_2025-10-30_quinta-feira.pdf" (ID: 3706608)
+[HttpScraper] Found file: "fotos_aula_15_2025-10-31_sexta-feira.pdf" (ID: 3706629)
+[HttpScraper] Found file: "fotos_aula_16_2025-11-12_quarta-feira.pdf" (ID: 3718766)
+[HttpScraper] Found file: "fotos_tira-duvidas_08_2025-11-13_quinta-feira.pdf" (ID: 3719802)
+[HttpScraper] Found file: "fotos_aula_17_2025-11-19_quarta-feira.pdf" (ID: 3726246)
+[HttpScraper] Found file: "anotacoes_aula_18_2025-11-28_sexta-feira.pdf" (ID: 3741046)
+[HttpScraper] Found 38 files and 5 news items.
+SIGAA: Found fresh script for file fotos_aula_12_2025-10-17_sexta-feira.pdf
+SIGAA: Attempting fast HTTP download for file 3687859...
+[HttpScraper] Downloading file "fotos_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687859) for course 513209
+[HttpScraper] Sending download request. ComponentID: formAva:j_id_jsp_1287906063_105:0:j_id_jsp_1287906063_165:26:idInserirMaterialArquivo
+[HttpScraper] Response headers: Content-Type=application/pdf, Content-Length=undefined
+[HttpScraper] Download complete: C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\fotos_aula_12_2025-10-17_sexta-feira.pdf
+SIGAA: HTTP download successful!
+Download successful! C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\fotos_aula_12_2025-10-17_sexta-feira.pdf
+File size: 436703 bytes
+File header: %PDF-
+
+Downloading: anotacoes_aula_13_2025-10-22_quarta-feira.pdf
+SIGAA: Downloading file anotacoes_aula_13_2025-10-22_quarta-feira.pdf...
+SIGAA: Re-entering course 513209 to refresh session before download...
+Playwright: Navigating to portal...
+Playwright Browser Log: A parser-blocking, cross site (i.e. different eTLD+1) script, https://vlibras.gov.br/app/vlibras-plugin.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.
+Playwright: Entering course 513209 (FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO)...
+Playwright Browser Log: Clicking course: CK0181 - FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO
+Playwright: URL not AVA after click, forcing navigation...
+Playwright: Verified we are in course "FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO"
+Playwright: Files detected on Main Page. Skipping navigation.
+Playwright: Captured HTML for course 513209 (94984 bytes)
+[HttpScraper] Cookies set. Count: 1
+[HttpScraper] Fetching course page for FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO...
+[HttpScraper] Using pre-fetched HTML from Playwright. Length: 94984
+[HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[HttpScraper] Saved Playwright HTML to debug_playwright.html
+[HttpScraper] Using Playwright HTML directly.
+[HttpScraper] Stored ViewState and 3 inputs for course 513209
+[HttpScraper] Scanning for files...
+[HttpScraper] Found file: "anotacoes_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627310)
+[HttpScraper] Found file: "fotos_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627323)
+[HttpScraper] Found file: "anotacoes_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627661)
+[HttpScraper] Found file: "fotos_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627680)
+[HttpScraper] Found file: "anotacoes_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633194)
+[HttpScraper] Found file: "fotos_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633220)
+[HttpScraper] Found file: "anotacoes_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3635645)
+[HttpScraper] Found file: "fotos_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3638719)
+[HttpScraper] Found file: "fotos_tira-duvidas_01_2025-09-18_quinta-feira.pdf" (ID: 3638752)
+[HttpScraper] Found file: "anotacoes_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642838)
+[HttpScraper] Found file: "fotos_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642845)
+[HttpScraper] Found file: "fotos_tira-duvidas_02_2025-09-25_quinta-feira.pdf" (ID: 3644716)
+[HttpScraper] Found file: "anotacoes_aula_06_2025-09-26_sexta-feira.pdf" (ID: 3645976)
+[HttpScraper] Found file: "Lista de Exercícios 01 — Monitoria" (ID: 3653135)
+[HttpScraper] Found file: "anotacoes_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3654421)
+[HttpScraper] Found file: "fotos_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3657214)
+[HttpScraper] Found file: "fotos_tira-duvidas_03_2025-10-02_quinta-feira.pdf" (ID: 3657222)
+[HttpScraper] Found file: "anotacoes_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3658227)
+[HttpScraper] Found file: "fotos_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3659010)
+[HttpScraper] Found file: "anotacoes_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670009)
+[HttpScraper] Found file: "fotos_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670041)
+[HttpScraper] Found file: "Lista de Exercícios 02 — Monitoria" (ID: 3671150)
+[HttpScraper] Found file: "fotos_aula_10_2025-10-10_sexta-feira.pdf" (ID: 3683689)
+[HttpScraper] Found file: "anotacoes_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3685869)
+[HttpScraper] Found file: "fotos_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3686249)
+[HttpScraper] Found file: "anotacoes_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687844)
+[HttpScraper] Found file: "fotos_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687859)
+[HttpScraper] Found file: "anotacoes_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697755)
+[HttpScraper] Found file: "fotos_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697756)
+[HttpScraper] Found file: "fotos_tira-duvidas_06_2025-10-23_quinta-feira.pdf" (ID: 3697757)
+[HttpScraper] Found file: "Lista de Exercícios 03 — Monitoria" (ID: 3700393)
+[HttpScraper] Found file: "fotos_aula_14_2025-10-24_sexta-feira.pdf" (ID: 3706586)
+[HttpScraper] Found file: "fotos_tira-duvidas_07_2025-10-30_quinta-feira.pdf" (ID: 3706608)
+[HttpScraper] Found file: "fotos_aula_15_2025-10-31_sexta-feira.pdf" (ID: 3706629)
+[HttpScraper] Found file: "fotos_aula_16_2025-11-12_quarta-feira.pdf" (ID: 3718766)
+[HttpScraper] Found file: "fotos_tira-duvidas_08_2025-11-13_quinta-feira.pdf" (ID: 3719802)
+[HttpScraper] Found file: "fotos_aula_17_2025-11-19_quarta-feira.pdf" (ID: 3726246)
+[HttpScraper] Found file: "anotacoes_aula_18_2025-11-28_sexta-feira.pdf" (ID: 3741046)
+[HttpScraper] Found 38 files and 5 news items.
+SIGAA: Found fresh script for file anotacoes_aula_13_2025-10-22_quarta-feira.pdf
+SIGAA: Attempting fast HTTP download for file 3697755...
+[HttpScraper] Downloading file "anotacoes_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697755) for course 513209
+[HttpScraper] Sending download request. ComponentID: formAva:j_id_jsp_1287906063_105:0:j_id_jsp_1287906063_165:27:idInserirMaterialArquivo
+[HttpScraper] Response headers: Content-Type=application/pdf, Content-Length=undefined
+[HttpScraper] Download complete: C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\anotacoes_aula_13_2025-10-22_quarta-feira.pdf
+SIGAA: HTTP download successful!
+Download successful! C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\anotacoes_aula_13_2025-10-22_quarta-feira.pdf
+File size: 433266 bytes
+File header: %PDF-
+
+Downloading: fotos_aula_13_2025-10-22_quarta-feira.pdf
+SIGAA: Downloading file fotos_aula_13_2025-10-22_quarta-feira.pdf...
+SIGAA: Re-entering course 513209 to refresh session before download...
+Playwright: Navigating to portal...
+Playwright Browser Log: A parser-blocking, cross site (i.e. different eTLD+1) script, https://vlibras.gov.br/app/vlibras-plugin.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.
+Playwright: Entering course 513209 (FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO)...
+Playwright Browser Log: Clicking course: CK0181 - FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO
+Playwright: URL not AVA after click, forcing navigation...
+Playwright: Verified we are in course "FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO"
+Playwright: Files detected on Main Page. Skipping navigation.
+Playwright: Captured HTML for course 513209 (94984 bytes)
+[HttpScraper] Cookies set. Count: 1
+[HttpScraper] Fetching course page for FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO...
+[HttpScraper] Using pre-fetched HTML from Playwright. Length: 94984
+[HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[HttpScraper] Saved Playwright HTML to debug_playwright.html
+[HttpScraper] Using Playwright HTML directly.
+[HttpScraper] Stored ViewState and 3 inputs for course 513209
+[HttpScraper] Scanning for files...
+[HttpScraper] Found file: "anotacoes_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627310)
+[HttpScraper] Found file: "fotos_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627323)
+[HttpScraper] Found file: "anotacoes_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627661)
+[HttpScraper] Found file: "fotos_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627680)
+[HttpScraper] Found file: "anotacoes_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633194)
+[HttpScraper] Found file: "fotos_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633220)
+[HttpScraper] Found file: "anotacoes_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3635645)
+[HttpScraper] Found file: "fotos_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3638719)
+[HttpScraper] Found file: "fotos_tira-duvidas_01_2025-09-18_quinta-feira.pdf" (ID: 3638752)
+[HttpScraper] Found file: "anotacoes_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642838)
+[HttpScraper] Found file: "fotos_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642845)
+[HttpScraper] Found file: "fotos_tira-duvidas_02_2025-09-25_quinta-feira.pdf" (ID: 3644716)
+[HttpScraper] Found file: "anotacoes_aula_06_2025-09-26_sexta-feira.pdf" (ID: 3645976)
+[HttpScraper] Found file: "Lista de Exercícios 01 — Monitoria" (ID: 3653135)
+[HttpScraper] Found file: "anotacoes_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3654421)
+[HttpScraper] Found file: "fotos_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3657214)
+[HttpScraper] Found file: "fotos_tira-duvidas_03_2025-10-02_quinta-feira.pdf" (ID: 3657222)
+[HttpScraper] Found file: "anotacoes_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3658227)
+[HttpScraper] Found file: "fotos_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3659010)
+[HttpScraper] Found file: "anotacoes_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670009)
+[HttpScraper] Found file: "fotos_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670041)
+[HttpScraper] Found file: "Lista de Exercícios 02 — Monitoria" (ID: 3671150)
+[HttpScraper] Found file: "fotos_aula_10_2025-10-10_sexta-feira.pdf" (ID: 3683689)
+[HttpScraper] Found file: "anotacoes_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3685869)
+[HttpScraper] Found file: "fotos_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3686249)
+[HttpScraper] Found file: "anotacoes_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687844)
+[HttpScraper] Found file: "fotos_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687859)
+[HttpScraper] Found file: "anotacoes_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697755)
+[HttpScraper] Found file: "fotos_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697756)
+[HttpScraper] Found file: "fotos_tira-duvidas_06_2025-10-23_quinta-feira.pdf" (ID: 3697757)
+[HttpScraper] Found file: "Lista de Exercícios 03 — Monitoria" (ID: 3700393)
+[HttpScraper] Found file: "fotos_aula_14_2025-10-24_sexta-feira.pdf" (ID: 3706586)
+[HttpScraper] Found file: "fotos_tira-duvidas_07_2025-10-30_quinta-feira.pdf" (ID: 3706608)
+[HttpScraper] Found file: "fotos_aula_15_2025-10-31_sexta-feira.pdf" (ID: 3706629)
+[HttpScraper] Found file: "fotos_aula_16_2025-11-12_quarta-feira.pdf" (ID: 3718766)
+[HttpScraper] Found file: "fotos_tira-duvidas_08_2025-11-13_quinta-feira.pdf" (ID: 3719802)
+[HttpScraper] Found file: "fotos_aula_17_2025-11-19_quarta-feira.pdf" (ID: 3726246)
+[HttpScraper] Found file: "anotacoes_aula_18_2025-11-28_sexta-feira.pdf" (ID: 3741046)
+[HttpScraper] Found 38 files and 5 news items.
+SIGAA: Found fresh script for file fotos_aula_13_2025-10-22_quarta-feira.pdf
+SIGAA: Attempting fast HTTP download for file 3697756...
+[HttpScraper] Downloading file "fotos_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697756) for course 513209
+[HttpScraper] Sending download request. ComponentID: formAva:j_id_jsp_1287906063_105:0:j_id_jsp_1287906063_165:28:idInserirMaterialArquivo
+[HttpScraper] Response headers: Content-Type=application/pdf, Content-Length=undefined
+[HttpScraper] Download complete: C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\fotos_aula_13_2025-10-22_quarta-feira.pdf
+SIGAA: HTTP download successful!
+Download successful! C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\fotos_aula_13_2025-10-22_quarta-feira.pdf
+File size: 1144538 bytes
+File header: %PDF-
+
+Downloading: fotos_tira-duvidas_06_2025-10-23_quinta-feira.pdf
+SIGAA: Downloading file fotos_tira-duvidas_06_2025-10-23_quinta-feira.pdf...
+SIGAA: Re-entering course 513209 to refresh session before download...
+Playwright: Navigating to portal...
+Playwright: Entering course 513209 (FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO)...
+Playwright Browser Log: Clicking course: CK0181 - FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO
+Playwright: URL not AVA after click, forcing navigation...
+Playwright: Verified we are in course "FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO"
+Playwright: Files detected on Main Page. Skipping navigation.
+Playwright: Captured HTML for course 513209 (94984 bytes)
+[HttpScraper] Cookies set. Count: 1
+[HttpScraper] Fetching course page for FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO...
+[HttpScraper] Using pre-fetched HTML from Playwright. Length: 94984
+[HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[HttpScraper] Saved Playwright HTML to debug_playwright.html
+[HttpScraper] Using Playwright HTML directly.
+[HttpScraper] Stored ViewState and 3 inputs for course 513209
+[HttpScraper] Scanning for files...
+[HttpScraper] Found file: "anotacoes_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627310)
+[HttpScraper] Found file: "fotos_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627323)
+[HttpScraper] Found file: "anotacoes_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627661)
+[HttpScraper] Found file: "fotos_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627680)
+[HttpScraper] Found file: "anotacoes_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633194)
+[HttpScraper] Found file: "fotos_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633220)
+[HttpScraper] Found file: "anotacoes_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3635645)
+[HttpScraper] Found file: "fotos_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3638719)
+[HttpScraper] Found file: "fotos_tira-duvidas_01_2025-09-18_quinta-feira.pdf" (ID: 3638752)
+[HttpScraper] Found file: "anotacoes_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642838)
+[HttpScraper] Found file: "fotos_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642845)
+[HttpScraper] Found file: "fotos_tira-duvidas_02_2025-09-25_quinta-feira.pdf" (ID: 3644716)
+[HttpScraper] Found file: "anotacoes_aula_06_2025-09-26_sexta-feira.pdf" (ID: 3645976)
+[HttpScraper] Found file: "Lista de Exercícios 01 — Monitoria" (ID: 3653135)
+[HttpScraper] Found file: "anotacoes_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3654421)
+[HttpScraper] Found file: "fotos_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3657214)
+[HttpScraper] Found file: "fotos_tira-duvidas_03_2025-10-02_quinta-feira.pdf" (ID: 3657222)
+[HttpScraper] Found file: "anotacoes_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3658227)
+[HttpScraper] Found file: "fotos_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3659010)
+[HttpScraper] Found file: "anotacoes_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670009)
+[HttpScraper] Found file: "fotos_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670041)
+[HttpScraper] Found file: "Lista de Exercícios 02 — Monitoria" (ID: 3671150)
+[HttpScraper] Found file: "fotos_aula_10_2025-10-10_sexta-feira.pdf" (ID: 3683689)
+[HttpScraper] Found file: "anotacoes_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3685869)
+[HttpScraper] Found file: "fotos_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3686249)
+[HttpScraper] Found file: "anotacoes_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687844)
+[HttpScraper] Found file: "fotos_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687859)
+[HttpScraper] Found file: "anotacoes_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697755)
+[HttpScraper] Found file: "fotos_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697756)
+[HttpScraper] Found file: "fotos_tira-duvidas_06_2025-10-23_quinta-feira.pdf" (ID: 3697757)
+[HttpScraper] Found file: "Lista de Exercícios 03 — Monitoria" (ID: 3700393)
+[HttpScraper] Found file: "fotos_aula_14_2025-10-24_sexta-feira.pdf" (ID: 3706586)
+[HttpScraper] Found file: "fotos_tira-duvidas_07_2025-10-30_quinta-feira.pdf" (ID: 3706608)
+[HttpScraper] Found file: "fotos_aula_15_2025-10-31_sexta-feira.pdf" (ID: 3706629)
+[HttpScraper] Found file: "fotos_aula_16_2025-11-12_quarta-feira.pdf" (ID: 3718766)
+[HttpScraper] Found file: "fotos_tira-duvidas_08_2025-11-13_quinta-feira.pdf" (ID: 3719802)
+[HttpScraper] Found file: "fotos_aula_17_2025-11-19_quarta-feira.pdf" (ID: 3726246)
+[HttpScraper] Found file: "anotacoes_aula_18_2025-11-28_sexta-feira.pdf" (ID: 3741046)
+[HttpScraper] Found 38 files and 5 news items.
+SIGAA: Found fresh script for file fotos_tira-duvidas_06_2025-10-23_quinta-feira.pdf
+SIGAA: Attempting fast HTTP download for file 3697757...
+[HttpScraper] Downloading file "fotos_tira-duvidas_06_2025-10-23_quinta-feira.pdf" (ID: 3697757) for course 513209
+[HttpScraper] Sending download request. ComponentID: formAva:j_id_jsp_1287906063_105:0:j_id_jsp_1287906063_165:29:idInserirMaterialArquivo
+[HttpScraper] Response headers: Content-Type=application/pdf, Content-Length=undefined
+[HttpScraper] Download complete: C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\fotos_tira-duvidas_06_2025-10-23_quinta-feira.pdf
+SIGAA: HTTP download successful!
+Download successful! C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\fotos_tira-duvidas_06_2025-10-23_quinta-feira.pdf
+File size: 1528634 bytes
+File header: %PDF-
+
+Downloading: Lista de Exercícios 03 — Monitoria
+SIGAA: Downloading file Lista de Exercícios 03 — Monitoria...
+SIGAA: Re-entering course 513209 to refresh session before download...
+Playwright: Navigating to portal...
+Playwright: Entering course 513209 (FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO)...
+Playwright Browser Log: Clicking course: CK0181 - FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO
+Playwright: URL not AVA after click, forcing navigation...
+Playwright: Verified we are in course "FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO"
+Playwright: Files detected on Main Page. Skipping navigation.
+Playwright: Captured HTML for course 513209 (94984 bytes)
+[HttpScraper] Cookies set. Count: 1
+[HttpScraper] Fetching course page for FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO...
+[HttpScraper] Using pre-fetched HTML from Playwright. Length: 94984
+[HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[HttpScraper] Saved Playwright HTML to debug_playwright.html
+[HttpScraper] Using Playwright HTML directly.
+[HttpScraper] Stored ViewState and 3 inputs for course 513209
+[HttpScraper] Scanning for files...
+[HttpScraper] Found file: "anotacoes_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627310)
+[HttpScraper] Found file: "fotos_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627323)
+[HttpScraper] Found file: "anotacoes_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627661)
+[HttpScraper] Found file: "fotos_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627680)
+[HttpScraper] Found file: "anotacoes_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633194)
+[HttpScraper] Found file: "fotos_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633220)
+[HttpScraper] Found file: "anotacoes_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3635645)
+[HttpScraper] Found file: "fotos_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3638719)
+[HttpScraper] Found file: "fotos_tira-duvidas_01_2025-09-18_quinta-feira.pdf" (ID: 3638752)
+[HttpScraper] Found file: "anotacoes_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642838)
+[HttpScraper] Found file: "fotos_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642845)
+[HttpScraper] Found file: "fotos_tira-duvidas_02_2025-09-25_quinta-feira.pdf" (ID: 3644716)
+[HttpScraper] Found file: "anotacoes_aula_06_2025-09-26_sexta-feira.pdf" (ID: 3645976)
+[HttpScraper] Found file: "Lista de Exercícios 01 — Monitoria" (ID: 3653135)
+[HttpScraper] Found file: "anotacoes_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3654421)
+[HttpScraper] Found file: "fotos_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3657214)
+[HttpScraper] Found file: "fotos_tira-duvidas_03_2025-10-02_quinta-feira.pdf" (ID: 3657222)
+[HttpScraper] Found file: "anotacoes_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3658227)
+[HttpScraper] Found file: "fotos_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3659010)
+[HttpScraper] Found file: "anotacoes_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670009)
+[HttpScraper] Found file: "fotos_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670041)
+[HttpScraper] Found file: "Lista de Exercícios 02 — Monitoria" (ID: 3671150)
+[HttpScraper] Found file: "fotos_aula_10_2025-10-10_sexta-feira.pdf" (ID: 3683689)
+[HttpScraper] Found file: "anotacoes_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3685869)
+[HttpScraper] Found file: "fotos_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3686249)
+[HttpScraper] Found file: "anotacoes_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687844)
+[HttpScraper] Found file: "fotos_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687859)
+[HttpScraper] Found file: "anotacoes_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697755)
+[HttpScraper] Found file: "fotos_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697756)
+[HttpScraper] Found file: "fotos_tira-duvidas_06_2025-10-23_quinta-feira.pdf" (ID: 3697757)
+[HttpScraper] Found file: "Lista de Exercícios 03 — Monitoria" (ID: 3700393)
+[HttpScraper] Found file: "fotos_aula_14_2025-10-24_sexta-feira.pdf" (ID: 3706586)
+[HttpScraper] Found file: "fotos_tira-duvidas_07_2025-10-30_quinta-feira.pdf" (ID: 3706608)
+[HttpScraper] Found file: "fotos_aula_15_2025-10-31_sexta-feira.pdf" (ID: 3706629)
+[HttpScraper] Found file: "fotos_aula_16_2025-11-12_quarta-feira.pdf" (ID: 3718766)
+[HttpScraper] Found file: "fotos_tira-duvidas_08_2025-11-13_quinta-feira.pdf" (ID: 3719802)
+[HttpScraper] Found file: "fotos_aula_17_2025-11-19_quarta-feira.pdf" (ID: 3726246)
+[HttpScraper] Found file: "anotacoes_aula_18_2025-11-28_sexta-feira.pdf" (ID: 3741046)
+[HttpScraper] Found 38 files and 5 news items.
+SIGAA: Found fresh script for file Lista de Exercícios 03 — Monitoria
+SIGAA: Attempting fast HTTP download for file 3700393...
+[HttpScraper] Downloading file "Lista de Exercícios 03 — Monitoria" (ID: 3700393) for course 513209
+[HttpScraper] Sending download request. ComponentID: formAva:j_id_jsp_1287906063_105:0:j_id_jsp_1287906063_165:30:idInserirMaterialArquivo
+[HttpScraper] Response headers: Content-Type=application/pdf, Content-Length=undefined
+[HttpScraper] Download complete: C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\Lista03_FMC.pdf
+SIGAA: HTTP download successful!
+Download successful! C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\Lista03_FMC.pdf
+File size: 377684 bytes
+File header: %PDF-
+
+Downloading: fotos_aula_14_2025-10-24_sexta-feira.pdf
+SIGAA: Downloading file fotos_aula_14_2025-10-24_sexta-feira.pdf...
+SIGAA: Re-entering course 513209 to refresh session before download...
+Playwright: Navigating to portal...
+Playwright Browser Log: A parser-blocking, cross site (i.e. different eTLD+1) script, https://vlibras.gov.br/app/vlibras-plugin.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.
+Playwright: Entering course 513209 (FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO)...
+Playwright Browser Log: Clicking course: CK0181 - FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO
+Playwright: URL not AVA after click, forcing navigation...
+Playwright: Verified we are in course "FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO"
+Playwright: Files detected on Main Page. Skipping navigation.
+Playwright: Captured HTML for course 513209 (94995 bytes)
+[HttpScraper] Cookies set. Count: 1
+[HttpScraper] Fetching course page for FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO...
+[HttpScraper] Using pre-fetched HTML from Playwright. Length: 94995
+[HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[HttpScraper] Saved Playwright HTML to debug_playwright.html
+[HttpScraper] Using Playwright HTML directly.
+[HttpScraper] Stored ViewState and 3 inputs for course 513209
+[HttpScraper] Scanning for files...
+[HttpScraper] Found file: "anotacoes_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627310)
+[HttpScraper] Found file: "fotos_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627323)
+[HttpScraper] Found file: "anotacoes_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627661)
+[HttpScraper] Found file: "fotos_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627680)
+[HttpScraper] Found file: "anotacoes_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633194)
+[HttpScraper] Found file: "fotos_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633220)
+[HttpScraper] Found file: "anotacoes_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3635645)
+[HttpScraper] Found file: "fotos_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3638719)
+[HttpScraper] Found file: "fotos_tira-duvidas_01_2025-09-18_quinta-feira.pdf" (ID: 3638752)
+[HttpScraper] Found file: "anotacoes_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642838)
+[HttpScraper] Found file: "fotos_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642845)
+[HttpScraper] Found file: "fotos_tira-duvidas_02_2025-09-25_quinta-feira.pdf" (ID: 3644716)
+[HttpScraper] Found file: "anotacoes_aula_06_2025-09-26_sexta-feira.pdf" (ID: 3645976)
+[HttpScraper] Found file: "Lista de Exercícios 01 — Monitoria" (ID: 3653135)
+[HttpScraper] Found file: "anotacoes_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3654421)
+[HttpScraper] Found file: "fotos_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3657214)
+[HttpScraper] Found file: "fotos_tira-duvidas_03_2025-10-02_quinta-feira.pdf" (ID: 3657222)
+[HttpScraper] Found file: "anotacoes_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3658227)
+[HttpScraper] Found file: "fotos_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3659010)
+[HttpScraper] Found file: "anotacoes_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670009)
+[HttpScraper] Found file: "fotos_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670041)
+[HttpScraper] Found file: "Lista de Exercícios 02 — Monitoria" (ID: 3671150)
+[HttpScraper] Found file: "fotos_aula_10_2025-10-10_sexta-feira.pdf" (ID: 3683689)
+[HttpScraper] Found file: "anotacoes_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3685869)
+[HttpScraper] Found file: "fotos_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3686249)
+[HttpScraper] Found file: "anotacoes_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687844)
+[HttpScraper] Found file: "fotos_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687859)
+[HttpScraper] Found file: "anotacoes_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697755)
+[HttpScraper] Found file: "fotos_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697756)
+[HttpScraper] Found file: "fotos_tira-duvidas_06_2025-10-23_quinta-feira.pdf" (ID: 3697757)
+[HttpScraper] Found file: "Lista de Exercícios 03 — Monitoria" (ID: 3700393)
+[HttpScraper] Found file: "fotos_aula_14_2025-10-24_sexta-feira.pdf" (ID: 3706586)
+[HttpScraper] Found file: "fotos_tira-duvidas_07_2025-10-30_quinta-feira.pdf" (ID: 3706608)
+[HttpScraper] Found file: "fotos_aula_15_2025-10-31_sexta-feira.pdf" (ID: 3706629)
+[HttpScraper] Found file: "fotos_aula_16_2025-11-12_quarta-feira.pdf" (ID: 3718766)
+[HttpScraper] Found file: "fotos_tira-duvidas_08_2025-11-13_quinta-feira.pdf" (ID: 3719802)
+[HttpScraper] Found file: "fotos_aula_17_2025-11-19_quarta-feira.pdf" (ID: 3726246)
+[HttpScraper] Found file: "anotacoes_aula_18_2025-11-28_sexta-feira.pdf" (ID: 3741046)
+[HttpScraper] Found 38 files and 5 news items.
+SIGAA: Found fresh script for file fotos_aula_14_2025-10-24_sexta-feira.pdf
+SIGAA: Attempting fast HTTP download for file 3706586...
+[HttpScraper] Downloading file "fotos_aula_14_2025-10-24_sexta-feira.pdf" (ID: 3706586) for course 513209
+[HttpScraper] Sending download request. ComponentID: formAva:j_id_jsp_1287906063_105:0:j_id_jsp_1287906063_165:31:idInserirMaterialArquivo
+[HttpScraper] Response headers: Content-Type=application/pdf, Content-Length=undefined
+[HttpScraper] Download complete: C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\fotos_aula_14_2025-10-24_sexta-feira.pdf
+SIGAA: HTTP download successful!
+Download successful! C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\fotos_aula_14_2025-10-24_sexta-feira.pdf
+File size: 1072696 bytes
+File header: %PDF-
+
+Downloading: fotos_tira-duvidas_07_2025-10-30_quinta-feira.pdf
+SIGAA: Downloading file fotos_tira-duvidas_07_2025-10-30_quinta-feira.pdf...
+SIGAA: Re-entering course 513209 to refresh session before download...
+Playwright: Navigating to portal...
+Playwright Browser Log: A parser-blocking, cross site (i.e. different eTLD+1) script, https://vlibras.gov.br/app/vlibras-plugin.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.
+Playwright: Entering course 513209 (FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO)...
+Playwright Browser Log: Clicking course: CK0181 - FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO
+Playwright: URL not AVA after click, forcing navigation...
+Playwright: Verified we are in course "FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO"
+Playwright: Files detected on Main Page. Skipping navigation.
+Playwright: Captured HTML for course 513209 (94995 bytes)
+[HttpScraper] Cookies set. Count: 1
+[HttpScraper] Fetching course page for FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO...
+[HttpScraper] Using pre-fetched HTML from Playwright. Length: 94995
+[HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[HttpScraper] Saved Playwright HTML to debug_playwright.html
+[HttpScraper] Using Playwright HTML directly.
+[HttpScraper] Stored ViewState and 3 inputs for course 513209
+[HttpScraper] Scanning for files...
+[HttpScraper] Found file: "anotacoes_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627310)
+[HttpScraper] Found file: "fotos_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627323)
+[HttpScraper] Found file: "anotacoes_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627661)
+[HttpScraper] Found file: "fotos_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627680)
+[HttpScraper] Found file: "anotacoes_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633194)
+[HttpScraper] Found file: "fotos_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633220)
+[HttpScraper] Found file: "anotacoes_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3635645)
+[HttpScraper] Found file: "fotos_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3638719)
+[HttpScraper] Found file: "fotos_tira-duvidas_01_2025-09-18_quinta-feira.pdf" (ID: 3638752)
+[HttpScraper] Found file: "anotacoes_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642838)
+[HttpScraper] Found file: "fotos_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642845)
+[HttpScraper] Found file: "fotos_tira-duvidas_02_2025-09-25_quinta-feira.pdf" (ID: 3644716)
+[HttpScraper] Found file: "anotacoes_aula_06_2025-09-26_sexta-feira.pdf" (ID: 3645976)
+[HttpScraper] Found file: "Lista de Exercícios 01 — Monitoria" (ID: 3653135)
+[HttpScraper] Found file: "anotacoes_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3654421)
+[HttpScraper] Found file: "fotos_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3657214)
+[HttpScraper] Found file: "fotos_tira-duvidas_03_2025-10-02_quinta-feira.pdf" (ID: 3657222)
+[HttpScraper] Found file: "anotacoes_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3658227)
+[HttpScraper] Found file: "fotos_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3659010)
+[HttpScraper] Found file: "anotacoes_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670009)
+[HttpScraper] Found file: "fotos_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670041)
+[HttpScraper] Found file: "Lista de Exercícios 02 — Monitoria" (ID: 3671150)
+[HttpScraper] Found file: "fotos_aula_10_2025-10-10_sexta-feira.pdf" (ID: 3683689)
+[HttpScraper] Found file: "anotacoes_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3685869)
+[HttpScraper] Found file: "fotos_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3686249)
+[HttpScraper] Found file: "anotacoes_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687844)
+[HttpScraper] Found file: "fotos_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687859)
+[HttpScraper] Found file: "anotacoes_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697755)
+[HttpScraper] Found file: "fotos_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697756)
+[HttpScraper] Found file: "fotos_tira-duvidas_06_2025-10-23_quinta-feira.pdf" (ID: 3697757)
+[HttpScraper] Found file: "Lista de Exercícios 03 — Monitoria" (ID: 3700393)
+[HttpScraper] Found file: "fotos_aula_14_2025-10-24_sexta-feira.pdf" (ID: 3706586)
+[HttpScraper] Found file: "fotos_tira-duvidas_07_2025-10-30_quinta-feira.pdf" (ID: 3706608)
+[HttpScraper] Found file: "fotos_aula_15_2025-10-31_sexta-feira.pdf" (ID: 3706629)
+[HttpScraper] Found file: "fotos_aula_16_2025-11-12_quarta-feira.pdf" (ID: 3718766)
+[HttpScraper] Found file: "fotos_tira-duvidas_08_2025-11-13_quinta-feira.pdf" (ID: 3719802)
+[HttpScraper] Found file: "fotos_aula_17_2025-11-19_quarta-feira.pdf" (ID: 3726246)
+[HttpScraper] Found file: "anotacoes_aula_18_2025-11-28_sexta-feira.pdf" (ID: 3741046)
+[HttpScraper] Found 38 files and 5 news items.
+SIGAA: Found fresh script for file fotos_tira-duvidas_07_2025-10-30_quinta-feira.pdf
+SIGAA: Attempting fast HTTP download for file 3706608...
+[HttpScraper] Downloading file "fotos_tira-duvidas_07_2025-10-30_quinta-feira.pdf" (ID: 3706608) for course 513209
+[HttpScraper] Sending download request. ComponentID: formAva:j_id_jsp_1287906063_105:0:j_id_jsp_1287906063_165:32:idInserirMaterialArquivo
+[HttpScraper] Response headers: Content-Type=application/pdf, Content-Length=undefined
+[HttpScraper] Download complete: C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\fotos_tira-duvidas_07_2025-10-30_quinta-feira.pdf
+SIGAA: HTTP download successful!
+Download successful! C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\fotos_tira-duvidas_07_2025-10-30_quinta-feira.pdf
+File size: 312281 bytes
+File header: %PDF-
+
+Downloading: fotos_aula_15_2025-10-31_sexta-feira.pdf
+SIGAA: Downloading file fotos_aula_15_2025-10-31_sexta-feira.pdf...
+SIGAA: Re-entering course 513209 to refresh session before download...
+Playwright: Navigating to portal...
+Playwright Browser Log: A parser-blocking, cross site (i.e. different eTLD+1) script, https://vlibras.gov.br/app/vlibras-plugin.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.
+Playwright: Entering course 513209 (FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO)...
+Playwright Browser Log: Clicking course: CK0181 - FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO
+Playwright: URL not AVA after click, forcing navigation...
+Playwright: Verified we are in course "FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO"
+Playwright: Files detected on Main Page. Skipping navigation.
+Playwright: Captured HTML for course 513209 (94995 bytes)
+[HttpScraper] Cookies set. Count: 1
+[HttpScraper] Fetching course page for FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO...
+[HttpScraper] Using pre-fetched HTML from Playwright. Length: 94995
+[HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[HttpScraper] Saved Playwright HTML to debug_playwright.html
+[HttpScraper] Using Playwright HTML directly.
+[HttpScraper] Stored ViewState and 3 inputs for course 513209
+[HttpScraper] Scanning for files...
+[HttpScraper] Found file: "anotacoes_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627310)
+[HttpScraper] Found file: "fotos_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627323)
+[HttpScraper] Found file: "anotacoes_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627661)
+[HttpScraper] Found file: "fotos_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627680)
+[HttpScraper] Found file: "anotacoes_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633194)
+[HttpScraper] Found file: "fotos_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633220)
+[HttpScraper] Found file: "anotacoes_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3635645)
+[HttpScraper] Found file: "fotos_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3638719)
+[HttpScraper] Found file: "fotos_tira-duvidas_01_2025-09-18_quinta-feira.pdf" (ID: 3638752)
+[HttpScraper] Found file: "anotacoes_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642838)
+[HttpScraper] Found file: "fotos_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642845)
+[HttpScraper] Found file: "fotos_tira-duvidas_02_2025-09-25_quinta-feira.pdf" (ID: 3644716)
+[HttpScraper] Found file: "anotacoes_aula_06_2025-09-26_sexta-feira.pdf" (ID: 3645976)
+[HttpScraper] Found file: "Lista de Exercícios 01 — Monitoria" (ID: 3653135)
+[HttpScraper] Found file: "anotacoes_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3654421)
+[HttpScraper] Found file: "fotos_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3657214)
+[HttpScraper] Found file: "fotos_tira-duvidas_03_2025-10-02_quinta-feira.pdf" (ID: 3657222)
+[HttpScraper] Found file: "anotacoes_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3658227)
+[HttpScraper] Found file: "fotos_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3659010)
+[HttpScraper] Found file: "anotacoes_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670009)
+[HttpScraper] Found file: "fotos_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670041)
+[HttpScraper] Found file: "Lista de Exercícios 02 — Monitoria" (ID: 3671150)
+[HttpScraper] Found file: "fotos_aula_10_2025-10-10_sexta-feira.pdf" (ID: 3683689)
+[HttpScraper] Found file: "anotacoes_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3685869)
+[HttpScraper] Found file: "fotos_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3686249)
+[HttpScraper] Found file: "anotacoes_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687844)
+[HttpScraper] Found file: "fotos_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687859)
+[HttpScraper] Found file: "anotacoes_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697755)
+[HttpScraper] Found file: "fotos_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697756)
+[HttpScraper] Found file: "fotos_tira-duvidas_06_2025-10-23_quinta-feira.pdf" (ID: 3697757)
+[HttpScraper] Found file: "Lista de Exercícios 03 — Monitoria" (ID: 3700393)
+[HttpScraper] Found file: "fotos_aula_14_2025-10-24_sexta-feira.pdf" (ID: 3706586)
+[HttpScraper] Found file: "fotos_tira-duvidas_07_2025-10-30_quinta-feira.pdf" (ID: 3706608)
+[HttpScraper] Found file: "fotos_aula_15_2025-10-31_sexta-feira.pdf" (ID: 3706629)
+[HttpScraper] Found file: "fotos_aula_16_2025-11-12_quarta-feira.pdf" (ID: 3718766)
+[HttpScraper] Found file: "fotos_tira-duvidas_08_2025-11-13_quinta-feira.pdf" (ID: 3719802)
+[HttpScraper] Found file: "fotos_aula_17_2025-11-19_quarta-feira.pdf" (ID: 3726246)
+[HttpScraper] Found file: "anotacoes_aula_18_2025-11-28_sexta-feira.pdf" (ID: 3741046)
+[HttpScraper] Found 38 files and 5 news items.
+SIGAA: Found fresh script for file fotos_aula_15_2025-10-31_sexta-feira.pdf
+SIGAA: Attempting fast HTTP download for file 3706629...
+[HttpScraper] Downloading file "fotos_aula_15_2025-10-31_sexta-feira.pdf" (ID: 3706629) for course 513209
+[HttpScraper] Sending download request. ComponentID: formAva:j_id_jsp_1287906063_105:0:j_id_jsp_1287906063_165:33:idInserirMaterialArquivo
+[HttpScraper] Response headers: Content-Type=application/pdf, Content-Length=undefined
+[HttpScraper] Download complete: C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\fotos_aula_15_2025-10-31_sexta-feira.pdf
+SIGAA: HTTP download successful!
+Download successful! C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\fotos_aula_15_2025-10-31_sexta-feira.pdf
+File size: 1119205 bytes
+File header: %PDF-
+
+Downloading: fotos_aula_16_2025-11-12_quarta-feira.pdf
+SIGAA: Downloading file fotos_aula_16_2025-11-12_quarta-feira.pdf...
+SIGAA: Re-entering course 513209 to refresh session before download...
+Playwright: Navigating to portal...
+Playwright Browser Log: A parser-blocking, cross site (i.e. different eTLD+1) script, https://vlibras.gov.br/app/vlibras-plugin.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.
+Playwright: Entering course 513209 (FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO)...
+Playwright Browser Log: Clicking course: CK0181 - FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO
+Playwright: URL not AVA after click, forcing navigation...
+Playwright: Verified we are in course "FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO"
+Playwright: Files detected on Main Page. Skipping navigation.
+Playwright: Captured HTML for course 513209 (94995 bytes)
+[HttpScraper] Cookies set. Count: 1
+[HttpScraper] Fetching course page for FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO...
+[HttpScraper] Using pre-fetched HTML from Playwright. Length: 94995
+[HttpScraper] Pre-fetched page title: "AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas"
+[HttpScraper] Saved Playwright HTML to debug_playwright.html
+[HttpScraper] Using Playwright HTML directly.
+[HttpScraper] Stored ViewState and 3 inputs for course 513209
+[HttpScraper] Scanning for files...
+[HttpScraper] Found file: "anotacoes_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627310)
+[HttpScraper] Found file: "fotos_aula_01_2025-09-10_quarta-feira.pdf" (ID: 3627323)
+[HttpScraper] Found file: "anotacoes_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627661)
+[HttpScraper] Found file: "fotos_aula_02_2025-09-12_sexta-feira.pdf" (ID: 3627680)
+[HttpScraper] Found file: "anotacoes_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633194)
+[HttpScraper] Found file: "fotos_aula_03_2025-09-17_quarta-feira.pdf" (ID: 3633220)
+[HttpScraper] Found file: "anotacoes_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3635645)
+[HttpScraper] Found file: "fotos_aula_04_2025-09-19_sexta-feira.pdf" (ID: 3638719)
+[HttpScraper] Found file: "fotos_tira-duvidas_01_2025-09-18_quinta-feira.pdf" (ID: 3638752)
+[HttpScraper] Found file: "anotacoes_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642838)
+[HttpScraper] Found file: "fotos_aula_05_2025-09-24_quarta-feira.pdf" (ID: 3642845)
+[HttpScraper] Found file: "fotos_tira-duvidas_02_2025-09-25_quinta-feira.pdf" (ID: 3644716)
+[HttpScraper] Found file: "anotacoes_aula_06_2025-09-26_sexta-feira.pdf" (ID: 3645976)
+[HttpScraper] Found file: "Lista de Exercícios 01 — Monitoria" (ID: 3653135)
+[HttpScraper] Found file: "anotacoes_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3654421)
+[HttpScraper] Found file: "fotos_aula_07_2025-10-01_quarta-feira.pdf" (ID: 3657214)
+[HttpScraper] Found file: "fotos_tira-duvidas_03_2025-10-02_quinta-feira.pdf" (ID: 3657222)
+[HttpScraper] Found file: "anotacoes_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3658227)
+[HttpScraper] Found file: "fotos_aula_08_2025-10-03_sexta-feira.pdf" (ID: 3659010)
+[HttpScraper] Found file: "anotacoes_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670009)
+[HttpScraper] Found file: "fotos_aula_09_2025-10-08_quarta-feira.pdf" (ID: 3670041)
+[HttpScraper] Found file: "Lista de Exercícios 02 — Monitoria" (ID: 3671150)
+[HttpScraper] Found file: "fotos_aula_10_2025-10-10_sexta-feira.pdf" (ID: 3683689)
+[HttpScraper] Found file: "anotacoes_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3685869)
+[HttpScraper] Found file: "fotos_aula_11_2025-10-15_quarta-feira.pdf" (ID: 3686249)
+[HttpScraper] Found file: "anotacoes_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687844)
+[HttpScraper] Found file: "fotos_aula_12_2025-10-17_sexta-feira.pdf" (ID: 3687859)
+[HttpScraper] Found file: "anotacoes_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697755)
+[HttpScraper] Found file: "fotos_aula_13_2025-10-22_quarta-feira.pdf" (ID: 3697756)
+[HttpScraper] Found file: "fotos_tira-duvidas_06_2025-10-23_quinta-feira.pdf" (ID: 3697757)
+[HttpScraper] Found file: "Lista de Exercícios 03 — Monitoria" (ID: 3700393)
+[HttpScraper] Found file: "fotos_aula_14_2025-10-24_sexta-feira.pdf" (ID: 3706586)
+[HttpScraper] Found file: "fotos_tira-duvidas_07_2025-10-30_quinta-feira.pdf" (ID: 3706608)
+[HttpScraper] Found file: "fotos_aula_15_2025-10-31_sexta-feira.pdf" (ID: 3706629)
+[HttpScraper] Found file: "fotos_aula_16_2025-11-12_quarta-feira.pdf" (ID: 3718766)
+[HttpScraper] Found file: "fotos_tira-duvidas_08_2025-11-13_quinta-feira.pdf" (ID: 3719802)
+[HttpScraper] Found file: "fotos_aula_17_2025-11-19_quarta-feira.pdf" (ID: 3726246)
+[HttpScraper] Found file: "anotacoes_aula_18_2025-11-28_sexta-feira.pdf" (ID: 3741046)
+[HttpScraper] Found 38 files and 5 news items.
+SIGAA: Found fresh script for file fotos_aula_16_2025-11-12_quarta-feira.pdf
+SIGAA: Attempting fast HTTP download for file 3718766...
+[HttpScraper] Downloading file "fotos_aula_16_2025-11-12_quarta-feira.pdf" (ID: 3718766) for course 513209
+[HttpScraper] Sending download request. ComponentID: formAva:j_id_jsp_1287906063_105:0:j_id_jsp_1287906063_165:34:idInserirMaterialArquivo
+[HttpScraper] Response headers: Content-Type=application/pdf, Content-Length=undefined
+[HttpScraper] Download complete: C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\fotos_aula_16_2025-11-12_quarta-feira.pdf
+SIGAA: HTTP download successful!
+Download successful! C:\Users\Bruno Lage\Desktop\Pastinha\Programas\Projects\SIGAA-ME\downloads_test\FUNDAMENTOS MATEMÁTICOS DA COMPUTAÇÃO\fotos_aula_16_2025-11-12_quarta-feira.pdf
+File size: 1317143 bytes
+File header: %PDF-
+
+Downloading: fotos_tira-duvidas_08_2025-11-13_quinta-feira.pdf
+SIGAA: Downloading file fotos_tira-duvidas_08_2025-11-13_quinta-feira.pdf...
+SIGAA: Re-entering course 513209 to refresh session before download...
+Playwright: Navigating to portal...
+Playwright Browser Log: A parser-blocking, cross site (i.e. different eTLD+1) script, https://vlibras.gov.br/app/vlibras-plugin.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.

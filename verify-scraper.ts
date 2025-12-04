@@ -1,11 +1,18 @@
-input: process.stdin,
-    output: process.stdout,
+import { SigaaService } from './electron/services/sigaa.service';
+import * as readline from 'readline';
+import * as fs from 'fs';
+import * as path from 'path';
+
+function askQuestion(query: string) {
+    const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout,
     });
 
-return new Promise(resolve => rl.question(query, ans => {
-    rl.close();
-    resolve(ans);
-}));
+    return new Promise(resolve => rl.question(query, ans => {
+        rl.close();
+        resolve(ans);
+    }));
 }
 
 async function main() {
@@ -27,11 +34,21 @@ async function main() {
     console.log('\n[1/4] Logging in...');
     const loginResult = await sigaa.login(username, password);
     let filesForCourse = null;
+    let courseWithFiles: any = null;
 
-    console.log('\n[3/4] Searching for course "CÁLCULO FUNDAMENTAL II"...');
+    // 2. Get Courses
+    console.log('\n[2/4] Fetching courses...');
+    const coursesResult = await sigaa.getCourses();
+    if (!coursesResult.success || !coursesResult.courses) {
+        console.error('Failed to fetch courses:', coursesResult.message);
+        return;
+    }
+    console.log(`Found ${coursesResult.courses.length} courses.`);
+
+    console.log('\n[3/4] Searching for course "FUNDAMENTOS MATEMÁTICOS"...');
 
     // Prioritize the specific course
-    courseWithFiles = coursesResult.courses.find((c: any) => c.name.includes('CÁLCULO FUNDAMENTAL II'));
+    courseWithFiles = coursesResult.courses.find((c: any) => c.name.includes('FUNDAMENTOS MATEMÁTICOS'));
 
     if (courseWithFiles) {
         console.log(`Found target course: ${courseWithFiles.code} - ${courseWithFiles.name}`);

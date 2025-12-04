@@ -1,5 +1,7 @@
 import { PlaywrightLoginService } from './playwright-login.service';
 import { HttpScraperService } from './http-scraper.service';
+import * as fs from 'fs';
+import * as path from 'path';
 
 // This class will handle all the logic for talking to SIGAA using Playwright and HTTP.
 // We keep it here in the "Backend" (Electron Main Process) so it's secure.
@@ -101,9 +103,16 @@ export class SigaaService {
         }
     }
 
+
+
+    // Helper to sanitize folder names
+    private sanitizeFolderName(name: string): string {
+        return name.replace(/[<>:"/\\|?*]/g, '').trim();
+    }
+
     async downloadFile(
         courseId: string,
-        _courseName: string,
+        courseName: string, // Changed from _courseName to use it
         fileName: string,
         _fileUrl: string,
         basePath: string,
@@ -116,9 +125,17 @@ export class SigaaService {
                 return { success: false, message: 'Script not provided for download' };
             }
 
+            // Create course subdirectory
+            const safeCourseName = this.sanitizeFolderName(courseName || 'Unknown Course');
+            const targetDir = path.join(basePath, safeCourseName);
+
+            if (!fs.existsSync(targetDir)) {
+                fs.mkdirSync(targetDir, { recursive: true });
+            }
+
             // 1. Re-enter course to ensure fresh ViewState (Critical for avoiding 1KB error pages)
             console.log(`SIGAA: Re-entering course ${courseId} to refresh session before download...`);
-            const entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, _courseName || 'Unknown Course');
+            const entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
 
             if (!entryResult.success || !entryResult.html) {
                 return { success: false, message: entryResult.error || 'Failed to enter course for download' };
@@ -129,7 +146,7 @@ export class SigaaService {
                 this.httpScraper.setCookies(entryResult.cookies);
             }
             // We must parse the new HTML to update the ViewState in HttpScraper
-            const parseResult = await this.httpScraper.getCourseFiles(courseId, _courseName, entryResult.html);
+            const parseResult = await this.httpScraper.getCourseFiles(courseId, courseName, entryResult.html);
 
             let targetScript = script;
             if (parseResult.success && parseResult.files) {
@@ -152,7 +169,7 @@ export class SigaaService {
                 courseId,
                 fileId,
                 fileName,
-                basePath,
+                targetDir, // Use the new subdirectory
                 targetScript
             );
 
@@ -179,6 +196,14 @@ export class SigaaService {
         try {
             console.log(`SIGAA: Downloading all files for course ${courseName} (HTTP only)...`);
 
+            // Create course subdirectory
+            const safeCourseName = this.sanitizeFolderName(courseName || 'Unknown Course');
+            const targetDir = path.join(basePath, safeCourseName);
+
+            if (!fs.existsSync(targetDir)) {
+                fs.mkdirSync(targetDir, { recursive: true });
+            }
+
             const results: any[] = [];
             let downloaded = 0;
             let skipped = 0;
@@ -186,14 +211,10 @@ export class SigaaService {
 
             // Filter out duplicates first
             const queue = files.filter(file => {
-                const courseDownloads = downloadedFiles[courseId] || {};
-                if (courseDownloads[file.name]) {
-                    // Check if file actually exists on disk
-                    // We don't have easy access to fs here without importing it, 
-                    // but we can assume the UI state is somewhat correct or let the UI handle it.
-                    // However, to be safe and match previous logic, we should probably check.
-                    // For now, let's trust the downloadedFiles record passed from UI/Main.
-                    console.log(`Skipping duplicate: ${file.name}`);
+                // Check if file exists in the TARGET directory
+                const targetFilePath = path.join(targetDir, file.name);
+                if (fs.existsSync(targetFilePath)) {
+                    console.log(`Skipping duplicate (exists on disk): ${file.name}`);
                     skipped++;
                     results.push({ fileName: file.name, status: 'skipped' });
                     if (onProgress) onProgress(file.name, 'skipped');
@@ -253,7 +274,7 @@ export class SigaaService {
                     courseId,
                     fileId,
                     file.name,
-                    basePath,
+                    targetDir, // Use the new subdirectory
                     targetScript
                 );
 
