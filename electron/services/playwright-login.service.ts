@@ -70,7 +70,7 @@ export class PlaywrightLoginService {
 
             // Extract cookies
             const cookies = await context.cookies();
-            console.log('Playwright: Found cookies:', cookies.map(c => c.name).join(', '));
+            console.log(`Playwright: Found ${cookies.length} cookies:`, cookies.map(c => `${c.name} (${c.domain})`).join(', '));
 
             // Store cookies and credentials for future use
             this.storedCookies = cookies;
@@ -364,15 +364,37 @@ export class PlaywrightLoginService {
 
             // Always force navigation to portal to ensure clean state
             console.log(`Playwright: Navigating to portal for ${courseName}...`);
-            await page.goto('https://si3.ufc.br/sigaa/verPortalDiscente.do');
-            await page.waitForLoadState('networkidle');
 
-            // Check if we were redirected to login
-            if (page.url().includes('verTelaLogin') || page.url().includes('logar.do')) {
-                console.warn('Playwright: Redirected to login page. Session expired.');
-                // Don't close page - we might need to re-login and reuse it
-                this.page = null;
-                return { success: false, error: 'Session expired - please login again' };
+            // Better navigation strategy: Go to Home -> Click Menu Discente
+            // This mimics user behavior and avoids "Access Denied" errors
+            try {
+                await page.goto('https://si3.ufc.br/sigaa/paginaInicial.do');
+                await page.waitForLoadState('networkidle');
+
+                // Check if we were redirected to login
+                if (page.url().includes('verTelaLogin') || page.url().includes('logar.do')) {
+                    console.warn('Playwright: Redirected to login page. Session expired.');
+                    // Don't close page - we might need to re-login and reuse it
+                    this.page = null;
+                    return { success: false, error: 'Session expired - please login again' };
+                }
+
+                // Click on "Menu Discente" link
+                const studentLink = page.locator('a[href="/sigaa/verPortalDiscente.do"]').first();
+                if (await studentLink.isVisible()) {
+                    await studentLink.click();
+                    await page.waitForLoadState('networkidle');
+                } else {
+                    // Fallback to direct navigation if link not found
+                    console.log('Playwright: Menu Discente link not found, trying direct navigation...');
+                    await page.goto('https://si3.ufc.br/sigaa/verPortalDiscente.do');
+                    await page.waitForLoadState('networkidle');
+                }
+            } catch (navError) {
+                console.error('Playwright: Navigation error:', navError);
+                // Last resort fallback
+                await page.goto('https://si3.ufc.br/sigaa/verPortalDiscente.do');
+                await page.waitForLoadState('networkidle');
             }
 
             // Enter the course
