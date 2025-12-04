@@ -313,7 +313,7 @@ export class HttpScraperService {
                             });
                         }
 
-                        this.log(`[HttpScraper] Found file: "${fileName}" (ID: ${idMatch[1]})`);
+                        // this.log(`[HttpScraper] Found file: "${fileName}" (ID: ${idMatch[1]})`);
                         files.push({
                             name: fileName,
                             type: 'file',
@@ -421,6 +421,8 @@ export class HttpScraperService {
             }
 
             this.log(`[HttpScraper] Found ${files.length} files and ${news.length} news items.`);
+            this.log(`[HttpScraper] Found ${files.length} files and ${news.length} news items for course ${courseId}`);
+
             return { success: true, files, news };
 
         } catch (error: any) {
