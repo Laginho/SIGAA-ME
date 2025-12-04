@@ -200,7 +200,7 @@ async function syncInBackground(cachedCourses: any[], coursesListElement: HTMLEl
         }, 3000);
       }
     } else {
-      const BATCH_SIZE = 3;
+      const BATCH_SIZE = 10;
       console.log(`Updating ${coursesToUpdate.length} courses in batches of ${BATCH_SIZE}...`);
 
       for (let i = 0; i < coursesToUpdate.length; i += BATCH_SIZE) {
