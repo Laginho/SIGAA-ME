@@ -790,13 +790,44 @@ export class HttpScraperService {
                 this.log('[HttpScraper] WARNING: Response Content-Type is HTML. Likely an error page.');
             }
 
-            // Determine filename
+            // Determine filename and ensure it has an extension
             let finalFileName = fileName;
+            let detectedExtension = '';
+
+            // 1. Try to get filename from Content-Disposition header
             const contentDisposition = response.headers['content-disposition'];
             if (contentDisposition) {
-                const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+                const filenameMatch = contentDisposition.match(/filename\*?=['"]?(?:UTF-8'')?([^'";\n]+)['"]?/i);
                 if (filenameMatch) {
-                    finalFileName = filenameMatch[1];
+                    const dispositionFilename = decodeURIComponent(filenameMatch[1].trim());
+                    // Use the filename from header - it usually has the correct extension
+                    finalFileName = dispositionFilename;
+                    detectedExtension = path.extname(dispositionFilename).toLowerCase();
+                }
+            }
+
+            // 2. If no extension, try to infer from Content-Type
+            if (!detectedExtension && !path.extname(finalFileName)) {
+                const contentTypeMap: Record<string, string> = {
+                    'application/pdf': '.pdf',
+                    'application/msword': '.doc',
+                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+                    'application/vnd.ms-excel': '.xls',
+                    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
+                    'application/vnd.ms-powerpoint': '.ppt',
+                    'application/vnd.openxmlformats-officedocument.presentationml.presentation': '.pptx',
+                    'application/zip': '.zip',
+                    'application/x-rar-compressed': '.rar',
+                    'image/png': '.png',
+                    'image/jpeg': '.jpg',
+                    'text/plain': '.txt'
+                };
+
+                const contentTypeBase = contentType?.split(';')[0]?.trim();
+                if (contentTypeBase && contentTypeMap[contentTypeBase]) {
+                    detectedExtension = contentTypeMap[contentTypeBase];
+                    finalFileName = finalFileName + detectedExtension;
+                    this.log(`[HttpScraper] Added extension ${detectedExtension} to filename based on Content-Type`);
                 }
             }
 

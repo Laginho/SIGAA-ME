@@ -286,7 +286,27 @@ export class SigaaService {
             logger.info(`SIGAA: Refreshing course session for batch download...`);
 
             // Enter course via Playwright to get fresh HTML
-            const entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
+            let entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
+
+            // If course not found, try re-login and retry
+            if (!entryResult.success && entryResult.error?.includes('not found in portal')) {
+                logger.warn(`SIGAA: Course not found in portal. Attempting re-login...`);
+
+                // Try to get stored credentials and re-login
+                const reloginResult = await this.playwrightLogin.reloginWithStoredCredentials();
+
+                if (reloginResult.success) {
+                    logger.info(`SIGAA: Re-login successful. Retrying course entry...`);
+                    if (reloginResult.cookies) {
+                        this.httpScraper.setCookies(reloginResult.cookies);
+                    }
+
+                    // Retry entering the course
+                    entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
+                } else {
+                    logger.error(`SIGAA: Re-login failed: ${reloginResult.error}`);
+                }
+            }
 
             if (!entryResult.success || !entryResult.html) {
                 logger.error(`SIGAA: Failed to enter course for batch download: ${entryResult.error}`);

@@ -14,6 +14,10 @@ export class PlaywrightLoginService {
     private context: BrowserContext | null = null;
     private page: Page | null = null;
 
+    // Store credentials for automatic re-login when session expires
+    private storedUsername: string | null = null;
+    private storedPassword: string | null = null;
+
     async login(username: string, password: string): Promise<{ success: boolean; cookies?: any[]; userName?: string; error?: string }> {
         try {
             console.log('Playwright: Launching browser...');
@@ -68,8 +72,10 @@ export class PlaywrightLoginService {
             const cookies = await context.cookies();
             console.log('Playwright: Found cookies:', cookies.map(c => c.name).join(', '));
 
-            // Store cookies for future use
+            // Store cookies and credentials for future use
             this.storedCookies = cookies;
+            this.storedUsername = username;
+            this.storedPassword = password;
 
             this.context = context;
             this.page = page;
@@ -86,6 +92,29 @@ export class PlaywrightLoginService {
             await this.close();
             return { success: false, error: error.message };
         }
+    }
+
+    /**
+     * Re-login using stored credentials when session expires
+     */
+    async reloginWithStoredCredentials(): Promise<{ success: boolean; cookies?: any[]; error?: string }> {
+        if (!this.storedUsername || !this.storedPassword) {
+            return { success: false, error: 'No stored credentials available' };
+        }
+
+        console.log('Playwright: Attempting re-login with stored credentials...');
+
+        // Close existing browser to start fresh
+        await this.close();
+
+        // Perform login with stored credentials
+        const result = await this.login(this.storedUsername, this.storedPassword);
+
+        return {
+            success: result.success,
+            cookies: result.cookies,
+            error: result.error
+        };
     }
 
     /**
