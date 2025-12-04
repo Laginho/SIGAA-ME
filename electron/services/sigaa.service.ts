@@ -267,22 +267,23 @@ export class SigaaService {
                 return true;
             });
 
-            console.log(`SIGAA: Processing ${queue.length} files...`);
+            logger.info(`SIGAA: Processing ${queue.length} files...`);
 
             // 1. Re-enter course ONCE before the batch to ensure fresh ViewState
-            console.log(`SIGAA: Re-entering course ${courseId} to refresh session before batch download...`);
-            const entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
+            logger.info(`SIGAA: Re-entering course ${courseId} to refresh session before batch download...`);
 
-            if (!entryResult.success || !entryResult.html) {
-                return { success: false, message: entryResult.error || 'Failed to enter course for batch download' };
+            // USE HTTP ENTRY HERE TOO!
+            const httpEntry = await this.httpScraper.enterCourseHTTP(courseId);
+
+            if (!httpEntry.success || !httpEntry.html) {
+                return { success: false, message: `HTTP Entry failed: ${httpEntry.error}` };
             }
+
+            const html = httpEntry.html;
 
             // 2. Update HttpScraper with fresh state
-            if (entryResult.cookies) {
-                this.httpScraper.setCookies(entryResult.cookies);
-            }
             // We must parse the new HTML to update the ViewState in HttpScraper
-            const parseResult = await this.httpScraper.getCourseFiles(courseId, courseName, entryResult.html);
+            const parseResult = await this.httpScraper.getCourseFiles(courseId, courseName, html);
 
             const freshFilesMap = new Map<string, string>();
             if (parseResult.success && parseResult.files) {
