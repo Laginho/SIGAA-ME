@@ -89,8 +89,13 @@ export class SigaaService {
                 console.log('SIGAA: Fast HTTP Entry successful!');
                 html = httpEntry.html;
             } else {
-                console.warn('SIGAA: Fast HTTP Entry failed, falling back to Playwright:', httpEntry.error);
+                console.error('SIGAA: Fast HTTP Entry failed:', httpEntry.error);
+                return { success: false, message: `HTTP Entry failed: ${httpEntry.error}` };
 
+                // Fallback DISABLED for testing
+                /*
+                console.warn('SIGAA: Fast HTTP Entry failed, falling back to Playwright:', httpEntry.error);
+                
                 // Fallback to Playwright
                 const entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
                 if (!entryResult.success || !entryResult.html) {
@@ -101,6 +106,7 @@ export class SigaaService {
                 if (entryResult.cookies) {
                     this.httpScraper.setCookies(entryResult.cookies);
                 }
+                */
             }
 
             // 2. Parse files
