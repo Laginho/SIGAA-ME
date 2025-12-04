@@ -131,7 +131,12 @@ export class HttpScraperService {
             // 2. Find the input for this course ID
             const idInput = $(`input[name="idTurma"][value="${courseId}"]`);
             if (idInput.length === 0) {
-                return { success: false, error: 'Course ID input not found in portal' };
+                const title = $('title').text().trim();
+                this.log(`[HttpScraper] Error: Course ID ${courseId} not found. Page Title: "${title}"`);
+                try {
+                    await fs.promises.writeFile(`debug_portal_fail_${courseId}.html`, portalResponse.data);
+                } catch (e) { console.error('Failed to save debug file', e); }
+                return { success: false, error: `Course ID input not found in portal (Title: ${title})` };
             }
 
             // 3. Find the surrounding form
