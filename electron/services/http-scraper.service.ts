@@ -708,25 +708,23 @@ export class HttpScraperService {
                     // Check file size first
                     const stats = await fs.promises.stat(filePath);
 
-                    if (stats.size < 10240) { // < 10KB, suspicious
-                        // Perform robust verification
-                        const ext = path.extname(filePath).toLowerCase();
-                        const isValid = await this.verifyFileContent(filePath, ext);
+                    // Perform robust verification for ALL files
+                    const ext = path.extname(filePath).toLowerCase();
+                    const isValid = await this.verifyFileContent(filePath, ext);
 
-                        if (!isValid) {
-                            this.log(`[HttpScraper] ERROR: File verification failed. Size: ${stats.size} bytes.`);
+                    if (!isValid) {
+                        this.log(`[HttpScraper] ERROR: File verification failed. Size: ${stats.size} bytes.`);
 
-                            // Delete the invalid file
-                            try {
-                                await fs.promises.unlink(filePath);
-                                this.log(`[HttpScraper] Deleted invalid file: ${filePath}`);
-                            } catch (unlinkErr: any) {
-                                this.log(`[HttpScraper] Failed to delete invalid file: ${unlinkErr.message}`);
-                            }
-
-                            resolve({ success: false, error: 'Downloaded file failed verification (Invalid signature or HTML error page).' });
-                            return;
+                        // Delete the invalid file
+                        try {
+                            await fs.promises.unlink(filePath);
+                            this.log(`[HttpScraper] Deleted invalid file: ${filePath}`);
+                        } catch (unlinkErr: any) {
+                            this.log(`[HttpScraper] Failed to delete invalid file: ${unlinkErr.message}`);
                         }
+
+                        resolve({ success: false, error: 'Downloaded file failed verification (Invalid signature or HTML error page).' });
+                        return;
                     }
 
                     this.log(`[HttpScraper] Download complete: ${filePath} (Size: ${stats.size} bytes)`);
