@@ -274,41 +274,19 @@ export class SigaaService {
                 return true;
             });
 
-            // 1. Re-enter course ONCE before the batch to ensure fresh ViewState
-            logger.info(`SIGAA: Re-entering course ${courseId} to refresh session before batch download...`);
+            // 1. Use the existing session (from when getCourseFiles was called)
+            // DO NOT re-enter the course here - it causes failures
+            // The files already have fresh scripts from getCourseFiles
+            logger.info(`SIGAA: Using existing session for batch download...`);
 
-            // Use Fast API Entry
-            const entryResult = await this.playwrightLogin.enterCourseDirect(courseId, courseName || 'Unknown Course');
-            let html = entryResult.html;
-
-            if (!entryResult.success || !html) {
-                // Fallback
-                const fallbackResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
-                if (!fallbackResult.success || !fallbackResult.html) {
-                    return { success: false, message: `Entry failed: ${fallbackResult.error}` };
-                }
-                html = fallbackResult.html;
-                if (fallbackResult.cookies) {
-                    this.httpScraper.setCookies(fallbackResult.cookies);
-                }
-            } else {
-                if (entryResult.cookies) {
-                    this.httpScraper.setCookies(entryResult.cookies);
-                }
+            // Ensure httpScraper has fresh cookies from the existing Playwright session
+            const freshCookies = await this.playwrightLogin.getCookies();
+            if (freshCookies && freshCookies.length > 0) {
+                this.httpScraper.setCookies(freshCookies);
             }
 
-            // We must parse the new HTML to update the ViewState in HttpScraper
-            const parseResult = await this.httpScraper.getCourseFiles(courseId, courseName, html);
-
-            const freshFilesMap = new Map<string, string>();
-            if (parseResult.success && parseResult.files) {
-                parseResult.files.forEach(f => {
-                    if (f.name && f.script) {
-                        freshFilesMap.set(f.name, f.script);
-                    }
-                });
-                console.log(`SIGAA: Mapped ${freshFilesMap.size} fresh file scripts.`);
-            }
+            // The files array already has scripts from getCourseFiles
+            // We use them directly without re-parsing
 
             for (const file of queue) {
                 if (!file.script) {
@@ -319,12 +297,7 @@ export class SigaaService {
                     continue;
                 }
 
-                let targetScript = file.script;
-                if (freshFilesMap.has(file.name)) {
-                    targetScript = freshFilesMap.get(file.name)!;
-                } else {
-                    console.warn(`SIGAA: Using original script for ${file.name} (not found in fresh scan)`);
-                }
+                const targetScript = file.script;
 
                 // Extract ID from script
                 const idMatch = targetScript.match(/,id,([^,]+)/);

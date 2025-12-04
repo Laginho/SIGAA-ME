@@ -332,6 +332,13 @@ export class PlaywrightLoginService {
             await page.goto('https://si3.ufc.br/sigaa/verPortalDiscente.do');
             await page.waitForLoadState('networkidle');
 
+            // Check if we were redirected to login
+            if (page.url().includes('verTelaLogin') || page.url().includes('logar.do')) {
+                console.warn('Playwright: Redirected to login page. Session expired.');
+                await page.close();
+                return { success: false, error: 'Session expired - please login again' };
+            }
+
             // Enter the course
             console.log(`Playwright: Entering course ${courseId} (${courseName})...`);
             const entered = await page.evaluate((id: string) => {
@@ -353,6 +360,10 @@ export class PlaywrightLoginService {
             }, courseId);
 
             if (!entered.success) {
+                console.error(`Playwright: Course ${courseId} not found in portal. Current URL: ${page.url()}`);
+                // Optional: Save debug HTML
+                // const html = await page.content();
+                // fs.writeFileSync(`debug_portal_fail_${courseId}.html`, html);
                 await page.close();
                 return { success: false, error: 'Course link not found in portal' };
             }
