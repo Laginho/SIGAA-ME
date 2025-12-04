@@ -1,6 +1,7 @@
 import { chromium, Browser, BrowserContext, Page } from 'playwright';
 import * as fs from 'fs';
 import * as path from 'path';
+import { logger } from './logger.service';
 
 /**
  * Uses Playwright to automate a real browser for UFC SIGAA login.
