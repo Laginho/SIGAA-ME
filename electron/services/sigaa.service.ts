@@ -55,26 +55,29 @@ export class SigaaService {
         }
     }
 
-    async getCourseFiles(courseId: string, courseName?: string): Promise<{ success: boolean; files?: any[]; news?: any[]; message?: string }> {
+    async getCourseFiles(courseId: string, courseName: string): Promise<{ success: boolean; files?: any[]; news?: any[]; message?: string }> {
         try {
-            logger.info(`SIGAA: Fetching files for course ${courseName || courseId}...`);
+            // 1. Enter course via Headless API (Fast & Reliable)
+            logger.info('SIGAA: Entering course via Headless API...');
+            const entryResult = await this.playwrightLogin.enterCourseDirect(courseId, courseName || 'Unknown Course');
 
-            // 1. Enter course via Playwright (Reliable)
-            logger.info('SIGAA: Entering course via Playwright...');
-            const entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
+            let html = entryResult.html;
 
-            if (!entryResult.success || !entryResult.html) {
-                logger.error('SIGAA: Failed to enter course via Playwright:', entryResult.error);
-                return { success: false, message: entryResult.error || 'Failed to enter course' };
-            }
-
-            const html = entryResult.html;
-
-            // Sync cookies back to HttpScraper for parsing/downloads
-            if (entryResult.cookies) {
-                this.httpScraper.setCookies(entryResult.cookies);
-                const ua = await this.playwrightLogin.getUserAgent();
-                this.httpScraper.setUserAgent(ua);
+            if (!entryResult.success || !html) {
+                logger.error('SIGAA: Failed to enter course via Headless API:', entryResult.error);
+                // Fallback to full browser if API fails
+                logger.warn('SIGAA: Falling back to full browser entry...');
+                const fallbackResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
+                if (!fallbackResult.success || !fallbackResult.html) {
+                    return { success: false, message: fallbackResult.error || 'Failed to enter course' };
+                }
+                // Use fallback result
+                html = fallbackResult.html;
+                if (fallbackResult.cookies) {
+                    this.httpScraper.setCookies(fallbackResult.cookies);
+                    const ua = await this.playwrightLogin.getUserAgent();
+                    this.httpScraper.setUserAgent(ua);
+                }
             }
 
             // 2. Parse files
@@ -114,28 +117,35 @@ export class SigaaService {
                 return { success: false, message: 'Script not provided for download' };
             }
 
-            // Create course subdirectory
-            const safeCourseName = this.sanitizeFolderName(courseName || 'Unknown Course');
+            // 0. Prepare Target Directory (Subdirectory per course)
+            const safeCourseName = this.sanitizeFolderName(courseName);
             const targetDir = path.join(basePath, safeCourseName);
 
             if (!fs.existsSync(targetDir)) {
                 fs.mkdirSync(targetDir, { recursive: true });
             }
 
-            // 1. Re-enter course to ensure fresh ViewState (Critical for avoiding 1KB error pages)
-            console.log(`SIGAA: Re-entering course ${courseId} to refresh session before download...`);
-            const entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
+            // 1. Enter course via Headless API (Fast & Reliable)
+            logger.info('SIGAA: Entering course via Headless API for download...');
+            const entryResult = await this.playwrightLogin.enterCourseDirect(courseId, courseName || 'Unknown Course');
 
-            if (!entryResult.success || !entryResult.html) {
-                return { success: false, message: entryResult.error || 'Failed to enter course for download' };
-            }
+            let parseResult: { success: boolean; files?: any[]; error?: string } = { success: false };
 
-            // 2. Update HttpScraper with fresh state
-            if (entryResult.cookies) {
-                this.httpScraper.setCookies(entryResult.cookies);
+            if (entryResult.success && entryResult.html) {
+                if (entryResult.cookies) {
+                    this.httpScraper.setCookies(entryResult.cookies);
+                }
+                parseResult = await this.httpScraper.getCourseFiles(courseId, courseName, entryResult.html);
+            } else {
+                logger.warn('SIGAA: Headless API entry failed for download, trying fallback...');
+                const fallbackResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
+                if (fallbackResult.success && fallbackResult.html) {
+                    if (fallbackResult.cookies) {
+                        this.httpScraper.setCookies(fallbackResult.cookies);
+                    }
+                    parseResult = await this.httpScraper.getCourseFiles(courseId, courseName, fallbackResult.html);
+                }
             }
-            // We must parse the new HTML to update the ViewState in HttpScraper
-            const parseResult = await this.httpScraper.getCourseFiles(courseId, courseName, entryResult.html);
 
             let targetScript = script;
             if (parseResult.success && parseResult.files) {
@@ -220,7 +230,7 @@ export class SigaaService {
         courseName: string,
         files: Array<{ name: string; url: string; script?: string }>,
         basePath: string,
-        downloadedFiles: Record<string, any>,
+        _downloadedFiles: Record<string, any>,
         onProgress?: (fileName: string, status: 'downloaded' | 'skipped' | 'failed') => void
     ): Promise<{ success: boolean; downloaded?: number; skipped?: number; failed?: number; results?: any[]; message?: string }> {
         try {
@@ -240,6 +250,7 @@ export class SigaaService {
             let failed = 0;
 
             // Filter out duplicates first
+            // Filter out duplicates first
             const queue = files.filter(file => {
                 // Check if file exists in the TARGET directory
                 const targetFilePath = path.join(targetDir, file.name);
@@ -252,24 +263,28 @@ export class SigaaService {
                 }
                 return true;
             });
-            logger.info(`SIGAA: Processing ${queue.length} files...`);
 
             // 1. Re-enter course ONCE before the batch to ensure fresh ViewState
             logger.info(`SIGAA: Re-entering course ${courseId} to refresh session before batch download...`);
 
-            const entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
+            // Use Fast API Entry
+            const entryResult = await this.playwrightLogin.enterCourseDirect(courseId, courseName || 'Unknown Course');
+            let html = entryResult.html;
 
-            if (!entryResult.success || !entryResult.html) {
-                return { success: false, message: `Entry failed: ${entryResult.error}` };
-            }
-
-            const html = entryResult.html;
-
-            // 2. Update HttpScraper with fresh state
-            if (entryResult.cookies) {
-                this.httpScraper.setCookies(entryResult.cookies);
-                const ua = await this.playwrightLogin.getUserAgent();
-                this.httpScraper.setUserAgent(ua);
+            if (!entryResult.success || !html) {
+                // Fallback
+                const fallbackResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
+                if (!fallbackResult.success || !fallbackResult.html) {
+                    return { success: false, message: `Entry failed: ${fallbackResult.error}` };
+                }
+                html = fallbackResult.html;
+                if (fallbackResult.cookies) {
+                    this.httpScraper.setCookies(fallbackResult.cookies);
+                }
+            } else {
+                if (entryResult.cookies) {
+                    this.httpScraper.setCookies(entryResult.cookies);
+                }
             }
 
             // We must parse the new HTML to update the ViewState in HttpScraper

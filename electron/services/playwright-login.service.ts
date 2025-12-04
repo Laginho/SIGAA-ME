@@ -1,6 +1,7 @@
 import { chromium, Browser, BrowserContext, Page } from 'playwright';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as cheerio from 'cheerio';
 import { logger } from './logger.service';
 
 /**
@@ -226,6 +227,90 @@ export class PlaywrightLoginService {
         } catch (error: any) {
             console.error('Playwright: Error fetching courses:', error);
             await this.close();
+            return { success: false, error: error.message };
+        }
+    }
+
+    async enterCourseDirect(courseId: string, courseName: string): Promise<{ success: boolean; html?: string; cookies?: any[]; error?: string }> {
+        try {
+            logger.info(`Playwright: Entering course ${courseName} (${courseId}) via Headless API...`);
+
+            if (!this.context) {
+                await this.getCourses(); // Ensure context exists
+            }
+
+            if (!this.context) {
+                return { success: false, error: 'Failed to initialize browser context' };
+            }
+
+            // 1. Fetch Portal Page (API Request - Fast)
+            const portalResponse = await this.context.request.get('https://si3.ufc.br/sigaa/verPortalDiscente.do');
+            const portalHtml = await portalResponse.text();
+
+            // 2. Parse Form Data
+            const $ = cheerio.load(portalHtml);
+            const idInput = $(`input[name="idTurma"][value="${courseId}"]`);
+
+            if (idInput.length === 0) {
+                return { success: false, error: 'Course ID input not found in portal' };
+            }
+
+            const form = idInput.closest('form');
+            const formName = form.attr('name');
+            const link = idInput.closest('tr').find('a[id*="turmaVirtual"]');
+            const onclick = link.attr('onclick');
+
+            if (!formName || !onclick) {
+                return { success: false, error: 'Could not extract form parameters' };
+            }
+
+            // Extract JSF parameters
+            const jsfMatch = onclick.match(/'([^']+)','([^']+)','([^']+)'/);
+            if (!jsfMatch) {
+                return { success: false, error: 'Could not parse JSF parameters' };
+            }
+
+            const [_, _formId, inputId, _value] = jsfMatch;
+
+            // Prepare Form Data
+            const formData: Record<string, string> = {};
+
+            // Add all hidden inputs from the form
+            form.find('input[type="hidden"]').each((_, el) => {
+                const name = $(el).attr('name');
+                const val = $(el).attr('value');
+                if (name && val) formData[name] = val;
+            });
+
+            // Add JSF specific inputs
+            formData[formName] = formName;
+            formData['javax.faces.ViewState'] = $('input[name="javax.faces.ViewState"]').val() as string;
+            formData[inputId] = inputId; // The button clicked
+            formData['idTurma'] = courseId; // Explicitly ensure this is set
+
+            // 3. Submit Form (API Request - Fast)
+            const entryResponse = await this.context.request.post('https://si3.ufc.br/sigaa/verPortalDiscente.do', {
+                form: formData,
+                headers: {
+                    'Referer': 'https://si3.ufc.br/sigaa/verPortalDiscente.do'
+                }
+            });
+
+            const entryHtml = await entryResponse.text();
+
+            if (entryHtml.includes('Menu Turma Virtual') || entryHtml.includes('id="conteudo"')) {
+                logger.info('Playwright: Headless API Entry successful!');
+                return {
+                    success: true,
+                    html: entryHtml,
+                    cookies: await this.context.cookies()
+                };
+            } else {
+                return { success: false, error: 'Headless API Entry failed (Unexpected response)' };
+            }
+
+        } catch (error: any) {
+            logger.error('Playwright: Headless API Entry Error:', error);
             return { success: false, error: error.message };
         }
     }
