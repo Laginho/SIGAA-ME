@@ -280,34 +280,78 @@ export class SigaaService {
 
             logger.info(`SIGAA: Queue after filtering: ${queue.length} files to download`);
 
-            // 1. Use the existing session (from when getCourseFiles was called)
-            // DO NOT re-enter the course here - it causes failures
-            // The files already have fresh scripts from getCourseFiles
-            logger.info(`SIGAA: Using existing session for batch download...`);
+            // 1. Ensure httpScraper has course session data (viewState, form inputs, etc.)
+            // This is REQUIRED for downloads to work - without it, downloadFile returns
+            // "Course session data not found" error
+            logger.info(`SIGAA: Refreshing course session for batch download...`);
 
-            // Ensure httpScraper has fresh cookies from the existing Playwright session
-            const freshCookies = await this.playwrightLogin.getCookies();
-            logger.info(`SIGAA: Got ${freshCookies?.length || 0} cookies from Playwright`);
-            if (freshCookies && freshCookies.length > 0) {
-                this.httpScraper.setCookies(freshCookies);
+            // Enter course via Playwright to get fresh HTML
+            const entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
+
+            if (!entryResult.success || !entryResult.html) {
+                logger.error(`SIGAA: Failed to enter course for batch download: ${entryResult.error}`);
+                return {
+                    success: false,
+                    message: entryResult.error || 'Failed to enter course for download',
+                    downloaded: 0,
+                    skipped,
+                    failed: queue.length,
+                    results
+                };
             }
 
-            // The files array already has scripts from getCourseFiles
-            // We use them directly without re-parsing
+            // Set cookies from Playwright session
+            if (entryResult.cookies && entryResult.cookies.length > 0) {
+                logger.info(`SIGAA: Got ${entryResult.cookies.length} cookies from Playwright`);
+                this.httpScraper.setCookies(entryResult.cookies);
+            }
+
+            // Parse course page to populate httpScraper.courseData map
+            // This is critical - it sets viewState, form inputs, and action URL needed for downloads
+            const parseResult = await this.httpScraper.getCourseFiles(courseId, courseName, entryResult.html);
+
+            if (!parseResult.success) {
+                logger.error(`SIGAA: Failed to parse course files: ${parseResult.error}`);
+                return {
+                    success: false,
+                    message: parseResult.error || 'Failed to parse course for download',
+                    downloaded: 0,
+                    skipped,
+                    failed: queue.length,
+                    results
+                };
+            }
+
+            logger.info(`SIGAA: Course session ready. Found ${parseResult.files?.length || 0} files on page.`);
+
+            // Update queue with fresh scripts from the parsed page if available
+            const freshFilesMap = new Map<string, string>();
+            if (parseResult.files) {
+                parseResult.files.forEach(f => {
+                    if (f.name && f.script) {
+                        freshFilesMap.set(f.name, f.script);
+                    }
+                });
+            }
 
             logger.info(`SIGAA: Starting download loop for ${queue.length} files...`);
             for (const file of queue) {
                 logger.info(`SIGAA: Processing file: ${file.name}`);
 
-                if (!file.script) {
-                    logger.warn(`SIGAA: Skipping ${file.name} - no script provided`);
+                // Use fresh script from parsed page if available, otherwise use original
+                let targetScript = file.script;
+                if (freshFilesMap.has(file.name)) {
+                    targetScript = freshFilesMap.get(file.name)!;
+                    logger.info(`SIGAA: Using fresh script for ${file.name}`);
+                }
+
+                if (!targetScript) {
+                    logger.warn(`SIGAA: Skipping ${file.name} - no script available`);
                     failed++;
                     results.push({ fileName: file.name, status: 'failed' });
                     if (onProgress) onProgress(file.name, 'failed');
                     continue;
                 }
-
-                const targetScript = file.script;
 
                 // Extract ID from script
                 const idMatch = targetScript.match(/,id,([^,]+)/);
