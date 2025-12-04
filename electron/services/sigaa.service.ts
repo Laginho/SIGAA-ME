@@ -1,6 +1,8 @@
 import { HttpScraperService } from './http-scraper.service';
 import { PlaywrightLoginService } from './playwright-login.service';
 import { logger } from './logger.service';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export class SigaaService {
     private playwrightLogin: PlaywrightLoginService;
