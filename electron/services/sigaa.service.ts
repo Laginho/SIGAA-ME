@@ -178,18 +178,48 @@ export class SigaaService {
                 return { success: true, filePath: httpResult.filePath };
             }
 
-            console.warn('SIGAA: HTTP download failed. Falling back to Playwright...', httpResult.error);
+            console.warn('SIGAA: HTTP download failed. Refreshing session and retrying HTTP download...', httpResult.error);
 
-            // Fallback to Playwright
-            return await this.playwrightLogin.downloadFile(
+            // 4. Refresh Session and Retry (HTTP Only)
+            console.log(`SIGAA: Re-entering course ${courseId} to refresh session (Retry Attempt)...`);
+            const retryEntryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
+
+            if (!retryEntryResult.success || !retryEntryResult.html) {
+                return { success: false, message: retryEntryResult.error || 'Failed to refresh session for retry' };
+            }
+
+            // Update HttpScraper with fresh state
+            if (retryEntryResult.cookies) {
+                this.httpScraper.setCookies(retryEntryResult.cookies);
+            }
+            // Parse again to get fresh script
+            const retryParseResult = await this.httpScraper.getCourseFiles(courseId, courseName, retryEntryResult.html);
+
+            let retryScript = script;
+            if (retryParseResult.success && retryParseResult.files) {
+                const freshFile = retryParseResult.files.find(f => f.name === fileName);
+                if (freshFile && freshFile.script) {
+                    retryScript = freshFile.script;
+                }
+            }
+
+            // Retry HTTP Download
+            console.log(`SIGAA: Retrying HTTP download for file ${fileName}...`);
+            const retryHttpResult = await this.httpScraper.downloadFile(
                 courseId,
-                courseName,
+                fileId,
                 fileName,
-                _fileUrl, // We might need the URL if script fails, but Playwright handles scripts too
-                basePath,
-                _downloadedFiles,
-                script
+                targetDir,
+                retryScript
             );
+
+            if (retryHttpResult.success) {
+                console.log('SIGAA: HTTP retry successful!');
+                return { success: true, filePath: retryHttpResult.filePath };
+            } else {
+                return { success: false, message: retryHttpResult.error || 'Download failed after retry' };
+            }
+
         } catch (error: any) {
             console.error('SIGAA: Error downloading file:', error);
             return { success: false, message: error.message || 'Download failed' };
@@ -294,45 +324,75 @@ export class SigaaService {
                     results.push({ fileName: file.name, status: 'downloaded', filePath: result.filePath });
                     if (onProgress) onProgress(file.name, 'downloaded');
                 } else {
-                    failed++;
                     results.push({ fileName: file.name, status: 'failed' });
                     if (onProgress) onProgress(file.name, 'failed');
                 }
             }
 
-            // Retry failed files with Playwright
+            // Retry failed files with HTTP (after session refresh)
             if (failed > 0) {
-                console.log(`SIGAA: ${failed} files failed HTTP download. Retrying with Playwright...`);
+                console.log(`SIGAA: ${failed} files failed HTTP download. Refreshing session and retrying...`);
 
-                const failedFiles = results
-                    .filter(r => r.status === 'failed')
-                    .map(r => files.find(f => f.name === r.fileName))
-                    .filter(f => f !== undefined) as Array<{ name: string; url: string; script?: string }>;
+                // 1. Refresh Session
+                const retryEntryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
 
-                if (failedFiles.length > 0) {
-                    const pwResult = await this.playwrightLogin.downloadAllFiles(
-                        courseId,
-                        courseName,
-                        failedFiles,
-                        basePath,
-                        downloadedFiles,
-                        onProgress
-                    );
+                if (retryEntryResult.success && retryEntryResult.html) {
+                    // Update HttpScraper
+                    if (retryEntryResult.cookies) {
+                        this.httpScraper.setCookies(retryEntryResult.cookies);
+                    }
+                    const retryParseResult = await this.httpScraper.getCourseFiles(courseId, courseName, retryEntryResult.html);
 
-                    // Update stats
-                    downloaded += pwResult.downloaded;
-                    failed -= pwResult.downloaded; // If it was failed, now it's downloaded
-                    // skipped remains same (or increases if PW skips)
+                    const retryFreshFilesMap = new Map<string, string>();
+                    if (retryParseResult.success && retryParseResult.files) {
+                        retryParseResult.files.forEach(f => {
+                            if (f.name && f.script) {
+                                retryFreshFilesMap.set(f.name, f.script);
+                            }
+                        });
+                    }
 
-                    // Update results array
-                    pwResult.results.forEach(pwR => {
-                        const index = results.findIndex(r => r.fileName === pwR.fileName);
-                        if (index >= 0) {
-                            results[index] = pwR;
-                        } else {
-                            results.push(pwR);
+                    const failedFiles = results
+                        .filter(r => r.status === 'failed')
+                        .map(r => files.find(f => f.name === r.fileName))
+                        .filter(f => f !== undefined) as Array<{ name: string; url: string; script?: string }>;
+
+                    for (const file of failedFiles) {
+                        console.log(`SIGAA: Retrying HTTP download for ${file.name}...`);
+
+                        let retryScript = file.script;
+                        if (retryFreshFilesMap.has(file.name)) {
+                            retryScript = retryFreshFilesMap.get(file.name)!;
                         }
-                    });
+
+                        if (!retryScript) continue;
+
+                        const idMatch = retryScript.match(/,id,([^,]+)/);
+                        const fileId = idMatch ? idMatch[1] : 'unknown';
+
+                        const retryResult = await this.httpScraper.downloadFile(
+                            courseId,
+                            fileId,
+                            file.name,
+                            targetDir,
+                            retryScript
+                        );
+
+                        if (retryResult.success) {
+                            downloaded++;
+                            failed--;
+                            // Update result in array
+                            const index = results.findIndex(r => r.fileName === file.name);
+                            if (index >= 0) {
+                                results[index] = { fileName: file.name, status: 'downloaded', filePath: retryResult.filePath };
+                            }
+                            if (onProgress) onProgress(file.name, 'downloaded');
+                        } else {
+                            console.error(`SIGAA: Retry failed for ${file.name}: ${retryResult.error}`);
+                        }
+                    }
+                } else {
+                    console.error('SIGAA: Failed to refresh session for batch retry');
                 }
             }
 
