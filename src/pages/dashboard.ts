@@ -200,28 +200,39 @@ async function syncInBackground(cachedCourses: any[], coursesListElement: HTMLEl
         }, 3000);
       }
     } else {
-      console.log(`Updating ${coursesToUpdate.length} courses...`);
+      const BATCH_SIZE = 3;
+      console.log(`Updating ${coursesToUpdate.length} courses in batches of ${BATCH_SIZE}...`);
 
-      for (const course of coursesToUpdate) {
-        const filesResult = await window.api.getCourseFiles(course.id, course.name);
-        // If fetch failed, keep existing files/news to avoid wiping data
-        const cachedCourse = updatedCourses.find(c => c.id === course.id);
-        const files = filesResult.success ? filesResult.files : (cachedCourse?.files || []);
-        const news = filesResult.success ? filesResult.news : (cachedCourse?.news || []);
+      for (let i = 0; i < coursesToUpdate.length; i += BATCH_SIZE) {
+        const batch = coursesToUpdate.slice(i, i + BATCH_SIZE);
+        console.log(`Processing batch ${i / BATCH_SIZE + 1}/${Math.ceil(coursesToUpdate.length / BATCH_SIZE)}`);
 
-        const newCourse = {
-          ...course,
-          files,
-          news,
-          fileCount: files?.length || 0
-        };
+        await Promise.all(batch.map(async (course) => {
+          try {
+            const filesResult = await window.api.getCourseFiles(course.id, course.name);
 
-        const existingIndex = updatedCourses.findIndex(c => c.id === course.id);
-        if (existingIndex >= 0) {
-          updatedCourses[existingIndex] = newCourse;
-        } else {
-          updatedCourses.push(newCourse);
-        }
+            // If fetch failed, keep existing files/news to avoid wiping data
+            const cachedCourse = updatedCourses.find(c => c.id === course.id);
+            const files = filesResult.success ? filesResult.files : (cachedCourse?.files || []);
+            const news = filesResult.success ? filesResult.news : (cachedCourse?.news || []);
+
+            const newCourse = {
+              ...course,
+              files,
+              news,
+              fileCount: files?.length || 0
+            };
+
+            const existingIndex = updatedCourses.findIndex(c => c.id === course.id);
+            if (existingIndex >= 0) {
+              updatedCourses[existingIndex] = newCourse;
+            } else {
+              updatedCourses.push(newCourse);
+            }
+          } catch (err) {
+            console.error(`Error syncing course ${course.name}:`, err);
+          }
+        }));
       }
 
       // Update cache
