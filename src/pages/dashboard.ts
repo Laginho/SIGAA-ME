@@ -75,8 +75,18 @@ async function fetchCoursesWithSync(forceRefresh: boolean = false) {
         syncStatus.className = 'sync-status';
       }
 
-      // Now sync in background
-      setTimeout(() => syncInBackground(coursesWithFiles, coursesListElement, syncStatus), 500);
+      // Now sync in background if enabled
+      window.api.getLiveSyncEnabled().then(enabled => {
+        if (enabled) {
+          setTimeout(() => syncInBackground(coursesWithFiles, coursesListElement, syncStatus), 500);
+        } else {
+          console.log('Live Sync is disabled. Skipping background sync.');
+          if (syncStatus) {
+            syncStatus.textContent = `Sync desativado`;
+            syncStatus.className = 'sync-status';
+          }
+        }
+      });
     } else {
       // No cache or force refresh - do full fetch with progress
       await fullFetchWithProgress(coursesListElement, syncStatus);

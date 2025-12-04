@@ -175,6 +175,15 @@ ipcMain.handle('get-news-detail', async (_, { courseId, newsId }) => {
   return await sigaaService.getNewsDetail(courseId, newsId);
 })
 
+// Live Sync Toggle
+ipcMain.handle('get-live-sync-enabled', () => {
+  return sigaaService.getLiveSyncEnabled();
+})
+
+ipcMain.handle('set-live-sync-enabled', (_, enabled: boolean) => {
+  sigaaService.setLiveSyncEnabled(enabled);
+})
+
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
