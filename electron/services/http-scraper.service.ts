@@ -17,21 +17,26 @@ export class HttpScraperService {
     private logPath = path.join(process.cwd(), 'scraper.log');
     private courseData: Map<string, { viewState: string; action: string; formName: string; inputs: Record<string, string> }> = new Map();
 
+    private logStream: fs.WriteStream;
+
     constructor() {
-        // Clear log file on startup
-        try {
-            fs.writeFileSync(this.logPath, '');
-        } catch (e) { }
+        // Create/Clear log file on startup using WriteStream
+        this.logStream = fs.createWriteStream(this.logPath, { flags: 'w' });
+
+        // Handle stream errors
+        this.logStream.on('error', (err) => {
+            console.error('Log stream error:', err);
+        });
     }
 
     private log(message: string) {
         const timestamp = new Date().toISOString();
         const logMessage = `[${timestamp}] ${message}\n`;
         console.log(message);
-        try {
-            fs.appendFileSync(this.logPath, logMessage);
-        } catch (e) {
-            console.error('Failed to write to log file:', e);
+
+        // Non-blocking write
+        if (this.logStream.writable) {
+            this.logStream.write(logMessage);
         }
     }
 
@@ -150,7 +155,12 @@ export class HttpScraperService {
 
             // Skip navigation if using Playwright HTML (already navigated)
             if (preFetchedHtml) {
-                try { fs.writeFileSync(`debug_playwright_${courseId}.html`, preFetchedHtml); this.log('[HttpScraper] Saved Playwright HTML to debug_playwright.html'); } catch (e) { this.log('[HttpScraper] Failed to save debug file'); }
+                try {
+                    await fs.promises.writeFile(`debug_playwright_${courseId}.html`, preFetchedHtml);
+                    this.log('[HttpScraper] Saved Playwright HTML to debug_playwright.html');
+                } catch (e) {
+                    this.log('[HttpScraper] Failed to save debug file');
+                }
                 this.log('[HttpScraper] Using Playwright HTML directly.');
             } else {
                 // Strategy 1: Look for "Conteúdo" in menu
@@ -539,8 +549,56 @@ export class HttpScraperService {
             return { success: true, news: newsDetail };
 
         } catch (error: any) {
-            console.error('[HttpScraper] Error fetching news detail:', error);
+
+        } catch (error: any) {
+            this.log(`[HttpScraper] Download error: ${error.message}`);
             return { success: false, error: error.message };
+        }
+    }
+
+    private async verifyFileContent(filePath: string, expectedExtension: string): Promise<boolean> {
+        try {
+            const handle = await fs.promises.open(filePath, 'r');
+            const buffer = Buffer.alloc(8);
+            await handle.read(buffer, 0, 8, 0);
+            await handle.close();
+
+            const hex = buffer.toString('hex').toUpperCase();
+
+            // Magic Bytes signatures
+            const signatures: Record<string, string[]> = {
+                '.pdf': ['25504446'], // %PDF
+                '.zip': ['504B0304'], // PK..
+                '.docx': ['504B0304'], // PK..
+                '.xlsx': ['504B0304'], // PK..
+                '.pptx': ['504B0304'], // PK..
+                '.png': ['89504E47'], // .PNG
+                '.jpg': ['FFD8FF'],
+                '.jpeg': ['FFD8FF'],
+                '.gif': ['47494638'], // GIF8
+                '.rar': ['52617221'], // Rar!
+            };
+
+            // If we have a signature for this extension, check it
+            if (signatures[expectedExtension]) {
+                const isValid = signatures[expectedExtension].some(sig => hex.startsWith(sig));
+                if (!isValid) {
+                    this.log(`[HttpScraper] Magic Byte mismatch for ${expectedExtension}. Found: ${hex}`);
+                    return false;
+                }
+            }
+
+            // Check for HTML error pages (often start with <html, <!DOC, or whitespace then <)
+            const contentStart = buffer.toString('utf8').trim().substring(0, 5).toLowerCase();
+            if (contentStart.startsWith('<html') || contentStart.startsWith('<!doc')) {
+                this.log(`[HttpScraper] File appears to be HTML (likely error page)`);
+                return false;
+            }
+
+            return true;
+        } catch (error) {
+            this.log(`[HttpScraper] Verification error: ${error}`);
+            return false; // Assume invalid if we can't read it
         }
     }
 
@@ -618,8 +676,6 @@ export class HttpScraperService {
             const contentType = response.headers['content-type'];
             if (contentType && (contentType.includes('text/html') || contentType.includes('application/xhtml'))) {
                 this.log('[HttpScraper] WARNING: Response Content-Type is HTML. Likely an error page.');
-                // We can't easily read the stream here without consuming it, but the file writer will save it.
-                // We will check the file content after writing.
             }
 
             // Determine filename
@@ -630,12 +686,6 @@ export class HttpScraperService {
                 if (filenameMatch) {
                     finalFileName = filenameMatch[1];
                 }
-            }
-
-            // Ensure extension
-            if (!path.extname(finalFileName)) {
-                // If no extension, try to guess from content-type or keep as is
-                // For now, trust the provided fileName or content-disposition
             }
 
             const filePath = path.join(basePath, finalFileName);
@@ -654,25 +704,33 @@ export class HttpScraperService {
             response.data.pipe(writer);
 
             return new Promise((resolve, reject) => {
-                writer.on('finish', () => {
-                    // Check if file is too small (likely error page)
-                    fs.stat(filePath, (err, stats) => {
-                        if (!err && stats.size < 10240) { // Increased to 10KB to catch larger error pages
-                            // Read file content to check for error
-                            fs.readFile(filePath, 'utf8', (readErr, content) => {
-                                if (!readErr && (content.includes('<html') || content.includes('<!DOCTYPE') || content.includes('Login'))) {
-                                    this.log(`[HttpScraper] ERROR: Downloaded file appears to be an HTML error page. Size: ${stats.size} bytes. Content preview:\n${content.substring(0, 500)}...`);
-                                    resolve({ success: false, error: 'Downloaded file is an HTML error page (Session likely expired).' });
-                                } else {
-                                    this.log(`[HttpScraper] Download complete: ${filePath} (Size: ${stats.size} bytes)`);
-                                    resolve({ success: true, filePath });
-                                }
-                            });
-                        } else {
-                            this.log(`[HttpScraper] Download complete: ${filePath}`);
-                            resolve({ success: true, filePath });
+                writer.on('finish', async () => {
+                    // Check file size first
+                    const stats = await fs.promises.stat(filePath);
+
+                    if (stats.size < 10240) { // < 10KB, suspicious
+                        // Perform robust verification
+                        const ext = path.extname(filePath).toLowerCase();
+                        const isValid = await this.verifyFileContent(filePath, ext);
+
+                        if (!isValid) {
+                            this.log(`[HttpScraper] ERROR: File verification failed. Size: ${stats.size} bytes.`);
+
+                            // Delete the invalid file
+                            try {
+                                await fs.promises.unlink(filePath);
+                                this.log(`[HttpScraper] Deleted invalid file: ${filePath}`);
+                            } catch (unlinkErr: any) {
+                                this.log(`[HttpScraper] Failed to delete invalid file: ${unlinkErr.message}`);
+                            }
+
+                            resolve({ success: false, error: 'Downloaded file failed verification (Invalid signature or HTML error page).' });
+                            return;
                         }
-                    });
+                    }
+
+                    this.log(`[HttpScraper] Download complete: ${filePath} (Size: ${stats.size} bytes)`);
+                    resolve({ success: true, filePath });
                 });
                 writer.on('error', (err) => {
                     this.log(`[HttpScraper] File write error: ${err.message}`);

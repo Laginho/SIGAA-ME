@@ -178,7 +178,18 @@ export class SigaaService {
                 return { success: true, filePath: httpResult.filePath };
             }
 
-            return { success: false, message: httpResult.error || 'Download failed (HTTP only)' };
+            console.warn('SIGAA: HTTP download failed. Falling back to Playwright...', httpResult.error);
+
+            // Fallback to Playwright
+            return await this.playwrightLogin.downloadFile(
+                courseId,
+                courseName,
+                fileName,
+                _fileUrl, // We might need the URL if script fails, but Playwright handles scripts too
+                basePath,
+                _downloadedFiles,
+                script
+            );
         } catch (error: any) {
             console.error('SIGAA: Error downloading file:', error);
             return { success: false, message: error.message || 'Download failed' };
@@ -286,6 +297,42 @@ export class SigaaService {
                     failed++;
                     results.push({ fileName: file.name, status: 'failed' });
                     if (onProgress) onProgress(file.name, 'failed');
+                }
+            }
+
+            // Retry failed files with Playwright
+            if (failed > 0) {
+                console.log(`SIGAA: ${failed} files failed HTTP download. Retrying with Playwright...`);
+
+                const failedFiles = results
+                    .filter(r => r.status === 'failed')
+                    .map(r => files.find(f => f.name === r.fileName))
+                    .filter(f => f !== undefined) as Array<{ name: string; url: string; script?: string }>;
+
+                if (failedFiles.length > 0) {
+                    const pwResult = await this.playwrightLogin.downloadAllFiles(
+                        courseId,
+                        courseName,
+                        failedFiles,
+                        basePath,
+                        downloadedFiles,
+                        onProgress
+                    );
+
+                    // Update stats
+                    downloaded += pwResult.downloaded;
+                    failed -= pwResult.downloaded; // If it was failed, now it's downloaded
+                    // skipped remains same (or increases if PW skips)
+
+                    // Update results array
+                    pwResult.results.forEach(pwR => {
+                        const index = results.findIndex(r => r.fileName === pwR.fileName);
+                        if (index >= 0) {
+                            results[index] = pwR;
+                        } else {
+                            results.push(pwR);
+                        }
+                    });
                 }
             }
 
