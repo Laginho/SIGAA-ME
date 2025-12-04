@@ -549,8 +549,6 @@ export class HttpScraperService {
             return { success: true, news: newsDetail };
 
         } catch (error: any) {
-
-        } catch (error: any) {
             this.log(`[HttpScraper] Download error: ${error.message}`);
             return { success: false, error: error.message };
         }
