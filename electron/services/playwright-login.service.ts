@@ -552,4 +552,17 @@ export class PlaywrightLoginService {
             this.browser = null;
         }
     }
+    async getUserAgent(): Promise<string> {
+        if (this.page) {
+            return await this.page.evaluate(() => navigator.userAgent);
+        }
+        if (this.context) {
+            const page = await this.context.newPage();
+            const ua = await page.evaluate(() => navigator.userAgent);
+            await page.close();
+            return ua;
+        }
+        // Fallback if no browser is open (shouldn't happen if we are syncing)
+        return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
+    }
 }

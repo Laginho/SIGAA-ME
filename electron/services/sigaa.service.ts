@@ -66,6 +66,10 @@ export class SigaaService {
             const cookies = await this.playwrightLogin.getCookies();
             this.httpScraper.setCookies(cookies);
 
+            // Sync User-Agent
+            const ua = await this.playwrightLogin.getUserAgent();
+            this.httpScraper.setUserAgent(ua);
+
             const httpEntry = await this.httpScraper.enterCourseHTTP(courseId);
 
             let html = '';
