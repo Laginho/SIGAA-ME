@@ -75,22 +75,37 @@ export class SigaaService {
         try {
             console.log(`SIGAA: Fetching files for course ${courseName || courseId}...`);
 
-            // 1. Use Playwright to enter the course and capture HTML (Hybrid Approach)
-            console.log('SIGAA: Entering course via Playwright to ensure session validity...');
-            const entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
+            // 1. Try Fast HTTP Entry first
+            console.log('SIGAA: Attempting Fast HTTP Entry...');
 
-            if (!entryResult.success || !entryResult.html) {
-                console.error('SIGAA: Failed to enter course via Playwright:', entryResult.error);
-                return { success: false, message: entryResult.error || 'Failed to enter course' };
+            // Ensure we have cookies from login
+            const cookies = await this.playwrightLogin.getCookies();
+            this.httpScraper.setCookies(cookies);
+
+            const httpEntry = await this.httpScraper.enterCourseHTTP(courseId);
+
+            let html = '';
+            if (httpEntry.success && httpEntry.html) {
+                console.log('SIGAA: Fast HTTP Entry successful!');
+                html = httpEntry.html;
+            } else {
+                console.warn('SIGAA: Fast HTTP Entry failed, falling back to Playwright:', httpEntry.error);
+
+                // Fallback to Playwright
+                const entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
+                if (!entryResult.success || !entryResult.html) {
+                    console.error('SIGAA: Failed to enter course via Playwright:', entryResult.error);
+                    return { success: false, message: entryResult.error || 'Failed to enter course' };
+                }
+                html = entryResult.html;
+                if (entryResult.cookies) {
+                    this.httpScraper.setCookies(entryResult.cookies);
+                }
             }
 
-            // 2. Pass cookies and HTML to HttpScraper for fast parsing
-            console.log('SIGAA: Passing captured HTML to HttpScraper...');
-            if (entryResult.cookies) {
-                this.httpScraper.setCookies(entryResult.cookies);
-            }
-
-            const result = await this.httpScraper.getCourseFiles(courseId, courseName, entryResult.html);
+            // 2. Parse files
+            console.log('SIGAA: Parsing course files...');
+            const result = await this.httpScraper.getCourseFiles(courseId, courseName, html);
 
             if (!result.success) {
                 return { success: false, message: result.error || 'Failed to fetch files' };
