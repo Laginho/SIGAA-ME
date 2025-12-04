@@ -7,10 +7,20 @@ import * as path from 'path';
 export class SigaaService {
     private playwrightLogin: PlaywrightLoginService;
     private httpScraper: HttpScraperService;
+    private liveSyncEnabled = false;
 
     constructor() {
         this.playwrightLogin = new PlaywrightLoginService();
         this.httpScraper = new HttpScraperService();
+    }
+
+    getLiveSyncEnabled(): boolean {
+        return this.liveSyncEnabled;
+    }
+
+    setLiveSyncEnabled(enabled: boolean) {
+        this.liveSyncEnabled = enabled;
+        logger.info(`SIGAA: Live Sync set to ${enabled}`);
     }
 
     async login(username: string, password: string): Promise<{ success: boolean; message?: string; account?: { name: string; photoUrl?: string } }> {
@@ -367,7 +377,7 @@ export class SigaaService {
                         .filter(f => f !== undefined) as Array<{ name: string; url: string; script?: string }>;
 
                     for (const file of failedFiles) {
-                        console.log(`SIGAA: Retrying HTTP download for ${file.name}...`);
+                        console.log(`SIGAA: Retrying HTTP download for ${file.name} (Attempt 1/3)...`);
 
                         let retryScript = file.script;
                         if (retryFreshFilesMap.has(file.name)) {
@@ -379,25 +389,50 @@ export class SigaaService {
                         const idMatch = retryScript.match(/,id,([^,]+)/);
                         const fileId = idMatch ? idMatch[1] : 'unknown';
 
-                        const retryResult = await this.httpScraper.downloadFile(
-                            courseId,
-                            fileId,
-                            file.name,
-                            targetDir,
-                            retryScript
-                        );
+                        // Retry Loop
+                        let retrySuccess = false;
+                        for (let attempt = 1; attempt <= 3; attempt++) {
+                            if (attempt > 1) console.log(`SIGAA: Retry attempt ${attempt}/3 for ${file.name}...`);
 
-                        if (retryResult.success) {
-                            downloaded++;
-                            failed--;
-                            // Update result in array
-                            const index = results.findIndex(r => r.fileName === file.name);
-                            if (index >= 0) {
-                                results[index] = { fileName: file.name, status: 'downloaded', filePath: retryResult.filePath };
+                            const retryResult = await this.httpScraper.downloadFile(
+                                courseId,
+                                fileId,
+                                file.name,
+                                targetDir,
+                                retryScript || ''
+                            );
+
+                            if (retryResult.success) {
+                                downloaded++;
+                                failed--;
+                                // Update result in array
+                                const index = results.findIndex(r => r.fileName === file.name);
+                                if (index >= 0) {
+                                    results[index] = { fileName: file.name, status: 'downloaded', filePath: retryResult.filePath };
+                                }
+                                if (onProgress) onProgress(file.name, 'downloaded');
+                                retrySuccess = true;
+                                break; // Success!
+                            } else {
+                                console.warn(`SIGAA: Retry ${attempt} failed for ${file.name}: ${retryResult.error}`);
+                                // Refresh session before next attempt if not last attempt
+                                if (attempt < 3) {
+                                    const refreshResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
+                                    if (refreshResult.success && refreshResult.cookies) {
+                                        this.httpScraper.setCookies(refreshResult.cookies);
+                                        // Update script if possible
+                                        if (refreshResult.html) {
+                                            const newParse = await this.httpScraper.getCourseFiles(courseId, courseName, refreshResult.html);
+                                            const newFile = newParse.files?.find(f => f.name === file.name);
+                                            if (newFile?.script) retryScript = newFile.script;
+                                        }
+                                    }
+                                }
                             }
-                            if (onProgress) onProgress(file.name, 'downloaded');
-                        } else {
-                            console.error(`SIGAA: Retry failed for ${file.name}: ${retryResult.error}`);
+                        }
+
+                        if (!retrySuccess) {
+                            console.error(`SIGAA: All retry attempts failed for ${file.name}`);
                         }
                     }
                 } else {
