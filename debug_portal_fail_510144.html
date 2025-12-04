@@ -1,6 +1,485 @@
-<script>
-document.cookie = 'JSESSIONID' + '=invalido;expires=Thu, 01 Jan 1970 23:59:59 GMT;path=/';
-alert('Sua sess�o foi expirada. � necess�rio autenticar-se novamente!');
-document.location.href = '/sigaa';
+<!DOCTYPE html><html class="background" lang="pt-BR"><head>
+	<meta http-equiv="Pragma" content="no-cache">
+
+
+<title>SIGAA - UFC</title>
+
+<link rel="shortcut icon" href="/shared/img/brasao.ico">
+
+<script type="text/javascript" src="/shared/jsBundles/jawr_loader.js"></script>
+<script type="text/javascript">
+	JAWR.loader.style('/bundles/css/sigaa_base.css', 'all');
+	JAWR.loader.style('/css/ufrn_print.css', 'print');
+	
+	JAWR.loader.script('/bundles/js/sigaa_base.js');
+</script> <link rel="stylesheet" type="text/css" media="all" href="/shared/cssBundles/gzip_517038146/bundles/css/sigaa_base.css">  <link rel="stylesheet" type="text/css" media="print" href="/shared/cssBundles/gzip_48504048/css/ufrn_print.css">  <script type="text/javascript" src="/shared/jsBundles/gzip_33446069/bundles/js/sigaa_base.js"> </script> 
+
+<!--<meta name="viewport" content="width=device-width, initial-scale=1">-->
+<link rel="stylesheet" type="text/css" media="all" href="/sigaa/cssBundles/gzip_1256847914/bundles/css/sigaa.css">
+
+
+<script type="text/javascript">
+   	JAWR.loader.script('/javascript/jquery-1.7.1.min.js');
+   	JAWR.loader.script('/javascript/jquery/jquery.cookie.js');
+</script> <script type="text/javascript" src="/shared/jsBundles/gzip_76217053/javascript/jquery-1.7.1.min.js"> </script>  <script type="text/javascript" src="/shared/jsBundles/gzip_811590381/javascript/jquery/jquery.cookie.js"> </script> 
+
+<script type="text/javascript">
+   	var j$=jQuery.noConflict();
 </script>
 
+<link rel="stylesheet" href="/shared/acessibilidade/bootstrap-acessibilidade.css">
+
+<script type="text/javascript" src="/shared/acessibilidade/accessible_jscookmenu.js"></script>
+
+<script type="text/javascript" src="/shared/acessibilidade/ferramentas_acessibilidade.js"></script>
+
+<script type="text/javascript" src="/shared/acessibilidade/accessible_extjs_basic_dialog.js"></script>
+
+
+
+
+
+
+
+
+<script type="text/javascript">
+	var mensagem;
+	var initMensagem = function() {
+		mensagem = new Mensagem();
+	}
+	YAHOO.util.Event.addListener(window,'load', initMensagem);
+</script>
+<!-- Fim dos imports para abrir chamado -->
+
+<link rel="stylesheet" href="/sigaa/css/html5/correcoes.css" type="text/css">
+
+
+
+<link rel="stylesheet" type="text/css" media="all" href="/sigaa/cssBundles/gzip_530109038/css/html5/bootstrap-form.css">
+
+<link rel="stylesheet" type="text/css" media="all" href="/sigaa/cssBundles/gzip_1578515502/css/html5/bootstrap-acessibilidade.css">
+
+
+
+<link rel="stylesheet" href="/sigaa/css/html5/flexboxgrid.css" type="text/css">
+
+<link rel="stylesheet" type="text/css" media="all" href="/sigaa/cssBundles/gzip_N242246130/css/html5/html5-main.css">
+
+<link rel="stylesheet" type="text/css" media="all" href="/sigaa/cssBundles/gzip_121451417/css/html5/html5-lista.css">
+
+<link rel="stylesheet" type="text/css" media="all" href="/sigaa/cssBundles/gzip_N1404962710/css/html5/html5-form.css">
+
+<link rel="stylesheet" type="text/css" media="all" href="/sigaa/cssBundles/gzip_N1624543208/css/html5/html5-detalhes.css">
+
+
+<link rel="stylesheet" type="text/css" media="all" href="/sigaa/cssBundles/gzip_N603275713/css/html5/html5-botoes.css">
+
+
+<link rel="stylesheet" type="text/css" media="all" href="/sigaa/cssBundles/gzip_688604679/css/tags/sigaa-tags.css">
+
+
+
+<style>[vw] [vw-access-button]{display:none;flex-direction:row-reverse;width:40px;height:40px;cursor:pointer;overflow:hidden;position:absolute;border-radius:8px;transition:all 0.5s ease;right:0;left:auto}[vw] [vw-access-button] img{max-height:40px;transition:all 0.5s ease;border-radius:8px;opacity:1 !important;visibility:visible !important}[vw] [vw-access-button] .vp-access-button{width:40px;height:40px;z-index:1}[vw] [vw-access-button] .vp-pop-up{position:absolute;height:40px;min-width:150px;z-index:0;left:0;right:auto}[vw] [vw-access-button]:hover{width:200px}[vw] [vw-access-button].isLeft{flex-direction:row;left:0;right:auto}[vw] [vw-access-button].isLeft .vp-pop-up{left:auto;right:0}[vw] [vw-access-button].isTopOrBottom:hover{bottom:-20px;top:0;margin-right:-80px}[vw] [vw-access-button].active{display:flex}
+</style><style>[vw].left [vw-plugin-wrapper]{float:left}[vw] [vw-plugin-wrapper]{position:relative;display:none;width:300px;height:100%;float:right;background:white;-webkit-box-shadow:0px 0px 15px rgba(0,0,0,0.2);-moz-box-shadow:0px 0px 15px rgba(0,0,0,0.2);box-shadow:0px 0px 15px rgba(0,0,0,0.2);border-radius:12px;-moz-border-radius:12px;-webkit-border-radius:12px}[vw] [vw-plugin-wrapper].active{display:-webkit-flex;display:flex;flex-direction:column;-webkit-flex-direction:column;height:450px;max-width:100%;min-height:100%}
+</style><style>div[vw]{position:fixed;max-width:95vw;min-height:40px;min-width:40px;z-index:2147483645 !important;display:none;margin:10px !important}div[vw].enabled{display:block}div[vw].active{margin-top:-285px}div[vw].left{left:0;right:initial}
+</style></head>
+
+<body id="elgen-0">
+	
+
+	
+		<div id="container">
+			
+			
+<style>
+	#menu-acessibilidade{
+		width: 0px !important;
+		height: 0px !important;
+		padding: 0 !important;
+		overflow: hidden !important;
+		clip: rect(0,0,0,0) !important;
+		white-space: nowrap !important;
+		border: 0 !important;
+	}
+	#menu-acessibilidade a{
+		background-color: #fff;
+		border-radius: 0 2px 2px 0;
+		box-shadow: 0 2px 2px 0 rgba(0,0,0,.16),0 0 0 1px rgba(0,0,0,.08);
+		display: flex;
+		z-index: 1001;
+		border: 2px solid rgba(0,0,0,.16);
+		cursor: pointer;
+		font-size: 13px;
+		line-height: 20px;
+		margin: 6px 11px;
+		min-height: 32px;
+		text-decoration: underline;
+		text-align: center;
+		width: 128px;
+		white-space: normal;
+	}
+	#menu-acessibilidade a:focus{
+		position: fixed;
+		top: 0;
+		left: 0;
+		clip: auto;
+		overflow: visible;
+	}
+</style>
+<div id="menu-acessibilidade">
+	<h2 id="titulo-menu-acessibilidade">Atalhos de Acessibilidade</h2>
+	<a accesskey="1" id="link-skipto-menu" href="#menu-dropdown" class="link-acessibilidade" aria-hidden="true" tabindex="-1">Pular para Menu de Navegação </a>
+	<a accesskey="2" id="link-skipto-conteudo" href="#conteudo" class="link-acessibilidade">Pular para Início do Conteúdo</a>
+	<a accesskey="3" id="link-skipto-rodape" href="#rodape" class="link-acessibilidade">Pular para Rodapé</a>
+	<script>
+		j$(function(){
+			let menu=document.getElementById('menu-dropdown');
+			if(menu){
+				j$('#link-skipto-menu').attr('aria-hidden','false').attr('tabindex','0');
+			}
+		});
+	</script>
+</div>
+<header id="cabecalho" role="banner">
+
+
+	
+	
+
+	<div id="info-sistema">
+		<span role="paragraph">
+			<h1 role="none">
+				UFC - SIGAA -
+			</h1>
+			<h3 role="none">Sistema Integrado de Gestão de Atividades Acadêmicas</h3>
+		</span>
+
+		
+			<div id="tempoSessao" role="paragraph"><small><em>Tempo de Sessão:</em> <span id="spanRelogio" title="Tempo restante para a expiração da sessão.">01:30</span></small></div>
+			<span class="sair-sistema"> <a href="/sigaa/logar.do?dispatch=logOff"><span aria-hidden="true">SAIR</span> <span class="sr-only">encerrar sessão</span></a> </span>
+		
+	</div>
+
+	
+
+
+	
+
+
+
+	<div id="painel-usuario">
+
+		
+			<div id="menu-usuario">
+	<h2 id="menu-usuario-header" class="sr-only">Menu de usuário</h2>
+	<ul aria-labelledby="menu-usuario-header">
+		<li class="modulos">
+			
+				<span id="modulos"><a href="javascript:void(0)" id="show-modulos">Módulos</a></span>
+			
+		</li>
+
+		
+
+		<li class="chamado">
+			
+			
+				
+					<a href="javascript:void(0)" onclick="setarCookie(); window.open('/sigaa/abrirChamado.jsf?tipo=3&amp;sistema=2&amp;idUsuario=1', 'chamado', 'scrollbars=1,width=700,height=600')">Abrir
+						Chamado
+					</a>
+				
+				
+			
+		</li>
+
+		
+
+		
+
+		
+
+		
+			<li class="dados-pessoais">
+				<a href="javascript:void(0)" onclick="window.open('/sigaa/alterar_dados.jsf','','width=670,height=430, top=100, left=100, scrollbars' )">Alterar E-mail/Senha</a>
+			</li>
+		
+		
+<!-- 		<li class="ajuda"> -->
+ 			
+
+
+
+<!-- 		</li> -->
+	</ul>
+</div>
+
+			<div id="info-usuario">
+	<h2 class="sr-only">Informações do usuário</h2>
+	<!-- [RM #8268] Alterar a camada de apresentacao dos elementos que exibem os dados do usuario logado -->
+	<div class="nome_vinculo_deslogar_unidade_periodo">
+		<div class="nome_vinculo_deslogar_periodo">
+
+			<!-- O codigo abaixo eh responsavel por exibir o nome do usuario
+				e as opcoes de "Alterar Vinculo" e "Deslogar"(opcao Logar Como)  -->
+			
+				<div class="nome_vinculo_deslogar">
+					<div class="nome_usuario">
+						<p> BRUNO DELUIZ LAGE</p>
+					</div>
+					
+					<div class="vinculo_deslogar">
+						
+						
+						
+					</div>
+				</div>
+			
+			
+			<!-- Exibe a informacao do periodo letivo -->
+			<div class="periodo">
+				
+			</div>
+		</div>
+		
+		<!-- Exibe as informacoes da unidade do usuario -->		
+		<div class="info_unidade">
+			<p>
+				
+			         
+			         
+			            CENTRO DE TECNOLOGIA
+			            
+							(11.00.01.19)
+						 
+							
+						
+			         
+      			
+				
+			</p>
+		</div>
+	</div>
+</div>
+		
+
+		
+	</div>
+</header>
+			
+			<script>
+				j$(function(){
+					let main=j$('main,[role="main"]').not('#conteudo,[role="none"]').first();
+					if(main.length){
+						j$('#conteudo').attr('role','none');
+						if(!main.attr('id')) main.attr('id','conteudoPrincipal');
+						let id_conteudo=main.attr('id');
+						j$('#link-skipto-conteudo').attr('href','#'+id_conteudo);
+					}
+					else{
+						let menu=j$('#menu-dropdown');
+						if(menu.length){
+							main = menu.next();
+							if(!main.attr('id')) main.attr('id','conteudoPrincipal');
+							let id_conteudo=main.attr('id');
+							j$('#link-skipto-conteudo').attr('href','#'+id_conteudo);
+						}
+					}
+				})
+			</script>
+			<main id="conteudo">
+				
+	
+
+	
+
+
+
+
+
+	
+		
+	
+
+	<script type="text/javascript">
+		j$(document).ready(function(){
+			j$.cookie('sistema', null);
+		});
+	
+		function setarCookie(){
+			j$.cookie('sistema', null);
+			j$.cookie('sistema', 'sigaa', { path: '/' });
+		}
+
+		function abrirDivDetalhes(div, width, height) {
+			dialog = YAHOO.ext.DialogManager.get(div);
+			$(div).style.display='block';
+			$(div).style.backgroundColor = '#FFFFFF';
+			if(!width) width = 600;
+			if(!height) height = 400;
+			if ( !dialog ) {
+				dialog = new YAHOO.ext.BasicDialog(div, {
+				        modal: false,
+				        width: width,
+				        height: height,
+				        constraintoviewport: false,
+				        fixedcenter: true,
+				        shadow: false,
+				        minWidth:600,
+				        minHeight:0,
+				        proxyDrag: true
+				});
+				dialog.addKeyListener(27, dialog.hide, dialog);
+				dialog.addButton('Fechar Painel', dialog.hide, dialog);
+			}
+			dialog.show();
+			YAHOO.ext.DialogManager.bringToFront(div);
+		}
+
+
+		function desabilitar_link(event) {
+			tornar_link_desabilitado(event.element());
+		}
+
+		function tornar_link_desabilitado(elemento) {
+			console.log(elemento)
+			elemento.setAttribute('onclick', 'return false;');
+			elemento.classList.add("disabled")
+		}
+		function desabilitar_elemento_pai(event) {
+			tornar_link_desabilitado(event.element().parentElement);
+		}
+		
+	</script>
+
+	
+	
+	
+
+
+
+
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+
+
+<table width="80%" align="center" bgcolor="#000080">
+
+	<tbody><tr>
+		<td class="erro" align="center"><br>
+		<br>
+		<img src="/shared/img/erro_autorizacao.gif"><br>
+		<font color="white"> Acesso Negado<br>
+		Usuário Não Autorizado<br><br></font></td>
+	</tr>
+	<tr>
+		<td></td>
+	</tr>
+	<tr>
+		<td><br>
+		<table width="80%" align="center">
+			<tbody><tr>
+				<td><b> <font color="white"> Caso seja necessária a
+				utilização desta funcionalidade, <a href="javascript://nop/" accesskey="a" onclick="mensagem.show(2);">
+				<font color="white">Clique Aqui</font></a> para liberação de sua permissão. </font> </b></td>
+			</tr>
+		</tbody></table>
+
+
+		<br>
+		<br>
+		</td><td>
+	</td></tr>
+</tbody></table>
+
+
+<br>
+<br>
+<center><a href="javascript:history.go(-1)"> Voltar </a></center>
+<br>
+<br>
+
+
+
+
+
+
+
+			
+				
+			
+		</main> 
+		<br>
+
+		
+			
+			<div style="width: 80%; text-align: center; margin: 10px auto;">
+				Não Definido
+			</div>
+			
+		
+		<footer id="rodape" role="contentinfo">
+			<p>
+				SIGAA |
+				Copyright © 2010-2025 
+			  - Superintendência de Tecnologia da Informação
+			  - UFC
+			  - <span itemprop="telephone">(85) 3366-9999</span>
+			  - si3asprd04.ufc.br
+			</p>
+		</footer>
+	
+	</div>  
+	<div class="panel-container dialog" id="painel-mensagem-envio_c"><div id="painel-mensagem-envio" class=" module overlay panel" style="visibility: inherit;"><div class="hd">Mensagem</div> <div class="bd">Aguarde...</div><div class="ft"></div></div></div>
+
+
+
+
+<script type="text/javascript">
+	Relogio.init(90);
+</script>
+
+	<div id="mensagem">
+		<div class="x-window-header"></div>
+		<div class="x-window-body"></div>
+	</div>
+
+	
+	<div vw="" class="enabled" style="left: initial; right: 0px; top: 50%; bottom: initial; transform: translateY(calc(-50% - 10px));">
+	    <div vw-access-button="" class="active"><img class="vp-access-button" data-src="assets/access_icon.svg" alt="Conteúdo acessível em Libras usando o VLibras Widget com opções dos Avatares Ícaro, Hosana ou Guga." src="https://vlibras.gov.br/app//assets/access_icon.svg">
+<img class="vp-pop-up" data-src="assets/access_popup.jpg" alt="Conteúdo acessível em Libras usando o VLibras Widget com opções dos Avatares Ícaro, Hosana ou Guga." src="https://vlibras.gov.br/app//assets/access_popup.jpg">
+</div>
+	    <div vw-plugin-wrapper=""><div vp="">
+  <div vp-box=""></div>
+  <div vp-message-box=""></div>
+  <div vp-settings=""></div>
+  <div vp-dictionary=""></div>
+  <div vp-settings-btn=""></div>
+  <div vp-info-screen=""></div>
+  <div vp-suggestion-screen=""></div>
+  <div vp-translator-screen=""></div>
+  <div vp-more-options-screen=""></div>
+  <div vp-emotions-tooltip=""></div>
+  <div vp-main-guide-screen=""></div>
+  <div vp-suggestion-button=""></div>
+  <div vp-rate-box=""></div>
+  <div vp-change-avatar=""></div>
+  <div vp-aux-controls=""></div>
+  <div vp-controls=""></div>
+  <span vp-click-blocker=""></span>
+</div>
+</div>
+	</div>
+	<script src="https://vlibras.gov.br/app/vlibras-plugin.js" charset="UTF-8"></script>
+	<script>
+		new window.VLibras.Widget('https://vlibras.gov.br/app');
+	</script>
+
+	
+
+
+<p aria-live="polite" id="yahoo-dialog-status" class="sr-only" tabindex="-1"></p></body></html>
