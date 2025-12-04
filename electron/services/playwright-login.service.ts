@@ -295,8 +295,67 @@ export class PlaywrightLoginService {
                 console.log(`Playwright: Verified we are in course "${courseName}"`);
             }
 
-            // Files are located on the "Principal" (Main) page, so we don't need to navigate anywhere else.
-            console.log('Playwright: Files are on the main page. Skipping navigation to "Conteúdo".');
+            // HYBRID NAVIGATION STRATEGY:
+            // 1. Check if files are present on the Main Page (e.g., Calculus).
+            // 2. If not, navigate to "Conteúdo" (e.g., FMC).
+            
+            const hasFilesOnMainPage = await page.evaluate(() => {
+                const contentDiv = document.getElementById('conteudo');
+                if (!contentDiv) return false;
+                
+                // Look for jsfcljs links in the main content area
+                const links = Array.from(contentDiv.querySelectorAll('a[onclick*="jsfcljs"]'));
+                
+                // Filter out "Visualizar" links (usually News/Evaluations) and check for actual file links
+                const hasFileLinks = links.some(link => {
+                    const text = link.textContent?.trim() || '';
+                    return text !== '' && !text.includes('(Visualizar)');
+                });
+
+                // Check for the specific "No topics" message
+                const noTopicsMessage = document.body.innerText.includes('O Sistema detectou que até agora seu professor não criou nenhum tópico de aula');
+                
+                return hasFileLinks && !noTopicsMessage;
+            });
+
+            if (hasFilesOnMainPage) {
+                console.log('Playwright: Files detected on Main Page. Skipping navigation.');
+            } else {
+                console.log('Playwright: Main page seems empty or has no files. Attempting to navigate to "Conteúdo"...');
+                try {
+                    // Try to find and click the "Conteúdo" menu item
+                    const navigated = await page.evaluate(() => {
+                        // Helper to find text in elements
+                        const containsText = (el: Element, text: string) => el.textContent?.trim() === text;
+                        
+                        // 1. Try to find "Conteúdo" directly
+                        const menuItems = Array.from(document.querySelectorAll('.itemMenu'));
+                        let conteudoItem = menuItems.find(item => containsText(item, 'Conteúdo'));
+                        
+                        if (conteudoItem) {
+                            const link = conteudoItem.closest('a');
+                            if (link) {
+                                link.click();
+                                return true;
+                            }
+                        }
+                        
+                        // 2. If not visible, maybe we need to expand "Materiais"
+                        // (This part is tricky purely via JS without UI interaction, but click() on hidden elements often works in JSF)
+                        return false;
+                    });
+
+                    if (navigated) {
+                        await page.waitForLoadState('networkidle');
+                        await page.waitForTimeout(2000); // Wait for content load
+                        console.log('Playwright: Successfully navigated to "Conteúdo".');
+                    } else {
+                        console.warn('Playwright: Could not find "Conteúdo" menu item. Staying on Main Page.');
+                    }
+                } catch (navError) {
+                    console.error('Playwright: Error navigating to Conteúdo:', navError);
+                }
+            }
 
             // Get HTML and Cookies
             const html = await page.content();
