@@ -295,9 +295,12 @@ export class SigaaService {
             // The files array already has scripts from getCourseFiles
             // We use them directly without re-parsing
 
+            logger.info(`SIGAA: Starting download loop for ${queue.length} files...`);
             for (const file of queue) {
+                logger.info(`SIGAA: Processing file: ${file.name}`);
+
                 if (!file.script) {
-                    console.warn(`SIGAA: Skipping ${file.name} - no script provided`);
+                    logger.warn(`SIGAA: Skipping ${file.name} - no script provided`);
                     failed++;
                     results.push({ fileName: file.name, status: 'failed' });
                     if (onProgress) onProgress(file.name, 'failed');
@@ -309,6 +312,7 @@ export class SigaaService {
                 // Extract ID from script
                 const idMatch = targetScript.match(/,id,([^,]+)/);
                 const fileId = idMatch ? idMatch[1] : 'unknown';
+                logger.info(`SIGAA: Downloading ${file.name} (ID: ${fileId})...`);
 
                 const result = await this.httpScraper.downloadFile(
                     courseId,
@@ -319,14 +323,19 @@ export class SigaaService {
                 );
 
                 if (result.success) {
+                    logger.info(`SIGAA: Downloaded ${file.name} successfully`);
                     downloaded++;
                     results.push({ fileName: file.name, status: 'downloaded', filePath: result.filePath });
                     if (onProgress) onProgress(file.name, 'downloaded');
                 } else {
+                    logger.error(`SIGAA: Failed to download ${file.name}: ${result.error}`);
+                    failed++;
                     results.push({ fileName: file.name, status: 'failed' });
                     if (onProgress) onProgress(file.name, 'failed');
                 }
             }
+
+            logger.info(`SIGAA: Download loop complete. Downloaded: ${downloaded}, Failed: ${failed}, Skipped: ${skipped}`);
 
             // Retry failed files with HTTP (after session refresh)
             if (failed > 0) {
