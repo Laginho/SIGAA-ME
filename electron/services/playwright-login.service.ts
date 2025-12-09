@@ -742,30 +742,57 @@ export class PlaywrightLoginService {
             }
 
             // 2. Find and click the news link
-            const newsLinkSelector = `a[onclick*="${newsId}"]`;
-            const newsLink = await page.$(newsLinkSelector);
+            // News links are inside forms that contain a hidden input with name="id" and value=newsId
+            // Structure: <form><input name="id" value="newsId"><a href="#" onclick="...">(Visualizar)</a></form>
+            console.log(`Playwright: Looking for news link with ID ${newsId}...`);
 
-            if (!newsLink) {
-                console.log(`Playwright: News link with ID ${newsId} not found on page. Trying alternative selector...`);
-                // Try finding by iterating through all links
-                const allLinks = await page.$$('a[onclick*="visualizar"]');
-                let found = false;
-                for (const link of allLinks) {
-                    const onclick = await link.getAttribute('onclick');
-                    if (onclick && onclick.includes(newsId)) {
-                        console.log(`Playwright: Found news link by alternative search.`);
-                        await link.click();
-                        found = true;
-                        break;
-                    }
+            let found = false;
+
+            // Strategy 1: Find form with hidden input containing the news ID
+            const formSelector = `form:has(input[name="id"][value="${newsId}"])`;
+            const newsForm = await page.$(formSelector);
+
+            if (newsForm) {
+                console.log(`Playwright: Found form containing news ID ${newsId}`);
+                const linkInForm = await newsForm.$('a');
+                if (linkInForm) {
+                    console.log(`Playwright: Clicking link inside form...`);
+                    await linkInForm.click();
+                    found = true;
                 }
-                if (!found) {
-                    return { success: false, error: `News link with ID ${newsId} not found` };
-                }
-            } else {
-                console.log(`Playwright: Clicking news link for ${newsId}...`);
-                await newsLink.click();
             }
+
+            // Strategy 2: Fallback - look in page.evaluate for more complex DOM traversal
+            if (!found) {
+                console.log(`Playwright: Form selector failed, using page.evaluate...`);
+                found = await page.evaluate((id) => {
+                    const inputs = document.querySelectorAll('input[name="id"]');
+                    for (const input of inputs) {
+                        if ((input as HTMLInputElement).value === id) {
+                            const form = input.closest('form');
+                            if (form) {
+                                const link = form.querySelector('a');
+                                if (link) {
+                                    (link as HTMLAnchorElement).click();
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                    return false;
+                }, newsId);
+            }
+
+            if (!found) {
+                // Save debug HTML
+                const html = await page.content();
+                const debugPath = path.join(process.cwd(), `debug_playwright_news_fail_${newsId}.html`);
+                fs.writeFileSync(debugPath, html);
+                console.log(`Playwright: Saved debug HTML to ${debugPath}`);
+                return { success: false, error: `News link with ID ${newsId} not found` };
+            }
+
+            console.log(`Playwright: Successfully clicked news link for ${newsId}`);
 
             // 3. Wait for page to load
             await page.waitForLoadState('networkidle');
