@@ -7,6 +7,47 @@ import { SigaaService } from './services/sigaa.service'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
+// ===== FILE LOGGER SETUP =====
+const logsDir = path.join(__dirname, '..', 'logs');
+if (!fs.existsSync(logsDir)) {
+  fs.mkdirSync(logsDir, { recursive: true });
+}
+
+const logFileName = `app_${new Date().toISOString().replace(/[:.]/g, '-')}.log`;
+const logFilePath = path.join(logsDir, logFileName);
+const logStream = fs.createWriteStream(logFilePath, { flags: 'a' });
+
+const originalConsoleLog = console.log;
+const originalConsoleError = console.error;
+const originalConsoleWarn = console.warn;
+
+const formatLog = (level: string, args: any[]) => {
+  const timestamp = new Date().toISOString();
+  const message = args.map(arg =>
+    typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+  ).join(' ');
+  return `[${timestamp}] [${level}] ${message}\n`;
+};
+
+console.log = (...args: any[]) => {
+  originalConsoleLog.apply(console, args);
+  logStream.write(formatLog('INFO', args));
+};
+
+console.error = (...args: any[]) => {
+  originalConsoleError.apply(console, args);
+  logStream.write(formatLog('ERROR', args));
+};
+
+console.warn = (...args: any[]) => {
+  originalConsoleWarn.apply(console, args);
+  logStream.write(formatLog('WARN', args));
+};
+
+console.log('=== SIGAA-ME App Started ===');
+console.log(`Log file: ${logFilePath}`);
+// ===== END FILE LOGGER SETUP =====
+
 
 // The built directory structure
 //
