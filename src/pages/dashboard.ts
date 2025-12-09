@@ -110,7 +110,7 @@ async function fullFetchWithProgress(coursesListElement: HTMLElement, syncStatus
   coursesListElement.innerHTML = `
     <div class="loading-courses">
       <div class="loading-spinner"></div>
-      <p>Carregando disciplinas e materiais...</p>
+      <p>Carregando disciplinas e materiais. Estimativa: 2 min</p>
       <div class="progress-bar">
         <div class="progress-fill" id="progressFill"></div>
       </div>
