@@ -506,13 +506,13 @@ export class SigaaService {
         }
     }
 
-    async getNewsDetail(courseId: string, newsId: string): Promise<{ success: boolean; news?: any; message?: string }> {
+    async getNewsDetail(courseId: string, newsId: string, script?: string): Promise<{ success: boolean; news?: any; message?: string }> {
         try {
-            console.log(`SIGAA: Fetching news detail ${newsId} using HTTP Scraper...`);
+            console.log(`SIGAA: Fetching news detail ${newsId} using HTTP Scraper... Script present: ${!!script}`);
             // Use HTTP Scraper for speed
             const freshCookies = await this.playwrightLogin.getCookies();
             this.httpScraper.setCookies(freshCookies);
-            const result = await this.httpScraper.getNewsDetail(courseId, newsId);
+            const result = await this.httpScraper.getNewsDetail(courseId, newsId, script);
 
             if (!result.success) {
                 return { success: false, message: result.error || 'Failed to fetch news detail' };

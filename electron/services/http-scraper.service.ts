@@ -482,7 +482,13 @@ export class HttpScraperService {
                             if (title && date && onclick) {
                                 const idMatch = onclick.match(/['"](\\d+)['"]/);
                                 if (idMatch) {
-                                    news.push({ title, date, notification, id: idMatch[1] });
+                                    news.push({
+                                        title,
+                                        date,
+                                        notification,
+                                        id: idMatch[1],
+                                        script: onclick  // Capture the script for later use
+                                    });
                                 }
                             }
                         }
@@ -544,94 +550,97 @@ export class HttpScraperService {
         }
     }
 
-    async getNewsDetail(courseId: string, newsId: string): Promise<{ success: boolean; news?: any; error?: string }> {
+    async getNewsDetail(courseId: string, newsId: string, script?: string): Promise<{ success: boolean; news?: any; error?: string }> {
         try {
-            const dashboardUrl = `${this.baseUrl}/sigaa/portais/discente/discente.jsf`;
-            const dashboardResponse = await axios.get(dashboardUrl, {
-                headers: {
-                    'Cookie': this.getCookieHeader(dashboardUrl),
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                    'Referer': `${this.baseUrl}/sigaa/verPortalDiscente.do`,
-                    'Connection': 'keep-alive'
-                },
-                timeout: 10000
-            });
+            this.log(`[HttpScraper] Fetching news detail ${newsId} for course ${courseId}`);
 
-            this.updateCookies(dashboardResponse);
-
-            const $ = cheerio.load(dashboardResponse.data);
-            let input = $(`input[name="idTurma"][value="${courseId}"]`);
-            if (input.length === 0) input = $(`input[name="id"][value="${courseId}"]`);
-
-            if (input.length === 0) return { success: false, error: 'Course not found on dashboard' };
-
-            const form = input.closest('form');
-            const formData = new URLSearchParams();
-            form.find('input').each((_, el) => {
-                const name = $(el).attr('name');
-                const value = $(el).attr('value');
-                if (name && value) formData.append(name, value);
-            });
-
-            const coursePageResponse = await axios.post(dashboardUrl, formData.toString(), {
-                headers: {
-                    'Cookie': this.getCookieHeader(dashboardUrl),
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                },
-                timeout: 10000
-            });
-
-            this.updateCookies(coursePageResponse);
-
-            const $course = cheerio.load(coursePageResponse.data);
-            let targetForm: any = null;
-            $course('a').each((_, el) => {
-                const onclick = $(el).attr('onclick');
-                if (onclick && onclick.includes(newsId)) targetForm = $(el).closest('form');
-            });
-
-            if (!targetForm || targetForm.length === 0) {
-                const hiddenInput = $course(`input[value="${newsId}"]`);
-                if (hiddenInput.length > 0) targetForm = hiddenInput.closest('form');
+            // 1. Check if we have session data for this course
+            const courseInfo = this.courseData.get(courseId);
+            if (!courseInfo) {
+                return { success: false, error: 'Course session data not found. Please refresh the course list.' };
             }
 
-            if (!targetForm || targetForm.length === 0) targetForm = $course('form').first();
+            // 2. Prepare Form Data
+            const formData = new URLSearchParams();
 
-            const newsFormData = new URLSearchParams();
-            targetForm.find('input').each((_: any, el: any) => {
-                const name = $(el).attr('name');
-                const value = $(el).attr('value');
-                if (name && value) newsFormData.append(name, value);
-            });
+            // Add inputs from cached session
+            if (courseInfo.inputs) {
+                Object.entries(courseInfo.inputs).forEach(([key, value]) => {
+                    formData.append(key, value);
+                });
+            }
 
-            newsFormData.set('id', newsId);
+            // Add ViewState
+            formData.set('javax.faces.ViewState', courseInfo.viewState);
 
-            const newsResponse = await axios.post(dashboardUrl, newsFormData.toString(), {
+            // Add Form Name
+            if (!formData.has(courseInfo.formName)) {
+                formData.append(courseInfo.formName, courseInfo.formName);
+            }
+
+            // 3. Parse Script (Onclick) to get specific parameters
+            // Example: jsfcljs(document.forms['formAva'],'formAva:noticias:0:visualizar,formAva:noticias:0:visualizar,id,12345','');
+            if (script) {
+                this.log(`[HttpScraper] Using provided script: ${script}`);
+                const match = script.match(/jsfcljs\([^,]+,'([^']+)'/);
+                if (match) {
+                    const paramsStr = match[1];
+                    const params = paramsStr.split(',');
+                    // Add all params from script
+                    for (let i = 0; i < params.length; i += 2) {
+                        if (params[i] && params[i + 1]) {
+                            formData.append(params[i], params[i + 1]);
+                        }
+                    }
+                    // Ensure the main component ID is sent (often the first param is the trigger)
+                    const componentId = params[0];
+                    formData.append(componentId, componentId);
+                }
+            } else {
+                // Fallback (guessing parameter names - risky)
+                this.log(`[HttpScraper] No script provided. Attempting generic fetch.`);
+                formData.append('id', newsId);
+            }
+
+            this.log(`[HttpScraper] Posting to ${courseInfo.action} to fetch news...`);
+
+            const newsResponse = await axios.post(`${this.baseUrl}${courseInfo.action}`, formData.toString(), {
                 headers: {
-                    'Cookie': this.getCookieHeader(dashboardUrl),
+                    'Cookie': this.getCookieHeader(`${this.baseUrl}${courseInfo.action}`),
                     'Content-Type': 'application/x-www-form-urlencoded',
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                    'Referer': dashboardUrl,
+                    'Referer': `${this.baseUrl}${courseInfo.action}`,
                     'Connection': 'keep-alive'
                 },
                 timeout: 10000
             });
 
             this.updateCookies(newsResponse);
+
+            // DEBUG: Save the news page
+            try {
+                await fs.promises.writeFile(`debug_news_content_${newsId}.html`, newsResponse.data);
+                this.log(`[HttpScraper] Saved debug_news_content_${newsId}.html`);
+            } catch (e) { console.error(e); }
+
             const $news = cheerio.load(newsResponse.data);
 
+            // Parsing Logic
             const getTextAfterLabel = (label: string) => {
                 let result = '';
-                $news('td, th, label, span, div').each((_, el) => {
-                    if ($news(el).text().trim().replace(':', '') === label) {
+                $news('td, th, label, span, div, strong, b').each((_, el) => {
+                    const text = $news(el).text().trim().replace(':', '');
+                    if (text === label) {
+                        // Try next sibling
+                        let next = $news(el).next();
+                        if (next.length > 0) {
+                            result = next.text().trim();
+                            return false;
+                        }
+                        // Try parent's next sibling (table structure)
                         const parentTd = $news(el).closest('td');
                         if (parentTd.length && parentTd.next().length) {
                             result = parentTd.next().text().trim();
-                            return false;
-                        }
-                        if ($news(el).next().length) {
-                            result = $news(el).next().text().trim();
                             return false;
                         }
                     }
@@ -641,10 +650,12 @@ export class HttpScraperService {
 
             const getContent = () => {
                 let result = '';
-                $news('td, th, label, span, div').each((_, el) => {
-                    if ($news(el).text().trim().replace(':', '') === 'Texto') {
+                $news('td, th, label, span, div, strong, b').each((_, el) => {
+                    const text = $news(el).text().trim().replace(':', '');
+                    if (text === 'Texto') {
                         const parentTd = $news(el).closest('td');
                         if (parentTd.length && parentTd.next().length) {
+                            // Get inner HTML of the content cell
                             result = parentTd.next().html() || '';
                             return false;
                         }
@@ -653,17 +664,27 @@ export class HttpScraperService {
                 return result;
             };
 
+            const title = getTextAfterLabel('Título') || getTextAfterLabel('Assunto');
+            const date = getTextAfterLabel('Data') || getTextAfterLabel('Data de Cadastro');
+            const content = getContent();
+
+            this.log(`[HttpScraper] Parsed News: Title="${title}", Date="${date}", ContentLength=${content.length}`);
+
+            if (!content) {
+                return { success: false, error: 'Could not extract news content from response' };
+            }
+
             const newsDetail = {
-                title: getTextAfterLabel('Título') || getTextAfterLabel('Assunto'),
-                date: getTextAfterLabel('Data'),
-                content: getContent(),
+                title,
+                date,
+                content,
                 notification: getTextAfterLabel('Notificação')
             };
 
             return { success: true, news: newsDetail };
 
         } catch (error: any) {
-            this.log(`[HttpScraper] Download error: ${error.message}`);
+            this.log(`[HttpScraper] News Fetch Error: ${error.message}`);
             return { success: false, error: error.message };
         }
     }
