@@ -11,7 +11,7 @@ interface Window {
         downloadAllFiles: (data: any) => Promise<any>;
         checkFilesExistence: (filePaths: string[]) => Promise<any[]>;
         onDownloadProgress: (callback: (data: any) => void) => () => void;
-        getNewsDetail: (courseId: string, newsId: string) => Promise<any>;
+        getNewsDetail: (courseId: string, courseName: string, newsId: string) => Promise<any>;
         getLiveSyncEnabled: () => Promise<boolean>;
         setLiveSyncEnabled: (enabled: boolean) => Promise<void>;
     };
