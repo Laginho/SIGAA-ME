@@ -104,7 +104,7 @@ async function fetchCourseFiles(courseId: string) {
       `
     } else {
       newsListElement.innerHTML = course.news.map((item: any) => `
-        <div class="news-item" data-id="${item.id}" data-script="${item.script || ''}">
+        <div class="news-item" data-id="${item.id}">
           <div class="news-title">${item.title}</div>
           <div class="news-date">${item.date}</div>
           ${item.notification === 'Sim' ? '<div class="news-notification">🔔 Notificação</div>' : ''}
@@ -116,9 +116,8 @@ async function fetchCourseFiles(courseId: string) {
       newsItems.forEach(item => {
         item.addEventListener('click', () => {
           const newsId = item.getAttribute('data-id')
-          const script = item.getAttribute('data-script')
           if (newsId) {
-            openNewsModal(courseId, newsId, script || undefined)
+            openNewsModal(courseId, course.name, newsId)
           }
         })
       })
@@ -361,7 +360,7 @@ async function testDownloadAll(courseId: string) {
 }
 
 
-async function openNewsModal(courseId: string, newsId: string, script?: string) {
+async function openNewsModal(courseId: string, courseName: string, newsId: string) {
   const modal = document.getElementById('newsModal')
   const modalBody = document.getElementById('modalBody')
   const closeBtn = modal?.querySelector('.modal-close')
@@ -423,9 +422,9 @@ async function openNewsModal(courseId: string, newsId: string, script?: string) 
       return;
     }
 
-    // If not cached, fetch it
-    console.log('Fetching news with script:', script);
-    const result = await window.api.getNewsDetail(courseId, newsId, script)
+    // If not cached, fetch it using Playwright
+    console.log('Fetching news via Playwright for course:', courseName);
+    const result = await window.api.getNewsDetail(courseId, courseName, newsId)
 
     if (result.success && result.news) {
       modalBody.innerHTML = `

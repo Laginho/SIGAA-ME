@@ -506,13 +506,11 @@ export class SigaaService {
         }
     }
 
-    async getNewsDetail(courseId: string, newsId: string, script?: string): Promise<{ success: boolean; news?: any; message?: string }> {
+    async getNewsDetail(courseId: string, courseName: string, newsId: string): Promise<{ success: boolean; news?: any; message?: string }> {
         try {
-            console.log(`SIGAA: Fetching news detail ${newsId} using HTTP Scraper... Script present: ${!!script}`);
-            // Use HTTP Scraper for speed
-            const freshCookies = await this.playwrightLogin.getCookies();
-            this.httpScraper.setCookies(freshCookies);
-            const result = await this.httpScraper.getNewsDetail(courseId, newsId, script);
+            console.log(`SIGAA: Fetching news detail ${newsId} using Playwright...`);
+            // Use Playwright for reliable JSF session handling
+            const result = await this.playwrightLogin.getNewsDetail(courseId, courseName, newsId);
 
             if (!result.success) {
                 return { success: false, message: result.error || 'Failed to fetch news detail' };
