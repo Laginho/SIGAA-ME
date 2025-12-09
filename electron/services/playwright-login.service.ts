@@ -716,6 +716,124 @@ export class PlaywrightLoginService {
         }
     }
 
+    async getNewsDetail(courseId: string, courseName: string, newsId: string): Promise<{ success: boolean; news?: any; error?: string }> {
+        try {
+            console.log(`Playwright: Fetching news ${newsId} for course ${courseName}...`);
+
+            if (!this.browser || !this.context || !this.page || this.page.isClosed()) {
+                console.log('Playwright: Browser not active, relaunching...');
+                await this.getCourses();
+            }
+
+            if (!this.page || this.page.isClosed()) {
+                return { success: false, error: 'Failed to initialize browser page' };
+            }
+
+            const page = this.page;
+
+            // 1. Navigate to course AVA page if not already there
+            if (!page.url().includes('ava/index.jsf')) {
+                console.log('Playwright: Navigating to AVA...');
+                // We need to enter the course first
+                const enterResult = await this.enterCourseAndGetHTML(courseId, courseName);
+                if (!enterResult.success) {
+                    return { success: false, error: enterResult.error };
+                }
+            }
+
+            // 2. Find and click the news link
+            const newsLinkSelector = `a[onclick*="${newsId}"]`;
+            const newsLink = await page.$(newsLinkSelector);
+
+            if (!newsLink) {
+                console.log(`Playwright: News link with ID ${newsId} not found on page. Trying alternative selector...`);
+                // Try finding by iterating through all links
+                const allLinks = await page.$$('a[onclick*="visualizar"]');
+                let found = false;
+                for (const link of allLinks) {
+                    const onclick = await link.getAttribute('onclick');
+                    if (onclick && onclick.includes(newsId)) {
+                        console.log(`Playwright: Found news link by alternative search.`);
+                        await link.click();
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    return { success: false, error: `News link with ID ${newsId} not found` };
+                }
+            } else {
+                console.log(`Playwright: Clicking news link for ${newsId}...`);
+                await newsLink.click();
+            }
+
+            // 3. Wait for page to load
+            await page.waitForLoadState('networkidle');
+            await page.waitForTimeout(500);
+
+            // 4. Parse the news content
+            const newsData = await page.evaluate(() => {
+                const getText = (label: string): string => {
+                    const allElements = document.querySelectorAll('td, th, span, label, strong, b, div');
+                    for (const el of allElements) {
+                        if (el.textContent?.trim().replace(':', '') === label) {
+                            // Try sibling
+                            const next = el.nextElementSibling;
+                            if (next) return next.textContent?.trim() || '';
+                            // Try parent's sibling (table row)
+                            const parentTd = el.closest('td');
+                            if (parentTd && parentTd.nextElementSibling) {
+                                return parentTd.nextElementSibling.textContent?.trim() || '';
+                            }
+                        }
+                    }
+                    return '';
+                };
+
+                const getContent = (): string => {
+                    const allElements = document.querySelectorAll('td, th, span, label, strong, b, div');
+                    for (const el of allElements) {
+                        if (el.textContent?.trim().replace(':', '') === 'Texto') {
+                            const parentTd = el.closest('td');
+                            if (parentTd && parentTd.nextElementSibling) {
+                                return parentTd.nextElementSibling.innerHTML || '';
+                            }
+                        }
+                    }
+                    return '';
+                };
+
+                return {
+                    title: getText('Título') || getText('Assunto'),
+                    date: getText('Data') || getText('Data de Cadastro'),
+                    content: getContent(),
+                    notification: getText('Notificação')
+                };
+            });
+
+            console.log(`Playwright: Parsed news - Title: "${newsData.title}", ContentLength: ${newsData.content.length}`);
+
+            // 5. Navigate back to AVA if needed (for subsequent operations)
+            // Not strictly necessary but keeps state clean
+            // await page.goBack();
+
+            if (!newsData.content && !newsData.title) {
+                // Save debug HTML
+                const html = await page.content();
+                const debugPath = path.join(process.cwd(), `debug_playwright_news_${newsId}.html`);
+                fs.writeFileSync(debugPath, html);
+                console.log(`Playwright: Saved debug HTML to ${debugPath}`);
+                return { success: false, error: 'Could not parse news content from page' };
+            }
+
+            return { success: true, news: newsData };
+
+        } catch (error: any) {
+            console.error('Playwright: Error fetching news:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
     async close() {
         if (this.browser) {
             console.log('Playwright: Closing browser...');

@@ -34,7 +34,7 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.on('download-progress', subscription)
     return () => ipcRenderer.off('download-progress', subscription)
   },
-  getNewsDetail: (courseId: string, newsId: string, script?: string) => ipcRenderer.invoke('get-news-detail', { courseId, newsId, script }),
+  getNewsDetail: (courseId: string, courseName: string, newsId: string) => ipcRenderer.invoke('get-news-detail', { courseId, courseName, newsId }),
   getLiveSyncEnabled: () => ipcRenderer.invoke('get-live-sync-enabled'),
   setLiveSyncEnabled: (enabled: boolean) => ipcRenderer.invoke('set-live-sync-enabled', enabled)
 })
