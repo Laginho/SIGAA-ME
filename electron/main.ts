@@ -172,7 +172,10 @@ ipcMain.handle('check-files-existence', async (_, filePaths: string[]) => {
 
 // Get news detail
 ipcMain.handle('get-news-detail', async (_, { courseId, courseName, newsId }) => {
-  return await sigaaService.getNewsDetail(courseId, courseName, newsId);
+  console.log(`[IPC] get-news-detail called: courseId=${courseId}, courseName=${courseName}, newsId=${newsId}`);
+  const result = await sigaaService.getNewsDetail(courseId, courseName, newsId);
+  console.log(`[IPC] get-news-detail result:`, result.success, result.message || '');
+  return result;
 })
 
 // Live Sync Toggle
