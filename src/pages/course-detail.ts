@@ -104,7 +104,7 @@ async function fetchCourseFiles(courseId: string) {
       `
     } else {
       newsListElement.innerHTML = course.news.map((item: any) => `
-        <div class="news-item" data-id="${item.id}">
+        <div class="news-item" data-id="${item.id}" data-script="${item.script || ''}">
           <div class="news-title">${item.title}</div>
           <div class="news-date">${item.date}</div>
           ${item.notification === 'Sim' ? '<div class="news-notification">🔔 Notificação</div>' : ''}
@@ -116,8 +116,9 @@ async function fetchCourseFiles(courseId: string) {
       newsItems.forEach(item => {
         item.addEventListener('click', () => {
           const newsId = item.getAttribute('data-id')
+          const script = item.getAttribute('data-script')
           if (newsId) {
-            openNewsModal(courseId, newsId)
+            openNewsModal(courseId, newsId, script || undefined)
           }
         })
       })
@@ -360,7 +361,7 @@ async function testDownloadAll(courseId: string) {
 }
 
 
-async function openNewsModal(courseId: string, newsId: string) {
+async function openNewsModal(courseId: string, newsId: string, script?: string) {
   const modal = document.getElementById('newsModal')
   const modalBody = document.getElementById('modalBody')
   const closeBtn = modal?.querySelector('.modal-close')
@@ -423,7 +424,8 @@ async function openNewsModal(courseId: string, newsId: string) {
     }
 
     // If not cached, fetch it
-    const result = await window.api.getNewsDetail(courseId, newsId)
+    console.log('Fetching news with script:', script);
+    const result = await window.api.getNewsDetail(courseId, newsId, script)
 
     if (result.success && result.news) {
       modalBody.innerHTML = `

@@ -171,8 +171,8 @@ ipcMain.handle('check-files-existence', async (_, filePaths: string[]) => {
 })
 
 // Get news detail
-ipcMain.handle('get-news-detail', async (_, { courseId, newsId }) => {
-  return await sigaaService.getNewsDetail(courseId, newsId);
+ipcMain.handle('get-news-detail', async (_, { courseId, newsId, script }) => {
+  return await sigaaService.getNewsDetail(courseId, newsId, script);
 })
 
 // Live Sync Toggle
