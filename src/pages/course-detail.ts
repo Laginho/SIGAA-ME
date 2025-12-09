@@ -427,6 +427,28 @@ async function openNewsModal(courseId: string, courseName: string, newsId: strin
     const result = await window.api.getNewsDetail(courseId, courseName, newsId)
 
     if (result.success && result.news) {
+      // Cache the fetched content in localStorage
+      try {
+        const cachedData = localStorage.getItem('coursesWithFiles');
+        if (cachedData) {
+          const courses = JSON.parse(cachedData);
+          const course = courses.find((c: any) => c.id === courseId);
+          if (course && course.news) {
+            const newsItem = course.news.find((n: any) => n.id === newsId);
+            if (newsItem) {
+              newsItem.content = result.news.content;
+              newsItem.title = result.news.title;
+              newsItem.date = result.news.date;
+              newsItem.notification = result.news.notification;
+              localStorage.setItem('coursesWithFiles', JSON.stringify(courses));
+              console.log('Cached news content for', newsId);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to cache news content:', e);
+      }
+
       modalBody.innerHTML = `
         <div class="modal-header">
           <h3 class="modal-title">${result.news.title}</h3>
