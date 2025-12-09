@@ -825,19 +825,36 @@ export class PlaywrightLoginService {
                 };
 
                 const getContent = (): string => {
-                    // Strategy 1: Look for "Texto" label
+                    // Strategy 1: Look for "Texto" label in th/td structure
+                    // Structure: <th><b>Texto:</b></th><td>...content...</td>
+                    const thElements = document.querySelectorAll('th');
+                    for (const th of thElements) {
+                        if (th.textContent?.trim().replace(':', '').toLowerCase() === 'texto') {
+                            // Get the next sibling td
+                            const nextTd = th.nextElementSibling;
+                            if (nextTd && nextTd.tagName === 'TD') {
+                                // Get the content and clean it up
+                                let html = nextTd.innerHTML;
+                                // Remove excessive whitespace
+                                html = html.replace(/\s+/g, ' ').trim();
+                                return html;
+                            }
+                        }
+                    }
+
+                    // Strategy 2: Look for td/label pairs
                     const allElements = document.querySelectorAll('td, th, span, label, strong, b, div');
                     for (const el of allElements) {
                         const text = el.textContent?.trim().replace(':', '');
                         if (text === 'Texto') {
-                            const parentTd = el.closest('td');
+                            const parentTd = el.closest('td') || el.closest('th');
                             if (parentTd && parentTd.nextElementSibling) {
                                 return parentTd.nextElementSibling.innerHTML || '';
                             }
                         }
                     }
 
-                    // Strategy 2: Look for content in specific SIGAA containers
+                    // Strategy 3: Look for content in specific SIGAA containers
                     const contentContainers = [
                         '.conteudo-noticia',
                         '#conteudo-noticia',
@@ -855,7 +872,7 @@ export class PlaywrightLoginService {
                         }
                     }
 
-                    // Strategy 3: Look for the largest content block on the page
+                    // Strategy 4: Look for the largest content block on the page
                     const mainContent = document.getElementById('conteudo');
                     if (mainContent) {
                         // Find the deepest div with significant text content
