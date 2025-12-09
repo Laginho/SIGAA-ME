@@ -796,14 +796,21 @@ export class PlaywrightLoginService {
 
             // 3. Wait for page to load
             await page.waitForLoadState('networkidle');
-            await page.waitForTimeout(500);
+            await page.waitForTimeout(1000);
+
+            // DEBUG: Save news detail page HTML
+            const newsDetailHtml = await page.content();
+            const debugNewsPath = path.join(process.cwd(), `debug_news_detail_${newsId}.html`);
+            fs.writeFileSync(debugNewsPath, newsDetailHtml);
+            console.log(`Playwright: Saved news detail page to ${debugNewsPath}`);
 
             // 4. Parse the news content
             const newsData = await page.evaluate(() => {
                 const getText = (label: string): string => {
                     const allElements = document.querySelectorAll('td, th, span, label, strong, b, div');
                     for (const el of allElements) {
-                        if (el.textContent?.trim().replace(':', '') === label) {
+                        const text = el.textContent?.trim().replace(':', '');
+                        if (text === label) {
                             // Try sibling
                             const next = el.nextElementSibling;
                             if (next) return next.textContent?.trim() || '';
@@ -818,15 +825,60 @@ export class PlaywrightLoginService {
                 };
 
                 const getContent = (): string => {
+                    // Strategy 1: Look for "Texto" label
                     const allElements = document.querySelectorAll('td, th, span, label, strong, b, div');
                     for (const el of allElements) {
-                        if (el.textContent?.trim().replace(':', '') === 'Texto') {
+                        const text = el.textContent?.trim().replace(':', '');
+                        if (text === 'Texto') {
                             const parentTd = el.closest('td');
                             if (parentTd && parentTd.nextElementSibling) {
                                 return parentTd.nextElementSibling.innerHTML || '';
                             }
                         }
                     }
+
+                    // Strategy 2: Look for content in specific SIGAA containers
+                    const contentContainers = [
+                        '.conteudo-noticia',
+                        '#conteudo-noticia',
+                        '.texto-noticia',
+                        '.noticia-texto',
+                        'div[class*="noticia"]',
+                        '.msgBody',
+                        '#msgBody'
+                    ];
+
+                    for (const selector of contentContainers) {
+                        const container = document.querySelector(selector);
+                        if (container && container.innerHTML.trim()) {
+                            return container.innerHTML;
+                        }
+                    }
+
+                    // Strategy 3: Look for the largest content block on the page
+                    const mainContent = document.getElementById('conteudo');
+                    if (mainContent) {
+                        // Find the deepest div with significant text content
+                        const divs = mainContent.querySelectorAll('div, td');
+                        let bestContent = '';
+                        let maxLength = 0;
+
+                        for (const div of divs) {
+                            const text = div.textContent?.trim() || '';
+                            // Skip if it contains labels like "Título", "Data", etc.
+                            if (text.length > maxLength &&
+                                !text.startsWith('Título') &&
+                                !text.startsWith('Data') &&
+                                !text.startsWith('Notificação') &&
+                                text.length > 20) {
+                                maxLength = text.length;
+                                bestContent = div.innerHTML;
+                            }
+                        }
+
+                        if (bestContent) return bestContent;
+                    }
+
                     return '';
                 };
 
