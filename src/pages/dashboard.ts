@@ -6,16 +6,17 @@ interface UserAccount {
 }
 
 export function renderDashboardPage(app: HTMLDivElement, account: UserAccount) {
+  let name: string = account.name.charAt(0).toUpperCase() + account.name.slice(1);
   app.innerHTML = `
     <div class="dashboard-container">
       <header class="dashboard-header">
         <div class="user-info">
           ${account.photoUrl
       ? `<img src="${account.photoUrl}" alt="Foto de Perfil" class="user-photo">`
-      : `<div class="user-photo-placeholder">${account.name.charAt(0)}</div>`
+      : `<div class="user-photo-placeholder">${name.charAt(0)}</div>`
     }
           <div class="user-details">
-            <h1 class="user-name">Olá, ${account.name}</h1>
+            <h1 class="user-name">Olá, ${name}</h1>
             <p class="user-status">Bem-vindo ao SIGAA-ME</p>
           </div>
         </div>
