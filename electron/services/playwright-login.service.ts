@@ -450,9 +450,21 @@ export class PlaywrightLoginService {
                 return { success: false, error: `Course link not found in portal. Available IDs: ${debugInfo.courseIds.join(', ')}` };
             }
 
-            await page.waitForLoadState('networkidle');
-            // Wait for course selection to register
-            await page.waitForTimeout(2000);
+            if (entered.success) {
+                logger.info('Playwright: Click processed, waiting for Course Page content...');
+                try {
+                    // Crucial: Wait for specific text that ONLY appears on the course page
+                    await page.waitForSelector('text=Menu Turma Virtual', { timeout: 15000 });
+                    logger.info('Playwright: Verified we are on Course Page (found "Menu Turma Virtual")');
+                } catch (e) {
+                    logger.warn('Playwright: Timeout waiting for "Menu Turma Virtual". Navigation may have failed or page is slow.');
+                    // Don't throw - let it proceed to check URL/content below, but this warns us
+                }
+
+                await page.waitForLoadState('networkidle');
+                // Wait slightly more for JSF to settle
+                await page.waitForTimeout(2000);
+            }
 
             // Navigate to AVA to ensure we are in the course context
             // Note: Clicking the link usually redirects to AVA, but we ensure it here
