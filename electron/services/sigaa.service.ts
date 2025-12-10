@@ -116,15 +116,19 @@ export class SigaaService {
     async getCourseFiles(courseId: string, courseName: string): Promise<{ success: boolean; files?: any[]; news?: any[]; message?: string }> {
         try {
             // 1. Enter course via Headless API (Fast & Reliable)
-            logger.info('SIGAA: Entering course via Headless API...');
-            const entryResult = await this.playwrightLogin.enterCourseDirect(courseId, courseName || 'Unknown Course');
+            // logger.info('SIGAA: Entering course via Headless API...');
+            // const entryResult = await this.playwrightLogin.enterCourseDirect(courseId, courseName || 'Unknown Course');
 
-            let html = entryResult.html;
+            // let html = entryResult.html;
+
+            // FORCE FALLBACK for debugging
+            const entryResult = { success: false, html: '', error: 'Forced Fallback' };
+            let html = '';
 
             if (!entryResult.success || !html) {
-                logger.error('SIGAA: Failed to enter course via Headless API:', entryResult.error);
+                // logger.error('SIGAA: Failed to enter course via Headless API:', entryResult.error);
                 // Fallback to full browser if API fails
-                logger.warn('SIGAA: Falling back to full browser entry...');
+                logger.info('SIGAA: entering course via Full Browser (Reliable)...'); // Changed log level to info
                 const fallbackResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
                 if (!fallbackResult.success || !fallbackResult.html) {
                     return { success: false, message: fallbackResult.error || 'Failed to enter course' };
