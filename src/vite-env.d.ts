@@ -15,6 +15,7 @@ interface Window {
         getLiveSyncEnabled: () => Promise<boolean>;
         setLiveSyncEnabled: (enabled: boolean) => Promise<void>;
         onSyncUpdate: (callback: (data: any) => void) => () => void;
+        onSyncScanning: (callback: (data: any) => void) => () => void;
     };
     ipcRenderer: any;
 }

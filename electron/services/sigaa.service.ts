@@ -694,7 +694,16 @@ export class SigaaService {
             //   They fight for Playwright resource.
             //   This is acceptable for V1. The interval is long (60s). Collision chance low.
 
+            // Notify start
+            if (this.mainWindow) {
+                this.mainWindow.webContents.send('on-sync-scanning', { courseId: selectedCourse.id, checking: true });
+            }
+
             const result = await this.getCourseFiles(selectedCourse.id, selectedCourse.name);
+
+            if (this.mainWindow) {
+                this.mainWindow.webContents.send('on-sync-scanning', { courseId: selectedCourse.id, checking: false });
+            }
 
             if (result.success && result.files && this.mainWindow) {
                 // Determine if there are NEW items.
@@ -711,6 +720,9 @@ export class SigaaService {
 
         } catch (e) {
             logger.error(`SIGAA: Smart Sync failed for ${selectedCourse.name}`, e);
+            if (this.mainWindow) {
+                this.mainWindow.webContents.send('on-sync-scanning', { courseId: selectedCourse.id, checking: false });
+            }
         }
     }
 }

@@ -86,7 +86,25 @@ export function renderDashboardPage(app: HTMLDivElement, account: UserAccount) {
   window.api.onSyncUpdate((data) => {
     handleSmartSyncUpdate(data);
   });
+
+  // Listen for scanning status (Visual Feedback)
+  window.api.onSyncScanning((data) => {
+    const control = document.querySelector('.live-sync-control');
+    if (control) {
+      if (data.checking) {
+        control.classList.add('scanning');
+        // Optional: Show "Checking..." in the label?
+        // const label = control.querySelector('.switch-label');
+        // if (label) label.textContent = 'Verificando...';
+      } else {
+        control.classList.remove('scanning');
+        // if (label) label.textContent = 'Live';
+      }
+    }
+  });
 }
+
+
 
 async function fetchCoursesWithSync(forceRefresh: boolean = false) {
   const coursesListElement = document.getElementById('coursesList');
@@ -224,6 +242,17 @@ function handleSmartSyncUpdate(data: { courseId: string; files: any[]; news: any
     const courses = JSON.parse(cachedData);
     const courseIndex = courses.findIndex((c: any) => c.id === data.courseId);
     if (courseIndex >= 0) {
+      const currentCourse = courses[courseIndex];
+
+      // Diff check to avoid spamming user
+      const filesChanged = JSON.stringify(currentCourse.files) !== JSON.stringify(data.files);
+      const newsChanged = JSON.stringify(currentCourse.news) !== JSON.stringify(data.news);
+
+      if (!filesChanged && !newsChanged) {
+        console.log(`Smart Sync: No changes detected for ${currentCourse.name}`);
+        return;
+      }
+
       courses[courseIndex].files = data.files;
       courses[courseIndex].news = data.news;
       courses[courseIndex].fileCount = data.files.length;
