@@ -142,6 +142,8 @@ export class SigaaService {
             logger.info('SIGAA: Parsing course files...');
             const result = await this.httpScraper.getCourseFiles(courseId, courseName, html);
 
+            logger.info(`SIGAA: Parsed ${courseName} - Files: ${result.files?.length || 0}, News: ${result.news?.length || 0}`);
+
             if (!result.success) {
                 return { success: false, message: result.error || 'Failed to fetch files' };
             }

@@ -249,19 +249,34 @@ function handleSmartSyncUpdate(data: { courseId: string; files: any[]; news: any
     const courseIndex = courses.findIndex((c: any) => c.id === data.courseId);
     if (courseIndex >= 0) {
       const currentCourse = courses[courseIndex];
+      const newFiles = data.files || [];
+      const newNews = data.news || [];
+      const oldFiles = currentCourse.files || [];
+      const oldNews = currentCourse.news || [];
+
+      // SAFETY: Don't wipe existing data with empty results
+      if (newFiles.length === 0 && oldFiles.length > 0) {
+        console.warn(`Smart Sync: Ignoring empty files response for ${currentCourse.name} (had ${oldFiles.length} files)`);
+        return;
+      }
+      if (newNews.length === 0 && oldNews.length > 0 && newFiles.length === oldFiles.length) {
+        console.warn(`Smart Sync: Ignoring empty news response for ${currentCourse.name}`);
+        return;
+      }
 
       // Diff check to avoid spamming user
-      const filesChanged = JSON.stringify(currentCourse.files) !== JSON.stringify(data.files);
-      const newsChanged = JSON.stringify(currentCourse.news) !== JSON.stringify(data.news);
+      const filesChanged = JSON.stringify(oldFiles) !== JSON.stringify(newFiles);
+      const newsChanged = JSON.stringify(oldNews) !== JSON.stringify(newNews);
 
       if (!filesChanged && !newsChanged) {
         console.log(`Smart Sync: No changes detected for ${currentCourse.name}`);
         return;
       }
 
-      courses[courseIndex].files = data.files;
-      courses[courseIndex].news = data.news;
-      courses[courseIndex].fileCount = data.files.length;
+      // Only update if we have real data
+      courses[courseIndex].files = newFiles;
+      courses[courseIndex].news = newNews;
+      courses[courseIndex].fileCount = newFiles.length;
       localStorage.setItem('coursesWithFiles', JSON.stringify(courses));
 
       showToast(`Novos conteúdos em ${courses[courseIndex].name}`);
