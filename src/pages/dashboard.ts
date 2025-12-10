@@ -21,6 +21,13 @@ export function renderDashboardPage(app: HTMLDivElement, account: UserAccount) {
           </div>
         </div>
         <div class="header-actions">
+          <div class="live-sync-control" title="Smart LiveSync: Checks for updates in background">
+            <label class="switch">
+              <input type="checkbox" id="liveSyncToggle">
+              <span class="slider round"></span>
+            </label>
+            <span class="switch-label">Live</span>
+          </div>
           <span id="syncStatus" class="sync-status"></span>
           <button id="refreshBtn" class="btn-refresh" title="Sincronizar">🔄</button>
           <button id="logoutBtn" class="btn-logout">Sair</button>
@@ -43,6 +50,29 @@ export function renderDashboardPage(app: HTMLDivElement, account: UserAccount) {
     sessionStorage.clear();
     window.location.hash = '#/login';
   });
+
+  // Live Sync Toggle
+  const liveSyncToggle = document.getElementById('liveSyncToggle') as HTMLInputElement;
+  if (liveSyncToggle) {
+    // Initial state
+    window.api.getLiveSyncEnabled().then(enabled => {
+      liveSyncToggle.checked = enabled;
+      updateSyncStatusUI(enabled);
+    });
+
+    // Change handler
+    liveSyncToggle.addEventListener('change', (e) => {
+      const enabled = (e.target as HTMLInputElement).checked;
+      window.api.setLiveSyncEnabled(enabled);
+      updateSyncStatusUI(enabled);
+
+      if (enabled) {
+        showToast('Smart LiveSync ativado');
+      } else {
+        showToast('Smart LiveSync pausado');
+      }
+    });
+  }
 
   // Refresh button handler
   document.getElementById('refreshBtn')?.addEventListener('click', () => {
@@ -169,6 +199,19 @@ async function fullFetchWithProgress(coursesListElement: HTMLElement, syncStatus
         Erro ao carregar disciplinas: ${result.message || 'Erro desconhecido'}
       </div>
     `;
+  }
+}
+
+function updateSyncStatusUI(enabled: boolean) {
+  const syncStatus = document.getElementById('syncStatus');
+  if (syncStatus) {
+    if (enabled) {
+      syncStatus.textContent = '';
+      syncStatus.className = 'sync-status';
+    } else {
+      syncStatus.textContent = 'Sync desativado';
+      syncStatus.className = 'sync-status';
+    }
   }
 }
 
