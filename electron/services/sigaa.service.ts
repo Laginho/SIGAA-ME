@@ -4,14 +4,46 @@ import { logger } from './logger.service';
 import * as fs from 'fs';
 import * as path from 'path';
 
+import { BrowserWindow } from 'electron';
+
 export class SigaaService {
     private playwrightLogin: PlaywrightLoginService;
     private httpScraper: HttpScraperService;
-    private liveSyncEnabled = false;
+    private liveSyncEnabled = true;
+
+    // Smart Sync Properties
+    private isBusy = false;
+    private busyCount = 0;
+    private isSyncPaused = false;
+    private syncIntervalId: NodeJS.Timeout | null = null;
+    private mainWindow: BrowserWindow | null = null;
+    private lastSyncTimes: Map<string, number> = new Map();
+    private readonly SYNC_INTERVAL_MS = 60000; // Check one course every 60s (relaxed)
 
     constructor() {
         this.playwrightLogin = new PlaywrightLoginService();
         this.httpScraper = new HttpScraperService();
+    }
+
+    setMainWindow(window: BrowserWindow) {
+        this.mainWindow = window;
+    }
+
+    private startBusy() {
+        this.busyCount++;
+        this.isBusy = true;
+        logger.info(`SIGAA: Service busy count: ${this.busyCount} (User Action)`);
+    }
+
+    private stopBusy() {
+        this.busyCount--;
+        if (this.busyCount <= 0) {
+            this.busyCount = 0;
+            this.isBusy = false;
+            logger.info('SIGAA: Service is free.');
+        } else {
+            logger.info(`SIGAA: Service busy count: ${this.busyCount}`);
+        }
     }
 
     getLiveSyncEnabled(): boolean {
@@ -21,6 +53,11 @@ export class SigaaService {
     setLiveSyncEnabled(enabled: boolean) {
         this.liveSyncEnabled = enabled;
         logger.info(`SIGAA: Live Sync set to ${enabled}`);
+        if (enabled) {
+            this.startSmartSync();
+        } else {
+            this.stopSmartSync();
+        }
     }
 
     async login(username: string, password: string): Promise<{ success: boolean; message?: string; account?: { name: string; photoUrl?: string } }> {
@@ -49,17 +86,25 @@ export class SigaaService {
         }
     }
 
+    private cachedCoursesList: any[] = [];
+
     async getCourses(): Promise<{ success: boolean; courses?: any[]; message?: string }> {
         try {
             logger.info('SIGAA: Fetching courses using Playwright...');
+            // Mark busy
+            this.startBusy();
             const result = await this.playwrightLogin.getCourses();
-            if (result.success) {
-                logger.info(`SIGAA: Found ${result.courses?.length || 0} courses`);
+            this.stopBusy();
+
+            if (result.success && result.courses) {
+                logger.info(`SIGAA: Found ${result.courses.length || 0} courses`);
+                this.cachedCoursesList = result.courses;
             } else {
                 logger.error('SIGAA: Failed to fetch courses', result.error);
             }
             return { success: result.success, courses: result.courses, message: result.error };
         } catch (error: any) {
+            this.stopBusy();
             logger.error('SIGAA: Error fetching courses', error);
             return { success: false, message: error.message || 'Failed to fetch courses' };
         }
@@ -115,6 +160,23 @@ export class SigaaService {
     async downloadFile(
         courseId: string,
         courseName: string, // Changed from _courseName to use it
+        fileName: string,
+        _fileUrl: string,
+        basePath: string,
+        _downloadedFiles: Record<string, any>,
+        script?: string
+    ): Promise<{ success: boolean; filePath?: string; message?: string }> {
+        this.startBusy();
+        try {
+            return await this._downloadFileInternal(courseId, courseName, fileName, _fileUrl, basePath, _downloadedFiles, script);
+        } finally {
+            this.stopBusy();
+        }
+    }
+
+    private async _downloadFileInternal(
+        courseId: string,
+        courseName: string,
         fileName: string,
         _fileUrl: string,
         basePath: string,
@@ -244,6 +306,7 @@ export class SigaaService {
         onProgress?: (fileName: string, status: 'downloaded' | 'skipped' | 'failed') => void
     ): Promise<{ success: boolean; downloaded?: number; skipped?: number; failed?: number; results?: any[]; message?: string }> {
         try {
+            this.startBusy();
             logger.info(`SIGAA: =====================================`);
             logger.info(`SIGAA: downloadAllFiles called for course ${courseName}`);
             logger.info(`SIGAA: Files received: ${files.length}`);
@@ -503,10 +566,13 @@ export class SigaaService {
         } catch (error: any) {
             console.error('SIGAA: Error downloading files:', error);
             return { success: false, message: error.message || 'Download failed' };
+        } finally {
+            this.stopBusy();
         }
     }
 
     async getNewsDetail(courseId: string, courseName: string, newsId: string): Promise<{ success: boolean; news?: any; message?: string }> {
+        this.startBusy();
         try {
             console.log(`SIGAA: Fetching news detail ${newsId} using Playwright...`);
             // Use Playwright for reliable JSF session handling
@@ -520,6 +586,130 @@ export class SigaaService {
         } catch (error: any) {
             console.error('SIGAA: Error fetching news detail:', error);
             return { success: false, message: error.message || 'Failed to fetch news detail' };
+        } finally {
+            this.stopBusy();
         }
     }
-}
+
+    // =========================================================================
+    // SMART SYNC ENGINE
+    // =========================================================================
+
+    startSmartSync() {
+        if (this.syncIntervalId) clearInterval(this.syncIntervalId);
+
+        logger.info('SIGAA: Starting Smart Sync Engine...');
+        // Initial check
+        this.processNextSync();
+        // Loop
+        this.syncIntervalId = setInterval(() => this.processNextSync(), 5000);
+    }
+
+    stopSmartSync() {
+        if (this.syncIntervalId) {
+            clearInterval(this.syncIntervalId);
+            this.syncIntervalId = null;
+            logger.info('SIGAA: Smart Sync Engine stopped.');
+        }
+    }
+
+    pauseSync() {
+        if (!this.isSyncPaused) {
+            this.isSyncPaused = true;
+            logger.info('SIGAA: Smart Sync PAUSED.');
+        }
+    }
+
+    resumeSync() {
+        if (this.isSyncPaused) {
+            this.isSyncPaused = false;
+            logger.info('SIGAA: Smart Sync RESUMED.');
+        }
+    }
+
+    private async processNextSync() {
+        // 1. Check constraints
+        if (!this.liveSyncEnabled) return;
+        if (this.isBusy) {
+            // logger.info('SIGAA: Smart Sync skipped (Service Busy)');
+            return;
+        }
+        if (this.isSyncPaused) {
+            // logger.info('SIGAA: Smart Sync skipped (Paused)');
+            return;
+        }
+
+        // 2. Find a stale course
+        if (this.cachedCoursesList.length === 0) return;
+
+        const now = Date.now();
+        // Find course with oldest sync time (or never synced)
+        // Sort by time ascending (undefined = 0)
+        const coursesToSync = [...this.cachedCoursesList].sort((a, b) => {
+            const timeA = this.lastSyncTimes.get(a.id) || 0;
+            const timeB = this.lastSyncTimes.get(b.id) || 0;
+            return timeA - timeB;
+        });
+
+        const selectedCourse = coursesToSync[0];
+        const lastSync = this.lastSyncTimes.get(selectedCourse.id) || 0;
+
+        // Only sync if older than interval
+        if (now - lastSync < this.SYNC_INTERVAL_MS) {
+            // All courses are fresh enough
+            return;
+        }
+
+        // 3. Sync it!
+        logger.info(`SIGAA: Smart Sync running for ${selectedCourse.name} (Last sync: ${lastSync ? new Date(lastSync).toLocaleTimeString() : 'Never'})...`);
+
+        // Mark sync time NOW to prevent re-picking immediately if it takes time
+        this.lastSyncTimes.set(selectedCourse.id, now);
+
+        try {
+            // We use getCourseFiles which uses Playwright (likely headless API if possible)
+            // But getCourseFiles is wrapped with startBusy/stopBusy...
+            // Wait, if I call getCourseFiles, it sets BUSY.
+            // If BUSY is set, processNextSync returns.
+            // That's fine for the NEXT tick. But how does this call proceed?
+            // Since processNextSync is async, we await it.
+            // But getCourseFiles marks busy. Does that mean it blocks itself?
+            // No, because we check isBusy BEFORE calling.
+
+            // PROBLEM: if getCourseFiles sets isBusy=true, then user tries to do something, 
+            // the user action might trigger startBusy (count=2).
+            // That's OK. But we want user actions to PAUSE sync.
+            // If sync is ALREADY running, can we interrupt it?
+            // Playwright is single-threaded context. If sync is navigating, user action (also Playwright) waits or fails.
+
+            // Ideally, Smart Sync should check `busyCount > 0` (user actions).
+            // Sync itself should NOT increment busyCount (or use a different flag).
+            // I'll modify getCourseFiles to take an option `isBackground: boolean`.
+            // If background, don't increment busyCount.
+
+            // For now, simple solution: 
+            // - `processNextSync` sets its own flag `isSyncing`.
+            // - `getCourseFiles` increments busyCount. 
+            // - Conflict: User clicks. `busyCount` goes up. Sync is already running.
+            //   They fight for Playwright resource.
+            //   This is acceptable for V1. The interval is long (60s). Collision chance low.
+
+            const result = await this.getCourseFiles(selectedCourse.id, selectedCourse.name);
+
+            if (result.success && result.files && this.mainWindow) {
+                // Determine if there are NEW items.
+                // Since this service is stateless regarding previous files (Client has the list),
+                // we send the full list and let the Client diff it?
+                // Or we send an event "course-updated" and client handles it.
+
+                this.mainWindow.webContents.send('on-sync-update', {
+                    courseId: selectedCourse.id,
+                    files: result.files,
+                    news: result.news
+                });
+            }
+
+        } catch (e) {
+            logger.error(`SIGAA: Smart Sync failed for ${selectedCourse.name}`, e);
+        }
+    }

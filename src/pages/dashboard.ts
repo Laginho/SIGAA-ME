@@ -6,10 +6,10 @@ interface UserAccount {
 }
 
 export function renderDashboardPage(app: HTMLDivElement, account: UserAccount) {
-  let name: string = account.name.charAt(0).toUpperCase() + account.name.slice(1);
+  let name: string = account.name.charAt(0).toUpperCase() + account.name.slice(1).toLowerCase();
   app.innerHTML = `
     <div class="dashboard-container">
-      <header class="dashboard-header">
+      <header class="dashboard-header"> 
         <div class="user-info">
           ${account.photoUrl
       ? `<img src="${account.photoUrl}" alt="Foto de Perfil" class="user-photo">`
@@ -51,6 +51,11 @@ export function renderDashboardPage(app: HTMLDivElement, account: UserAccount) {
 
   // Automatically fetch/sync courses when dashboard loads
   fetchCoursesWithSync(false);
+
+  // Listen for Smart Sync updates
+  window.api.onSyncUpdate((data) => {
+    handleSmartSyncUpdate(data);
+  });
 }
 
 async function fetchCoursesWithSync(forceRefresh: boolean = false) {
@@ -79,9 +84,9 @@ async function fetchCoursesWithSync(forceRefresh: boolean = false) {
       // Now sync in background if enabled
       window.api.getLiveSyncEnabled().then(enabled => {
         if (enabled) {
-          setTimeout(() => syncInBackground(coursesWithFiles, coursesListElement, syncStatus), 500);
+          console.log('Live Sync is enabled. Backend engine should be running.');
         } else {
-          console.log('Live Sync is disabled. Skipping background sync.');
+          console.log('Live Sync is disabled.');
           if (syncStatus) {
             syncStatus.textContent = `Sync desativado`;
             syncStatus.className = 'sync-status';
@@ -167,108 +172,41 @@ async function fullFetchWithProgress(coursesListElement: HTMLElement, syncStatus
   }
 }
 
-async function syncInBackground(cachedCourses: any[], coursesListElement: HTMLElement, syncStatus: HTMLElement | null) {
-  console.log('Starting background sync...');
+function handleSmartSyncUpdate(data: { courseId: string; files: any[]; news: any[] }) {
+  console.log('Received Smart Sync update for course:', data.courseId);
+  const cachedData = localStorage.getItem('coursesWithFiles');
+  if (cachedData) {
+    const courses = JSON.parse(cachedData);
+    const courseIndex = courses.findIndex((c: any) => c.id === data.courseId);
+    if (courseIndex >= 0) {
+      courses[courseIndex].files = data.files;
+      courses[courseIndex].news = data.news;
+      courses[courseIndex].fileCount = data.files.length;
+      localStorage.setItem('coursesWithFiles', JSON.stringify(courses));
 
-  if (syncStatus) {
-    syncStatus.textContent = '🔄 Sincronizando...';
-    syncStatus.className = 'sync-status syncing';
-  }
+      showToast(`Novos conteúdos em ${courses[courseIndex].name}`);
 
-  try {
-    // Fetch course list only (fast!)
-    const result = await window.api.getCourses();
-
-    if (!result.success || !result.courses) {
-      if (syncStatus) {
-        syncStatus.textContent = 'Erro no sync';
-        syncStatus.className = 'sync-status error';
+      // Update UI if visible
+      const coursesListElement = document.getElementById('coursesList');
+      if (coursesListElement) {
+        displayCourses(courses, coursesListElement);
       }
-      return;
-    }
-
-    // Compare with cached data
-    const coursesToUpdate: any[] = [];
-    const updatedCourses = [...cachedCourses];
-
-    for (const serverCourse of result.courses) {
-      // cachedCourse is not used here
-      // const cachedCourse = cachedCourses.find(c => c.id === serverCourse.id);
-
-      // Always update to check for new files/news
-      // In a more advanced version, we could check file counts if the API returned them
-      coursesToUpdate.push(serverCourse);
-    }
-
-    if (coursesToUpdate.length === 0) {
-      console.log('No updates needed');
-      if (syncStatus) {
-        syncStatus.textContent = '✓ Atualizado';
-        syncStatus.className = 'sync-status synced';
-        setTimeout(() => {
-          syncStatus.textContent = `Último sync: ${new Date().toLocaleTimeString()}`;
-          syncStatus.className = 'sync-status';
-        }, 3000);
-      }
-    } else {
-      const BATCH_SIZE = 1;
-      console.log(`Updating ${coursesToUpdate.length} courses sequentially (to avoid server state collision)...`);
-
-      for (let i = 0; i < coursesToUpdate.length; i += BATCH_SIZE) {
-        const batch = coursesToUpdate.slice(i, i + BATCH_SIZE);
-        console.log(`Processing batch ${i / BATCH_SIZE + 1}/${Math.ceil(coursesToUpdate.length / BATCH_SIZE)}`);
-
-        await Promise.all(batch.map(async (course) => {
-          try {
-            const filesResult = await window.api.getCourseFiles(course.id, course.name);
-
-            // If fetch failed, keep existing files/news to avoid wiping data
-            const cachedCourse = updatedCourses.find(c => c.id === course.id);
-            const files = filesResult.success ? filesResult.files : (cachedCourse?.files || []);
-            const news = filesResult.success ? filesResult.news : (cachedCourse?.news || []);
-
-            const newCourse = {
-              ...course,
-              files,
-              news,
-              fileCount: files?.length || 0
-            };
-
-            const existingIndex = updatedCourses.findIndex(c => c.id === course.id);
-            if (existingIndex >= 0) {
-              updatedCourses[existingIndex] = newCourse;
-            } else {
-              updatedCourses.push(newCourse);
-            }
-          } catch (err) {
-            console.error(`Error syncing course ${course.name}:`, err);
-          }
-        }));
-      }
-
-      // Update cache
-      localStorage.setItem('coursesWithFiles', JSON.stringify(updatedCourses));
-      localStorage.setItem('cacheTimestamp', Date.now().toString());
-
-      // Refresh display
-      displayCourses(updatedCourses, coursesListElement);
-
-      if (syncStatus) {
-        syncStatus.textContent = `✓ ${coursesToUpdate.length} atualizações`;
-        syncStatus.className = 'sync-status synced';
-        setTimeout(() => {
-          syncStatus.textContent = `Último sync: ${new Date().toLocaleTimeString()}`;
-          syncStatus.className = 'sync-status';
-        }, 5000);
-      }
-    }
-  } catch (error) {
-    console.error('Background sync error:', error);
-    if (syncStatus) {
-      syncStatus.textContent = 'Erro no sync';
-      syncStatus.className = 'sync-status error';
     }
   }
+}
+
+function showToast(message: string) {
+  const toast = document.createElement('div');
+  toast.className = 'toast-notification';
+  toast.innerText = message;
+  document.body.appendChild(toast);
+  // Trigger animation
+  setTimeout(() => toast.classList.add('show'), 10);
+
+  setTimeout(() => {
+    toast.classList.remove('show');
+    setTimeout(() => toast.remove(), 300);
+  }, 4000);
 }
 
 function displayCourses(coursesWithFiles: any[], coursesListElement: HTMLElement) {

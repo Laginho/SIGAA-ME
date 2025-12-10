@@ -538,6 +538,47 @@ export class HttpScraperService {
                 });
             }
 
+            // Strategy 3: Parse sidebar timeline for FILE dates (e.g. "Adicionado arquivo Lista 3")
+            const fileEvents: { name: string, date: string }[] = [];
+
+            // Look in all panels (Notícias, Atividades, etc) for .menu-direita
+            $newsPage('.rich-stglpanel-body .menu-direita li').each((_, li) => {
+                const dateText = $(li).find('.data').text().trim(); // "22/11" or "22/11 10:00"
+                const descText = $(li).find('.descricao').text().trim(); // "Adicionado arquivo Lista 3"
+
+                // Parse date - usually dd/mm or dd/mm/yyyy. Assume current year if missing.
+                let date = dateText;
+                if (date && date.match(/^\d{2}\/\d{2}$/)) {
+                    const currentYear = new Date().getFullYear();
+                    date = `${date}/${currentYear}`;
+                }
+
+                if (descText.startsWith('Adicionado arquivo')) {
+                    const fileName = descText.replace('Adicionado arquivo', '').trim();
+                    if (fileName && date) {
+                        fileEvents.push({ name: fileName, date });
+                    }
+                }
+            });
+
+            this.log(`[HttpScraper] Found ${fileEvents.length} file events in timeline.`);
+
+            // Map dates to files
+            files.forEach(file => {
+                // strict match first
+                let event = fileEvents.find(e => e.name === file.name);
+
+                if (!event) {
+                    // Try partial match (sometimes filenames are truncated or formatted differently)
+                    event = fileEvents.find(e => file.name.includes(e.name) || e.name.includes(file.name));
+                }
+
+                if (event) {
+                    file.date = event.date;
+                    // this.log(`[HttpScraper] Matched date ${event.date} for file ${file.name}`);
+                }
+            });
+
             this.log(`[HttpScraper] Found ${files.length} files and ${news.length} news items.`);
             this.log(`[HttpScraper] Found ${files.length} files and ${news.length} news items for course ${courseId}`);
 

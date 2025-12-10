@@ -247,3 +247,32 @@
 .btn-refresh:active {
     transform: rotate(180deg) scale(0.95);
 }
+
+/* Toast Notification */
+.toast-notification {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    background-color: #333;
+    color: white;
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 1000;
+    font-size: 0.9rem;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.toast-notification::before {
+    content: '🔔';
+}
+
+.toast-notification.show {
+    opacity: 1;
+    transform: translateY(0);
+}
