@@ -14,6 +14,13 @@ function route() {
     const courseId = hash.replace('#/course/', '')
     renderCourseDetailPage(app, courseId)
   } else if (hash === '#/dashboard') {
+    // Resume sync whenever we enter the dashboard
+    try {
+      (window as any).api.resumeSync();
+    } catch (e) {
+      console.error('Failed to resume sync:', e);
+    }
+
     // Get account from sessionStorage
     const accountData = sessionStorage.getItem('account')
     if (accountData) {
