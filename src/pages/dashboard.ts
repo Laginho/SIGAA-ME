@@ -208,9 +208,11 @@ function updateSyncStatusUI(enabled: boolean) {
     if (enabled) {
       syncStatus.textContent = '';
       syncStatus.className = 'sync-status';
+      syncStatus.style.display = 'none';
     } else {
       syncStatus.textContent = 'Sync desativado';
       syncStatus.className = 'sync-status';
+      syncStatus.style.display = 'inline-block';
     }
   }
 }
