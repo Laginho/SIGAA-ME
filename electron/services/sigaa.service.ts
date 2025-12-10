@@ -642,8 +642,21 @@ export class SigaaService {
             return;
         }
 
-        // 2. Find a stale course
-        if (this.cachedCoursesList.length === 0) return;
+        // 2. Find a stale course - fetch if needed
+        if (this.cachedCoursesList.length === 0) {
+            logger.info('SIGAA: Smart Sync - No cached courses, fetching...');
+            try {
+                const result = await this.getCourses();
+                if (!result.success || !result.courses || result.courses.length === 0) {
+                    logger.warn('SIGAA: Smart Sync - Could not fetch courses, will retry later.');
+                    return;
+                }
+                // cachedCoursesList is now populated by getCourses()
+            } catch (e) {
+                logger.error('SIGAA: Smart Sync - Failed to fetch courses', e);
+                return;
+            }
+        }
 
         const now = Date.now();
         // Find course with oldest sync time (or never synced)
