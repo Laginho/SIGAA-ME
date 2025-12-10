@@ -644,11 +644,21 @@ export class SigaaService {
         this.stopBusy();
     }
 
-    resumeSync() {
+    async resumeSync() {
+        // Force cleanup of any lingering operations (e.g. aborted Load All News)
+        if (this.isBusy) {
+            logger.warn('SIGAA: Resume requested while Busy. Forcing reset...');
+            await this.playwrightLogin.forceReset();
+            this.stopBusy();
+        }
+
         if (this.isSyncPaused) {
             this.isSyncPaused = false;
-            logger.info('SIGAA: Smart Sync RESUMED.');
         }
+
+        // Restart the loop
+        this.setLiveSyncEnabled(true);
+        logger.info('SIGAA: Smart Sync RESUMED (Loop Restarted).');
     }
 
     async loadAllNews(courseId: string): Promise<{ success: boolean; news?: any[]; message?: string }> {

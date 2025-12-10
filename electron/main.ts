@@ -235,8 +235,8 @@ ipcMain.handle('pause-sync', async () => {
   await sigaaService.pauseSync();
 });
 
-ipcMain.handle('resume-sync', () => {
-  sigaaService.resumeSync();
+ipcMain.handle('resume-sync', async () => {
+  await sigaaService.resumeSync();
 });
 
 ipcMain.handle('load-all-news', async (_, courseId: string) => {
