@@ -748,35 +748,11 @@ export class SigaaService {
         logger.info(`SIGAA: Smart Sync running for ${selectedCourse.name} (Last sync: ${lastSync ? new Date(lastSync).toLocaleTimeString() : 'Never'})...`);
 
         // Mark sync time NOW to prevent re-picking immediately if it takes time
+        const previousSyncTime = this.lastSyncTimes.get(selectedCourse.id) || 0;
         this.lastSyncTimes.set(selectedCourse.id, now);
 
         try {
-            // We use getCourseFiles which uses Playwright (likely headless API if possible)
-            // But getCourseFiles is wrapped with startBusy/stopBusy...
-            // Wait, if I call getCourseFiles, it sets BUSY.
-            // If BUSY is set, processNextSync returns.
-            // That's fine for the NEXT tick. But how does this call proceed?
-            // Since processNextSync is async, we await it.
-            // But getCourseFiles marks busy. Does that mean it blocks itself?
-            // No, because we check isBusy BEFORE calling.
-
-            // PROBLEM: if getCourseFiles sets isBusy=true, then user tries to do something, 
-            // the user action might trigger startBusy (count=2).
-            // That's OK. But we want user actions to PAUSE sync.
-            // If sync is ALREADY running, can we interrupt it?
-            // Playwright is single-threaded context. If sync is navigating, user action (also Playwright) waits or fails.
-
-            // Ideally, Smart Sync should check `busyCount > 0` (user actions).
-            // Sync itself should NOT increment busyCount (or use a different flag).
-            // I'll modify getCourseFiles to take an option `isBackground: boolean`.
-            // If background, don't increment busyCount.
-
-            // For now, simple solution: 
-            // - `processNextSync` sets its own flag `isSyncing`.
-            // - `getCourseFiles` increments busyCount. 
-            // - Conflict: User clicks. `busyCount` goes up. Sync is already running.
-            //   They fight for Playwright resource.
-            //   This is acceptable for V1. The interval is long (60s). Collision chance low.
+            // ... (comments omitted for brevity, logic remains same)
 
             // Notify start
             if (this.mainWindow) {
@@ -809,8 +785,16 @@ export class SigaaService {
                 logger.warn(`SIGAA: Smart Sync for ${selectedCourse.name} returned no data or failed.`);
             }
 
-        } catch (e) {
-            logger.error(`SIGAA: Smart Sync failed for ${selectedCourse.name}`, e);
+        } catch (e: any) {
+
+            // ROLLBACK LOGIC: If aborted (Paused) or Target Closed, revert time so we retry immediately
+            if (!this.liveSyncEnabled || e.message?.includes('Target closed') || e.message?.includes('browser is not open')) {
+                logger.warn(`SIGAA: Sync aborted for ${selectedCourse.name}. Rolling back sync time to retry later.`);
+                this.lastSyncTimes.set(selectedCourse.id, previousSyncTime);
+            } else {
+                logger.error(`SIGAA: Smart Sync failed for ${selectedCourse.name}`, e);
+            }
+
             if (this.mainWindow) {
                 this.mainWindow.webContents.send('on-sync-scanning', { courseId: selectedCourse.id, checking: false });
             }
