@@ -492,45 +492,41 @@ export class PlaywrightLoginService {
                 console.log(`Playwright: Verified we are in course "${courseName}"`);
             }
 
-            // HYBRID NAVIGATION STRATEGY:
-            // 1. Check if files are present on the Main Page (e.g., Calculus).
-            // 2. If not, navigate to "Conteúdo" (e.g., FMC).
 
-            const hasFilesOnMainPage = await page.evaluate(() => {
-                // Verify we are on the course page
-                try {
-                    await page.waitForSelector('text=Menu Turma Virtual', { timeout: 15000 });
-                    logger.info('Playwright: Verified we are on Course Page (found "Menu Turma Virtual")');
-                } catch (e) {
-                    logger.warn('Playwright: Could not verify "Menu Turma Virtual". We might be on the portal or a different page.');
-                    const content = await page.content();
-                    if (content.includes('Portal do Discente')) {
-                        throw new Error('Still on Portal Page after clicking course.');
-                    }
+            // Verify we are on the course page
+            try {
+                await page.waitForSelector('text=Menu Turma Virtual', { timeout: 15000 });
+                logger.info('Playwright: Verified we are on Course Page (found "Menu Turma Virtual")');
+            } catch (e) {
+                logger.warn('Playwright: Could not verify "Menu Turma Virtual". We might be on the portal or a different page.');
+                const content = await page.content();
+                if (content.includes('Portal do Discente')) {
+                    throw new Error('Still on Portal Page after clicking course.');
                 }
-
-                return {
-                    success: true,
-                    html: await page.content(),
-                    cookies: await this.context!.cookies()
-                };
-
-            } catch (error: any) {
-                const html = await this.getPageHTML();
-                if (html) {
-                    const debugPath = `debug_playwright_fail_${courseId}.html`;
-                    const debugFullPath = path.resolve(process.cwd(), debugPath);
-                    fs.writeFileSync(debugFullPath, html);
-                    logger.error(`Playwright: Navigation failed. Saved HTML to ${debugFullPath}`);
-                }
-                logger.error(`Playwright: Error entering course ${courseId}:`, error);
-                // Don't close likely
-                return { success: false, error: error.message };
             }
-        }
 
-    async navigateToFilesSection(): Promise < { success: boolean; html?: string; error?: string } > {
-            if(!this.browser || !this.page) {
+            return {
+                success: true,
+                html: await page.content(),
+                cookies: await this.context!.cookies()
+            };
+
+        } catch (error: any) {
+            const html = this.page ? await this.page.content().catch(() => '') : '';
+            if (html) {
+                const debugPath = `debug_playwright_fail_${courseId}.html`;
+                const debugFullPath = path.resolve(process.cwd(), debugPath);
+                fs.writeFileSync(debugFullPath, html);
+                logger.error(`Playwright: Navigation failed. Saved HTML to ${debugFullPath}`);
+            }
+            logger.error(`Playwright: Error entering course ${courseId}:`, error);
+            // Don't close likely
+            return { success: false, error: error.message };
+        }
+    }
+
+    async navigateToFilesSection(): Promise<{ success: boolean; html?: string; error?: string }> {
+        if (!this.browser || !this.page) {
             return { success: false, error: 'Browser not initialized' };
         }
         const page = this.page;
