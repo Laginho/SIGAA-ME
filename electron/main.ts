@@ -231,8 +231,8 @@ ipcMain.handle('set-live-sync-enabled', (_, enabled: boolean) => {
 })
 
 // Sync Pause/Resume (Manual)
-ipcMain.handle('pause-sync', () => {
-  sigaaService.pauseSync();
+ipcMain.handle('pause-sync', async () => {
+  await sigaaService.pauseSync();
 });
 
 ipcMain.handle('resume-sync', () => {
