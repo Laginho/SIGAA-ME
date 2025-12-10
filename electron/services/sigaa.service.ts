@@ -114,48 +114,55 @@ export class SigaaService {
     }
 
     async getCourseFiles(courseId: string, courseName: string): Promise<{ success: boolean; files?: any[]; news?: any[]; message?: string }> {
+        this.startBusy();
         try {
-            // 1. Enter course via Headless API (Fast & Reliable)
-            // logger.info('SIGAA: Entering course via Headless API...');
-            // const entryResult = await this.playwrightLogin.enterCourseDirect(courseId, courseName || 'Unknown Course');
+            // 1. Enter course (Lands on Dashboard/Portal)
+            logger.info('SIGAA: entering course via Full Browser (Dashboard)...');
+            const entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
 
-            // let html = entryResult.html;
-
-            // FORCE FALLBACK for debugging
-            const entryResult = { success: false, html: '', error: 'Forced Fallback' };
-            let html = '';
-
-            if (!entryResult.success || !html) {
-                // logger.error('SIGAA: Failed to enter course via Headless API:', entryResult.error);
-                // Fallback to full browser if API fails
-                logger.info('SIGAA: entering course via Full Browser (Reliable)...'); // Changed log level to info
-                const fallbackResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
-                if (!fallbackResult.success || !fallbackResult.html) {
-                    return { success: false, message: fallbackResult.error || 'Failed to enter course' };
-                }
-                // Use fallback result
-                html = fallbackResult.html;
-                if (fallbackResult.cookies) {
-                    this.httpScraper.setCookies(fallbackResult.cookies);
-                    const ua = await this.playwrightLogin.getUserAgent();
-                    this.httpScraper.setUserAgent(ua);
-                }
+            if (!entryResult.success || !entryResult.html) {
+                return { success: false, message: entryResult.error || 'Failed to enter course' };
             }
 
-            // 2. Parse files
-            logger.info('SIGAA: Parsing course files...');
-            const result = await this.httpScraper.getCourseFiles(courseId, courseName, html);
-
-            logger.info(`SIGAA: Parsed ${courseName} - Files: ${result.files?.length || 0}, News: ${result.news?.length || 0}`);
-
-            if (!result.success) {
-                return { success: false, message: result.error || 'Failed to fetch files' };
+            if (entryResult.cookies) {
+                this.httpScraper.setCookies(entryResult.cookies);
+                const ua = await this.playwrightLogin.getUserAgent();
+                this.httpScraper.setUserAgent(ua);
             }
 
-            return { success: true, files: result.files, news: result.news };
+            // 2. Parse News (from Dashboard)
+            logger.info('SIGAA: Parsing news from Dashboard...');
+            const dashboardParse = await this.httpScraper.getCourseFiles(courseId, courseName, entryResult.html);
+            const newsItems = dashboardParse.news || [];
+            logger.info(`SIGAA: Found ${newsItems.length} news items on Dashboard.`);
+
+            // 3. Navigate to Files Section (Materiais > Conteúdo)
+            logger.info('SIGAA: Navigating to Files Section for file scraping...');
+            const filesNavResult = await this.playwrightLogin.navigateToFilesSection();
+
+            let filesList: any[] = [];
+
+            if (filesNavResult.success && filesNavResult.html) {
+                // 4. Parse Files (from Files Page)
+                logger.info('SIGAA: Parsing files from Files Section...');
+                // Reuse httpScraper logic, but ignore news from this page (likely duplication or none)
+                const filesParse = await this.httpScraper.getCourseFiles(courseId, courseName, filesNavResult.html);
+                filesList = filesParse.files || [];
+                logger.info(`SIGAA: Found ${filesList.length} files in Files Section.`);
+            } else {
+                logger.warn('SIGAA: Failed to navigate to Files Section. Files list might be incomplete.', filesNavResult.error);
+                // Fallback: Use whatever we found on dashboard (likely 0)
+                filesList = dashboardParse.files || [];
+            }
+
+            logger.info(`SIGAA: Parsed ${courseName} - Total Files: ${filesList.length}, Total News: ${newsItems.length}`);
+
+            return { success: true, files: filesList, news: newsItems };
         } catch (error: any) {
             logger.error('SIGAA: Error fetching files:', error);
             return { success: false, message: error.message || 'Failed to fetch files' };
+        } finally {
+            this.stopBusy();
         }
     }
 
@@ -206,9 +213,9 @@ export class SigaaService {
                 fs.mkdirSync(targetDir, { recursive: true });
             }
 
-            // 1. Enter course via Headless API (Fast & Reliable)
-            logger.info('SIGAA: Entering course via Headless API for download...');
-            const entryResult = await this.playwrightLogin.enterCourseDirect(courseId, courseName || 'Unknown Course');
+            // 1. Enter course via Full Browser (Dashboard) - Headless API skips valid ViewState for files
+            logger.info('SIGAA: Entering course via Full Browser for download (State reliability)...');
+            const entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
 
             let parseResult: { success: boolean; files?: any[]; error?: string } = { success: false };
 
@@ -216,16 +223,20 @@ export class SigaaService {
                 if (entryResult.cookies) {
                     this.httpScraper.setCookies(entryResult.cookies);
                 }
-                parseResult = await this.httpScraper.getCourseFiles(courseId, courseName, entryResult.html);
-            } else {
-                logger.warn('SIGAA: Headless API entry failed for download, trying fallback...');
-                const fallbackResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
-                if (fallbackResult.success && fallbackResult.html) {
-                    if (fallbackResult.cookies) {
-                        this.httpScraper.setCookies(fallbackResult.cookies);
-                    }
-                    parseResult = await this.httpScraper.getCourseFiles(courseId, courseName, fallbackResult.html);
+
+                // 2. Navigate to Files Section (Essential for ViewState)
+                logger.info('SIGAA: Navigating to Files Section for download state...');
+                const filesNavResult = await this.playwrightLogin.navigateToFilesSection();
+
+                if (filesNavResult.success && filesNavResult.html) {
+                    logger.info('SIGAA: Files Section loaded. Parsing fresh scripts...');
+                    parseResult = await this.httpScraper.getCourseFiles(courseId, courseName, filesNavResult.html);
+                } else {
+                    logger.warn('SIGAA: Failed to navigate to files section. Proceeding with Dashboard HTML (likely to fail)...');
+                    parseResult = await this.httpScraper.getCourseFiles(courseId, courseName, entryResult.html);
                 }
+            } else {
+                return { success: false, message: entryResult.error || 'Failed to enter course' };
             }
 
             let targetScript = script;

@@ -497,76 +497,101 @@ export class PlaywrightLoginService {
             // 2. If not, navigate to "Conteúdo" (e.g., FMC).
 
             const hasFilesOnMainPage = await page.evaluate(() => {
-                const contentDiv = document.getElementById('conteudo');
-                if (!contentDiv) return false;
+                // Verify we are on the course page
+                try {
+                    await page.waitForSelector('text=Menu Turma Virtual', { timeout: 15000 });
+                    logger.info('Playwright: Verified we are on Course Page (found "Menu Turma Virtual")');
+                } catch (e) {
+                    logger.warn('Playwright: Could not verify "Menu Turma Virtual". We might be on the portal or a different page.');
+                    const content = await page.content();
+                    if (content.includes('Portal do Discente')) {
+                        throw new Error('Still on Portal Page after clicking course.');
+                    }
+                }
 
-                // Look for jsfcljs links in the main content area
-                const links = Array.from(contentDiv.querySelectorAll('a[onclick*="jsfcljs"]'));
+                return {
+                    success: true,
+                    html: await page.content(),
+                    cookies: await this.context!.cookies()
+                };
 
-                // Filter out "Visualizar" links (usually News/Evaluations) and check for actual file links
-                const hasFileLinks = links.some(link => {
-                    const text = link.textContent?.trim() || '';
-                    return text !== '' && !text.includes('(Visualizar)');
-                });
+            } catch (error: any) {
+                const html = await this.getPageHTML();
+                if (html) {
+                    const debugPath = `debug_playwright_fail_${courseId}.html`;
+                    const debugFullPath = path.resolve(process.cwd(), debugPath);
+                    fs.writeFileSync(debugFullPath, html);
+                    logger.error(`Playwright: Navigation failed. Saved HTML to ${debugFullPath}`);
+                }
+                logger.error(`Playwright: Error entering course ${courseId}:`, error);
+                // Don't close likely
+                return { success: false, error: error.message };
+            }
+        }
 
-                // Check for the specific "No topics" message
-                const noTopicsMessage = document.body.innerText.includes('O Sistema detectou que até agora seu professor não criou nenhum tópico de aula');
+    async navigateToFilesSection(): Promise < { success: boolean; html?: string; error?: string } > {
+            if(!this.browser || !this.page) {
+            return { success: false, error: 'Browser not initialized' };
+        }
+        const page = this.page;
 
-                return hasFileLinks && !noTopicsMessage;
+        try {
+            logger.info('Playwright: Navigating to Files Section (Materiais > Conteúdo)...');
+
+            // Find "Conteúdo" in the menu
+            // We use 'text=Conteúdo' but scoped to .itemMenu for precision
+            const success = await page.evaluate(async () => {
+                const menuItems = Array.from(document.querySelectorAll('.itemMenu'));
+                const contentItem = menuItems.find(item => item.textContent?.trim() === 'Conteúdo');
+                if (contentItem) {
+                    const link = contentItem.closest('a');
+                    if (link) {
+                        link.click();
+                        return true;
+                    }
+                }
+                return false;
             });
 
-            if (hasFilesOnMainPage) {
-                console.log('Playwright: Files detected on Main Page. Skipping navigation.');
-            } else {
-                console.log('Playwright: Main page seems empty or has no files. Attempting to navigate to "Conteúdo"...');
-                try {
-                    // Try to find and click the "Conteúdo" menu item
-                    const navigated = await page.evaluate(() => {
-                        // Helper to find text in elements
-                        const containsText = (el: Element, text: string) => el.textContent?.trim() === text;
-
-                        // 1. Try to find "Conteúdo" directly
+            if (!success) {
+                // Try clicking "Materiais" first if it's an accordion
+                logger.info('Playwright: "Conteúdo" not found directly, checking "Materiais"...');
+                const materiaisVisible = await page.isVisible('text=Materiais');
+                if (materiaisVisible) {
+                    await page.click('text=Materiais');
+                    await page.waitForTimeout(500);
+                    // Try finding Conteúdo again
+                    const successRetry = await page.evaluate(async () => {
                         const menuItems = Array.from(document.querySelectorAll('.itemMenu'));
-                        let conteudoItem = menuItems.find(item => containsText(item, 'Conteúdo'));
-
-                        if (conteudoItem) {
-                            const link = conteudoItem.closest('a');
+                        const contentItem = menuItems.find(item => item.textContent?.trim() === 'Conteúdo');
+                        if (contentItem) {
+                            const link = contentItem.closest('a');
                             if (link) {
                                 link.click();
                                 return true;
                             }
                         }
-
-                        // 2. If not visible, maybe we need to expand "Materiais"
-                        // (This part is tricky purely via JS without UI interaction, but click() on hidden elements often works in JSF)
                         return false;
                     });
-
-                    if (navigated) {
-                        await page.waitForLoadState('networkidle');
-                        await page.waitForTimeout(2000); // Wait for content load
-                        console.log('Playwright: Successfully navigated to "Conteúdo".');
-                    } else {
-                        console.warn('Playwright: Could not find "Conteúdo" menu item. Staying on Main Page.');
+                    if (!successRetry) {
+                        throw new Error('Could not find "Conteúdo" link even after expanding Materiais');
                     }
-                } catch (navError) {
-                    console.error('Playwright: Error navigating to Conteúdo:', navError);
+                } else {
+                    throw new Error('Could not find "Conteúdo" link');
                 }
             }
 
-            // Get HTML and Cookies
-            const html = await page.content();
-            const cookies = await this.context!.cookies();
+            // Wait for load
+            await page.waitForLoadState('networkidle');
+            await page.waitForTimeout(2000); // Wait for JSF update
 
-            console.log(`Playwright: Captured HTML for course ${courseId} (${html.length} bytes)`);
-
-            // Keep the page alive for future operations - don't close it
-
-            return { success: true, html, cookies };
+            return {
+                success: true,
+                html: await page.content()
+            };
 
         } catch (error: any) {
-            console.error('Playwright: Error entering course:', error);
-            // Don't close the page - it's the shared instance
+            logger.error('Playwright: Error navigating to Files Section:', error);
             return { success: false, error: error.message };
         }
     }
