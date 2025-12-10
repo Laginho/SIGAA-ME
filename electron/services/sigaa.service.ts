@@ -23,6 +23,9 @@ export class SigaaService {
     constructor() {
         this.playwrightLogin = new PlaywrightLoginService();
         this.httpScraper = new HttpScraperService();
+        if (this.liveSyncEnabled) {
+            this.startSmartSync();
+        }
     }
 
     setMainWindow(window: BrowserWindow) {
