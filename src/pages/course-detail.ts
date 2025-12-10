@@ -107,7 +107,7 @@ async function fetchCourseFiles(courseId: string) {
         <div class="news-item" data-id="${item.id}">
           <div class="news-title">${item.title}</div>
           <div class="news-date">${item.date}</div>
-          ${item.notification === 'Sim' ? '<div class="news-notification">🔔 Notificação</div>' : ''}
+          ${item.notification === 'Sim' ? '<div class="news-notification" title="O professor enviou um email sobre esta notícia">📧 Email Enviado</div>' : ''}
         </div>
       `).join('')
 
