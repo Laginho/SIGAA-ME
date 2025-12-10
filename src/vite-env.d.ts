@@ -14,6 +14,7 @@ interface Window {
         getNewsDetail: (courseId: string, courseName: string, newsId: string) => Promise<any>;
         getLiveSyncEnabled: () => Promise<boolean>;
         setLiveSyncEnabled: (enabled: boolean) => Promise<void>;
+        onSyncUpdate: (callback: (data: any) => void) => () => void;
     };
     ipcRenderer: any;
 }
