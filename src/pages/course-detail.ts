@@ -13,7 +13,10 @@ export function renderCourseDetailPage(container: HTMLDivElement, courseId: stri
       <!-- News Section -->
       <div class="course-content mb-4">
         <section class="news-section">
-          <h2>Notícias da Disciplina</h2>
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2>Notícias da Disciplina</h2>
+            <button id="loadAllNewsBtn" class="btn-sm" style="background: #e67e22; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.9em;">📰 Carregar todas</button>
+          </div>
           <div id="newsList" class="news-list">
             <div class="loading">Carregando notícias...</div>
           </div>
@@ -45,6 +48,12 @@ export function renderCourseDetailPage(container: HTMLDivElement, courseId: stri
   // Back button handler
   const backButton = document.getElementById('backButton')
   backButton?.addEventListener('click', () => {
+    // Resume sync when leaving
+    try {
+      (window as any).api.resumeSync();
+    } catch (e) {
+      console.error('Failed to resume sync:', e);
+    }
     window.location.hash = '#/dashboard'
   })
 
@@ -54,8 +63,58 @@ export function renderCourseDetailPage(container: HTMLDivElement, courseId: stri
     await testDownloadAll(courseId)
   })
 
+  // Load All News handler
+  const loadAllNewsBtn = document.getElementById('loadAllNewsBtn')
+  loadAllNewsBtn?.addEventListener('click', async () => {
+    const btn = loadAllNewsBtn as HTMLButtonElement;
+    const originalText = btn.innerHTML;
+    try {
+      btn.innerHTML = '🔄 Carregando...';
+      btn.disabled = true;
+
+      const result = await (window as any).api.loadAllNews(courseId);
+
+      if (result.success && result.news) {
+        // Find current cached course
+        const cachedData = localStorage.getItem('coursesWithFiles');
+        if (cachedData) {
+          const courses = JSON.parse(cachedData);
+          const course = courses.find((c: any) => c.id === courseId);
+          if (course) {
+            // Merge content
+            course.news = result.news;
+            localStorage.setItem('coursesWithFiles', JSON.stringify(courses));
+            // Refresh UI
+            fetchCourseFiles(courseId);
+          }
+        }
+        btn.innerHTML = '✅ Concluído';
+        setTimeout(() => {
+          btn.innerHTML = originalText;
+          btn.disabled = false;
+        }, 3000);
+      } else {
+        alert('Erro ao carregar notícias: ' + result.message);
+        btn.innerHTML = '❌ Erro';
+        btn.disabled = false;
+      }
+    } catch (e: any) {
+      console.error(e);
+      alert('Erro: ' + e.message);
+      btn.innerHTML = '❌ Erro';
+      btn.disabled = false;
+    }
+  })
+
   // Fetch course files
   fetchCourseFiles(courseId)
+
+  // Pause sync while viewing course details
+  try {
+    (window as any).api.pauseSync();
+  } catch (e) {
+    console.error('Failed to pause sync:', e);
+  }
 }
 
 async function fetchCourseFiles(courseId: string) {

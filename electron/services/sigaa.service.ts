@@ -647,6 +647,53 @@ export class SigaaService {
         }
     }
 
+    async loadAllNews(courseId: string): Promise<{ success: boolean; news?: any[]; message?: string }> {
+        this.startBusy();
+        try {
+            logger.info(`SIGAA: Loading all news for course ${courseId}...`);
+
+            // 1. Enter Course to get fresh News List (and ViewState)
+            const entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, 'Unknown');
+            if (!entryResult.success || !entryResult.html) {
+                return { success: false, message: entryResult.error || 'Failed to enter course' };
+            }
+
+            if (entryResult.cookies) {
+                this.httpScraper.setCookies(entryResult.cookies);
+            }
+
+            // 2. Parse News Headers
+            const parseResult = await this.httpScraper.getCourseFiles(courseId, 'Unknown', entryResult.html);
+            const newsItems = parseResult.news || [];
+
+            logger.info(`SIGAA: Found ${newsItems.length} news items. Fetching content for all...`);
+
+            // 3. Fetch detail for each
+            const enrichedNews: any[] = [];
+            for (const item of newsItems) {
+                logger.info(`SIGAA: Fetching content for news "${item.title}"...`);
+                // Add explicit small delay to be nice to server
+                await new Promise(r => setTimeout(r, 500));
+
+                const detail = await this.httpScraper.getNewsDetail(courseId, item.id, item.script);
+                if (detail.success) {
+                    enrichedNews.push({ ...item, content: detail.news?.content });
+                } else {
+                    logger.warn(`SIGAA: Failed to fetch news "${item.title}": ${detail.error}`);
+                    enrichedNews.push(item); // Keep header at least
+                }
+            }
+
+            return { success: true, news: enrichedNews };
+
+        } catch (error: any) {
+            logger.error('SIGAA: Error loading all news:', error);
+            return { success: false, message: error.message };
+        } finally {
+            this.stopBusy();
+        }
+    }
+
     private async processNextSync() {
         // 1. Check constraints
         if (!this.liveSyncEnabled) return;

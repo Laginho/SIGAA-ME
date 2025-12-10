@@ -46,5 +46,11 @@ contextBridge.exposeInMainWorld('api', {
     const subscription = (_event: any, data: any) => callback(data)
     ipcRenderer.on('on-sync-scanning', subscription)
     return () => ipcRenderer.off('on-sync-scanning', subscription)
-  }
+  },
+  // Manual Sync Control
+  pauseSync: () => ipcRenderer.invoke('pause-sync'),
+  resumeSync: () => ipcRenderer.invoke('resume-sync'),
+
+  // News Content
+  loadAllNews: (courseId: string) => ipcRenderer.invoke('load-all-news', courseId)
 })
