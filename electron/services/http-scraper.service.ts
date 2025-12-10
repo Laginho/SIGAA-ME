@@ -509,15 +509,18 @@ export class HttpScraperService {
                         body.contents().each((__, element) => {
                             // Check for text node containing date
                             if (element.type === 'text') {
-                                const text = $(element).text().trim();
+                                const rawText = $(element).text();
+                                const cleanText = rawText.replace(/\s+/g, ' ').trim();
                                 // Match date format dd/mm/yyyy hh:mm or just dd/mm/yyyy
-                                if (text.match(/\d{2}\/\d{2}\/\d{4}/)) {
-                                    currentDate = text;
+                                // Example: "02/12/2025 22:24"
+                                const dateMatch = cleanText.match(/(\d{2}\/\d{2}\/\d{4}(?:\s+\d{2}:\d{2})?)/);
+                                if (dateMatch) {
+                                    currentDate = dateMatch[1];
                                 }
                             }
                             // Check for title in italics
                             else if (element.type === 'tag' && element.tagName === 'i') {
-                                currentTitle = $(element).text().trim();
+                                currentTitle = $(element).text().replace(/\s+/g, ' ').trim();
                             }
                             // Check for form with ID
                             else if (element.type === 'tag' && element.tagName === 'form') {
