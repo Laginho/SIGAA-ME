@@ -94,6 +94,19 @@ export class PlaywrightLoginService {
         }
     }
 
+    async forceReset() {
+        if (this.context) {
+            console.log('Playwright: Force resetting context (Abort Navigation)...');
+            try {
+                await this.context.close();
+            } catch (e) {
+                console.error('Playwright: Error closing context during reset:', e);
+            }
+            this.context = null;
+            this.page = null;
+        }
+    }
+
     /**
      * Re-login using stored credentials when session expires
      */

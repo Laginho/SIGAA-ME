@@ -633,11 +633,15 @@ export class SigaaService {
         }
     }
 
-    pauseSync() {
-        if (!this.isSyncPaused) {
-            this.isSyncPaused = true;
-            logger.info('SIGAA: Smart Sync PAUSED.');
-        }
+    async pauseSync() {
+        this.setLiveSyncEnabled(false);
+        await this.abortSync();
+    }
+
+    async abortSync() {
+        logger.warn('SIGAA: Aborting current sync operation (User Override)...');
+        await this.playwrightLogin.forceReset();
+        this.stopBusy();
     }
 
     resumeSync() {
