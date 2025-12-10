@@ -327,7 +327,7 @@ export class PlaywrightLoginService {
 
             const entryHtml = await entryResponse.text();
 
-            if (entryHtml.includes('Menu Turma Virtual') || entryHtml.includes('id="conteudo"')) {
+            if (entryHtml.includes('Menu Turma Virtual')) {
                 logger.info('Playwright: Headless API Entry successful!');
                 return {
                     success: true,
@@ -335,7 +335,11 @@ export class PlaywrightLoginService {
                     cookies: await this.context.cookies()
                 };
             } else {
-                return { success: false, error: 'Headless API Entry failed (Unexpected response)' };
+                // Save debug HTML for failed navigations
+                const debugPath = `debug_playwright_fail_${courseId}.html`;
+                require('fs').writeFileSync(debugPath, entryHtml);
+                logger.warn(`Playwright: Course page validation failed (no 'Menu Turma Virtual'). Saved to ${debugPath}`);
+                return { success: false, error: 'Headless API Entry failed - did not reach Virtual Classroom' };
             }
 
         } catch (error: any) {
