@@ -84,21 +84,27 @@ export function renderDashboardPage(app: HTMLDivElement, account: UserAccount) {
 
   // Listen for Smart Sync updates
   window.api.onSyncUpdate((data) => {
+    console.log('[Dashboard] Received sync update:', data.courseId);
     handleSmartSyncUpdate(data);
   });
 
   // Listen for scanning status (Visual Feedback)
   window.api.onSyncScanning((data) => {
     const control = document.querySelector('.live-sync-control');
+    const label = control?.querySelector('.switch-label') as HTMLElement;
     if (control) {
       if (data.checking) {
         control.classList.add('scanning');
-        // Optional: Show "Checking..." in the label?
-        // const label = control.querySelector('.switch-label');
-        // if (label) label.textContent = 'Verificando...';
+        if (label && data.courseName) {
+          // Truncate long names
+          const shortName = data.courseName.length > 15
+            ? data.courseName.substring(0, 12) + '...'
+            : data.courseName;
+          label.textContent = `🔄 ${shortName}`;
+        }
       } else {
         control.classList.remove('scanning');
-        // if (label) label.textContent = 'Live';
+        if (label) label.textContent = 'Live';
       }
     }
   });
