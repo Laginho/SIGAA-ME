@@ -18,7 +18,7 @@ export class SigaaService {
     private syncIntervalId: NodeJS.Timeout | null = null;
     private mainWindow: BrowserWindow | null = null;
     private lastSyncTimes: Map<string, number> = new Map();
-    private readonly SYNC_INTERVAL_MS = 60000; // Check one course every 60s (relaxed)
+    private readonly SYNC_INTERVAL_MS = 10000; // Check one course every 10s (testing)
 
     constructor() {
         this.playwrightLogin = new PlaywrightLoginService();
@@ -699,26 +699,33 @@ export class SigaaService {
 
             // Notify start
             if (this.mainWindow) {
-                this.mainWindow.webContents.send('on-sync-scanning', { courseId: selectedCourse.id, checking: true });
+                this.mainWindow.webContents.send('on-sync-scanning', {
+                    courseId: selectedCourse.id,
+                    courseName: selectedCourse.name,
+                    checking: true
+                });
             }
 
             const result = await this.getCourseFiles(selectedCourse.id, selectedCourse.name);
 
             if (this.mainWindow) {
-                this.mainWindow.webContents.send('on-sync-scanning', { courseId: selectedCourse.id, checking: false });
+                this.mainWindow.webContents.send('on-sync-scanning', {
+                    courseId: selectedCourse.id,
+                    courseName: selectedCourse.name,
+                    checking: false
+                });
             }
 
             if (result.success && result.files && this.mainWindow) {
-                // Determine if there are NEW items.
-                // Since this service is stateless regarding previous files (Client has the list),
-                // we send the full list and let the Client diff it?
-                // Or we send an event "course-updated" and client handles it.
+                logger.info(`SIGAA: Smart Sync completed for ${selectedCourse.name}. Files: ${result.files.length}, News: ${result.news?.length || 0}`);
 
                 this.mainWindow.webContents.send('on-sync-update', {
                     courseId: selectedCourse.id,
                     files: result.files,
                     news: result.news
                 });
+            } else {
+                logger.warn(`SIGAA: Smart Sync for ${selectedCourse.name} returned no data or failed.`);
             }
 
         } catch (e) {
