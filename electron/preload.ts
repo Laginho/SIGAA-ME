@@ -41,5 +41,10 @@ contextBridge.exposeInMainWorld('api', {
     const subscription = (_event: any, data: any) => callback(data)
     ipcRenderer.on('on-sync-update', subscription)
     return () => ipcRenderer.off('on-sync-update', subscription)
+  },
+  onSyncScanning: (callback: (data: any) => void) => {
+    const subscription = (_event: any, data: any) => callback(data)
+    ipcRenderer.on('on-sync-scanning', subscription)
+    return () => ipcRenderer.off('on-sync-scanning', subscription)
   }
 })

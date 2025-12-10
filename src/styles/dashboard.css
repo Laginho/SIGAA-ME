@@ -351,3 +351,14 @@ input:checked+.slider:before {
 .slider.round:before {
     border-radius: 50%;
 }
+
+/* Pulse animation for scanning */
+@keyframes pulse-blue {
+    0% { box-shadow: 0 0 0 0 rgba(33, 150, 243, 0.7); }
+    70% { box-shadow: 0 0 0 6px rgba(33, 150, 243, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(33, 150, 243, 0); }
+}
+
+.live-sync-control.scanning .slider {
+    animation: pulse-blue 1.5s infinite;
+}
