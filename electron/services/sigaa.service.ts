@@ -713,3 +713,4 @@ export class SigaaService {
             logger.error(`SIGAA: Smart Sync failed for ${selectedCourse.name}`, e);
         }
     }
+}
