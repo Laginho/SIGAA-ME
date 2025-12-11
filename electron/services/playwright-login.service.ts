@@ -497,10 +497,12 @@ export class PlaywrightLoginService {
             const normalizedContent = normalize(pageContent);
             const normalizedName = normalize(courseName);
 
-            // We check if the course name (or a significant part of it) is present
-            // This is a heuristic; exact match might fail due to formatting
-            if (!normalizedContent.includes(normalizedName.substring(0, 20))) {
-                console.warn(`Playwright: WARNING - Course name "${courseName}" not found in page content! Possible contamination.`);
+            // We check if the course name is present (Strict Check)
+            // Removing substring limit to ensure we distinguish between "Course I" and "Course II"
+            if (!normalizedContent.includes(normalizedName)) {
+                const errorMsg = `Playwright: Course verification failed! Page does not contain "${courseName}". We might be on the wrong course page.`;
+                console.error(errorMsg);
+                throw new Error(errorMsg);
             } else {
                 console.log(`Playwright: Verified we are in course "${courseName}"`);
             }
