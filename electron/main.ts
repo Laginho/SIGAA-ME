@@ -239,8 +239,8 @@ ipcMain.handle('resume-sync', async () => {
   await sigaaService.resumeSync();
 });
 
-ipcMain.handle('load-all-news', async (_, courseId: string) => {
-  return await sigaaService.loadAllNews(courseId);
+ipcMain.handle('load-all-news', async (_, courseId: string, courseName: string) => {
+  return await sigaaService.loadAllNews(courseId, courseName);
 });
 
 // Quit when all windows are closed, except on macOS. There, it's common

@@ -52,5 +52,6 @@ contextBridge.exposeInMainWorld('api', {
   resumeSync: () => ipcRenderer.invoke('resume-sync'),
 
   // News Content
-  loadAllNews: (courseId: string) => ipcRenderer.invoke('load-all-news', courseId)
+  // News Content
+  loadAllNews: (courseId: string, courseName: string) => ipcRenderer.invoke('load-all-news', courseId, courseName)
 })
