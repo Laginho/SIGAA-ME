@@ -796,8 +796,17 @@ export class SigaaService {
 
                 // ROLLBACK LOGIC: If we failed AND sync is disabled (Paused), it means we aborted.
                 // Revert time so we retry this course immediately next time.
-                if (!this.liveSyncEnabled) {
-                    logger.warn(`SIGAA: Sync interrupted/paused for ${selectedCourse.name}. Rolling back sync time.`);
+                // ROLLBACK LOGIC: If we failed AND (sync is paused OR error indicates abort)
+                // Revert time so we retry this course immediately next time.
+                const isAborted = !this.liveSyncEnabled ||
+                    (result.message && (
+                        result.message.includes('Target closed') ||
+                        result.message.includes('browser is not open') ||
+                        result.message.includes('Object has been destroyed')
+                    ));
+
+                if (isAborted) {
+                    logger.warn(`SIGAA: Sync interrupted/aborted for ${selectedCourse.name} (${result.message}). Rolling back sync time.`);
                     this.lastSyncTimes.set(selectedCourse.id, previousSyncTime);
                 }
             }
