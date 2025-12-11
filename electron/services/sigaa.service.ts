@@ -793,6 +793,13 @@ export class SigaaService {
                 });
             } else {
                 logger.warn(`SIGAA: Smart Sync for ${selectedCourse.name} returned no data or failed.`);
+
+                // ROLLBACK LOGIC: If we failed AND sync is disabled (Paused), it means we aborted.
+                // Revert time so we retry this course immediately next time.
+                if (!this.liveSyncEnabled) {
+                    logger.warn(`SIGAA: Sync interrupted/paused for ${selectedCourse.name}. Rolling back sync time.`);
+                    this.lastSyncTimes.set(selectedCourse.id, previousSyncTime);
+                }
             }
 
         } catch (e: any) {
