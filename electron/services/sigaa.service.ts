@@ -661,13 +661,13 @@ export class SigaaService {
         logger.info('SIGAA: Smart Sync RESUMED (Loop Restarted).');
     }
 
-    async loadAllNews(courseId: string): Promise<{ success: boolean; news?: any[]; message?: string }> {
+    async loadAllNews(courseId: string, courseName: string): Promise<{ success: boolean; news?: any[]; message?: string }> {
         this.startBusy();
         try {
-            logger.info(`SIGAA: Loading all news for course ${courseId}...`);
+            logger.info(`SIGAA: Loading all news for course ${courseName} (${courseId})...`);
 
             // 1. Enter Course to get fresh News List (and ViewState)
-            const entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, 'Unknown');
+            const entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName);
             if (!entryResult.success || !entryResult.html) {
                 return { success: false, message: entryResult.error || 'Failed to enter course' };
             }

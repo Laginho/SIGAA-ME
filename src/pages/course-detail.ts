@@ -66,13 +66,18 @@ export function renderCourseDetailPage(container: HTMLDivElement, courseId: stri
   // Load All News handler
   const loadAllNewsBtn = document.getElementById('loadAllNewsBtn')
   loadAllNewsBtn?.addEventListener('click', async () => {
+    // Get fresh course data for name
+    const cachedData = localStorage.getItem('coursesWithFiles');
+    const courses = cachedData ? JSON.parse(cachedData) : [];
+    const course = courses.find((c: any) => c.id === courseId);
+
     const btn = loadAllNewsBtn as HTMLButtonElement;
     const originalText = btn.innerHTML;
     try {
       btn.innerHTML = '🔄 Carregando...';
       btn.disabled = true;
 
-      const result = await (window as any).api.loadAllNews(courseId);
+      const result = await (window as any).api.loadAllNews(courseId, course?.name || 'Unknown Course');
 
       if (result.success && result.news) {
         // Find current cached course
