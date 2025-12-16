@@ -3,6 +3,7 @@ import { renderLoginPage } from './pages/login'
 import { renderDashboardPage } from './pages/dashboard'
 import { renderCourseDetailPage } from './pages/course-detail'
 import { renderLoadingPage } from './pages/loading'
+import { renderSyncSelectionPage } from './pages/sync-selection'
 
 const app = document.querySelector<HTMLDivElement>('#app')!
 
@@ -17,12 +18,21 @@ function route() {
     // Get account from sessionStorage
     const accountData = sessionStorage.getItem('account')
     if (accountData) {
+      // Logic: If no cache, likely "New Game" -> Redirect to Sync Selection
+      const hasCache = localStorage.getItem('coursesWithFiles');
+      if (!hasCache) {
+        window.location.hash = '#/sync-selection';
+        return;
+      }
+
       const account = JSON.parse(accountData)
       renderDashboardPage(app, account)
     } else {
       // No account data, redirect to login
       window.location.hash = '#/login'
     }
+  } else if (hash === '#/sync-selection') {
+    renderSyncSelectionPage(app)
   } else {
     renderLoginPage(app)
   }

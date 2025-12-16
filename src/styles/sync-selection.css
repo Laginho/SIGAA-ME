@@ -1,0 +1,203 @@
+/* Sync Selection Screen - Witcher 3 Style */
+
+.sync-selection-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100vh;
+    background: #141414;
+    background-image: radial-gradient(circle at center, #1f1f1f 0%, #000000 100%);
+    color: #e0e0e0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    animation: fadeIn 0.8s ease-in-out;
+}
+
+.sync-header {
+    margin-bottom: 3rem;
+    text-align: center;
+    position: relative;
+}
+
+.sync-header::after {
+    content: '';
+    display: block;
+    width: 120%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #d4af37, transparent); /* Gold accent */
+    margin: 1rem -10% 0 -10%;
+    opacity: 0.7;
+}
+
+.sync-title {
+    font-size: 2.5rem;
+    font-weight: 300;
+    letter-spacing: 2px;
+    color: #f0f0f0;
+    text-transform: uppercase;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+}
+
+.sync-subtitle {
+    font-size: 1.1rem;
+    color: #888;
+    margin-top: 0.5rem;
+    font-weight: 300;
+}
+
+.sync-cards-container {
+    display: flex;
+    gap: 2rem;
+    padding: 0 2rem;
+    max-width: 1200px;
+    width: 100%;
+    justify-content: center;
+    perspective: 1000px;
+}
+
+.sync-card {
+    background: rgba(30, 30, 30, 0.9);
+    border: 1px solid #444;
+    border-radius: 4px;
+    width: 300px;
+    height: 450px;
+    padding: 2rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+}
+
+.sync-card:not(.disabled):hover {
+    transform: translateY(-15px) scale(1.02);
+    border-color: #d4af37;
+    box-shadow: 0 20px 40px rgba(212, 175, 55, 0.15); /* Gold glow */
+    background: rgba(40, 40, 40, 0.95);
+}
+
+.sync-card.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    filter: grayscale(0.8);
+}
+
+.card-icon {
+    font-size: 4rem;
+    margin-bottom: 2rem;
+    color: #bbb;
+    transition: color 0.3s ease;
+}
+
+.sync-card:hover .card-icon {
+    color: #d4af37;
+}
+
+.card-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: #fff;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.card-subtitle {
+    font-size: 0.9rem;
+    color: #d4af37;
+    margin-bottom: 2rem;
+    font-style: italic;
+    font-family: 'Georgia', serif;
+}
+
+.card-description {
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: #aaa;
+    margin-bottom: auto;
+}
+
+.card-meta {
+    margin-top: 2rem;
+    font-size: 0.8rem;
+    color: #666;
+    padding-top: 1rem;
+    border-top: 1px solid #333;
+    width: 100%;
+}
+
+/* Progress Overlay */
+.sync-progress-overlay {
+    background: rgba(0, 0, 0, 0.82);
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    backdrop-filter: blur(5px);
+    transition: opacity 0.3s ease;
+}
+
+.spinner-sword {
+    width: 60px;
+    height: 60px;
+    border: 4px solid rgba(212, 175, 55, 0.3);
+    border-top: 4px solid #d4af37;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 1.5rem;
+}
+
+.progress-list {
+    margin-top: 2rem;
+    width: 80%;
+    max-width: 400px;
+    background: #222;
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid #444;
+}
+
+.progress-bar-container {
+    height: 6px;
+    background: #111;
+    width: 100%;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    background: #d4af37;
+    width: 0%;
+    transition: width 0.3s ease;
+    box-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
+}
+
+.progress-text {
+    padding: 1rem;
+    color: #ccc;
+    font-size: 0.9rem;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
