@@ -2,6 +2,9 @@ import '../styles/sync-selection.css';
 
 
 export function renderSyncSelectionPage(app: HTMLDivElement) {
+  // Check if user has cached data (meaning they can go back)
+  const hasCache = localStorage.getItem('coursesWithFiles');
+
   app.innerHTML = `
     <div class="sync-selection-container">
       <header class="sync-header">
@@ -46,6 +49,8 @@ export function renderSyncSelectionPage(app: HTMLDivElement) {
           <div class="card-meta">Em breve</div>
         </div>
       </div>
+
+      ${hasCache ? '<a href="#/dashboard" class="back-link">← Voltar ao Dashboard</a>' : ''}
     </div>
   `;
 
