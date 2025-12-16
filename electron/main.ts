@@ -78,8 +78,6 @@ function createWindow() {
     },
   })
 
-  sigaaService.setMainWindow(win);
-
   // Test active push message to Renderer-process.
   win.webContents.on('did-finish-load', () => {
     win?.webContents.send('main-process-message', (new Date).toLocaleString())
@@ -221,23 +219,6 @@ ipcMain.handle('get-news-detail', async (_, { courseId, courseName, newsId }) =>
   return result;
 })
 
-// Live Sync Toggle
-ipcMain.handle('get-live-sync-enabled', () => {
-  return sigaaService.getLiveSyncEnabled();
-})
-
-ipcMain.handle('set-live-sync-enabled', (_, enabled: boolean) => {
-  sigaaService.setLiveSyncEnabled(enabled);
-})
-
-// Sync Pause/Resume (Manual)
-ipcMain.handle('pause-sync', async () => {
-  await sigaaService.pauseSync();
-});
-
-ipcMain.handle('resume-sync', async () => {
-  await sigaaService.resumeSync();
-});
 
 ipcMain.handle('load-all-news', async (_, courseId: string, courseName: string) => {
   return await sigaaService.loadAllNews(courseId, courseName);

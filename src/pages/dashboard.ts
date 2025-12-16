@@ -21,13 +21,6 @@ export function renderDashboardPage(app: HTMLDivElement, account: UserAccount) {
           </div>
         </div>
         <div class="header-actions">
-          <div class="live-sync-control" title="Smart LiveSync: Checks for updates in background">
-            <label class="switch">
-              <input type="checkbox" id="liveSyncToggle">
-              <span class="slider round"></span>
-            </label>
-            <span class="switch-label">Live</span>
-          </div>
           <span id="syncStatus" class="sync-status"></span>
           <button id="refreshBtn" class="btn-refresh" title="Sincronizar">🔄</button>
           <button id="logoutBtn" class="btn-logout">Sair</button>
@@ -51,29 +44,6 @@ export function renderDashboardPage(app: HTMLDivElement, account: UserAccount) {
     window.location.hash = '#/login';
   });
 
-  // Live Sync Toggle
-  const liveSyncToggle = document.getElementById('liveSyncToggle') as HTMLInputElement;
-  if (liveSyncToggle) {
-    // Initial state
-    window.api.getLiveSyncEnabled().then(enabled => {
-      liveSyncToggle.checked = enabled;
-      updateSyncStatusUI(enabled);
-    });
-
-    // Change handler
-    liveSyncToggle.addEventListener('change', (e) => {
-      const enabled = (e.target as HTMLInputElement).checked;
-      window.api.setLiveSyncEnabled(enabled);
-      updateSyncStatusUI(enabled);
-
-      if (enabled) {
-        showToast('Smart LiveSync ativado');
-      } else {
-        showToast('Smart LiveSync pausado');
-      }
-    });
-  }
-
   // Refresh button handler
   document.getElementById('refreshBtn')?.addEventListener('click', () => {
     fetchCoursesWithSync(true); // Force refresh
@@ -81,33 +51,6 @@ export function renderDashboardPage(app: HTMLDivElement, account: UserAccount) {
 
   // Automatically fetch/sync courses when dashboard loads
   fetchCoursesWithSync(false);
-
-  // Listen for Smart Sync updates
-  window.api.onSyncUpdate((data) => {
-    console.log('[Dashboard] Received sync update:', data.courseId);
-    handleSmartSyncUpdate(data);
-  });
-
-  // Listen for scanning status (Visual Feedback)
-  window.api.onSyncScanning((data) => {
-    const control = document.querySelector('.live-sync-control');
-    const label = control?.querySelector('.switch-label') as HTMLElement;
-    if (control) {
-      if (data.checking) {
-        control.classList.add('scanning');
-        if (label && data.courseName) {
-          // Truncate long names
-          const shortName = data.courseName.length > 15
-            ? data.courseName.substring(0, 12) + '...'
-            : data.courseName;
-          label.textContent = `🔄 ${shortName}`;
-        }
-      } else {
-        control.classList.remove('scanning');
-        if (label) label.textContent = 'Live';
-      }
-    }
-  });
 }
 
 
@@ -134,19 +77,6 @@ async function fetchCoursesWithSync(forceRefresh: boolean = false) {
         syncStatus.textContent = `Último sync: ${cacheDate.toLocaleTimeString()}`;
         syncStatus.className = 'sync-status';
       }
-
-      // Now sync in background if enabled
-      window.api.getLiveSyncEnabled().then(enabled => {
-        if (enabled) {
-          console.log('Live Sync is enabled. Backend engine should be running.');
-        } else {
-          console.log('Live Sync is disabled.');
-          if (syncStatus) {
-            syncStatus.textContent = `Sync desativado`;
-            syncStatus.className = 'sync-status';
-          }
-        }
-      });
     } else {
       // No cache or force refresh - do full fetch with progress
       await fullFetchWithProgress(coursesListElement, syncStatus);
@@ -224,84 +154,6 @@ async function fullFetchWithProgress(coursesListElement: HTMLElement, syncStatus
       </div>
     `;
   }
-}
-
-function updateSyncStatusUI(enabled: boolean) {
-  const syncStatus = document.getElementById('syncStatus');
-  if (syncStatus) {
-    if (enabled) {
-      syncStatus.textContent = '';
-      syncStatus.className = 'sync-status';
-      syncStatus.style.display = 'none';
-    } else {
-      syncStatus.textContent = 'Sync desativado';
-      syncStatus.className = 'sync-status';
-      syncStatus.style.display = 'inline-block';
-    }
-  }
-}
-
-function handleSmartSyncUpdate(data: { courseId: string; files: any[]; news: any[] }) {
-  console.log('Received Smart Sync update for course:', data.courseId);
-  const cachedData = localStorage.getItem('coursesWithFiles');
-  if (cachedData) {
-    const courses = JSON.parse(cachedData);
-    const courseIndex = courses.findIndex((c: any) => c.id === data.courseId);
-    if (courseIndex >= 0) {
-      const currentCourse = courses[courseIndex];
-      const newFiles = data.files || [];
-      const newNews = data.news || [];
-      const oldFiles = currentCourse.files || [];
-      const oldNews = currentCourse.news || [];
-
-      // SAFETY: Don't wipe existing data with empty results
-      if (newFiles.length === 0 && oldFiles.length > 0) {
-        console.warn(`Smart Sync: Ignoring empty files response for ${currentCourse.name} (had ${oldFiles.length} files)`);
-        return;
-      }
-      if (newNews.length === 0 && oldNews.length > 0 && newFiles.length === oldFiles.length) {
-        console.warn(`Smart Sync: Ignoring empty news response for ${currentCourse.name}`);
-        return;
-      }
-
-      // Diff check to avoid spamming user
-      const filesChanged = JSON.stringify(oldFiles) !== JSON.stringify(newFiles);
-      const newsChanged = JSON.stringify(oldNews) !== JSON.stringify(newNews);
-
-      if (!filesChanged && !newsChanged) {
-        console.log(`Smart Sync: No changes detected for ${currentCourse.name}`);
-        return;
-      }
-
-      // Only update if we have real data
-      courses[courseIndex].files = newFiles;
-      courses[courseIndex].news = newNews;
-      courses[courseIndex].fileCount = newFiles.length;
-      localStorage.setItem('coursesWithFiles', JSON.stringify(courses));
-
-      showToast(`Novos conteúdos em ${courses[courseIndex].name}`);
-
-      // Update UI if visible
-      const coursesListElement = document.getElementById('coursesList');
-      if (coursesListElement) {
-        displayCourses(courses, coursesListElement);
-      }
-    }
-  }
-}
-
-function showToast(message: string) {
-  const toast = document.createElement('div');
-  toast.className = 'toast-notification';
-  toast.innerText = message;
-  document.body.appendChild(toast);
-  // Trigger animation
-  setTimeout(() => toast.classList.add('show'), 10);
-
-  setTimeout(() => {
-    toast.classList.remove('show');
-    setTimeout(() => toast.remove(), 300);
-  }, 4000);
 }
 
 function displayCourses(coursesWithFiles: any[], coursesListElement: HTMLElement) {
