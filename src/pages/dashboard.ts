@@ -46,113 +46,46 @@ export function renderDashboardPage(app: HTMLDivElement, account: UserAccount) {
 
   // Refresh button handler
   document.getElementById('refreshBtn')?.addEventListener('click', () => {
-    fetchCoursesWithSync(true); // Force refresh
+    // Redirect to Sync Selection screen for manual refresh
+    window.location.hash = '#/sync-selection';
   });
 
-  // Automatically fetch/sync courses when dashboard loads
-  fetchCoursesWithSync(false);
+  // Load courses from cache
+  loadCoursesFromCache();
 }
 
 
 
-async function fetchCoursesWithSync(forceRefresh: boolean = false) {
+function loadCoursesFromCache() {
   const coursesListElement = document.getElementById('coursesList');
   const syncStatus = document.getElementById('syncStatus');
   if (!coursesListElement) return;
 
   try {
-    // Try to load from cache first
     const cachedData = localStorage.getItem('coursesWithFiles');
     const cacheTimestamp = localStorage.getItem('cacheTimestamp');
 
-    if (cachedData && !forceRefresh) {
-      // Show cached data immediately!
+    if (cachedData) {
       console.log('Loading from cache...');
       const coursesWithFiles = JSON.parse(cachedData);
       displayCourses(coursesWithFiles, coursesListElement);
 
-      // Show when data was cached
       if (cacheTimestamp && syncStatus) {
         const cacheDate = new Date(parseInt(cacheTimestamp));
         syncStatus.textContent = `Último sync: ${cacheDate.toLocaleTimeString()}`;
         syncStatus.className = 'sync-status';
       }
     } else {
-      // No cache or force refresh - do full fetch with progress
-      await fullFetchWithProgress(coursesListElement, syncStatus);
+      // Should normally be handled by main.ts redirect, but just in case:
+      coursesListElement.innerHTML = '<div class="no-courses">Nenhum dado encontrado. <a href="#/sync-selection">Sincronizar agora</a></div>';
     }
   } catch (error: any) {
     console.error('Error loading courses:', error);
-    if (coursesListElement) {
-      coursesListElement.innerHTML = `
+    coursesListElement.innerHTML = `
         <div class="error-message">
-          Erro ao carregar disciplinas: ${error.message || 'Erro desconhecido'}
+          Erro ao carregar cache: ${error.message}
         </div>
       `;
-    }
-  }
-}
-
-async function fullFetchWithProgress(coursesListElement: HTMLElement, syncStatus: HTMLElement | null) {
-  console.log('Doing full fetch with progress...');
-
-  // Show loading with progress bar
-  coursesListElement.innerHTML = `
-    <div class="loading-courses">
-      <div class="loading-spinner"></div>
-      <p>Carregando disciplinas e materiais. Estimativa: 2 min</p>
-      <div class="progress-bar">
-        <div class="progress-fill" id="progressFill"></div>
-      </div>
-      <p class="progress-text" id="progressText">0%</p>
-    </div>
-  `;
-
-  const result = await window.api.getCourses();
-
-  if (result.success && result.courses) {
-    console.log(`Fetched ${result.courses.length} courses`);
-
-    const coursesWithFiles: any[] = [];
-    const progressFill = document.getElementById('progressFill') as HTMLElement;
-    const progressText = document.getElementById('progressText') as HTMLElement;
-
-    for (let i = 0; i < result.courses.length; i++) {
-      const course = result.courses[i];
-      console.log(`Fetching files for course ${i + 1}/${result.courses.length}: ${course.name}`);
-
-      const progress = Math.round(((i + 1) / result.courses.length) * 100);
-      if (progressFill) progressFill.style.width = `${progress}%`;
-      if (progressText) progressText.textContent = `${progress}% - ${course.code}`;
-
-      const filesResult = await window.api.getCourseFiles(course.id, course.name);
-
-      coursesWithFiles.push({
-        ...course,
-        files: filesResult.success ? filesResult.files : [],
-        news: filesResult.success ? filesResult.news : [],
-        fileCount: filesResult.success ? filesResult.files?.length || 0 : 0
-      });
-    }
-
-    // Save to localStorage
-    localStorage.setItem('coursesWithFiles', JSON.stringify(coursesWithFiles));
-    localStorage.setItem('cacheTimestamp', Date.now().toString());
-
-    console.log('All courses cached to localStorage!');
-
-    displayCourses(coursesWithFiles, coursesListElement);
-
-    if (syncStatus) {
-      syncStatus.textContent = `Sincronizado às ${new Date().toLocaleTimeString()}`;
-      syncStatus.className = 'sync-status synced';
-    }
-  } else {
-    coursesListElement.innerHTML = `
-      <div class="error-message">
-        Erro ao carregar disciplinas: ${result.message || 'Erro desconhecido'}
-      </div>
-    `;
   }
 }
 
