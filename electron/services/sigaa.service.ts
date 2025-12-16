@@ -4,37 +4,22 @@ import { logger } from './logger.service';
 import * as fs from 'fs';
 import * as path from 'path';
 
-import { BrowserWindow } from 'electron';
+
 
 export class SigaaService {
     private playwrightLogin: PlaywrightLoginService;
     private httpScraper: HttpScraperService;
-    private liveSyncEnabled = true;
 
-    // Smart Sync Properties
-    private isBusy = false;
+    // Operation state - used for logging and reference counting
     private busyCount = 0;
-    private isSyncPaused = false;
-    private syncIntervalId: NodeJS.Timeout | null = null;
-    private mainWindow: BrowserWindow | null = null;
-    private lastSyncTimes: Map<string, number> = new Map();
-    private readonly SYNC_INTERVAL_MS = 10000; // Check one course every 10s (testing)
 
     constructor() {
         this.playwrightLogin = new PlaywrightLoginService();
         this.httpScraper = new HttpScraperService();
-        if (this.liveSyncEnabled) {
-            this.startSmartSync();
-        }
-    }
-
-    setMainWindow(window: BrowserWindow) {
-        this.mainWindow = window;
     }
 
     private startBusy() {
         this.busyCount++;
-        this.isBusy = true;
         logger.info(`SIGAA: Service busy count: ${this.busyCount} (User Action)`);
     }
 
@@ -42,26 +27,13 @@ export class SigaaService {
         this.busyCount--;
         if (this.busyCount <= 0) {
             this.busyCount = 0;
-            this.isBusy = false;
             logger.info('SIGAA: Service is free.');
         } else {
             logger.info(`SIGAA: Service busy count: ${this.busyCount}`);
         }
     }
 
-    getLiveSyncEnabled(): boolean {
-        return this.liveSyncEnabled;
-    }
 
-    setLiveSyncEnabled(enabled: boolean) {
-        this.liveSyncEnabled = enabled;
-        logger.info(`SIGAA: Live Sync set to ${enabled}`);
-        if (enabled) {
-            this.startSmartSync();
-        } else {
-            this.stopSmartSync();
-        }
-    }
 
     async login(username: string, password: string): Promise<{ success: boolean; message?: string; account?: { name: string; photoUrl?: string } }> {
         try {
@@ -89,7 +61,6 @@ export class SigaaService {
         }
     }
 
-    private cachedCoursesList: any[] = [];
 
     async getCourses(): Promise<{ success: boolean; courses?: any[]; message?: string }> {
         try {
@@ -101,7 +72,6 @@ export class SigaaService {
 
             if (result.success && result.courses) {
                 logger.info(`SIGAA: Found ${result.courses.length || 0} courses`);
-                this.cachedCoursesList = result.courses;
             } else {
                 logger.error('SIGAA: Failed to fetch courses', result.error);
             }
@@ -611,56 +581,6 @@ export class SigaaService {
         }
     }
 
-    // =========================================================================
-    // SMART SYNC ENGINE
-    // =========================================================================
-
-    startSmartSync() {
-        if (this.syncIntervalId) clearInterval(this.syncIntervalId);
-
-        logger.info('SIGAA: Starting Smart Sync Engine...');
-        // Initial check
-        this.processNextSync();
-        // Loop
-        this.syncIntervalId = setInterval(() => this.processNextSync(), 5000);
-    }
-
-    stopSmartSync() {
-        if (this.syncIntervalId) {
-            clearInterval(this.syncIntervalId);
-            this.syncIntervalId = null;
-            logger.info('SIGAA: Smart Sync Engine stopped.');
-        }
-    }
-
-    async pauseSync() {
-        this.setLiveSyncEnabled(false);
-        await this.abortSync();
-    }
-
-    async abortSync() {
-        logger.warn('SIGAA: Aborting current sync operation (User Override)...');
-        await this.playwrightLogin.forceReset();
-        this.stopBusy();
-    }
-
-    async resumeSync() {
-        // Force cleanup of any lingering operations (e.g. aborted Load All News)
-        if (this.isBusy) {
-            logger.warn('SIGAA: Resume requested while Busy. Forcing reset...');
-            await this.playwrightLogin.forceReset();
-            this.stopBusy();
-        }
-
-        if (this.isSyncPaused) {
-            this.isSyncPaused = false;
-        }
-
-        // Restart the loop
-        this.setLiveSyncEnabled(true);
-        logger.info('SIGAA: Smart Sync RESUMED (Loop Restarted).');
-    }
-
     async loadAllNews(courseId: string, courseName: string): Promise<{ success: boolean; news?: any[]; message?: string }> {
         this.startBusy();
         try {
@@ -706,125 +626,6 @@ export class SigaaService {
             return { success: false, message: error.message };
         } finally {
             this.stopBusy();
-        }
-    }
-
-    private async processNextSync() {
-        // 1. Check constraints
-        if (!this.liveSyncEnabled) return;
-        if (this.isBusy) {
-            // logger.info('SIGAA: Smart Sync skipped (Service Busy)');
-            return;
-        }
-        if (this.isSyncPaused) {
-            // logger.info('SIGAA: Smart Sync skipped (Paused)');
-            return;
-        }
-
-        // 2. Find a stale course - fetch if needed
-        if (this.cachedCoursesList.length === 0) {
-            logger.info('SIGAA: Smart Sync - No cached courses, fetching...');
-            try {
-                const result = await this.getCourses();
-                if (!result.success || !result.courses || result.courses.length === 0) {
-                    logger.warn('SIGAA: Smart Sync - Could not fetch courses, will retry later.');
-                    return;
-                }
-                // cachedCoursesList is now populated by getCourses()
-            } catch (e) {
-                logger.error('SIGAA: Smart Sync - Failed to fetch courses', e);
-                return;
-            }
-        }
-
-        const now = Date.now();
-        // Find course with oldest sync time (or never synced)
-        // Sort by time ascending (undefined = 0)
-        const coursesToSync = [...this.cachedCoursesList].sort((a, b) => {
-            const timeA = this.lastSyncTimes.get(a.id) || 0;
-            const timeB = this.lastSyncTimes.get(b.id) || 0;
-            return timeA - timeB;
-        });
-
-        const selectedCourse = coursesToSync[0];
-        const lastSync = this.lastSyncTimes.get(selectedCourse.id) || 0;
-
-        // Only sync if older than interval
-        if (now - lastSync < this.SYNC_INTERVAL_MS) {
-            // All courses are fresh enough
-            return;
-        }
-
-        // 3. Sync it!
-        logger.info(`SIGAA: Smart Sync running for ${selectedCourse.name} (Last sync: ${lastSync ? new Date(lastSync).toLocaleTimeString() : 'Never'})...`);
-
-        // Mark sync time NOW to prevent re-picking immediately if it takes time
-        const previousSyncTime = this.lastSyncTimes.get(selectedCourse.id) || 0;
-        this.lastSyncTimes.set(selectedCourse.id, now);
-
-        try {
-            // ... (comments omitted for brevity, logic remains same)
-
-            // Notify start
-            if (this.mainWindow) {
-                this.mainWindow.webContents.send('on-sync-scanning', {
-                    courseId: selectedCourse.id,
-                    courseName: selectedCourse.name,
-                    checking: true
-                });
-            }
-
-            const result = await this.getCourseFiles(selectedCourse.id, selectedCourse.name);
-
-            if (this.mainWindow) {
-                this.mainWindow.webContents.send('on-sync-scanning', {
-                    courseId: selectedCourse.id,
-                    courseName: selectedCourse.name,
-                    checking: false
-                });
-            }
-
-            if (result.success && result.files && this.mainWindow) {
-                logger.info(`SIGAA: Smart Sync completed for ${selectedCourse.name}. Files: ${result.files.length}, News: ${result.news?.length || 0}`);
-
-                this.mainWindow.webContents.send('on-sync-update', {
-                    courseId: selectedCourse.id,
-                    files: result.files,
-                    news: result.news
-                });
-            } else {
-                logger.warn(`SIGAA: Smart Sync for ${selectedCourse.name} returned no data or failed.`);
-
-                // ROLLBACK LOGIC: If we failed AND sync is disabled (Paused), it means we aborted.
-                // Revert time so we retry this course immediately next time.
-                // ROLLBACK LOGIC: If we failed AND (sync is paused OR error indicates abort)
-                // Revert time so we retry this course immediately next time.
-                const isAborted = !this.liveSyncEnabled ||
-                    (result.message && (
-                        result.message.includes('Target closed') ||
-                        result.message.includes('browser is not open') ||
-                        result.message.includes('Object has been destroyed')
-                    ));
-
-                if (isAborted) {
-                    logger.warn(`SIGAA: Sync interrupted/aborted for ${selectedCourse.name} (${result.message}). Rolling back sync time.`);
-                    this.lastSyncTimes.set(selectedCourse.id, previousSyncTime);
-                }
-            }
-
-        } catch (e: any) {
-
-            // ROLLBACK LOGIC: If aborted (Paused) or Target Closed, revert time so we retry immediately
-            if (!this.liveSyncEnabled || e.message?.includes('Target closed') || e.message?.includes('browser is not open')) {
-                logger.warn(`SIGAA: Sync aborted for ${selectedCourse.name}. Rolling back sync time to retry later.`);
-                this.lastSyncTimes.set(selectedCourse.id, previousSyncTime);
-            } else {
-                logger.error(`SIGAA: Smart Sync failed for ${selectedCourse.name}`, e);
-            }
-
-            if (this.mainWindow) {
-                this.mainWindow.webContents.send('on-sync-scanning', { courseId: selectedCourse.id, checking: false });
-            }
         }
     }
 }

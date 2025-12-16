@@ -12,10 +12,7 @@ interface Window {
         checkFilesExistence: (filePaths: string[]) => Promise<any[]>;
         onDownloadProgress: (callback: (data: any) => void) => () => void;
         getNewsDetail: (courseId: string, courseName: string, newsId: string) => Promise<any>;
-        getLiveSyncEnabled: () => Promise<boolean>;
-        setLiveSyncEnabled: (enabled: boolean) => Promise<void>;
-        onSyncUpdate: (callback: (data: any) => void) => () => void;
-        onSyncScanning: (callback: (data: any) => void) => () => void;
+        loadAllNews: (courseId: string, courseName: string) => Promise<any>;
     };
     ipcRenderer: any;
 }

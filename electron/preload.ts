@@ -35,23 +35,7 @@ contextBridge.exposeInMainWorld('api', {
     return () => ipcRenderer.off('download-progress', subscription)
   },
   getNewsDetail: (courseId: string, courseName: string, newsId: string) => ipcRenderer.invoke('get-news-detail', { courseId, courseName, newsId }),
-  getLiveSyncEnabled: () => ipcRenderer.invoke('get-live-sync-enabled'),
-  setLiveSyncEnabled: (enabled: boolean) => ipcRenderer.invoke('set-live-sync-enabled', enabled),
-  onSyncUpdate: (callback: (data: any) => void) => {
-    const subscription = (_event: any, data: any) => callback(data)
-    ipcRenderer.on('on-sync-update', subscription)
-    return () => ipcRenderer.off('on-sync-update', subscription)
-  },
-  onSyncScanning: (callback: (data: any) => void) => {
-    const subscription = (_event: any, data: any) => callback(data)
-    ipcRenderer.on('on-sync-scanning', subscription)
-    return () => ipcRenderer.off('on-sync-scanning', subscription)
-  },
-  // Manual Sync Control
-  pauseSync: () => ipcRenderer.invoke('pause-sync'),
-  resumeSync: () => ipcRenderer.invoke('resume-sync'),
 
-  // News Content
   // News Content
   loadAllNews: (courseId: string, courseName: string) => ipcRenderer.invoke('load-all-news', courseId, courseName)
 })
