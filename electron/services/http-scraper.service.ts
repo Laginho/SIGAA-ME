@@ -526,13 +526,18 @@ export class HttpScraperService {
                             else if (element.type === 'tag' && element.tagName === 'form') {
                                 const form = $(element);
                                 const idInput = form.find('input[name="id"]').val();
+                                
+                                // Extract onclick script from the form's link (needed for HTTP fetching)
+                                const formLink = form.find('a');
+                                const onclick = formLink.attr('onclick') || '';
 
                                 if (idInput && currentDate && currentTitle) {
                                     news.push({
                                         title: currentTitle,
                                         date: currentDate,
                                         id: String(idInput),
-                                        notification: ''
+                                        notification: '',
+                                        script: onclick  // Include the script for HTTP-based fetching
                                     });
                                 }
                             }

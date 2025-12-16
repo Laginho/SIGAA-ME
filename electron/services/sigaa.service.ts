@@ -682,16 +682,17 @@ export class SigaaService {
 
             logger.info(`SIGAA: Found ${newsItems.length} news items. Fetching content for all...`);
 
-            // 3. Fetch detail for each
+            // 3. Fetch detail for each news item using Playwright (HTTP scraper fails due to session issues)
             const enrichedNews: any[] = [];
             for (const item of newsItems) {
                 logger.info(`SIGAA: Fetching content for news "${item.title}"...`);
-                // Add explicit small delay to be nice to server
-                await new Promise(r => setTimeout(r, 500));
 
-                const detail = await this.httpScraper.getNewsDetail(courseId, item.id, item.script);
-                if (detail.success) {
-                    enrichedNews.push({ ...item, content: detail.news?.content });
+                // Use Playwright for reliable JSF session handling instead of HTTP scraper
+                // The HTTP approach fails because sessions become stale between requests
+                const detail = await this.playwrightLogin.getNewsDetail(courseId, courseName, item.id);
+
+                if (detail.success && detail.news) {
+                    enrichedNews.push({ ...item, content: detail.news.content });
                 } else {
                     logger.warn(`SIGAA: Failed to fetch news "${item.title}": ${detail.error}`);
                     enrichedNews.push(item); // Keep header at least
