@@ -101,9 +101,9 @@ async function startSync(app: HTMLDivElement, mode: 'fast' | 'full') {
 
     // Save user photo URL if available
     if (result.photoUrl) {
-      const account = JSON.parse(sessionStorage.getItem('userAccount') || '{}');
+      const account = JSON.parse(sessionStorage.getItem('account') || '{}');
       account.photoUrl = result.photoUrl;
-      sessionStorage.setItem('userAccount', JSON.stringify(account));
+      sessionStorage.setItem('account', JSON.stringify(account));
       console.log('Saved user photo URL:', result.photoUrl);
     }
 
