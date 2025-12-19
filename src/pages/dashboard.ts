@@ -15,6 +15,14 @@ export function renderDashboardPage(app: HTMLDivElement, account: UserAccount) {
     }).join(' ');
   };
 
+  // Fallback: Load photoUrl from localStorage if not in account
+  if (!account.photoUrl) {
+    const savedPhotoUrl = localStorage.getItem('userPhotoUrl');
+    if (savedPhotoUrl) {
+      account.photoUrl = savedPhotoUrl;
+    }
+  }
+
   let name: string = toTitleCase(account.name);
   app.innerHTML = `
     <div class="dashboard-container">
