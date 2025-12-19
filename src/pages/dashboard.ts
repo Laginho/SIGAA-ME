@@ -108,7 +108,6 @@ function displayCourses(coursesWithFiles: any[], coursesListElement: HTMLElement
       <div class="course-card" onclick="window.location.hash='#/course/${course.id}'">
         <h3>${course.name}</h3>
         <p class="course-code">${course.code || 'Sem código'}</p>
-        <p class="course-professor">${course.professor || ''}</p>
         <p class="course-period">${course.period || 'Período não especificado'}</p>
         <p class="course-files-count">${course.fileCount || course.files?.length || 0} arquivos</p>
       </div>
