@@ -56,15 +56,14 @@ export function renderDashboardPage(app: HTMLDivElement, account: UserAccount) {
     </div>
   `;
 
-  // Logout handler
+  // Logout handler - clears credentials and session, but keeps cached data
   document.getElementById('logoutBtn')?.addEventListener('click', async () => {
     try {
       await window.api.logout();
     } catch (e) {
       console.error('Logout error:', e);
     }
-    // Clear all local storage
-    localStorage.clear();
+    // Only clear session, keep localStorage cache for faster next login
     sessionStorage.clear();
     window.location.hash = '#/login';
   });
