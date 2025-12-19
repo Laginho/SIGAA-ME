@@ -61,6 +61,11 @@ export class SigaaService {
         }
     }
 
+    async logout(): Promise<void> {
+        logger.info('SIGAA: Logging out, closing Playwright session...');
+        await this.playwrightLogin.close();
+    }
+
 
     async getCourses(): Promise<{ success: boolean; courses?: any[]; photoUrl?: string; message?: string }> {
         try {

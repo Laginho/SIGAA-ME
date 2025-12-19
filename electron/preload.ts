@@ -37,5 +37,9 @@ contextBridge.exposeInMainWorld('api', {
   getNewsDetail: (courseId: string, courseName: string, newsId: string) => ipcRenderer.invoke('get-news-detail', { courseId, courseName, newsId }),
 
   // News Content
-  loadAllNews: (courseId: string, courseName: string) => ipcRenderer.invoke('load-all-news', courseId, courseName)
+  loadAllNews: (courseId: string, courseName: string) => ipcRenderer.invoke('load-all-news', courseId, courseName),
+
+  // Session Management
+  logout: () => ipcRenderer.invoke('logout'),
+  clearAllData: () => ipcRenderer.invoke('clear-all-data')
 })

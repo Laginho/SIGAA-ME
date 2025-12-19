@@ -224,6 +224,44 @@ ipcMain.handle('load-all-news', async (_, courseId: string, courseName: string) 
   return await sigaaService.loadAllNews(courseId, courseName);
 });
 
+// Logout - delete credentials and close Playwright session
+ipcMain.handle('logout', async () => {
+  console.log('Logout: Clearing credentials and closing session...');
+  try {
+    // Delete saved credentials
+    if (fs.existsSync(CREDENTIALS_PATH)) {
+      fs.unlinkSync(CREDENTIALS_PATH);
+      console.log('Logout: Credentials file deleted');
+    }
+    // Close Playwright session
+    await sigaaService.logout();
+    console.log('Logout: Session closed');
+    return { success: true };
+  } catch (error: any) {
+    console.error('Logout error:', error);
+    return { success: false, message: error.message };
+  }
+});
+
+// Clear all data - same as logout but intended for "wipe data" action
+ipcMain.handle('clear-all-data', async () => {
+  console.log('Clear all data: Clearing credentials and closing session...');
+  try {
+    // Delete saved credentials
+    if (fs.existsSync(CREDENTIALS_PATH)) {
+      fs.unlinkSync(CREDENTIALS_PATH);
+      console.log('Clear all data: Credentials file deleted');
+    }
+    // Close Playwright session
+    await sigaaService.logout();
+    console.log('Clear all data: Session closed');
+    return { success: true };
+  } catch (error: any) {
+    console.error('Clear all data error:', error);
+    return { success: false, message: error.message };
+  }
+});
+
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.

@@ -40,6 +40,7 @@ export function renderDashboardPage(app: HTMLDivElement, account: UserAccount) {
         <div class="header-actions">
           <span id="syncStatus" class="sync-status"></span>
           <button id="refreshBtn" class="btn-refresh" title="Sincronizar">🔄</button>
+          <button id="clearDataBtn" class="btn-clear-data" title="Limpar todos os dados locais">🗑️</button>
           <button id="logoutBtn" class="btn-logout">Sair</button>
         </div>
       </header>
@@ -56,7 +57,30 @@ export function renderDashboardPage(app: HTMLDivElement, account: UserAccount) {
   `;
 
   // Logout handler
-  document.getElementById('logoutBtn')?.addEventListener('click', () => {
+  document.getElementById('logoutBtn')?.addEventListener('click', async () => {
+    try {
+      await window.api.logout();
+    } catch (e) {
+      console.error('Logout error:', e);
+    }
+    // Clear all local storage
+    localStorage.clear();
+    sessionStorage.clear();
+    window.location.hash = '#/login';
+  });
+
+  // Clear data handler
+  document.getElementById('clearDataBtn')?.addEventListener('click', async () => {
+    const confirmed = confirm('Tem certeza que deseja limpar todos os dados locais?\n\nIsso irá:\n- Remover credenciais salvas\n- Limpar cache de disciplinas\n- Remover histórico de downloads\n\nVocê precisará fazer login novamente.');
+    if (!confirmed) return;
+
+    try {
+      await window.api.clearAllData();
+    } catch (e) {
+      console.error('Clear data error:', e);
+    }
+    // Clear all local storage
+    localStorage.clear();
     sessionStorage.clear();
     window.location.hash = '#/login';
   });

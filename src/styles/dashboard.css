@@ -248,6 +248,21 @@
     transform: rotate(180deg) scale(0.95);
 }
 
+.btn-clear-data {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #ddd;
+    background: white;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 1.2rem;
+}
+
+.btn-clear-data:hover {
+    background-color: #fee;
+    border-color: #fcc;
+}
+
 /* Toast Notification */
 .toast-notification {
     position: fixed;
