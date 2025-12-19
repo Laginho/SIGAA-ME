@@ -100,32 +100,13 @@ export class SigaaService {
                 this.httpScraper.setUserAgent(ua);
             }
 
-            // 2. Parse News (from Dashboard)
-            logger.info('SIGAA: Parsing news from Dashboard...');
+            // 2. Parse Dashboard for BOTH files and news
+            // Files with download links (jsfcljs...id...) are on the Dashboard, not the Conteúdo page
+            logger.info('SIGAA: Parsing Dashboard for files and news...');
             const dashboardParse = await this.httpScraper.getCourseFiles(courseId, courseName, entryResult.html);
             const newsItems = dashboardParse.news || [];
-            logger.info(`SIGAA: Found ${newsItems.length} news items on Dashboard.`);
-
-            // 3. Navigate to Files Section (Materiais > Conteúdo)
-            logger.info('SIGAA: Navigating to Files Section for file scraping...');
-            const filesNavResult = await this.playwrightLogin.navigateToFilesSection();
-
-            let filesList: any[] = [];
-
-            if (filesNavResult.success && filesNavResult.html) {
-                // 4. Parse Files (from Files Page)
-                logger.info('SIGAA: Parsing files from Files Section...');
-                // Reuse httpScraper logic, but ignore news from this page (likely duplication or none)
-                const filesParse = await this.httpScraper.getCourseFiles(courseId, courseName, filesNavResult.html);
-                filesList = filesParse.files || [];
-                logger.info(`SIGAA: Found ${filesList.length} files in Files Section.`);
-            } else {
-                logger.warn('SIGAA: Failed to navigate to Files Section. Files list might be incomplete.', filesNavResult.error);
-                // Fallback: Use whatever we found on dashboard (likely 0)
-                filesList = dashboardParse.files || [];
-            }
-
-            logger.info(`SIGAA: Parsed ${courseName} - Total Files: ${filesList.length}, Total News: ${newsItems.length}`);
+            const filesList = dashboardParse.files || [];
+            logger.info(`SIGAA: Found ${filesList.length} files and ${newsItems.length} news items on Dashboard.`);
 
             return { success: true, files: filesList, news: newsItems };
         } catch (error: any) {
