@@ -98,6 +98,15 @@ async function startSync(app: HTMLDivElement, mode: 'fast' | 'full') {
 
     const courses = result.courses;
     const coursesWithContent: any[] = [];
+
+    // Save user photo URL if available
+    if (result.photoUrl) {
+      const account = JSON.parse(sessionStorage.getItem('userAccount') || '{}');
+      account.photoUrl = result.photoUrl;
+      sessionStorage.setItem('userAccount', JSON.stringify(account));
+      console.log('Saved user photo URL:', result.photoUrl);
+    }
+
     updateProgress(20, 'Disciplinas Encontradas', `${courses.length} disciplinas identificadas.`);
 
     // 3. Loop through courses

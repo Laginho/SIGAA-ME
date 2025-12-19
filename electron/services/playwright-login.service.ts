@@ -62,21 +62,25 @@ export class PlaywrightLoginService {
             // Login successful! Extract user data from the page
             console.log('Playwright: Login successful! Extracting user data...');
 
+            // DEBUG: Save login page HTML for selector inspection
+            try {
+                const loginPageHtml = await page.content();
+                fs.writeFileSync('debug_login_page.html', loginPageHtml);
+                console.log('Playwright: Saved debug_login_page.html for inspection');
+            } catch (e) {
+                console.warn('Playwright: Failed to save debug HTML:', e);
+            }
+
             // Stay on current page after login to extract user info
             const nameElement = await page.$('.nome_usuario, .info-usuario .nome');
             const userName = nameElement ? await nameElement.textContent() : null;
 
-            // Extract Photo URL
-            const photoElement = await page.$('.foto-usuario img, .info-usuario img');
-            let photoUrl = photoElement ? await photoElement.getAttribute('src') : null;
-
-            // Fix relative URL for photo if needed
-            if (photoUrl && !photoUrl.startsWith('http')) {
-                photoUrl = `https://si3.ufc.br${photoUrl}`;
-            }
+            // Note: Photo is only available on portal page, not login page
+            // Will extract it during getCourses instead
+            let photoUrl: string | null = null;
 
             console.log('Playwright: Extracted user name:', userName);
-            console.log('Playwright: Extracted photo URL:', photoUrl);
+            console.log('Playwright: Photo will be extracted from portal page during sync');
 
             // Extract cookies
             const cookies = await context.cookies();
@@ -160,7 +164,7 @@ export class PlaywrightLoginService {
         }
     }
 
-    async getCourses(): Promise<{ success: boolean; courses?: any[]; error?: string }> {
+    async getCourses(): Promise<{ success: boolean; courses?: any[]; photoUrl?: string; error?: string }> {
         try {
             logger.info('Playwright: Launching browser to fetch courses...');
 
@@ -215,6 +219,15 @@ export class PlaywrightLoginService {
             // Wait a bit for dynamic content
             await page.waitForTimeout(1000);
 
+            // DEBUG: Save portal page HTML for professor selector inspection
+            try {
+                const portalHtml = await page.content();
+                fs.writeFileSync('debug_portal_page.html', portalHtml);
+                console.log('Playwright: Saved debug_portal_page.html for inspection');
+            } catch (e) {
+                console.warn('Playwright: Failed to save debug HTML:', e);
+            }
+
             // Extract courses with robust selector-based logic
             console.log('Playwright: Extracting courses from page...');
             const courses = await page.evaluate(() => {
@@ -244,10 +257,8 @@ export class PlaywrightLoginService {
                                 name: parts.slice(1).join(' - ').trim(),
                                 period: periodCell ? (periodCell as HTMLElement).innerText.split('\n')[0] : '',
                                 href: nameLink.getAttribute('href'),
-                                onclick: nameLink.getAttribute('onclick'),
-                                professor: periodCell ?
-                                    (row.querySelector('td.nome') as HTMLElement)?.innerText?.split('\n').pop()?.trim() || 'Professor não identificado'
-                                    : 'Professor não identificado'
+                                onclick: nameLink.getAttribute('onclick')
+                                // Note: Professor name is not available in portal list view
                             });
                         }
                     }
@@ -271,6 +282,14 @@ export class PlaywrightLoginService {
                 console.log('Playwright: Sample courses:', courses.slice(0, 3));
             }
 
+            // Extract user photo from portal page
+            const photoElement = await page.$('.foto img, div.foto img');
+            let photoUrl = photoElement ? await photoElement.getAttribute('src') : null;
+            if (photoUrl && !photoUrl.startsWith('http')) {
+                photoUrl = `https://si3.ufc.br${photoUrl}`;
+            }
+            console.log('Playwright: Extracted photo URL from portal:', photoUrl);
+
             // DO NOT CLOSE BROWSER HERE - Keep it alive for course entry
             // await this.close(); 
 
@@ -278,7 +297,7 @@ export class PlaywrightLoginService {
             this.context = context;
             this.page = page;
 
-            return { success: true, courses };
+            return { success: true, courses, photoUrl: photoUrl || undefined };
 
         } catch (error: any) {
             console.error('Playwright: Error fetching courses:', error);
