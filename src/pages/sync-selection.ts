@@ -104,6 +104,8 @@ async function startSync(app: HTMLDivElement, mode: 'fast' | 'full') {
       const account = JSON.parse(sessionStorage.getItem('account') || '{}');
       account.photoUrl = result.photoUrl;
       sessionStorage.setItem('account', JSON.stringify(account));
+      // Also persist to localStorage for across sessions
+      localStorage.setItem('userPhotoUrl', result.photoUrl);
       console.log('Saved user photo URL:', result.photoUrl);
     }
 
