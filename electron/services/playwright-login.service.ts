@@ -18,7 +18,7 @@ export class PlaywrightLoginService {
     private storedUsername: string | null = null;
     private storedPassword: string | null = null;
 
-    async login(username: string, password: string): Promise<{ success: boolean; cookies?: any[]; userName?: string; error?: string }> {
+    async login(username: string, password: string): Promise<{ success: boolean; cookies?: any[]; userName?: string; photoUrl?: string; error?: string }> {
         try {
             console.log('Playwright: Launching browser...');
 
@@ -66,7 +66,17 @@ export class PlaywrightLoginService {
             const nameElement = await page.$('.nome_usuario, .info-usuario .nome');
             const userName = nameElement ? await nameElement.textContent() : null;
 
+            // Extract Photo URL
+            const photoElement = await page.$('.foto-usuario img, .info-usuario img');
+            let photoUrl = photoElement ? await photoElement.getAttribute('src') : null;
+
+            // Fix relative URL for photo if needed
+            if (photoUrl && !photoUrl.startsWith('http')) {
+                photoUrl = `https://si3.ufc.br${photoUrl}`;
+            }
+
             console.log('Playwright: Extracted user name:', userName);
+            console.log('Playwright: Extracted photo URL:', photoUrl);
 
             // Extract cookies
             const cookies = await context.cookies();
@@ -84,7 +94,8 @@ export class PlaywrightLoginService {
             return {
                 success: true,
                 cookies,
-                userName: userName?.trim() || 'User'
+                userName: userName?.trim() || 'User',
+                photoUrl: photoUrl || undefined
             };
 
         } catch (error: any) {
@@ -233,7 +244,10 @@ export class PlaywrightLoginService {
                                 name: parts.slice(1).join(' - ').trim(),
                                 period: periodCell ? (periodCell as HTMLElement).innerText.split('\n')[0] : '',
                                 href: nameLink.getAttribute('href'),
-                                onclick: nameLink.getAttribute('onclick')
+                                onclick: nameLink.getAttribute('onclick'),
+                                professor: periodCell ?
+                                    (row.querySelector('td.nome') as HTMLElement)?.innerText?.split('\n').pop()?.trim() || 'Professor não identificado'
+                                    : 'Professor não identificado'
                             });
                         }
                     }

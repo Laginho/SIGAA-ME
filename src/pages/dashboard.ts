@@ -6,7 +6,16 @@ interface UserAccount {
 }
 
 export function renderDashboardPage(app: HTMLDivElement, account: UserAccount) {
-  let name: string = account.name.charAt(0).toUpperCase() + account.name.slice(1).toLowerCase();
+  // Title Case Helper
+  const toTitleCase = (str: string) => {
+    return str.toLowerCase().split(' ').map(word => {
+      // Exceptions for Portuguese prepositions
+      if (['de', 'da', 'do', 'dos', 'das', 'e'].includes(word)) return word;
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    }).join(' ');
+  };
+
+  let name: string = toTitleCase(account.name);
   app.innerHTML = `
     <div class="dashboard-container">
       <header class="dashboard-header"> 
@@ -99,6 +108,7 @@ function displayCourses(coursesWithFiles: any[], coursesListElement: HTMLElement
       <div class="course-card" onclick="window.location.hash='#/course/${course.id}'">
         <h3>${course.name}</h3>
         <p class="course-code">${course.code || 'Sem código'}</p>
+        <p class="course-professor">${course.professor || ''}</p>
         <p class="course-period">${course.period || 'Período não especificado'}</p>
         <p class="course-files-count">${course.fileCount || course.files?.length || 0} arquivos</p>
       </div>
