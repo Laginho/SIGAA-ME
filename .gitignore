@@ -28,8 +28,8 @@ release/
 dist-electron/
 
 # Debug files
-debug_playwright_*.html
-*.py
+debug_*.html
+debug_*.json
 
 # Downloads and Test Output
 downloads_test/
