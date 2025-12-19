@@ -62,7 +62,7 @@ export class SigaaService {
     }
 
 
-    async getCourses(): Promise<{ success: boolean; courses?: any[]; message?: string }> {
+    async getCourses(): Promise<{ success: boolean; courses?: any[]; photoUrl?: string; message?: string }> {
         try {
             logger.info('SIGAA: Fetching courses using Playwright...');
             // Mark busy
@@ -75,7 +75,7 @@ export class SigaaService {
             } else {
                 logger.error('SIGAA: Failed to fetch courses', result.error);
             }
-            return { success: result.success, courses: result.courses, message: result.error };
+            return { success: result.success, courses: result.courses, photoUrl: result.photoUrl, message: result.error };
         } catch (error: any) {
             this.stopBusy();
             logger.error('SIGAA: Error fetching courses', error);
