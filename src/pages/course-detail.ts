@@ -7,7 +7,6 @@ export function renderCourseDetailPage(container: HTMLDivElement, courseId: stri
         <button id="backButton" class="back-button">← Voltar</button>
         <h1 id="courseTitle">Carregando...</h1>
         <p id="courseCode" class="course-code-header"></p>
-        <button id="downloadAllBtn" class="btn-download-all">⬇️ Baixar todos os arquivos</button>
       </div>
       
       <!-- News Section -->
@@ -26,7 +25,10 @@ export function renderCourseDetailPage(container: HTMLDivElement, courseId: stri
       <!-- Files Section -->
       <div class="course-content">
         <section class="files-section">
-          <h2>Materiais da Disciplina</h2>
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2>Materiais da Disciplina</h2>
+            <button id="downloadAllBtn" class="btn-sm" style="background: #27ae60; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.9em;">⬇️ Baixar todos</button>
+          </div>
           <div id="filesList" class="files-list">
             <div class="loading">Carregando arquivos...</div>
           </div>
