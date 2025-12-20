@@ -14,8 +14,9 @@ Desktop app for UFC's SIGAA, which aims to provide a better experience than the 
 
 ## Screenshots
 
-![Dashboard](https://prnt.sc/Esqk9HQdS3Y0)
-![Course](https://prnt.sc/ckJDt__XL-Fu)
+![Sync](docs/images/sync_menu.png)
+![Dashboard](docs/images/dashboard.png)
+![Course](docs/images/course.png)
 
 ## Dependencies
 
