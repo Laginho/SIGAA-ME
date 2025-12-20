@@ -33,6 +33,7 @@ debug_*.json
 
 # Downloads and Test Output
 downloads_test/
+debug/
 verification_output*.txt
 *.pdf
 *.zip
