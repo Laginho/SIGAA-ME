@@ -2,6 +2,7 @@ import axios, { AxiosResponse } from 'axios';
 import * as cheerio from 'cheerio';
 import * as fs from 'fs';
 import * as path from 'path';
+import { app } from 'electron';
 
 interface Cookie {
     name: string;
@@ -14,7 +15,8 @@ interface Cookie {
 export class HttpScraperService {
     private cookies: Cookie[] = [];
     private baseUrl: string = 'https://si3.ufc.br';
-    private logPath = path.join(process.cwd(), 'scraper.log');
+    // Use userData path (writable in production) instead of process.cwd() (may be inside app.asar)
+    private logPath = path.join(app.getPath('userData'), 'scraper.log');
     private courseData: Map<string, { viewState: string; action: string; formName: string; inputs: Record<string, string> }> = new Map();
 
     private logStream: fs.WriteStream;
@@ -526,7 +528,7 @@ export class HttpScraperService {
                             else if (element.type === 'tag' && element.tagName === 'form') {
                                 const form = $(element);
                                 const idInput = form.find('input[name="id"]').val();
-                                
+
                                 // Extract onclick script from the form's link (needed for HTTP fetching)
                                 const formLink = form.find('a');
                                 const onclick = formLink.attr('onclick') || '';

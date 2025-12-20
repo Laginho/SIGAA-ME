@@ -8,7 +8,8 @@ import { SigaaService } from './services/sigaa.service'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // ===== FILE LOGGER SETUP =====
-const logsDir = path.join(__dirname, '..', 'logs');
+// Use userData path (writable in production) instead of __dirname (inside app.asar)
+const logsDir = path.join(app.getPath('userData'), 'logs');
 if (!fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir, { recursive: true });
 }
