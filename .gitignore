@@ -32,7 +32,8 @@ debug_*.html
 debug_*.json
 
 # Downloads and Test Output
-downloads_test/
+.gitignore
+.agent/
 debug/
 verification_output*.txt
 *.pdf
