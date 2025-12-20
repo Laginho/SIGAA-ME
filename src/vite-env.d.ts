@@ -13,6 +13,8 @@ interface Window {
         onDownloadProgress: (callback: (data: any) => void) => () => void;
         getNewsDetail: (courseId: string, courseName: string, newsId: string) => Promise<any>;
         loadAllNews: (courseId: string, courseName: string) => Promise<any>;
+        logout: () => Promise<any>;
+        clearAllData: () => Promise<any>;
     };
     ipcRenderer: any;
 }

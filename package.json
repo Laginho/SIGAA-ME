@@ -1,7 +1,9 @@
 {
-  "name": "temp-app",
+  "name": "sigaa-me",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "Desktop app for UFC's SIGAA",
+  "author": "Bruno Lage",
   "type": "module",
   "scripts": {
     "dev": "vite",

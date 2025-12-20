@@ -1,9 +1,9 @@
 // @see - https://www.electron.build/configuration/configuration
 {
   "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
-  "appId": "YourAppID",
+  "appId": "com.laginho.sigaa-me",
   "asar": true,
-  "productName": "YourAppName",
+  "productName": "SIGAA-ME",
   "directories": {
     "output": "release/${version}"
   },
@@ -26,7 +26,8 @@
         ]
       }
     ],
-    "artifactName": "${productName}-Windows-${version}-Setup.${ext}"
+    "artifactName": "${productName}-Windows-${version}-Setup.${ext}",
+    "signAndEditExecutable": false
   },
   "nsis": {
     "oneClick": false,
