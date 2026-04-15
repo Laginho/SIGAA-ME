@@ -1,13 +1,14 @@
 {
   "name": "sigaa-me",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Desktop app for UFC's SIGAA",
   "author": "Bruno Lage",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build && electron-builder",
+    "publish": "tsc && vite build && electron-builder --publish always",
     "preview": "vite preview"
   },
   "devDependencies": {

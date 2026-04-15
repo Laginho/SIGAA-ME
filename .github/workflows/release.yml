@@ -1,0 +1,41 @@
+name: Release SIGAA-ME
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - 'v*.*.*' # Trigger on tags like v1.0.0
+
+jobs:
+  build:
+    name: Build & Release Windows
+    runs-on: windows-latest
+
+    permissions:
+      contents: write # Needed to create releases
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build and Publish (Tag)
+        # Runs ONLY when a tag is pushed
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run publish
+        
+      - name: Build Check Only (Branch)
+        # Runs on normal pushes to master (no publish)
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        run: npm run build
