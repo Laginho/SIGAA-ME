@@ -42,3 +42,11 @@ verification_output*.txt
 *.xlsx
 *.rar
 *.txt
+
+# Environment variables (contains credentials - NEVER commit)
+.env
+.env.*
+!.env.example
+
+# Test output
+coverage/

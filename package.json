@@ -9,15 +9,21 @@
     "dev": "vite",
     "build": "tsc && vite build && electron-builder",
     "publish": "tsc && vite build && electron-builder --publish always",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:ui": "vitest --ui",
+    "test:watch": "vitest"
   },
   "devDependencies": {
+    "@vitest/ui": "^4.1.4",
+    "dotenv": "^17.4.2",
     "electron": "^30.0.1",
     "electron-builder": "^24.13.3",
     "typescript": "^5.2.2",
     "vite": "^5.1.6",
     "vite-plugin-electron": "^0.28.6",
-    "vite-plugin-electron-renderer": "^0.14.5"
+    "vite-plugin-electron-renderer": "^0.14.5",
+    "vitest": "^4.1.4"
   },
   "main": "dist-electron/main.js",
   "dependencies": {
