@@ -3,7 +3,8 @@ import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import fs from 'node:fs'
 import { SigaaService } from './services/sigaa.service'
-
+import { autoUpdater } from 'electron-updater'
+import { execSync } from 'child_process'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -281,4 +282,43 @@ app.on('activate', () => {
   }
 })
 
-app.whenReady().then(createWindow)
+app.whenReady().then(() => {
+  // Check if Chrome is installed
+  try {
+    let chromeExists = false;
+    if (process.platform === 'win32') {
+      try {
+        execSync('reg query "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\chrome.exe"');
+        chromeExists = true;
+      } catch (e) {
+        try {
+          execSync('reg query "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\App Paths\\chrome.exe"');
+          chromeExists = true;
+        } catch (e2) {}
+      }
+    } else if (process.platform === 'darwin') {
+      chromeExists = fs.existsSync('/Applications/Google Chrome.app');
+    } else {
+      try {
+        execSync('which google-chrome');
+        chromeExists = true;
+      } catch (e) {}
+    }
+
+    if (!chromeExists) {
+      dialog.showErrorBox(
+        'Google Chrome Requerido',
+        'O SIGAA-ME precisa do Google Chrome instalado para funcionar. Por favor, instale o Chrome e tente novamente.'
+      );
+    }
+  } catch (e) {
+    console.error('Failed to check for Chrome:', e);
+  }
+
+  createWindow();
+
+  // Set up auto-updater
+  autoUpdater.checkForUpdatesAndNotify().catch(err => {
+    console.error('Failed to check for updates:', err);
+  });
+})

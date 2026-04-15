@@ -23,6 +23,7 @@ export class PlaywrightLoginService {
             console.log('Playwright: Launching browser...');
 
             this.browser = await chromium.launch({
+                channel: 'chrome',
                 headless: true
             });
 
@@ -174,6 +175,7 @@ export class PlaywrightLoginService {
             }
 
             this.browser = await chromium.launch({
+                channel: 'chrome',
                 headless: true
             });
 
@@ -703,7 +705,7 @@ export class PlaywrightLoginService {
             const { DownloadService } = await import('./download.service');
 
             // Launch a dedicated browser for this download to avoid concurrency issues
-            localBrowser = await chromium.launch({ headless: false });
+            localBrowser = await chromium.launch({ channel: 'chrome', headless: false });
             const downloadService = new DownloadService(localBrowser);
 
             const context = await localBrowser.newContext();
@@ -762,7 +764,7 @@ export class PlaywrightLoginService {
             const { DownloadService } = await import('./download.service');
 
             // Launch a dedicated browser for this batch download
-            localBrowser = await chromium.launch({ headless: false });
+            localBrowser = await chromium.launch({ channel: 'chrome', headless: false });
             const downloadService = new DownloadService(localBrowser);
 
             const context = await localBrowser.newContext();
