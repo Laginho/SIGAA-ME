@@ -2,6 +2,7 @@ import { chromium, Browser, BrowserContext, Page } from 'playwright';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as cheerio from 'cheerio';
+import { app } from 'electron';
 import { logger } from './logger.service';
 
 /**
@@ -63,13 +64,16 @@ export class PlaywrightLoginService {
             // Login successful! Extract user data from the page
             console.log('Playwright: Login successful! Extracting user data...');
 
-            // DEBUG: Save login page HTML for selector inspection
-            try {
-                const loginPageHtml = await page.content();
-                fs.writeFileSync('debug_login_page.html', loginPageHtml);
-                console.log('Playwright: Saved debug_login_page.html for inspection');
-            } catch (e) {
-                console.warn('Playwright: Failed to save debug HTML:', e);
+            // DEBUG: Save login page HTML for selector inspection (dev only)
+            if (!app.isPackaged) {
+                try {
+                    const loginPageHtml = await page.content();
+                    const debugPath = path.join(app.getPath('userData'), 'debug_login_page.html');
+                    fs.writeFileSync(debugPath, loginPageHtml);
+                    console.log('Playwright: Saved debug_login_page.html for inspection');
+                } catch (e) {
+                    console.warn('Playwright: Failed to save debug HTML:', e);
+                }
             }
 
             // Stay on current page after login to extract user info
@@ -221,13 +225,16 @@ export class PlaywrightLoginService {
             // Wait a bit for dynamic content
             await page.waitForTimeout(1000);
 
-            // DEBUG: Save portal page HTML for professor selector inspection
-            try {
-                const portalHtml = await page.content();
-                fs.writeFileSync('debug_portal_page.html', portalHtml);
-                console.log('Playwright: Saved debug_portal_page.html for inspection');
-            } catch (e) {
-                console.warn('Playwright: Failed to save debug HTML:', e);
+            // DEBUG: Save portal page HTML for professor selector inspection (dev only)
+            if (!app.isPackaged) {
+                try {
+                    const portalHtml = await page.content();
+                    const debugPath = path.join(app.getPath('userData'), 'debug_portal_page.html');
+                    fs.writeFileSync(debugPath, portalHtml);
+                    console.log('Playwright: Saved debug_portal_page.html for inspection');
+                } catch (e) {
+                    console.warn('Playwright: Failed to save debug HTML:', e);
+                }
             }
 
             // Extract courses with robust selector-based logic
@@ -271,13 +278,15 @@ export class PlaywrightLoginService {
 
             console.log('Playwright: Found courses:', courses.length);
 
-            // Save to debug file for analysis
-            try {
-                const debugPath = path.join(process.cwd(), 'debug_courses.json');
-                fs.writeFileSync(debugPath, JSON.stringify(courses, null, 2));
-                console.log(`Playwright: Saved course debug info to ${debugPath}`);
-            } catch (err) {
-                console.error('Playwright: Failed to save debug info:', err);
+            // Save to debug file for analysis (dev only)
+            if (!app.isPackaged) {
+                try {
+                    const debugPath = path.join(app.getPath('userData'), 'debug_courses.json');
+                    fs.writeFileSync(debugPath, JSON.stringify(courses, null, 2));
+                    console.log(`Playwright: Saved course debug info to ${debugPath}`);
+                } catch (err) {
+                    console.error('Playwright: Failed to save debug info:', err);
+                }
             }
 
             if (courses.length > 0) {
@@ -383,10 +392,12 @@ export class PlaywrightLoginService {
                     cookies: await this.context.cookies()
                 };
             } else {
-                // Save debug HTML for failed navigations
-                const debugPath = `debug_playwright_fail_${courseId}.html`;
-                require('fs').writeFileSync(debugPath, entryHtml);
-                logger.warn(`Playwright: Course page validation failed (no 'Menu Turma Virtual'). Saved to ${debugPath}`);
+                // Save debug HTML for failed navigations (dev only)
+                if (!app.isPackaged) {
+                    const debugPath = path.join(app.getPath('userData'), `debug_playwright_fail_${courseId}.html`);
+                    fs.writeFileSync(debugPath, entryHtml);
+                    logger.warn(`Playwright: Course page validation failed. Saved to ${debugPath}`);
+                }
                 return { success: false, error: 'Headless API Entry failed - did not reach Virtual Classroom' };
             }
 
@@ -487,9 +498,11 @@ export class PlaywrightLoginService {
                 // Save debug HTML
                 const html = await page.content();
                 try {
-                    const debugPath = path.join(process.cwd(), `debug_portal_fail_${courseId}.html`);
-                    fs.writeFileSync(debugPath, html);
-                    console.log(`Playwright: Saved debug HTML to ${debugPath}`);
+                    if (!app.isPackaged) {
+                        const debugPath = path.join(app.getPath('userData'), `debug_portal_fail_${courseId}.html`);
+                        fs.writeFileSync(debugPath, html);
+                        console.log(`Playwright: Saved debug HTML to ${debugPath}`);
+                    }
                 } catch (e) {
                     console.error('Failed to save debug HTML:', e);
                 }
@@ -563,9 +576,8 @@ export class PlaywrightLoginService {
 
         } catch (error: any) {
             const html = this.page ? await this.page.content().catch(() => '') : '';
-            if (html) {
-                const debugPath = `debug_playwright_fail_${courseId}.html`;
-                const debugFullPath = path.resolve(process.cwd(), debugPath);
+            if (html && !app.isPackaged) {
+                const debugFullPath = path.join(app.getPath('userData'), `debug_playwright_fail_${courseId}.html`);
                 fs.writeFileSync(debugFullPath, html);
                 logger.error(`Playwright: Navigation failed. Saved HTML to ${debugFullPath}`);
             }
@@ -871,11 +883,12 @@ export class PlaywrightLoginService {
             }
 
             if (!found) {
-                // Save debug HTML
-                const html = await page.content();
-                const debugPath = path.join(process.cwd(), `debug_playwright_news_fail_${newsId}.html`);
-                fs.writeFileSync(debugPath, html);
-                console.log(`Playwright: Saved debug HTML to ${debugPath}`);
+                if (!app.isPackaged) {
+                    const html = await page.content();
+                    const debugPath = path.join(app.getPath('userData'), `debug_playwright_news_fail_${newsId}.html`);
+                    fs.writeFileSync(debugPath, html);
+                    console.log(`Playwright: Saved debug HTML to ${debugPath}`);
+                }
                 return { success: false, error: `News link with ID ${newsId} not found` };
             }
 
@@ -885,11 +898,13 @@ export class PlaywrightLoginService {
             await page.waitForLoadState('networkidle');
             await page.waitForTimeout(1000);
 
-            // DEBUG: Save news detail page HTML
-            const newsDetailHtml = await page.content();
-            const debugNewsPath = path.join(process.cwd(), `debug_news_detail_${newsId}.html`);
-            fs.writeFileSync(debugNewsPath, newsDetailHtml);
-            console.log(`Playwright: Saved news detail page to ${debugNewsPath}`);
+            // DEBUG: Save news detail page HTML (dev only)
+            if (!app.isPackaged) {
+                const newsDetailHtml = await page.content();
+                const debugNewsPath = path.join(app.getPath('userData'), `debug_news_detail_${newsId}.html`);
+                fs.writeFileSync(debugNewsPath, newsDetailHtml);
+                console.log(`Playwright: Saved news detail page to ${debugNewsPath}`);
+            }
 
             // 4. Parse the news content
             const newsData = await page.evaluate(() => {
@@ -1001,11 +1016,12 @@ export class PlaywrightLoginService {
             // await page.goBack();
 
             if (!newsData.content && !newsData.title) {
-                // Save debug HTML
-                const html = await page.content();
-                const debugPath = path.join(process.cwd(), `debug_playwright_news_${newsId}.html`);
-                fs.writeFileSync(debugPath, html);
-                console.log(`Playwright: Saved debug HTML to ${debugPath}`);
+                if (!app.isPackaged) {
+                    const html = await page.content();
+                    const debugPath = path.join(app.getPath('userData'), `debug_playwright_news_${newsId}.html`);
+                    fs.writeFileSync(debugPath, html);
+                    console.log(`Playwright: Saved debug HTML to ${debugPath}`);
+                }
                 return { success: false, error: 'Could not parse news content from page' };
             }
 
