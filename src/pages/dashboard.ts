@@ -1,4 +1,5 @@
 import '../styles/dashboard.css';
+import { toast } from '../components/toast';
 
 interface UserAccount {
   name: string;
@@ -29,7 +30,7 @@ export function renderDashboardPage(app: HTMLDivElement, account: UserAccount) {
       <header class="dashboard-header"> 
         <div class="user-info">
           ${account.photoUrl
-      ? `<img src="${account.photoUrl}" alt="Foto de Perfil" class="user-photo">`
+      ? `<img src="${account.photoUrl}" alt="Foto de Perfil" class="user-photo" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';"><div class="user-photo-placeholder" style="display:none">${name.charAt(0)}</div>`
       : `<div class="user-photo-placeholder">${name.charAt(0)}</div>`
     }
           <div class="user-details">
@@ -70,18 +71,36 @@ export function renderDashboardPage(app: HTMLDivElement, account: UserAccount) {
 
   // Clear data handler
   document.getElementById('clearDataBtn')?.addEventListener('click', async () => {
-    const confirmed = confirm('Tem certeza que deseja limpar todos os dados locais?\n\nIsso irá:\n- Remover credenciais salvas\n- Limpar cache de disciplinas\n- Remover histórico de downloads\n\nVocê precisará fazer login novamente.');
-    if (!confirmed) return;
-
-    try {
-      await window.api.clearAllData();
-    } catch (e) {
-      console.error('Clear data error:', e);
+    const btn = document.getElementById('clearDataBtn') as HTMLButtonElement;
+    if (btn.dataset.confirming) {
+      // Second click — execute
+      delete btn.dataset.confirming;
+      btn.innerHTML = '🗑️';
+      btn.title = 'Limpar todos os dados locais';
+      try {
+        await window.api.clearAllData();
+      } catch (e) {
+        console.error('Clear data error:', e);
+      }
+      localStorage.clear();
+      sessionStorage.clear();
+      toast.success('Dados locais removidos.');
+      setTimeout(() => { window.location.hash = '#/login'; }, 1200);
+    } else {
+      // First click — ask for confirmation via button state
+      btn.dataset.confirming = '1';
+      btn.innerHTML = '⚠️';
+      btn.title = 'Clique novamente para confirmar a exclusão de todos os dados';
+      toast.info('Clique novamente no botão ⚠️ para confirmar a limpeza de dados.');
+      setTimeout(() => {
+        // Reset if user doesn't confirm within 4s
+        if (btn.dataset.confirming) {
+          delete btn.dataset.confirming;
+          btn.innerHTML = '🗑️';
+          btn.title = 'Limpar todos os dados locais';
+        }
+      }, 4000);
     }
-    // Clear all local storage
-    localStorage.clear();
-    sessionStorage.clear();
-    window.location.hash = '#/login';
   });
 
   // Refresh button handler
@@ -112,7 +131,24 @@ function loadCoursesFromCache() {
 
       if (cacheTimestamp && syncStatus) {
         const cacheDate = new Date(parseInt(cacheTimestamp));
-        syncStatus.textContent = `Último sync: ${cacheDate.toLocaleTimeString()}`;
+        const now = new Date();
+        const diffMs = now.getTime() - cacheDate.getTime();
+        const diffMin = Math.floor(diffMs / 60000);
+
+        let label: string;
+        if (diffMin < 1) {
+          label = 'agora mesmo';
+        } else if (diffMin < 60) {
+          label = `há ${diffMin} min`;
+        } else if (cacheDate.toDateString() === now.toDateString()) {
+          label = `hoje às ${cacheDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+        } else {
+          const day = cacheDate.getDate().toString().padStart(2, '0');
+          const month = (cacheDate.getMonth() + 1).toString().padStart(2, '0');
+          label = `${day}/${month} às ${cacheDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+        }
+
+        syncStatus.textContent = `Último sync: ${label}`;
         syncStatus.className = 'sync-status';
       }
     } else {

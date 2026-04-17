@@ -1,4 +1,5 @@
 import '../styles/course-detail.css'
+import { toast } from '../components/toast'
 
 export function renderCourseDetailPage(container: HTMLDivElement, courseId: string) {
   container.innerHTML = `
@@ -12,9 +13,9 @@ export function renderCourseDetailPage(container: HTMLDivElement, courseId: stri
       <!-- News Section -->
       <div class="course-content mb-4">
         <section class="news-section">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div class="section-header">
             <h2>Notícias da Disciplina</h2>
-            <button id="loadAllNewsBtn" class="btn-sm" style="background: #e67e22; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.9em;">📰 Carregar todas</button>
+            <button id="loadAllNewsBtn" class="btn-section-action btn-section-action--warning">📰 Carregar todas</button>
           </div>
           <div id="newsList" class="news-list">
             <div class="loading">Carregando notícias...</div>
@@ -25,9 +26,9 @@ export function renderCourseDetailPage(container: HTMLDivElement, courseId: stri
       <!-- Files Section -->
       <div class="course-content">
         <section class="files-section">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div class="section-header">
             <h2>Materiais da Disciplina</h2>
-            <button id="downloadAllBtn" class="btn-sm" style="background: #27ae60; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.9em;">⬇️ Baixar todos</button>
+            <button id="downloadAllBtn" class="btn-section-action btn-section-action--success">⬇️ Baixar todos</button>
           </div>
           <div id="filesList" class="files-list">
             <div class="loading">Carregando arquivos...</div>
@@ -101,13 +102,13 @@ export function renderCourseDetailPage(container: HTMLDivElement, courseId: stri
           btn.disabled = false;
         }, 3000);
       } else {
-        alert('Erro ao carregar notícias: ' + result.message);
+        toast.error('Erro ao carregar notícias: ' + (result.message || 'Erro desconhecido'));
         btn.innerHTML = '❌ Erro';
         btn.disabled = false;
       }
     } catch (e: any) {
       console.error(e);
-      alert('Erro: ' + e.message);
+      toast.error('Erro: ' + (e.message || 'Erro desconhecido'));
       btn.innerHTML = '❌ Erro';
       btn.disabled = false;
     }
@@ -166,7 +167,7 @@ async function fetchCourseFiles(courseId: string) {
     // Render News
     if (!course.news || course.news.length === 0) {
       newsListElement.innerHTML = `
-        <div class="no-files">Nenhuma notícia recente</div>
+        <div class="no-news">Nenhuma notícia recente</div>
       `
     } else {
       newsListElement.innerHTML = course.news.map((item: any) => `
@@ -193,6 +194,7 @@ async function fetchCourseFiles(courseId: string) {
       filesListElement.innerHTML = `
         <div class="no-files">Nenhum material disponível nesta disciplina</div>
       `
+
     } else {
       // Get downloaded status
       const downloadedFiles = JSON.parse(localStorage.getItem('downloadedFiles') || '{}');
@@ -330,15 +332,15 @@ async function downloadSingleFile(course: any, fileName: string, fileUrl: string
       span.title = 'Baixado';
       btnElement.replaceWith(span);
 
-      alert(`Download concluído: ${fileName}`);
+      toast.success(`Download concluído: ${fileName}`);
     } else {
-      alert(`Erro no download: ${result.error}`);
+      toast.error(`Erro no download: ${result.error || 'Erro desconhecido'}`);
       btnElement.innerHTML = '❌';
       btnElement.classList.remove('spinning');
     }
   } catch (error: any) {
     console.error('Download error:', error);
-    alert('Erro ao baixar arquivo: ' + error.message);
+    toast.error('Erro ao baixar arquivo: ' + error.message);
     btnElement.innerHTML = '❌';
     btnElement.classList.remove('spinning');
   }
@@ -350,7 +352,7 @@ async function testDownloadAll(courseId: string) {
   try {
     const cachedData = localStorage.getItem('coursesWithFiles');
     if (!cachedData) {
-      alert('No cached data found');
+      toast.error('Dados não encontrados. Faça uma sincronização primeiro.');
       return;
     }
 
@@ -358,7 +360,7 @@ async function testDownloadAll(courseId: string) {
     const course = coursesWithFiles.find((c: any) => c.id === courseId);
 
     if (!course || !course.files || course.files.length === 0) {
-      alert('No files to download');
+      toast.info('Nenhum arquivo para baixar nesta disciplina.');
       return;
     }
 
@@ -386,18 +388,11 @@ async function testDownloadAll(courseId: string) {
     });
 
     if (result.success || result.downloaded > 0 || result.skipped > 0) {
-      let message = `Download finalizado!\n\n✅ ${result.downloaded} baixados\n⏩ ${result.skipped} pulados\n❌ ${result.failed} falharam`;
-
-      if (result.failed > 0 && result.results) {
-        const failedFiles = result.results
-          .filter((r: any) => r.status === 'failed')
-          .map((r: any) => r.fileName);
-        if (failedFiles.length > 0) {
-          message += `\n\nFalhas:\n- ${failedFiles.join('\n- ')}`;
-        }
+      if (result.failed === 0) {
+        toast.success(`Download concluído! ${result.downloaded} baixados, ${result.skipped} já existiam.`);
+      } else {
+        toast.error(`${result.downloaded} baixados, ${result.failed} falharam. Tente novamente mais tarde.`);
       }
-
-      alert(message);
 
       if (result.results) {
         result.results.forEach((r: any) => {
@@ -415,12 +410,12 @@ async function testDownloadAll(courseId: string) {
       fetchCourseFiles(courseId);
 
     } else {
-      alert('Falha no download: ' + (result.message || 'Erro desconhecido'));
+      toast.error('Falha no download: ' + (result.message || 'Erro desconhecido'));
       fetchCourseFiles(courseId);
     }
   } catch (error: any) {
     console.error('Download error:', error);
-    alert('Erro no processo de download: ' + error.message);
+    toast.error('Erro no processo de download: ' + error.message);
     fetchCourseFiles(courseId);
   }
 }
@@ -433,8 +428,18 @@ async function openNewsModal(courseId: string, courseName: string, newsId: strin
 
   if (!modal || !modalBody) return
 
-  // Show loading state initially
-  modalBody.innerHTML = '<div class="loading">Carregando detalhes da notícia...</div>'
+  // Only show the loading overlay if content isn't already cached
+  const preCheck = (() => {
+    try {
+      const d = localStorage.getItem('coursesWithFiles');
+      if (!d) return false;
+      const c = JSON.parse(d).find((x: any) => x.id === courseId);
+      return !!(c?.news?.find((n: any) => n.id === newsId)?.content);
+    } catch { return false; }
+  })();
+  if (!preCheck) {
+    modalBody.innerHTML = '<div class="loading">Carregando detalhes da notícia...</div>';
+  }
   modal.classList.add('active')
 
   // Close handler
