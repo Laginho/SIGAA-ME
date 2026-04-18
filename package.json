@@ -1,7 +1,7 @@
 {
   "name": "sigaa-me",
   "private": true,
-  "version": "1.0.1",
+  "version": "1.0.3",
   "description": "Desktop app for UFC's SIGAA",
   "author": "Bruno Lage",
   "license": "MIT",
@@ -13,7 +13,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build && electron-builder",
-    "publish": "tsc && vite build && electron-builder --publish always",
+    "release": "tsc && vite build && electron-builder --publish always",
     "preview": "vite preview",
     "test": "vitest run",
     "test:ui": "vitest --ui",
