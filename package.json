@@ -4,6 +4,11 @@
   "version": "1.0.1",
   "description": "Desktop app for UFC's SIGAA",
   "author": "Bruno Lage",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Laginho/SIGAA-ME.git"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",

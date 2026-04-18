@@ -288,6 +288,20 @@ app.whenReady().then(() => {
   }
 
   createWindow();
+  
+  // Update Management
+  autoUpdater.on('update-available', () => {
+    console.log('[Updater] Update available!');
+  });
+  autoUpdater.on('update-not-available', () => {
+    console.log('[Updater] App is up to date.');
+  });
+  autoUpdater.on('error', (err) => {
+    console.error('[Updater] Update error:', err);
+  });
+  autoUpdater.on('update-downloaded', () => {
+    console.log('[Updater] Update downloaded. Preparing to install...');
+  });
 
   autoUpdater.checkForUpdatesAndNotify().catch(err => {
     console.error('Failed to check for updates:', err);
