@@ -64,10 +64,10 @@ async function startSync(app: HTMLDivElement, mode: 'fast' | 'full') {
   const overlay = document.createElement('div');
   overlay.className = 'sync-progress-overlay';
   overlay.innerHTML = `
-    <div class="spinner-sword"></div>
-    <h2 class="overlay-title">Sincronizando...</h2>
+    <div class="spinner-sword" id="syncSpinner"></div>
+    <h2 class="overlay-title" id="overlayTitle">Sincronizando...</h2>
     <p id="progressStatus" class="overlay-status">Iniciando...</p>
-    
+
     <div class="progress-list">
       <div class="progress-bar-container">
         <div class="progress-bar-fill" id="progressBar"></div>
@@ -77,7 +77,7 @@ async function startSync(app: HTMLDivElement, mode: 'fast' | 'full') {
   `;
   app.appendChild(overlay);
 
-  // Helper to update progress
+  // Helper: update progress bar + labels
   const updateProgress = (pct: number, status: string, detail: string) => {
     const bar = document.getElementById('progressBar');
     const statusEl = document.getElementById('progressStatus');
@@ -85,6 +85,40 @@ async function startSync(app: HTMLDivElement, mode: 'fast' | 'full') {
     if (bar) bar.style.width = `${pct}%`;
     if (statusEl) statusEl.textContent = status;
     if (detailEl) detailEl.textContent = detail;
+  };
+
+  // Helper: replace spinner with an inline error state — no alert()
+  const showError = (message: string, savedCount: number) => {
+    const spinner = document.getElementById('syncSpinner');
+    const title = document.getElementById('overlayTitle');
+    const detailEl = document.getElementById('progressDetail');
+    const bar = document.getElementById('progressBar');
+
+    if (spinner) spinner.style.display = 'none';
+    if (title) { title.textContent = 'Sincronização interrompida'; title.style.color = '#ff5555'; }
+    if (bar) bar.style.background = '#ff5555';
+    if (detailEl) { detailEl.textContent = message; detailEl.style.color = '#ff5555'; }
+
+    const actions = document.createElement('div');
+    actions.className = 'sync-error-actions';
+    actions.innerHTML = `
+      <button id="retryBtn" class="btn-section-action btn-section-action--primary">🔄 Tentar novamente</button>
+      ${savedCount > 0
+        ? `<button id="dashboardBtn" class="btn-section-action btn-section-action--success">
+             📊 Dashboard (${savedCount} disciplina${savedCount !== 1 ? 's' : ''} salva${savedCount !== 1 ? 's' : ''})
+           </button>`
+        : ''}
+    `;
+
+    overlay.querySelector('.progress-list')?.after(actions);
+
+    document.getElementById('retryBtn')?.addEventListener('click', () => {
+      overlay.remove();
+      startSync(app, mode);
+    });
+    document.getElementById('dashboardBtn')?.addEventListener('click', () => {
+      window.location.hash = '#/dashboard';
+    });
   };
 
   try {
@@ -99,35 +133,32 @@ async function startSync(app: HTMLDivElement, mode: 'fast' | 'full') {
     const courses = result.courses;
     const coursesWithContent: any[] = [];
 
-    // Save user photo URL if available
+    // Persist photo URL if returned
     if (result.photoUrl) {
       const account = JSON.parse(sessionStorage.getItem('account') || '{}');
       account.photoUrl = result.photoUrl;
       sessionStorage.setItem('account', JSON.stringify(account));
-      // Also persist to localStorage for across sessions
       localStorage.setItem('userPhotoUrl', result.photoUrl);
-      console.log('Saved user photo URL:', result.photoUrl);
     }
 
     updateProgress(20, 'Disciplinas Encontradas', `${courses.length} disciplinas identificadas.`);
 
-    // 3. Loop through courses
+    // 3. Loop — save progressively so a crash never loses already-completed data
     for (let i = 0; i < courses.length; i++) {
       const course = courses[i];
-      const stepPct = 20 + ((i / courses.length) * (mode === 'fast' ? 70 : 40)); // Fast sync goes to 90%, Full sync structure goes to 60%
+      const stepPct = 20 + ((i / courses.length) * (mode === 'fast' ? 70 : 40));
 
-      updateProgress(stepPct, `Processando: ${course.name}`, 'Verificando arquivos e notícias...');
+      updateProgress(
+        stepPct,
+        `Processando: ${course.name}`,
+        `(${i + 1}/${courses.length}) Verificando arquivos e notícias...`
+      );
 
-      // Fetch files & news headers (Fast)
       const filesResult = await window.api.getCourseFiles(course.id, course.name);
-
       let news = filesResult.success ? (filesResult.news || []) : [];
 
-      // If Full Sync, fetch items content
       if (mode === 'full' && news.length > 0) {
         updateProgress(stepPct + 5, `Baixando Conteúdo: ${course.name}`, `Lendo ${news.length} notícias...`);
-
-        // We can use the loadAllNews API which fetches content for all items
         const contentResult = await window.api.loadAllNews(course.id, course.name);
         if (contentResult.success && contentResult.news) {
           news = contentResult.news;
@@ -137,36 +168,23 @@ async function startSync(app: HTMLDivElement, mode: 'fast' | 'full') {
       coursesWithContent.push({
         ...course,
         files: filesResult.success ? filesResult.files : [],
-        news: news,
+        news,
         fileCount: filesResult.success ? filesResult.files?.length || 0 : 0
       });
+
+      // ✅ Write after every course: partial data always survives a crash
+      localStorage.setItem('coursesWithFiles', JSON.stringify(coursesWithContent));
+      localStorage.setItem('cacheTimestamp', Date.now().toString());
     }
 
-    updateProgress(100, 'Finalizado', 'Salvando dados...');
-
-    // 4. Save to Cache
-    localStorage.setItem('coursesWithFiles', JSON.stringify(coursesWithContent));
-    localStorage.setItem('cacheTimestamp', Date.now().toString());
-
-    // 5. Redirect to Dashboard
-    // We navigate to dashboard hash which naturally loads from cache
-    setTimeout(() => {
-      window.location.hash = '#/dashboard';
-      // Force a re-render if we are already "technically" on dashboard route (though we are actually on sync screen)
-      // But since we are creating a new route #/sync-selection, hash change will handle it.
-    }, 500);
+    updateProgress(100, 'Finalizado!', `${courses.length} disciplinas sincronizadas.`);
+    setTimeout(() => { window.location.hash = '#/dashboard'; }, 600);
 
   } catch (error: any) {
     console.error('Sync failed:', error);
-    const detailEl = document.getElementById('progressDetail');
-    if (detailEl) {
-      detailEl.textContent = `Erro: ${error.message}`;
-      detailEl.style.color = '#ff5555';
-    }
-    // Allow user to click back or similar? For now just stuck on error or reload.
-    setTimeout(() => {
-      overlay.remove();
-      alert(`Erro na sincronização: ${error.message}`);
-    }, 2000);
+    const savedSoFar = (() => {
+      try { return JSON.parse(localStorage.getItem('coursesWithFiles') || '[]').length; } catch { return 0; }
+    })();
+    showError(`Erro: ${error.message}`, savedSoFar);
   }
 }
