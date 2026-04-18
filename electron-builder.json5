@@ -53,6 +53,7 @@
   "publish": {
     "provider": "github",
     "owner": "Laginho",
-    "repo": "SIGAA-ME"
+    "repo": "SIGAA-ME",
+    "releaseType": "release"
   }
 }
