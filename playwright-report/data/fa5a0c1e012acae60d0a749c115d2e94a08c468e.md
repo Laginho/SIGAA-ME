@@ -6,45 +6,16 @@
 
 # Test info
 
-- Name: app.spec.ts >> App E2E >> shows the loading page, then login page
-- Location: tests\e2e\app.spec.ts:40:5
+- Name: app.spec.ts >> App E2E >> validates empty login inputs
+- Location: tests\e2e\app.spec.ts:54:5
 
 # Error details
 
 ```
-Error: expect(locator).toBeVisible() failed
-
-Locator: locator('#loginBtn')
-Expected: visible
-Timeout: 10000ms
-Error: element(s) not found
-
+Error: page.click: Target page, context or browser has been closed
 Call log:
-  - Expect "toBeVisible" with timeout 10000ms
   - waiting for locator('#loginBtn')
 
-```
-
-# Page snapshot
-
-```yaml
-- generic [ref=e4]:
-  - img "UFC Logo" [ref=e5]
-  - heading "SIGAA-ME" [level=1] [ref=e6]
-  - paragraph [ref=e7]: Para não depender de um app feito em Java.
-  - generic [ref=e8]:
-    - generic [ref=e9]:
-      - generic [ref=e10]: Usuário
-      - textbox "Usuário" [ref=e11]:
-        - /placeholder: Digite seu usuário
-    - generic [ref=e12]:
-      - generic [ref=e13]: Senha
-      - textbox "Senha" [ref=e14]:
-        - /placeholder: Digite sua senha
-    - generic [ref=e15]:
-      - checkbox "Lembrai de mim" [ref=e16] [cursor=pointer]
-      - generic [ref=e17] [cursor=pointer]: Lembrai de mim
-    - button "Entrar" [ref=e18] [cursor=pointer]
 ```
 
 # Test source
@@ -100,13 +71,13 @@ Call log:
   48  |         // Verify inputs exist
   49  |         await expect(window.locator('#username')).toBeVisible();
   50  |         await expect(window.locator('#password')).toBeVisible();
-> 51  |         await expect(window.locator('#loginBtn')).toBeVisible();
-      |                                                   ^ Error: expect(locator).toBeVisible() failed
+  51  |         await expect(window.locator('#loginBtn')).toBeVisible();
   52  |     });
   53  | 
   54  |     test('validates empty login inputs', async () => {
   55  |         await window.waitForSelector('h1.login-title');
-  56  |         await window.click('#loginBtn');
+> 56  |         await window.click('#loginBtn');
+      |                      ^ Error: page.click: Target page, context or browser has been closed
   57  |         
   58  |         // The toast should appear with an error or validation message
   59  |         // In our app, there is no HTML5 explicit check, it just fails or shows error message

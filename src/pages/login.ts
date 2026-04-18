@@ -5,7 +5,7 @@ export function renderLoginPage(app: HTMLDivElement) {
   app.innerHTML = `
     <div class="login-container">
       <div class="login-card">
-        <img src="./ufc-logo.png" alt="UFC Logo" class="login-logo" style="background: transparent;">
+        <img src="${import.meta.env.BASE_URL}ufc-logo.png" alt="UFC Logo" class="login-logo" style="background: transparent;">
         <h1 class="login-title">SIGAA-ME</h1>
         <p class="login-subtitle">Para não depender de um app feito em Java.</p>
         
@@ -25,7 +25,7 @@ export function renderLoginPage(app: HTMLDivElement) {
             <label for="rememberMe" class="form-label-checkbox">Lembrai de mim</label>
           </div>
 
-          <button type="submit" class="btn-primary">Entrar</button>
+          <button type="submit" id="loginBtn" class="btn-primary">Entrar</button>
         </form>
       </div>
     </div>
@@ -47,7 +47,10 @@ export function renderLoginPage(app: HTMLDivElement) {
     const password = passwordInput.value;
     const rememberMe = rememberMeInput.checked;
 
-    if (!username || !password) return;
+    if (!username || !password) {
+      toast.error('Por favor, preencha usuário e senha.');
+      return;
+    }
 
     // Disable button and show loading state
     if (submitButton) {
