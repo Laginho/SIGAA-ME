@@ -300,11 +300,19 @@ async function fetchCourseFiles(courseId: string) {
 
 async function downloadSingleFile(course: any, fileName: string, fileUrl: string, btnElement: HTMLElement, script?: string) {
   try {
-    const folderResult = await window.api.selectDownloadFolder();
-    if (!folderResult.success) {
-      btnElement.innerHTML = '⬇️';
-      btnElement.classList.remove('spinning');
-      return;
+    const settings = await window.api.getSettings();
+    let folderPath = settings.lastDownloadPath;
+
+    if (!folderPath) {
+      const folderResult = await window.api.selectDownloadFolder();
+      if (!folderResult.success) {
+        btnElement.innerHTML = '⬇️';
+        btnElement.classList.remove('spinning');
+        return;
+      }
+      folderPath = folderResult.folderPath;
+      // Save for next time
+      await window.api.updateSetting('lastDownloadPath', folderPath);
     }
 
     const downloadedFiles = JSON.parse(localStorage.getItem('downloadedFiles') || '{}');
@@ -314,7 +322,7 @@ async function downloadSingleFile(course: any, fileName: string, fileUrl: string
       courseName: course.name,
       fileName: fileName,
       fileUrl: fileUrl,
-      basePath: folderResult.folderPath,
+      basePath: folderPath,
       downloadedFiles,
       script
     });
@@ -365,14 +373,26 @@ async function testDownloadAll(courseId: string) {
       return;
     }
 
-    const folderResult = await window.api.selectDownloadFolder();
-    if (!folderResult.success) {
-      return;
+    const buttons = document.querySelectorAll('.btn-download-file');
+    const settings = await window.api.getSettings();
+    let folderPath = settings.lastDownloadPath;
+
+    if (!folderPath) {
+      const folderResult = await window.api.selectDownloadFolder();
+      if (!folderResult.success) {
+        buttons.forEach(b => {
+          b.innerHTML = '⬇️';
+          b.classList.remove('spinning');
+        });
+        return;
+      }
+      folderPath = folderResult.folderPath;
+      // Save for next time
+      await window.api.updateSetting('lastDownloadPath', folderPath);
     }
 
-    console.log('Download folder selected:', folderResult.folderPath);
+    console.log('Download folder selected:', folderPath);
 
-    const buttons = document.querySelectorAll('.btn-download-file');
     buttons.forEach(b => {
       b.innerHTML = '🔄';
       b.classList.add('spinning');
@@ -384,7 +404,7 @@ async function testDownloadAll(courseId: string) {
       courseId: course.id,
       courseName: course.name,
       files: course.files,
-      basePath: folderResult.folderPath,
+      basePath: folderPath,
       downloadedFiles
     });
 
