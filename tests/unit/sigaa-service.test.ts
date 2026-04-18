@@ -195,5 +195,4 @@ describe('SigaaService (Unit)', () => {
             expect(mockHttp.downloadFile).toHaveBeenCalledTimes(2);
             expect(result.success).toBe(false);
         });
-    });
 });

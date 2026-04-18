@@ -3,6 +3,7 @@ import * as cheerio from 'cheerio';
 import * as fs from 'fs';
 import * as path from 'path';
 import { app } from 'electron';
+import mime from 'mime-types';
 
 interface Cookie {
     name: string;
@@ -878,29 +879,25 @@ export class HttpScraperService {
                 }
             }
 
-            // 2. If no extension, try to infer from Content-Type
+            // 2. If no extension, infer from Content-Type using mime-types
             if (!detectedExtension && !path.extname(finalFileName)) {
-                const contentTypeMap: Record<string, string> = {
-                    'application/pdf': '.pdf',
-                    'application/msword': '.doc',
-                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
-                    'application/vnd.ms-excel': '.xls',
-                    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
-                    'application/vnd.ms-powerpoint': '.ppt',
-                    'application/vnd.openxmlformats-officedocument.presentationml.presentation': '.pptx',
-                    'application/zip': '.zip',
-                    'application/x-rar-compressed': '.rar',
-                    'image/png': '.png',
-                    'image/jpeg': '.jpg',
-                    'text/plain': '.txt'
-                };
-
                 const contentTypeBase = contentType?.split(';')[0]?.trim();
-                if (contentTypeBase && contentTypeMap[contentTypeBase]) {
-                    detectedExtension = contentTypeMap[contentTypeBase];
-                    finalFileName = finalFileName + detectedExtension;
-                    this.log(`[HttpScraper] Added extension ${detectedExtension} to filename based on Content-Type`);
+                if (contentTypeBase) {
+                    const mimeExt = mime.extension(contentTypeBase);
+                    if (mimeExt && mimeExt !== 'bin') {
+                        detectedExtension = '.' + mimeExt;
+                    }
                 }
+                
+                // 3. Ultimate Fallback: if it's application/octet-stream with NO extension, assume it's a PDF.
+                // SIGAA notoriously returns PDFs as octet-streams without extensions.
+                if (!detectedExtension) {
+                    detectedExtension = '.pdf';
+                    this.log('[HttpScraper] Ultimate fallback: Assigned .pdf since extension is unknown');
+                }
+
+                finalFileName = finalFileName + detectedExtension;
+                this.log(`[HttpScraper] Added extension ${detectedExtension} to filename`);
             }
 
             const filePath = path.join(basePath, finalFileName);
