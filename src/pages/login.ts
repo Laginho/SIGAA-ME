@@ -1,5 +1,5 @@
 import '../styles/login.css';
-import { showToast } from '../components/toast';
+import { toast } from '../components/toast';
 
 export function renderLoginPage(app: HTMLDivElement) {
   app.innerHTML = `
@@ -65,11 +65,11 @@ export function renderLoginPage(app: HTMLDivElement) {
         // Navigate to dashboard using hash
         window.location.hash = '#/dashboard';
       } else {
-        showToast(`Erro ao entrar: ${result.message}`, 'error');
+        toast.error(`Erro ao entrar: ${result.message}`);
       }
     } catch (error) {
       console.error(error);
-      showToast('Erro inesperado ao tentar entrar.', 'error');
+      toast.error('Erro inesperado ao tentar entrar.');
     } finally {
       if (submitButton) {
         submitButton.disabled = false;
