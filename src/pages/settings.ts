@@ -51,7 +51,7 @@ export async function renderSettingsPage(container: HTMLDivElement) {
           <div class="about-info">
             <p><strong>SIGAA-ME</strong></p>
             <p>Para não depender de um app feito em Java.</p>
-            <p>Versão: 1.0.3</p>
+            <p>Versão: 1.0.4</p>
           </div>
         </section>
       </div>
