@@ -2,9 +2,9 @@ import '../styles/settings.css';
 import { toast } from '../components/toast';
 
 export async function renderSettingsPage(container: HTMLDivElement) {
-    const settings = await window.api.getSettings();
+  const settings = await window.api.getSettings();
 
-    container.innerHTML = `
+  container.innerHTML = `
     <div class="settings-page">
       <header class="settings-header">
         <a href="#/dashboard" class="back-link">← Voltar</a>
@@ -38,9 +38,9 @@ export async function renderSettingsPage(container: HTMLDivElement) {
               <span class="setting-description">Caminho padrão: ${settings.lastDownloadPath || 'Sempre perguntar'}</span>
             </div>
             <div class="setting-control">
-              ${settings.lastDownloadPath 
-                ? '<button id="clearDownloadsBtn" class="btn-danger-outline">Limpar Padrão</button>'
-                : '<span class="about-info">Sempre pergunta</span>'}
+              ${settings.lastDownloadPath
+      ? '<button id="clearDownloadsBtn" class="btn-danger-outline">Limpar Padrão</button>'
+      : '<span class="about-info">Sempre pergunta</span>'}
             </div>
           </div>
         </section>
@@ -50,33 +50,33 @@ export async function renderSettingsPage(container: HTMLDivElement) {
           <h2>Sobre</h2>
           <div class="about-info">
             <p><strong>SIGAA-ME</strong></p>
-            <p>Versão: 1.0.1-beta (Polish Phase)</p>
-            <p>Desenvolvido para facilitar o acesso acadêmico.</p>
+            <p>Para não depender de um app feito em Java.</p>
+            <p>Versão: 1.0.1</p>
           </div>
         </section>
       </div>
     </div>
   `;
 
-    // Theme Toggle Logic
-    const themeToggle = document.getElementById('themeToggle') as HTMLInputElement;
-    themeToggle?.addEventListener('change', async (e) => {
-        const isDark = (e.target as HTMLInputElement).checked;
-        const newTheme = isDark ? 'dark' : 'light';
-        
-        // Update main process
-        await window.api.updateSetting('theme', newTheme);
-        
-        // Apply instantly
-        document.documentElement.setAttribute('data-theme', newTheme);
-        toast.info(`Tema ${newTheme === 'dark' ? 'escuro' : 'claro'} aplicado.`);
-    });
+  // Theme Toggle Logic
+  const themeToggle = document.getElementById('themeToggle') as HTMLInputElement;
+  themeToggle?.addEventListener('change', async (e) => {
+    const isDark = (e.target as HTMLInputElement).checked;
+    const newTheme = isDark ? 'dark' : 'light';
 
-    // Clear Downloads Logic
-    const clearDownloadsBtn = document.getElementById('clearDownloadsBtn');
-    clearDownloadsBtn?.addEventListener('click', async () => {
-        await window.api.updateSetting('lastDownloadPath', null);
-        toast.success('Preferência de download limpa. Perguntará novamente no próximo download.');
-        renderSettingsPage(container); // Re-render to update UI
-    });
+    // Update main process
+    await window.api.updateSetting('theme', newTheme);
+
+    // Apply instantly
+    document.documentElement.setAttribute('data-theme', newTheme);
+    toast.info(`Tema ${newTheme === 'dark' ? 'escuro' : 'claro'} aplicado.`);
+  });
+
+  // Clear Downloads Logic
+  const clearDownloadsBtn = document.getElementById('clearDownloadsBtn');
+  clearDownloadsBtn?.addEventListener('click', async () => {
+    await window.api.updateSetting('lastDownloadPath', null);
+    toast.success('Preferência de download limpa. Perguntará novamente no próximo download.');
+    renderSettingsPage(container); // Re-render to update UI
+  });
 }
