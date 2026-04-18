@@ -1,10 +1,11 @@
 import '../styles/login.css';
+import { showToast } from '../components/toast';
 
 export function renderLoginPage(app: HTMLDivElement) {
   app.innerHTML = `
     <div class="login-container">
       <div class="login-card">
-        <img src="/ufc-logo.png" alt="UFC Logo" class="login-logo" style="background: transparent;">
+        <img src="./ufc-logo.png" alt="UFC Logo" class="login-logo" style="background: transparent;">
         <h1 class="login-title">SIGAA-ME</h1>
         <p class="login-subtitle">Para não depender de um app feito em Java.</p>
         
@@ -64,11 +65,11 @@ export function renderLoginPage(app: HTMLDivElement) {
         // Navigate to dashboard using hash
         window.location.hash = '#/dashboard';
       } else {
-        alert(`Erro ao entrar: ${result.message}`);
+        showToast(`Erro ao entrar: ${result.message}`, 'error');
       }
     } catch (error) {
       console.error(error);
-      alert('Erro inesperado ao tentar entrar.');
+      showToast('Erro inesperado ao tentar entrar.', 'error');
     } finally {
       if (submitButton) {
         submitButton.disabled = false;
