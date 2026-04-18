@@ -242,6 +242,22 @@ ipcMain.handle('clear-all-data', async () => {
   }
 });
 
+let isQuitting = false;
+
+app.on('before-quit', async (e) => {
+  if (!isQuitting) {
+    e.preventDefault();
+    console.log('App is closing. Cleaning up background processes...');
+    isQuitting = true;
+    try {
+      await sigaaService.logout();
+    } catch (err) {
+      console.error('Cleanup error:', err);
+    }
+    app.quit();
+  }
+});
+
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
