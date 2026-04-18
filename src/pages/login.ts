@@ -12,12 +12,12 @@ export function renderLoginPage(app: HTMLDivElement) {
         <form class="login-form" id="loginForm">
           <div class="form-group">
             <label for="username" class="form-label">Usuário</label>
-            <input type="text" id="username" class="form-input" placeholder="Digite seu usuário" required>
+            <input type="text" id="username" class="form-input" placeholder="Digite seu usuário">
           </div>
           
           <div class="form-group">
             <label for="password" class="form-label">Senha</label>
-            <input type="password" id="password" class="form-input" placeholder="Digite sua senha" required>
+            <input type="password" id="password" class="form-input" placeholder="Digite sua senha">
           </div>
 
           <div class="form-group checkbox-group">
