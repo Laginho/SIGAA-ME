@@ -5,7 +5,7 @@
  * Tests that the sync flow:
  *   1. Saves course data to localStorage progressively (after each course)
  *   2. Shows an inline error overlay (not alert()) when sync fails
- *   3. Offers a "Tentar novamente" retry button on failure
+ *   3. Offers a "Tentar novamente" retry button on failureñ
  *   4. Offers a "Dashboard" button when partial data was already saved
  *
  * Uses a mocked window.api to simulate success, partial failure, and full failure.
@@ -112,7 +112,7 @@ describe('Sync: error state', () => {
     it('shows the progress overlay when sync starts', () => {
         const app = buildApp();
         renderSyncSelectionPage(app);
-        (window as any).api.getCourses = vi.fn().mockReturnValue(new Promise(() => {})); // never resolves
+        (window as any).api.getCourses = vi.fn().mockReturnValue(new Promise(() => { })); // never resolves
         document.getElementById('btnFastSync')?.click();
         expect(app.querySelector('.sync-progress-overlay')).not.toBeNull();
     });
@@ -122,7 +122,7 @@ describe('Sync: error state', () => {
         renderSyncSelectionPage(app);
         (window as any).api.getCourses = vi.fn().mockRejectedValue(new Error('Timeout'));
 
-        const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+        const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => { });
         document.getElementById('btnFastSync')?.click();
         for (let i = 0; i < 10; i++) await flushAll();
 
