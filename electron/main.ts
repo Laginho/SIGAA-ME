@@ -317,6 +317,17 @@ app.whenReady().then(() => {
   });
   autoUpdater.on('update-downloaded', () => {
     console.log('[Updater] Update downloaded. Preparing to install...');
+    dialog.showMessageBox({
+      type: 'info',
+      title: 'Atualização Disponível',
+      message: 'Uma nova versão do SIGAA-ME foi baixada. O aplicativo será reiniciado para instalar a atualização.',
+      buttons: ['Reiniciar e Instalar', 'Mais Tarde']
+    }).then(result => {
+      if (result.response === 0) {
+        // Force the app to quit and install using our graceful before-quit logic
+        autoUpdater.quitAndInstall();
+      }
+    });
   });
 
   autoUpdater.checkForUpdatesAndNotify().catch(err => {
