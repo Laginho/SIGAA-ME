@@ -15,11 +15,22 @@ test.describe('App E2E', () => {
     let window: Page;
 
     test.beforeAll(async () => {
-        // Build electron app to ensure dist-electron and dist are ready
-        // (Assuming the user runs `npm run build` or we test against the dev build)
-        // For local tests, connecting to `.` picks up the package.json "main"
-        electronApp = await electron.launch({ args: ['.'] });
+        // Use a temporary user-data-dir so tests don't share your real app session/cache
+        const testUserDataDir = path.resolve(process.cwd(), '.test-user-data');
+        electronApp = await electron.launch({ 
+            args: ['.', `--user-data-dir=${testUserDataDir}`] 
+        });
         window = await electronApp.firstWindow();
+        window.on('console', msg => console.log('RENDERER:', msg.type(), msg.text()));
+        window.on('pageerror', err => console.log('RENDERER EXCEPTION:', err.message));
+        
+        // Force clean slate for this test suite
+        await window.waitForLoadState('domcontentloaded');
+        await window.evaluate(() => {
+            localStorage.clear();
+            sessionStorage.clear();
+        });
+        await window.reload();
     });
 
     test.afterAll(async () => {
@@ -27,11 +38,13 @@ test.describe('App E2E', () => {
     });
 
     test('shows the loading page, then login page', async () => {
-        // App defaults to '#/loading' or starts checking session.
-        // Even if checking session fails, it should land on '#/login'
-        await window.waitForURL(/.*#\/login/);
+        // Since hash-based routing in Electron can sometimes elude waitForURL, rely on the DOM
+        console.log('Current URL start:', window.url());
         
-        const loginTitle = await window.locator('h2.login-title');
+        await window.screenshot({ path: 'test_error.png' });
+        
+        await window.waitForSelector('h2.login-title', { timeout: 10000 });
+        const loginTitle = window.locator('h2.login-title');
         await expect(loginTitle).toContainText('SIGAA M.E.');
 
         // Verify inputs exist
@@ -41,7 +54,7 @@ test.describe('App E2E', () => {
     });
 
     test('validates empty login inputs', async () => {
-        await window.waitForURL(/.*#\/login/);
+        await window.waitForSelector('h2.login-title');
         await window.click('#loginBtn');
         
         // The toast should appear with an error or validation message
@@ -57,8 +70,19 @@ describeOrSkip('App E2E (With Credentials)', () => {
     let window: Page;
 
     test.beforeAll(async () => {
-        electronApp = await electron.launch({ args: ['.'] });
+        const testUserDataDir = path.resolve(process.cwd(), '.test-user-data-auth');
+        electronApp = await electron.launch({ 
+            args: ['.', `--user-data-dir=${testUserDataDir}`] 
+        });
         window = await electronApp.firstWindow();
+        
+        // Force clean slate for this test suite too
+        await window.waitForLoadState('domcontentloaded');
+        await window.evaluate(() => {
+            localStorage.clear();
+            sessionStorage.clear();
+        });
+        await window.reload();
     });
 
     test.afterAll(async () => {
@@ -71,7 +95,7 @@ describeOrSkip('App E2E (With Credentials)', () => {
     });
 
     test('can log in and see dashboard', async () => {
-        await window.waitForURL(/.*#\/login/);
+        await window.waitForSelector('h2.login-title');
         
         // Fill credentials
         await window.fill('#username', SIGAA_USER!);
@@ -79,7 +103,7 @@ describeOrSkip('App E2E (With Credentials)', () => {
         await window.click('#loginBtn');
 
         // It should navigate to sync-selection eventually
-        await window.waitForURL(/.*#\/sync-selection/, { timeout: 30000 });
+        await window.waitForSelector('.sync-title', { timeout: 30000 });
         
         const title = window.locator('.sync-title');
         await expect(title).toContainText('Selecione o Modo de Sincronização');
