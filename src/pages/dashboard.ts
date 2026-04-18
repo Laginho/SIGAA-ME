@@ -1,5 +1,6 @@
 import '../styles/dashboard.css';
 import { toast } from '../components/toast';
+import { formatSyncLabel } from '../utils/ui-helpers';
 
 interface UserAccount {
   name: string;
@@ -130,25 +131,7 @@ function loadCoursesFromCache() {
       displayCourses(coursesWithFiles, coursesListElement);
 
       if (cacheTimestamp && syncStatus) {
-        const cacheDate = new Date(parseInt(cacheTimestamp));
-        const now = new Date();
-        const diffMs = now.getTime() - cacheDate.getTime();
-        const diffMin = Math.floor(diffMs / 60000);
-
-        let label: string;
-        if (diffMin < 1) {
-          label = 'agora mesmo';
-        } else if (diffMin < 60) {
-          label = `há ${diffMin} min`;
-        } else if (cacheDate.toDateString() === now.toDateString()) {
-          label = `hoje às ${cacheDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-        } else {
-          const day = cacheDate.getDate().toString().padStart(2, '0');
-          const month = (cacheDate.getMonth() + 1).toString().padStart(2, '0');
-          label = `${day}/${month} às ${cacheDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-        }
-
-        syncStatus.textContent = `Último sync: ${label}`;
+        syncStatus.textContent = `Último sync: ${formatSyncLabel(parseInt(cacheTimestamp))}`;
         syncStatus.className = 'sync-status';
       }
     } else {

@@ -1,5 +1,6 @@
 import '../styles/course-detail.css'
 import { toast } from '../components/toast'
+import { isNewsCached } from '../utils/ui-helpers'
 
 export function renderCourseDetailPage(container: HTMLDivElement, courseId: string) {
   container.innerHTML = `
@@ -428,16 +429,8 @@ async function openNewsModal(courseId: string, courseName: string, newsId: strin
 
   if (!modal || !modalBody) return
 
-  // Only show the loading overlay if content isn't already cached
-  const preCheck = (() => {
-    try {
-      const d = localStorage.getItem('coursesWithFiles');
-      if (!d) return false;
-      const c = JSON.parse(d).find((x: any) => x.id === courseId);
-      return !!(c?.news?.find((n: any) => n.id === newsId)?.content);
-    } catch { return false; }
-  })();
-  if (!preCheck) {
+  // Only show the loading spinner if content isn't already cached
+  if (!isNewsCached(courseId, newsId)) {
     modalBody.innerHTML = '<div class="loading">Carregando detalhes da notícia...</div>';
   }
   modal.classList.add('active')

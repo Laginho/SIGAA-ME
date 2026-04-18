@@ -2,16 +2,22 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
     test: {
-        // Look for tests in the tests/ directory
         include: ['tests/**/*.test.ts'],
-        // Don't import Electron — mock it
-        environment: 'node',
-        // Load .env for integration tests
+        globals: true,
+        testTimeout: 30000,
         env: {
             NODE_ENV: 'test'
         },
-        // Give longer timeout for live scraping tests
-        testTimeout: 30000,
-        globals: true,
+        // Per-file environment override using the @vitest-environment docblock.
+        // Default is node (for electron/service tests).
+        // Renderer tests use: // @vitest-environment jsdom
+        environment: 'node',
+        environmentOptions: {
+            jsdom: {
+                url: 'http://localhost',
+            }
+        },
+        // Treat CSS imports as no-ops so renderer modules can be imported in tests
+        css: false,
     },
 });
