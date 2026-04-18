@@ -12,9 +12,18 @@
 # Error details
 
 ```
-TimeoutError: page.waitForSelector: Timeout 10000ms exceeded.
+Error: expect(locator).toContainText(expected) failed
+
+Locator: locator('h1.login-title')
+Expected substring: "SIGAA M.E."
+Received string:    "SIGAA-ME"
+Timeout: 10000ms
+
 Call log:
-  - waiting for locator('h2.login-title') to be visible
+  - Expect "toContainText" with timeout 10000ms
+  - waiting for locator('h1.login-title')
+    14 × locator resolved to <h1 class="login-title">SIGAA-ME</h1>
+       - unexpected value "SIGAA-ME"
 
 ```
 
@@ -86,74 +95,72 @@ Call log:
   41  |         // Since hash-based routing in Electron can sometimes elude waitForURL, rely on the DOM
   42  |         console.log('Current URL start:', window.url());
   43  |         
-  44  |         await window.screenshot({ path: 'test_error.png' });
-  45  |         
-> 46  |         await window.waitForSelector('h2.login-title', { timeout: 10000 });
-      |                      ^ TimeoutError: page.waitForSelector: Timeout 10000ms exceeded.
-  47  |         const loginTitle = window.locator('h2.login-title');
-  48  |         await expect(loginTitle).toContainText('SIGAA M.E.');
-  49  | 
-  50  |         // Verify inputs exist
-  51  |         await expect(window.locator('#username')).toBeVisible();
-  52  |         await expect(window.locator('#password')).toBeVisible();
-  53  |         await expect(window.locator('#loginBtn')).toBeVisible();
-  54  |     });
-  55  | 
-  56  |     test('validates empty login inputs', async () => {
-  57  |         await window.waitForSelector('h2.login-title');
-  58  |         await window.click('#loginBtn');
-  59  |         
-  60  |         // The toast should appear with an error or validation message
-  61  |         // In our app, there is no HTML5 explicit check, it just fails or shows error message
-  62  |         // if empty. Wait, the login.ts might just do `if (!user) { showError() }`
-  63  |         const errorToast = window.locator('.toast--error');
-  64  |         await expect(errorToast).toBeVisible();
-  65  |     });
-  66  | });
-  67  | 
-  68  | describeOrSkip('App E2E (With Credentials)', () => {
-  69  |     let electronApp: ElectronApplication;
-  70  |     let window: Page;
-  71  | 
-  72  |     test.beforeAll(async () => {
-  73  |         const testUserDataDir = path.resolve(process.cwd(), '.test-user-data-auth');
-  74  |         electronApp = await electron.launch({ 
-  75  |             args: ['.', `--user-data-dir=${testUserDataDir}`] 
-  76  |         });
-  77  |         window = await electronApp.firstWindow();
-  78  |         
-  79  |         // Force clean slate for this test suite too
-  80  |         await window.waitForLoadState('domcontentloaded');
-  81  |         await window.evaluate(() => {
-  82  |             localStorage.clear();
-  83  |             sessionStorage.clear();
-  84  |         });
-  85  |         await window.reload();
-  86  |     });
-  87  | 
-  88  |     test.afterAll(async () => {
-  89  |         // Clean up mock storage used inside E2E to not pollute real session
-  90  |         await window.evaluate(() => {
-  91  |             localStorage.clear();
-  92  |             sessionStorage.clear();
-  93  |         });
-  94  |         await electronApp.close();
-  95  |     });
-  96  | 
-  97  |     test('can log in and see dashboard', async () => {
-  98  |         await window.waitForSelector('h2.login-title');
-  99  |         
-  100 |         // Fill credentials
-  101 |         await window.fill('#username', SIGAA_USER!);
-  102 |         await window.fill('#password', SIGAA_PASS!);
-  103 |         await window.click('#loginBtn');
-  104 | 
-  105 |         // It should navigate to sync-selection eventually
-  106 |         await window.waitForSelector('.sync-title', { timeout: 30000 });
-  107 |         
-  108 |         const title = window.locator('.sync-title');
-  109 |         await expect(title).toContainText('Selecione o Modo de Sincronização');
-  110 |     });
-  111 | });
-  112 | 
+  44  |         await window.waitForSelector('h1.login-title', { timeout: 10000 });
+  45  |         const loginTitle = window.locator('h1.login-title');
+> 46  |         await expect(loginTitle).toContainText('SIGAA M.E.');
+      |                                  ^ Error: expect(locator).toContainText(expected) failed
+  47  | 
+  48  |         // Verify inputs exist
+  49  |         await expect(window.locator('#username')).toBeVisible();
+  50  |         await expect(window.locator('#password')).toBeVisible();
+  51  |         await expect(window.locator('#loginBtn')).toBeVisible();
+  52  |     });
+  53  | 
+  54  |     test('validates empty login inputs', async () => {
+  55  |         await window.waitForSelector('h1.login-title');
+  56  |         await window.click('#loginBtn');
+  57  |         
+  58  |         // The toast should appear with an error or validation message
+  59  |         // In our app, there is no HTML5 explicit check, it just fails or shows error message
+  60  |         // if empty. Wait, the login.ts might just do `if (!user) { showError() }`
+  61  |         const errorToast = window.locator('.toast--error');
+  62  |         await expect(errorToast).toBeVisible();
+  63  |     });
+  64  | });
+  65  | 
+  66  | describeOrSkip('App E2E (With Credentials)', () => {
+  67  |     let electronApp: ElectronApplication;
+  68  |     let window: Page;
+  69  | 
+  70  |     test.beforeAll(async () => {
+  71  |         const testUserDataDir = path.resolve(process.cwd(), '.test-user-data-auth');
+  72  |         electronApp = await electron.launch({ 
+  73  |             args: ['.', `--user-data-dir=${testUserDataDir}`] 
+  74  |         });
+  75  |         window = await electronApp.firstWindow();
+  76  |         
+  77  |         // Force clean slate for this test suite too
+  78  |         await window.waitForLoadState('domcontentloaded');
+  79  |         await window.evaluate(() => {
+  80  |             localStorage.clear();
+  81  |             sessionStorage.clear();
+  82  |         });
+  83  |         await window.reload();
+  84  |     });
+  85  | 
+  86  |     test.afterAll(async () => {
+  87  |         // Clean up mock storage used inside E2E to not pollute real session
+  88  |         await window.evaluate(() => {
+  89  |             localStorage.clear();
+  90  |             sessionStorage.clear();
+  91  |         });
+  92  |         await electronApp.close();
+  93  |     });
+  94  | 
+  95  |     test('can log in and see dashboard', async () => {
+  96  |         await window.waitForSelector('h1.login-title');
+  97  |         
+  98  |         // Fill credentials
+  99  |         await window.fill('#username', SIGAA_USER!);
+  100 |         await window.fill('#password', SIGAA_PASS!);
+  101 |         await window.click('#loginBtn');
+  102 | 
+  103 |         // It should navigate to sync-selection eventually
+  104 |         await window.waitForSelector('.sync-title', { timeout: 30000 });
+  105 |         
+  106 |         const title = window.locator('.sync-title');
+  107 |         await expect(title).toContainText('Selecione o Modo de Sincronização');
+  108 |     });
+  109 | });
+  110 | 
 ```

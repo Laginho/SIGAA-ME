@@ -41,11 +41,9 @@ test.describe('App E2E', () => {
         // Since hash-based routing in Electron can sometimes elude waitForURL, rely on the DOM
         console.log('Current URL start:', window.url());
         
-        await window.screenshot({ path: 'test_error.png' });
-        
-        await window.waitForSelector('h2.login-title', { timeout: 10000 });
-        const loginTitle = window.locator('h2.login-title');
-        await expect(loginTitle).toContainText('SIGAA M.E.');
+        await window.waitForSelector('h1.login-title', { timeout: 10000 });
+        const loginTitle = window.locator('h1.login-title');
+        await expect(loginTitle).toContainText('SIGAA-ME');
 
         // Verify inputs exist
         await expect(window.locator('#username')).toBeVisible();
@@ -54,7 +52,7 @@ test.describe('App E2E', () => {
     });
 
     test('validates empty login inputs', async () => {
-        await window.waitForSelector('h2.login-title');
+        await window.waitForSelector('h1.login-title');
         await window.click('#loginBtn');
         
         // The toast should appear with an error or validation message
@@ -95,7 +93,7 @@ describeOrSkip('App E2E (With Credentials)', () => {
     });
 
     test('can log in and see dashboard', async () => {
-        await window.waitForSelector('h2.login-title');
+        await window.waitForSelector('h1.login-title');
         
         // Fill credentials
         await window.fill('#username', SIGAA_USER!);
