@@ -7,10 +7,9 @@
     justify-content: center;
     width: 100%;
     height: 100vh;
-    background: #f0f2f5;
-    background-image: radial-gradient(circle at center, #ffffff 0%, #e6e9f0 100%);
-    color: #333;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: var(--color-background);
+    color: var(--color-text-main);
+    font-family: var(--font-family);
     animation: fadeIn 0.8s ease-in-out;
 }
 
@@ -35,14 +34,14 @@
     font-size: 2.5rem;
     font-weight: 300;
     letter-spacing: 2px;
-    columns: #1a1a1a;
+    color: var(--color-text-main);
     text-transform: uppercase;
     text-shadow: none;
 }
 
 .sync-subtitle {
     font-size: 1.1rem;
-    color: #666;
+    color: var(--color-text-muted);
     margin-top: 0.5rem;
     font-weight: 400;
 }
@@ -58,10 +57,9 @@
 }
 
 .sync-card {
-    background: #ffffff;
-    border: 1px solid #e1e4e8;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
     border-radius: 8px;
-    /* Slightly more rounded for light theme */
     width: 300px;
     height: 450px;
     padding: 2rem 1.5rem;
@@ -73,7 +71,7 @@
     transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     position: relative;
     overflow: hidden;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05), 0 10px 15px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-md);
 }
 
 .sync-card:not(.disabled):hover {
@@ -143,7 +141,8 @@
    User asked for Light Theme, so let's do a Light Overlay.
 */
 .sync-progress-overlay {
-    background: rgba(255, 255, 255, 0.95);
+    background: var(--color-background);
+    opacity: 0.98;
     position: absolute;
     top: 0;
     left: 0;
@@ -169,14 +168,14 @@
 }
 
 .overlay-title {
-    color: #333;
+    color: var(--color-text-main);
     margin-bottom: 0.5rem;
     font-size: 1.5rem;
     font-weight: 600;
 }
 
 .overlay-status {
-    color: #666;
+    color: var(--color-text-muted);
     margin-bottom: 2rem;
     font-size: 1rem;
 }
@@ -185,11 +184,11 @@
     margin-top: 2rem;
     width: 80%;
     max-width: 400px;
-    background: #f9f9f9;
+    background: var(--color-surface);
     border-radius: 4px;
     overflow: hidden;
-    border: 1px solid #ddd;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+    border: 1px solid var(--color-border);
+    box-shadow: var(--shadow-sm);
 }
 
 .progress-bar-container {

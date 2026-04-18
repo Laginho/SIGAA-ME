@@ -5,11 +5,11 @@ import fs from 'node:fs'
 import { SigaaService } from './services/sigaa.service'
 import { autoUpdater } from 'electron-updater'
 import { execSync } from 'child_process'
+import { persistenceService } from './services/persistence.service'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // ===== FILE LOGGER SETUP =====
-// Use userData path (writable in production) instead of __dirname (inside app.asar)
 const logsDir = path.join(app.getPath('userData'), 'logs');
 if (!fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir, { recursive: true });
@@ -50,19 +50,8 @@ console.log('=== SIGAA-ME App Started ===');
 console.log(`Log file: ${logFilePath}`);
 // ===== END FILE LOGGER SETUP =====
 
-
-// The built directory structure
-//
-// ├─┬─┬ dist
-// │ │ └── index.html
-// │ │
-// │ ├─┬ dist-electron
-// │ │ ├── main.js
-// │ │ └── preload.mjs
-// │
 process.env.APP_ROOT = path.join(__dirname, '..')
 
-// 🚧 Use ['ENV_NAME'] avoid vite:define plugin - Vite@2.x
 export const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
 export const MAIN_DIST = path.join(process.env.APP_ROOT, 'dist-electron')
 export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
@@ -80,7 +69,6 @@ function createWindow() {
     },
   })
 
-  // Test active push message to Renderer-process.
   win.webContents.on('did-finish-load', () => {
     win?.webContents.send('main-process-message', (new Date).toLocaleString())
   })
@@ -88,7 +76,6 @@ function createWindow() {
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL)
   } else {
-    // win.loadFile('dist/index.html')
     win.loadFile(path.join(RENDERER_DIST, 'index.html'))
   }
 }
@@ -148,7 +135,6 @@ ipcMain.handle('get-course-files', async (_, { courseId, courseName }) => {
   return await sigaaService.getCourseFiles(courseId, courseName);
 })
 
-// Download folder selection
 ipcMain.handle('select-download-folder', async () => {
   const result = await dialog.showOpenDialog(win!, {
     properties: ['openDirectory', 'createDirectory'],
@@ -162,7 +148,6 @@ ipcMain.handle('select-download-folder', async () => {
   return { success: true, folderPath: result.filePaths[0] };
 })
 
-// Download single file
 ipcMain.handle('download-file', async (_, data: {
   courseId: string;
   courseName: string;
@@ -183,7 +168,6 @@ ipcMain.handle('download-file', async (_, data: {
   );
 })
 
-// Download all files for a course
 ipcMain.handle('download-all-files', async (_, data: {
   courseId: string;
   courseName: string;
@@ -205,7 +189,6 @@ ipcMain.handle('download-all-files', async (_, data: {
   );
 })
 
-// Check if files exist
 ipcMain.handle('check-files-existence', async (_, filePaths: string[]) => {
   return filePaths.map(filePath => ({
     path: filePath,
@@ -213,31 +196,31 @@ ipcMain.handle('check-files-existence', async (_, filePaths: string[]) => {
   }));
 })
 
-// Get news detail
 ipcMain.handle('get-news-detail', async (_, { courseId, courseName, newsId }) => {
-  console.log(`[IPC] get-news-detail called: courseId=${courseId}, courseName=${courseName}, newsId=${newsId}`);
-  const result = await sigaaService.getNewsDetail(courseId, courseName, newsId);
-  console.log(`[IPC] get-news-detail result:`, result.success, result.message || '');
-  return result;
+  return await sigaaService.getNewsDetail(courseId, courseName, newsId);
 })
-
 
 ipcMain.handle('load-all-news', async (_, courseId: string, courseName: string) => {
   return await sigaaService.loadAllNews(courseId, courseName);
 });
 
-// Logout - delete credentials and close Playwright session
+// App Settings Handlers
+ipcMain.handle('get-app-settings', async () => {
+  return persistenceService.getSettings();
+});
+
+ipcMain.handle('update-app-setting', async (_, { key, value }) => {
+  persistenceService.updateSetting(key, value);
+  return { success: true };
+});
+
 ipcMain.handle('logout', async () => {
   console.log('Logout: Clearing credentials and closing session...');
   try {
-    // Delete saved credentials
     if (fs.existsSync(CREDENTIALS_PATH)) {
       fs.unlinkSync(CREDENTIALS_PATH);
-      console.log('Logout: Credentials file deleted');
     }
-    // Close Playwright session
     await sigaaService.logout();
-    console.log('Logout: Session closed');
     return { success: true };
   } catch (error: any) {
     console.error('Logout error:', error);
@@ -245,18 +228,13 @@ ipcMain.handle('logout', async () => {
   }
 });
 
-// Clear all data - same as logout but intended for "wipe data" action
 ipcMain.handle('clear-all-data', async () => {
   console.log('Clear all data: Clearing credentials and closing session...');
   try {
-    // Delete saved credentials
     if (fs.existsSync(CREDENTIALS_PATH)) {
       fs.unlinkSync(CREDENTIALS_PATH);
-      console.log('Clear all data: Credentials file deleted');
     }
-    // Close Playwright session
     await sigaaService.logout();
-    console.log('Clear all data: Session closed');
     return { success: true };
   } catch (error: any) {
     console.error('Clear all data error:', error);
@@ -264,9 +242,6 @@ ipcMain.handle('clear-all-data', async () => {
   }
 });
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
@@ -275,15 +250,12 @@ app.on('window-all-closed', () => {
 })
 
 app.on('activate', () => {
-  // On OS X it's common to re-create a window in the app when the
-  // dock icon is clicked and there are no other windows open.
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow()
   }
 })
 
 app.whenReady().then(() => {
-  // Check if Chrome is installed
   try {
     let chromeExists = false;
     if (process.platform === 'win32') {
@@ -317,7 +289,6 @@ app.whenReady().then(() => {
 
   createWindow();
 
-  // Set up auto-updater
   autoUpdater.checkForUpdatesAndNotify().catch(err => {
     console.error('Failed to check for updates:', err);
   });

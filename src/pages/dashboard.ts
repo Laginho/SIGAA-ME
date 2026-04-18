@@ -42,6 +42,7 @@ export function renderDashboardPage(app: HTMLDivElement, account: UserAccount) {
         <div class="header-actions">
           <span id="syncStatus" class="sync-status"></span>
           <button id="refreshBtn" class="btn-refresh" title="Sincronizar">🔄</button>
+          <button id="settingsBtn" class="btn-settings" title="Configurações">⚙️</button>
           <button id="clearDataBtn" class="btn-clear-data" title="Limpar todos os dados locais">🗑️</button>
           <button id="logoutBtn" class="btn-logout">Sair</button>
         </div>
@@ -57,6 +58,11 @@ export function renderDashboardPage(app: HTMLDivElement, account: UserAccount) {
       </main>
     </div>
   `;
+
+  // Settings handler
+  document.getElementById('settingsBtn')?.addEventListener('click', () => {
+    window.location.hash = '#/settings';
+  });
 
   // Logout handler - clears credentials and session, but keeps cached data
   document.getElementById('logoutBtn')?.addEventListener('click', async () => {

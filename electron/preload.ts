@@ -41,5 +41,9 @@ contextBridge.exposeInMainWorld('api', {
 
   // Session Management
   logout: () => ipcRenderer.invoke('logout'),
-  clearAllData: () => ipcRenderer.invoke('clear-all-data')
+  clearAllData: () => ipcRenderer.invoke('clear-all-data'),
+
+  // App Settings
+  getSettings: () => ipcRenderer.invoke('get-app-settings'),
+  updateSetting: (key: string, value: any) => ipcRenderer.invoke('update-app-setting', { key, value })
 })

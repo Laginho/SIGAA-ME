@@ -15,6 +15,8 @@ interface Window {
         loadAllNews: (courseId: string, courseName: string) => Promise<any>;
         logout: () => Promise<any>;
         clearAllData: () => Promise<any>;
+        getSettings: () => Promise<any>;
+        updateSetting: (key: string, value: any) => Promise<any>;
     };
     ipcRenderer: any;
 }

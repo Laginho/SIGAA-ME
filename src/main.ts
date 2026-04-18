@@ -4,6 +4,7 @@ import { renderDashboardPage } from './pages/dashboard'
 import { renderCourseDetailPage } from './pages/course-detail'
 import { renderLoadingPage } from './pages/loading'
 import { renderSyncSelectionPage } from './pages/sync-selection'
+import { renderSettingsPage } from './pages/settings'
 
 const app = document.querySelector<HTMLDivElement>('#app')!
 
@@ -33,6 +34,8 @@ function route() {
     }
   } else if (hash === '#/sync-selection') {
     renderSyncSelectionPage(app)
+  } else if (hash === '#/settings') {
+    renderSettingsPage(app)
   } else {
     renderLoginPage(app)
   }
@@ -40,6 +43,11 @@ function route() {
 
 // Listen for hash changes
 window.addEventListener('hashchange', route)
+
+// Initial theme application
+window.api.getSettings().then((settings: any) => {
+  document.documentElement.setAttribute('data-theme', settings.theme);
+});
 
 // Initial route
 if (!window.location.hash || window.location.hash === '#/login') {
