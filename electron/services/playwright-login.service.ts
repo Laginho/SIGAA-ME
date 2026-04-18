@@ -881,14 +881,31 @@ export class PlaywrightLoginService {
                     return false;
                 }, newsId);
             }
+            
+            // Session Timeout Recovery Strategy:
+            // If the element wasn't found, the JSF session might have expired in the background 
+            // while keeping the 'ava/index.jsf' URL. We must force a refresh/re-entry.
+            if (!found) {
+                console.log(`Playwright: News ID ${newsId} not found. Session may have expired. Forcing course re-entry...`);
+                await this.enterCourseAndGetHTML(courseId, courseName);
+                
+                // Try finding it one more time
+                const retryNewsForm = await page.$(formSelector);
+                if (retryNewsForm) {
+                    console.log(`Playwright: Found form after forcing course refresh!`);
+                    const linkInForm = await retryNewsForm.$('a');
+                    if (linkInForm) {
+                        await linkInForm.click();
+                        found = true;
+                    }
+                }
+            }
 
             if (!found) {
-                if (!app.isPackaged) {
                     const html = await page.content();
-                    const debugPath = path.join(app.getPath('userData'), `debug_playwright_news_fail_${newsId}.html`);
-                    fs.writeFileSync(debugPath, html);
-                    console.log(`Playwright: Saved debug HTML to ${debugPath}`);
-                }
+                const debugPath = path.join(app.getPath('userData'), `debug_playwright_news_fail_${newsId}.html`);
+                fs.writeFileSync(debugPath, html);
+                console.log(`Playwright: Saved debug HTML to ${debugPath}`);
                 return { success: false, error: `News link with ID ${newsId} not found` };
             }
 
@@ -898,13 +915,11 @@ export class PlaywrightLoginService {
             await page.waitForLoadState('networkidle');
             await page.waitForTimeout(1000);
 
-            // DEBUG: Save news detail page HTML (dev only)
-            if (!app.isPackaged) {
-                const newsDetailHtml = await page.content();
-                const debugNewsPath = path.join(app.getPath('userData'), `debug_news_detail_${newsId}.html`);
-                fs.writeFileSync(debugNewsPath, newsDetailHtml);
-                console.log(`Playwright: Saved news detail page to ${debugNewsPath}`);
-            }
+            // DEBUG: Save news detail page HTML universally
+            const newsDetailHtml = await page.content();
+            const debugNewsPath = path.join(app.getPath('userData'), `debug_news_detail_${newsId}.html`);
+            fs.writeFileSync(debugNewsPath, newsDetailHtml);
+            console.log(`Playwright: Saved news detail page to ${debugNewsPath}`);
 
             // 4. Parse the news content
             const newsData = await page.evaluate(() => {
