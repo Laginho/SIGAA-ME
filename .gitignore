@@ -50,3 +50,8 @@ verification_output*.txt
 
 # Test output
 coverage/
+test-results/
+playwright-report/
+.test-user-data/
+.test-user-data-auth/
+test_error.png
