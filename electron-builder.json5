@@ -54,6 +54,6 @@
     "provider": "github",
     "owner": "Laginho",
     "repo": "SIGAA-ME",
-    "releaseType": "release"
+    "releaseType": "draft"
   }
 }

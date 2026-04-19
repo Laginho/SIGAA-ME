@@ -1,7 +1,7 @@
 {
   "name": "sigaa-me",
   "private": true,
-  "version": "1.0.7",
+  "version": "1.0.9",
   "description": "Desktop app for UFC's SIGAA",
   "author": "Bruno Lage",
   "license": "MIT",
@@ -14,8 +14,9 @@
     "dev": "vite",
     "build": "tsc && vite build && electron-builder",
     "release": "tsc && vite build && electron-builder --win --publish always",
-    "preview": "npm run build && start .\\release\\1.0.6\\win-unpacked\\SIGAA-ME.exe",
-    "test": "vitest run",
+    "release:patch": "standard-version --release-as patch && git push --follow-tags origin HEAD",
+    "release:minor": "standard-version --release-as minor && git push --follow-tags origin HEAD",
+    "preview": "npm run build && start .\\release\\1.0.7\\win-unpacked\\SIGAA-ME.exe",
     "test:ui": "vitest --ui",
     "test:watch": "vitest",
     "test:e2e": "tsc && vite build && playwright test"
@@ -29,6 +30,7 @@
     "electron": "^30.0.1",
     "electron-builder": "^24.13.3",
     "jsdom": "^29.0.2",
+    "standard-version": "^9.5.0",
     "typescript": "^5.2.2",
     "vite": "^5.1.6",
     "vite-plugin-electron": "^0.28.6",
