@@ -1,6 +1,7 @@
 import { Browser, Page } from 'playwright';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as mime from 'mime-types';
 
 export class DownloadService {
     constructor(_browser: Browser | null) {
@@ -42,6 +43,20 @@ export class DownloadService {
             console.log(`DownloadService: Script provided: ${!!script}`);
             if (script) console.log(`DownloadService: Script content (start): ${script.substring(0, 50)}...`);
 
+            // Intercept the response to detect the REAL Content-Type from the server.
+            // JSF redirectors often serve PDFs but the "suggestedFilename" from the browser
+            // says ".html" because the redirect response header is text/html.
+            let detectedContentType: string | null = null;
+            await page.route('**/*', async (route) => {
+                const response = await route.fetch();
+                const ct = response.headers()['content-type'] || '';
+                // Capture the type if it's a document, not a page resource
+                if (ct && !ct.includes('text/html') && !ct.includes('javascript') && !ct.includes('css') && !ct.includes('image/')) {
+                    detectedContentType = ct.split(';')[0].trim();
+                }
+                await route.fulfill({ response });
+            });
+
             // Setup listeners
             const downloadPromise = page.waitForEvent('download', { timeout: 60000 });
             const popupPromise = page.waitForEvent('popup', { timeout: 60000 });
@@ -80,13 +95,23 @@ export class DownloadService {
             if (result.type === 'download') {
                 const download = result.data;
                 let finalPath = filePath;
-                // Add extension if missing and we can guess it
-                const suggestedFilename = download.suggestedFilename();
-                const ext = path.extname(suggestedFilename);
+
+                // Priority: Content-Type from intercept > suggestedFilename from browser
+                let ext = '';
+                if (detectedContentType) {
+                    const mimeExt = mime.extension(detectedContentType);
+                    ext = mimeExt ? '.' + mimeExt : '';
+                    console.log(`Extension from Content-Type (${detectedContentType}): '${ext}'`);
+                }
+                if (!ext) {
+                    ext = path.extname(download.suggestedFilename());
+                    console.log(`Extension from suggestedFilename: '${ext}'`);
+                }
                 if (ext && !path.extname(finalPath)) {
                     finalPath += ext;
                 }
 
+                await page.unroute('**/*');
                 await download.saveAs(finalPath);
                 console.log(`Downloaded: ${finalPath}`);
                 return { success: true, filePath: finalPath };
