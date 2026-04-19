@@ -864,41 +864,56 @@ export class HttpScraperService {
             }
 
             // Determine filename and ensure it has an extension
+            // We PRORITIZE the `fileName` passed from the UI (e.g. "LISTA 1") because SIGAA often 
+            // sends mangled course names in the Content-Disposition header (like "ANA&#769...").
             let finalFileName = fileName;
             let detectedExtension = '';
 
-            // 1. Try to get filename from Content-Disposition header
+            // 1. Try to get the EXTENSION from Content-Disposition header
             const contentDisposition = response.headers['content-disposition'];
             if (contentDisposition) {
                 const filenameMatch = contentDisposition.match(/filename\*?=['"]?(?:UTF-8'')?([^'";\n]+)['"]?/i);
                 if (filenameMatch) {
                     const dispositionFilename = decodeURIComponent(filenameMatch[1].trim());
-                    // Use the filename from header - it usually has the correct extension
-                    finalFileName = dispositionFilename;
-                    detectedExtension = path.extname(dispositionFilename).toLowerCase();
+                    this.log(`[HttpScraper] Server suggested filename: "${dispositionFilename}"`);
+                    
+                    // Only extract the extension, DON'T overwrite the clean UI filename
+                    const extMatch = path.extname(dispositionFilename).toLowerCase();
+                    if (extMatch && extMatch.length > 1) {
+                        detectedExtension = extMatch;
+                        this.log(`[HttpScraper] Extracted extension from header: ${detectedExtension}`);
+                    }
                 }
             }
 
-            // 2. If no extension, infer from Content-Type using mime-types
+            // 2. If no extension from header, infer from Content-Type using mime-types
             if (!detectedExtension && !path.extname(finalFileName)) {
                 const contentTypeBase = contentType?.split(';')[0]?.trim();
                 if (contentTypeBase) {
                     const mimeExt = mime.extension(contentTypeBase);
                     if (mimeExt && mimeExt !== 'bin') {
                         detectedExtension = '.' + mimeExt;
+                        this.log(`[HttpScraper] Extracted extension from mime-type: ${detectedExtension}`);
                     }
                 }
                 
                 // 3. Ultimate Fallback: if it's application/octet-stream with NO extension, assume it's a PDF.
-                // SIGAA notoriously returns PDFs as octet-streams without extensions.
                 if (!detectedExtension) {
                     detectedExtension = '.pdf';
                     this.log('[HttpScraper] Ultimate fallback: Assigned .pdf since extension is unknown');
                 }
-
-                finalFileName = finalFileName + detectedExtension;
-                this.log(`[HttpScraper] Added extension ${detectedExtension} to filename`);
             }
+
+            // Apply the requested extension if the filename doesn't already have it
+            if (detectedExtension && !finalFileName.toLowerCase().endsWith(detectedExtension)) {
+                finalFileName = finalFileName + detectedExtension;
+                this.log(`[HttpScraper] Appended extension. Final filename: ${finalFileName}`);
+            }
+
+            // Sanitize the final filename to remove ANY illegal windows characters
+            // (in case the UI filename itself had bad characters)
+            finalFileName = finalFileName.replace(/[<>:"/\\|?*\x00-\x1F]/g, '_').trim();
+
 
             const filePath = path.join(basePath, finalFileName);
             const writer = fs.createWriteStream(filePath);

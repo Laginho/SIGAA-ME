@@ -596,57 +596,60 @@ export class PlaywrightLoginService {
         try {
             logger.info('Playwright: Navigating to Files Section (Materiais > Conteúdo)...');
 
-            // Find "Conteúdo" in the menu
-            // We use 'text=Conteúdo' but scoped to .itemMenu for precision
-            const success = await page.evaluate(async () => {
-                const menuItems = Array.from(document.querySelectorAll('.itemMenu'));
-                const contentItem = menuItems.find(item => item.textContent?.trim() === 'Conteúdo');
-                if (contentItem) {
-                    const link = contentItem.closest('a');
-                    if (link) {
-                        link.click();
-                        return true;
-                    }
+            // 1. First, check if Materiais accordion is closed and needs opening
+            const materiaisMenu = page.locator('.itemMenuHeaderMateriais').first();
+            if (await materiaisMenu.isVisible().catch(() => false)) {
+                // Check if the accordion content is visible yet
+                const contentContainer = materiaisMenu.locator('xpath=following-sibling::div').first();
+                if (!(await contentContainer.isVisible().catch(() => false))) {
+                    logger.info('Playwright: Opening Materiais accordion...');
+                    await materiaisMenu.click();
+                    await page.waitForTimeout(500); // Wait for open animation
                 }
-                return false;
-            });
-
-            if (!success) {
-                // Try clicking "Materiais" first if it's an accordion
-                logger.info('Playwright: "Conteúdo" not found directly, checking "Materiais"...');
-                const materiaisVisible = await page.isVisible('text=Materiais');
-                if (materiaisVisible) {
-                    await page.click('text=Materiais');
+            } else {
+                // Maybe it's a direct text 'Materiais'
+                const fallbackMateriais = page.locator('text=Materiais').first();
+                if (await fallbackMateriais.isVisible().catch(() => false)) {
+                    await fallbackMateriais.click();
                     await page.waitForTimeout(500);
-                    // Try finding Conteúdo again
-                    const successRetry = await page.evaluate(async () => {
-                        const menuItems = Array.from(document.querySelectorAll('.itemMenu'));
-                        const contentItem = menuItems.find(item => item.textContent?.trim() === 'Conteúdo');
-                        if (contentItem) {
-                            const link = contentItem.closest('a');
-                            if (link) {
-                                link.click();
-                                return true;
-                            }
-                        }
-                        return false;
-                    });
-                    if (!successRetry) {
-                        throw new Error('Could not find "Conteúdo" link even after expanding Materiais');
-                    }
-                } else {
-                    throw new Error('Could not find "Conteúdo" link');
                 }
             }
 
-            // Wait for load
-            await page.waitForLoadState('networkidle');
-            await page.waitForTimeout(2000); // Wait for JSF update
+            // 2. Use native Playwright locators with regex to bypass encoding issues
+            // This natively simulates a real mouse click which ensures JSF form submission triggers correctly
+            logger.info('Playwright: Looking for Conteúdo link...');
+            const conteudoLocator = page.locator('a, .itemMenu').filter({ hasText: /Conte.do/i }).first();
+            
+            if (await conteudoLocator.isVisible().catch(() => false)) {
+                logger.info('Playwright: Found Conteúdo link, clicking natively...');
+                await conteudoLocator.click();
+            } else {
+                logger.warn('Playwright: Could not find Conteúdo link via locators!');
+                // Log page state for debugging
+                const allMenuText = await page.locator('.itemMenu, a').allTextContents();
+                logger.warn(`Playwright: Available text contents: (truncated) ${allMenuText.join(', ').substring(0, 300)}`);
+                return { success: false, error: 'Conteúdo link not found' };
+            }
 
-            return {
-                success: true,
-                html: await page.content()
-            };
+            // 3. JSF uses AJAX partial updates. networkidle fires too early.
+            // Wait for the file download links to appear.
+            logger.info('Playwright: Waiting for files content to render...');
+            try {
+                await page.waitForFunction(() => {
+                    const links = document.querySelectorAll('a[onclick*="jsfcljs"][onclick*=",id,"]');
+                    return links.length > 0;
+                }, { timeout: 8000 });
+                logger.info('Playwright: Files content detected (found jsfcljs links).');
+            } catch {
+                logger.warn('Playwright: Timeout waiting for jsfcljs links. Falling back to 4s wait.');
+                await page.waitForTimeout(4000);
+            }
+
+            const html = await page.content();
+            const title = html.match(/<title>(.*?)<\/title>/i)?.[1] || 'unknown';
+            logger.info(`Playwright: Captured files page HTML. Title: "${title}", Length: ${html.length}`);
+
+            return { success: true, html };
 
         } catch (error: any) {
             logger.error('Playwright: Error navigating to Files Section:', error);
@@ -712,50 +715,111 @@ export class PlaywrightLoginService {
         _downloadedFiles: Record<string, any>,
         script?: string
     ): Promise<{ success: boolean; filePath?: string; error?: string }> {
-        let localBrowser: Browser | null = null;
-        try {
-            const { DownloadService } = await import('./download.service');
+        let maxRetries = 1;
+        let attempt = 0;
 
-            // Launch a dedicated browser for this download to avoid concurrency issues
-            localBrowser = await chromium.launch({ channel: 'chrome', headless: false });
-            const downloadService = new DownloadService(localBrowser);
+        while (attempt <= maxRetries) {
+            let localBrowser: Browser | null = null;
+            try {
+                const { DownloadService } = await import('./download.service');
 
-            const context = await localBrowser.newContext();
-            // Inject stored cookies
-            if (this.storedCookies.length > 0) {
-                await context.addCookies(this.storedCookies);
-            }
+                // Launch a dedicated browser for this download to avoid concurrency issues
+                localBrowser = await chromium.launch({ channel: 'chrome', headless: false });
+                const downloadService = new DownloadService(localBrowser);
 
-            const page = await context.newPage();
+                const context = await localBrowser.newContext();
+                // Inject stored cookies
+                if (this.storedCookies.length > 0) {
+                    await context.addCookies(this.storedCookies);
+                }
 
-            // Navigate to course page first
-            const navigated = await this.navigateToCourse(page, courseId);
-            if (!navigated) {
+                const page = await context.newPage();
+
+                // If this is a retry due to session timeout, we must force a fresh entry to the course
+                if (attempt > 0) {
+                    console.log(`Playwright: Single download retry attempt ${attempt}. Forcing course re-entry...`);
+                    const enterResult = await this.enterCourseAndGetHTML(courseId, courseName);
+                    if (!enterResult.success) {
+                        await localBrowser.close();
+                        throw new Error('Could not re-enter course for single download retry.');
+                    }
+                    const freshCookies = await this.context!.cookies();
+                    await context.addCookies(freshCookies);
+                }
+
+                // Navigate to course page first
+                const navigated = await this.navigateToCourse(page, courseId);
+                if (!navigated) {
+                    await localBrowser.close();
+                    return { success: false, error: 'Failed to navigate to course page' };
+                }
+
+                // CRITICAL: Navigate to the files/materials section (Materiais > Conteúdo)
+                // The AVA homepage (ava/index.jsf) does NOT contain the file download links!
+                // They live in the "Conteúdo" sub-page accessible via the sidebar menu.
+                console.log('Playwright: Navigating to files section (Conteúdo)...');
+                const filesNavSuccess = await page.evaluate(async () => {
+                    const menuItems = Array.from(document.querySelectorAll('.itemMenu'));
+                    const contentItem = menuItems.find(item => item.textContent?.trim() === 'Conteúdo');
+                    if (contentItem) {
+                        const link = contentItem.closest('a');
+                        if (link) { link.click(); return true; }
+                    }
+                    return false;
+                });
+
+                if (!filesNavSuccess) {
+                    // Try clicking "Materiais" first if it's an accordion
+                    console.log('Playwright: "Conteúdo" not found directly, trying "Materiais" accordion...');
+                    const materiaisVisible = await page.isVisible('text=Materiais');
+                    if (materiaisVisible) {
+                        await page.click('text=Materiais');
+                        await page.waitForTimeout(500);
+                        await page.evaluate(() => {
+                            const menuItems = Array.from(document.querySelectorAll('.itemMenu'));
+                            const contentItem = menuItems.find(item => item.textContent?.trim() === 'Conteúdo');
+                            if (contentItem) {
+                                const link = contentItem.closest('a');
+                                if (link) { link.click(); return true; }
+                            }
+                            return false;
+                        });
+                    }
+                }
+
+                await page.waitForLoadState('networkidle');
+                await page.waitForTimeout(2000); // Wait for JSF to settle
+
+                console.log(`Playwright: Now on files page. Downloading file ${fileName} `);
+                console.log(`Playwright: Script present: ${!!script} `);
+
+                const result = await downloadService.downloadFile(
+                    page,
+                    fileUrl,
+                    fileName,
+                    courseName,
+                    basePath,
+                    script
+                );
+
                 await localBrowser.close();
-                return { success: false, error: 'Failed to navigate to course page' };
+                return result;
+            } catch (error: any) {
+                if (localBrowser) {
+                    await localBrowser.close();
+                }
+
+                if (error.message === 'JSF_SESSION_EXPIRED' && attempt < maxRetries) {
+                    console.log(`Playwright: Session expired during single download. Restarting...`);
+                    attempt++;
+                    continue;
+                }
+
+                console.error('Playwright: Download error:', error);
+                return { success: false, error: error.message };
             }
-
-            console.log(`Playwright: Downloading file ${fileName} `);
-            console.log(`Playwright: Script present: ${!!script} `);
-
-            const result = await downloadService.downloadFile(
-                page,
-                fileUrl,
-                fileName,
-                courseName,
-                basePath,
-                script
-            );
-
-            await localBrowser.close();
-            return result;
-        } catch (error: any) {
-            console.error('Playwright: Download error:', error);
-            if (localBrowser) {
-                await localBrowser.close();
-            }
-            return { success: false, error: error.message };
         }
+        return { success: false, error: 'Maximum retries reached for single download' };
     }
 
     async downloadAllFiles(
@@ -812,6 +876,39 @@ export class PlaywrightLoginService {
                     await localBrowser.close();
                     return { downloaded: 0, skipped: 0, failed: files.length, results: [] };
                 }
+
+                // CRITICAL: Navigate to the files/materials section (Materiais > Conteúdo)
+                console.log('Playwright: Navigating to files section for batch download...');
+                const batchFilesNavSuccess = await page.evaluate(async () => {
+                    const menuItems = Array.from(document.querySelectorAll('.itemMenu'));
+                    const contentItem = menuItems.find(item => item.textContent?.trim() === 'Conteúdo');
+                    if (contentItem) {
+                        const link = contentItem.closest('a');
+                        if (link) { link.click(); return true; }
+                    }
+                    return false;
+                });
+
+                if (!batchFilesNavSuccess) {
+                    console.log('Playwright: "Conteúdo" not found directly, trying "Materiais" accordion...');
+                    const materiaisVisible = await page.isVisible('text=Materiais');
+                    if (materiaisVisible) {
+                        await page.click('text=Materiais');
+                        await page.waitForTimeout(500);
+                        await page.evaluate(() => {
+                            const menuItems = Array.from(document.querySelectorAll('.itemMenu'));
+                            const contentItem = menuItems.find(item => item.textContent?.trim() === 'Conteúdo');
+                            if (contentItem) {
+                                const link = contentItem.closest('a');
+                                if (link) { link.click(); return true; }
+                            }
+                            return false;
+                        });
+                    }
+                }
+
+                await page.waitForLoadState('networkidle');
+                await page.waitForTimeout(2000);
 
                 const result = await downloadService.downloadCourseFiles(
                     page,
