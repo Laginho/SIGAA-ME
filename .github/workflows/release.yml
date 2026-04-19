@@ -1,6 +1,7 @@
 name: Release SIGAA-ME
 
 on:
+  workflow_dispatch:
   push:
     tags:
       - 'v*.*.*' # Trigger on tags like v1.0.0
