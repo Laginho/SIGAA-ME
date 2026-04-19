@@ -33,8 +33,7 @@
           "x64"
         ]
       }
-    ],
-    "signAndEditExecutable": false
+    ]
   },
   "nsis": {
     "artifactName": "${productName}-Windows-${version}-Setup.${ext}",
