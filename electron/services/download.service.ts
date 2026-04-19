@@ -101,12 +101,18 @@ export class DownloadService {
                 if (detectedContentType) {
                     const mimeExt = mime.extension(detectedContentType);
                     ext = mimeExt ? '.' + mimeExt : '';
-                    console.log(`Extension from Content-Type (${detectedContentType}): '${ext}'`);
                 }
+                
                 if (!ext) {
                     ext = path.extname(download.suggestedFilename());
-                    console.log(`Extension from suggestedFilename: '${ext}'`);
                 }
+
+                // JSF redirects often cause the browser to suggest .html. Since most materials
+                // without explicit extensions are PDFs, we safely force .pdf in these cases.
+                if (ext === '.html' || ext === '.htm') {
+                    ext = '.pdf';
+                }
+
                 if (ext && !path.extname(finalPath)) {
                     finalPath += ext;
                 }
@@ -124,7 +130,12 @@ export class DownloadService {
                     const popupDownload = await popup.waitForEvent('download', { timeout: 10000 });
                     let finalPath = filePath;
                     const suggestedFilename = popupDownload.suggestedFilename();
-                    const ext = path.extname(suggestedFilename);
+                    let ext = path.extname(suggestedFilename);
+                    
+                    if (ext === '.html' || ext === '.htm') {
+                        ext = '.pdf';
+                    }
+
                     if (ext && !path.extname(finalPath)) {
                         finalPath += ext;
                     }
