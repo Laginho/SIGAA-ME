@@ -184,6 +184,12 @@ export class SigaaService {
                 logger.info('SIGAA: Navigating to Files Section for download state...');
                 const filesNavResult = await this.playwrightLogin.navigateToFilesSection();
 
+                logger.info(`SIGAA: filesNavResult.success=${filesNavResult.success}, hasHtml=${!!filesNavResult.html}, htmlLength=${filesNavResult.html?.length || 0}, error=${filesNavResult.error || 'none'}`);
+                if (filesNavResult.html) {
+                    const titleMatch = filesNavResult.html.match(/<title>(.*?)<\/title>/i);
+                    logger.info(`SIGAA: filesNavResult page title: "${titleMatch?.[1] || 'unknown'}"`);
+                }
+
                 if (filesNavResult.success && filesNavResult.html) {
                     logger.info('SIGAA: Files Section loaded. Parsing fresh scripts...');
                     parseResult = await this.httpScraper.getCourseFiles(courseId, courseName, filesNavResult.html);

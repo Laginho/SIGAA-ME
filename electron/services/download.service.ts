@@ -24,15 +24,34 @@ export class DownloadService {
 
             const filePath = path.join(courseFolder, this.sanitizeFileName(fileName));
 
-            // Check if file already exists (exact match)
-            if (fs.existsSync(filePath)) {
-                console.log(`File already exists: ${filePath}`);
-                return { success: true, filePath };
-            }
-            // Check if file exists with .pdf extension
-            if (fs.existsSync(filePath + '.pdf')) {
-                console.log(`File already exists: ${filePath}.pdf`);
-                return { success: true, filePath: filePath + '.pdf' };
+            let existingFileToUse = '';
+
+            const checkAndClearCorruptFile = (p: string) => {
+                if (fs.existsSync(p)) {
+                    try {
+                        const stats = fs.statSync(p);
+                        if (stats.size < 50000) {
+                            const content = fs.readFileSync(p, 'utf8');
+                            if (content.toLowerCase().includes('<!doctype html>') || content.toLowerCase().includes('<html') || content.toLowerCase().includes('<script') || content.toLowerCase().includes('sigaa')) {
+                                console.log(`Discovered corrupted 1 KB HTML cache file at ${p}. Deleting and forcing fresh download.`);
+                                fs.unlinkSync(p);
+                                return false;
+                            }
+                        }
+                    } catch (e) {
+                        console.error(`Error inspecting existing file at ${p}:`, e);
+                    }
+                    return true;
+                }
+                return false;
+            };
+
+            if (checkAndClearCorruptFile(filePath)) existingFileToUse = filePath;
+            else if (checkAndClearCorruptFile(filePath + '.pdf')) existingFileToUse = filePath + '.pdf';
+
+            if (existingFileToUse) {
+                console.log(`Valid file already exists: ${existingFileToUse}`);
+                return { success: true, filePath: existingFileToUse };
             }
 
             if (page.url() === 'about:blank') {
@@ -62,26 +81,50 @@ export class DownloadService {
             const popupPromise = page.waitForEvent('popup', { timeout: 60000 });
 
             // Trigger action
-            if (script) {
-                console.log('Executing JSF script to trigger download...');
-                // We need to execute the script in the page context
-                // The script is usually: if(typeof jsfcljs == 'function'){jsfcljs(...)}return false
-                await page.evaluate((scriptStr: string) => {
-                    const func = new Function(scriptStr.replace('return false', ''));
-                    func();
-                }, script);
-            } else {
-                console.log(`Looking for file link with text: "${fileName}"`);
-                const link = page.locator(`a:has-text("${fileName}")`).first();
-                if (await link.isVisible()) {
-                    await link.click({ force: true });
-                } else {
-                    // Fallback to URL navigation if no link found and no script
-                    if (fileUrl && !fileUrl.includes('javascript:')) {
-                        await page.goto(fileUrl, { waitUntil: 'networkidle', timeout: 30000 });
-                        return { success: true, filePath };
+            console.log(`Looking for fresh download script for: "${fileName}"`);
+            
+            const freshAction = await page.evaluate((fname) => {
+                const rows = Array.from(document.querySelectorAll('.item,.item-impar,.item-par, .form-baixar-arquivo'));
+                for (const row of rows) {
+                    const link = row.tagName.toLowerCase() === 'a' ? row : row.querySelector('.form-baixar-arquivo, a[href]');
+                    if (!link) continue;
+                    
+                    const desc = link.querySelector('.descricao-form-disciplina') || link;
+                    let text = (desc.textContent || '').trim().replace(/[\n\r]/g, '').trim();
+                    
+                    if (text === fname || text.includes(fname) || fname.includes(text)) {
+                        const onclick = link.getAttribute('onclick');
+                        if (onclick) return { type: 'script', value: onclick };
+                        
+                        const href = link.getAttribute('href');
+                        if (href) return { type: 'href', value: href };
                     }
-                    throw new Error('Link not found and no script provided');
+                }
+                return null;
+            }, fileName);
+
+            if (freshAction) {
+                if (freshAction.type === 'script') {
+                    console.log('Executing completely fresh JSF script from current DOM...');
+                    await page.evaluate((scriptStr: string) => {
+                        const func = new Function(scriptStr.replace('return false', ''));
+                        func();
+                    }, freshAction.value);
+                } else if (freshAction.type === 'href') {
+                    console.log('Navigating to direct URL from current DOM...');
+                    await page.goto(freshAction.value, { waitUntil: 'networkidle', timeout: 30000 });
+                }
+            } else {
+                console.log('Failed to find fresh action. Fallback to cached original script...');
+                if (script) {
+                    await page.evaluate((scriptStr: string) => {
+                        const func = new Function(scriptStr.replace('return false', ''));
+                        func();
+                    }, script);
+                } else if (fileUrl && !fileUrl.includes('javascript:')) {
+                    await page.goto(fileUrl, { waitUntil: 'networkidle', timeout: 30000 });
+                } else {
+                    throw new Error('Link not found and no script provided in fallback');
                 }
             }
 
@@ -102,7 +145,7 @@ export class DownloadService {
                     const mimeExt = mime.extension(detectedContentType);
                     ext = mimeExt ? '.' + mimeExt : '';
                 }
-                
+
                 if (!ext) {
                     ext = path.extname(download.suggestedFilename());
                 }
@@ -120,21 +163,35 @@ export class DownloadService {
 
                 await page.unroute('**/*');
                 await download.saveAs(finalPath);
-                
+
                 // --- JSF Error Page Detection ---
                 try {
-                    const stats = fs.statSync(finalPath);
-                    // If it's a tiny file (< 50KB) and starts with HTML, it's almost certainly an error/expired page
-                    if (stats.size < 50000) {
-                        const content = fs.readFileSync(finalPath, 'utf8');
-                        if (content.toLowerCase().includes('<!doctype html>') || content.toLowerCase().includes('<html')) {
-                            fs.unlinkSync(finalPath); // Delete the fake file
-                            if (content.includes('ViewExpiredException') || content.includes('Expira') || content.includes('expira')) {
-                                throw new Error('JSF_SESSION_EXPIRED');
-                            } else {
-                                throw new Error('O servidor retornou uma página de erro ao invés do arquivo.');
+                    let successRead = false;
+                    for (let i = 0; i < 5; i++) {
+                        try {
+                            const stats = fs.statSync(finalPath);
+                            if (stats.size < 50000) {
+                                const content = fs.readFileSync(finalPath, 'utf8');
+                                if (content.toLowerCase().includes('<!doctype html>') || content.toLowerCase().includes('<html') || content.toLowerCase().includes('<script') || content.toLowerCase().includes('sigaa')) {
+                                    for (let j = 0; j < 5; j++) {
+                                        try { fs.unlinkSync(finalPath); break; } catch { await new Promise(r => setTimeout(r, 100)); }
+                                    }
+                                    if (content.includes('ViewExpiredException') || content.includes('Expira') || content.toLowerCase().includes('expira')) {
+                                        throw new Error('JSF_SESSION_EXPIRED');
+                                    } else {
+                                        throw new Error('O servidor retornou uma página html ao invés do arquivo. Possível erro no SIGAA.');
+                                    }
+                                }
                             }
+                            break; // Not a small file, or check passed
+                        } catch (e: any) {
+                            if (e.message === 'JSF_SESSION_EXPIRED' || e.message.includes('servidor retornou')) throw e;
+                            console.error(`Error reading file for validation (attempt ${i + 1}/5):`, e.message);
+                            await new Promise(r => setTimeout(r, 200));
                         }
+                    }
+                    if (!successRead) {
+                        console.warn('Could not validate downloaded file due to lock errors. Assuming success but file might be corrupt.');
                     }
                 } catch (e: any) {
                     if (e.message === 'JSF_SESSION_EXPIRED' || e.message.includes('servidor retornou')) {
@@ -154,7 +211,7 @@ export class DownloadService {
                     let finalPath = filePath;
                     const suggestedFilename = popupDownload.suggestedFilename();
                     let ext = path.extname(suggestedFilename);
-                    
+
                     if (ext === '.html' || ext === '.htm') {
                         ext = '.pdf';
                     }
@@ -164,31 +221,45 @@ export class DownloadService {
                     }
 
                     await popupDownload.saveAs(finalPath);
-                    
-                    try {
-                        const stats = fs.statSync(finalPath);
-                        if (stats.size < 50000) {
-                            const content = fs.readFileSync(finalPath, 'utf8');
-                            if (content.toLowerCase().includes('<!doctype html>') || content.toLowerCase().includes('<html')) {
-                                fs.unlinkSync(finalPath);
-                                if (content.includes('ViewExpiredException') || content.includes('Expira') || content.includes('expira')) {
-                                    throw new Error('JSF_SESSION_EXPIRED');
-                                } else {
-                                    throw new Error('O servidor retornou uma página de erro.');
+
+                    let successReadPopup = false;
+                    for (let i = 0; i < 5; i++) {
+                        try {
+                            const stats = fs.statSync(finalPath);
+                            if (stats.size < 50000) {
+                                const content = fs.readFileSync(finalPath, 'utf8');
+                                if (content.toLowerCase().includes('<!doctype html>') || content.toLowerCase().includes('<html') || content.toLowerCase().includes('<script') || content.toLowerCase().includes('sigaa')) {
+                                    for (let j = 0; j < 5; j++) {
+                                        try { fs.unlinkSync(finalPath); break; } catch { await new Promise(r => setTimeout(r, 100)); }
+                                    }
+                                    if (content.includes('ViewExpiredException') || content.includes('Expira') || content.toLowerCase().includes('expira')) {
+                                        throw new Error('JSF_SESSION_EXPIRED');
+                                    } else {
+                                        throw new Error('O servidor retornou uma página html ao invés do arquivo. Possível erro no SIGAA.');
+                                    }
                                 }
                             }
+                            break;
+                        } catch (e: any) {
+                            if (e.message === 'JSF_SESSION_EXPIRED' || e.message.includes('servidor retornou')) {
+                                await popup.close();
+                                throw e;
+                            }
+                            console.error(`Popup error reading file for validation (attempt ${i + 1}/5):`, e.message);
+                            await new Promise(r => setTimeout(r, 200));
                         }
-                    } catch (e: any) {
-                        if (e.message === 'JSF_SESSION_EXPIRED' || e.message.includes('servidor retornou')) {
-                            await popup.close();
-                            throw e;
-                        }
+                    }
+                    if (!successReadPopup) {
+                        console.warn('Could not validate popup file due to lock errors.');
                     }
 
                     console.log(`Downloaded from popup: ${finalPath}`);
                     await popup.close();
                     return { success: true, filePath: finalPath };
-                } catch (e) {
+                } catch (e: any) {
+                    if (e.message === 'JSF_SESSION_EXPIRED' || e.message.includes('servidor retornou')) {
+                        throw e; // BUBBLE IT UP! IT'S NOT A TIMEOUT!
+                    }
                     // Try to intercept if download event didn't fire
                     console.log('Popup download event timeout, trying interception...');
                 }
@@ -224,7 +295,7 @@ export class DownloadService {
                     let finalPath = filePath;
                     const suggestedFilename = download.suggestedFilename();
                     let ext = path.extname(suggestedFilename);
-                    
+
                     if (ext === '.html' || ext === '.htm') {
                         ext = '.pdf';
                     }
@@ -234,31 +305,45 @@ export class DownloadService {
                     }
 
                     await download.saveAs(finalPath);
-                    
-                    try {
-                        const stats = fs.statSync(finalPath);
-                        if (stats.size < 50000) {
-                            const content = fs.readFileSync(finalPath, 'utf8');
-                            if (content.toLowerCase().includes('<!doctype html>') || content.toLowerCase().includes('<html')) {
-                                fs.unlinkSync(finalPath);
-                                if (content.includes('ViewExpiredException') || content.includes('Expira') || content.includes('expira')) {
-                                    throw new Error('JSF_SESSION_EXPIRED');
-                                } else {
-                                    throw new Error('O servidor retornou uma página de erro.');
+
+                    let successReadReload = false;
+                    for (let i = 0; i < 5; i++) {
+                        try {
+                            const stats = fs.statSync(finalPath);
+                            if (stats.size < 50000) {
+                                const content = fs.readFileSync(finalPath, 'utf8');
+                                if (content.toLowerCase().includes('<!doctype html>') || content.toLowerCase().includes('<html') || content.toLowerCase().includes('<script') || content.toLowerCase().includes('sigaa')) {
+                                    for (let j = 0; j < 5; j++) {
+                                        try { fs.unlinkSync(finalPath); break; } catch { await new Promise(r => setTimeout(r, 100)); }
+                                    }
+                                    if (content.includes('ViewExpiredException') || content.includes('Expira') || content.toLowerCase().includes('expira')) {
+                                        throw new Error('JSF_SESSION_EXPIRED');
+                                    } else {
+                                        throw new Error('O servidor retornou uma página html ao invés do arquivo. Possível erro no SIGAA.');
+                                    }
                                 }
                             }
+                            break;
+                        } catch (e: any) {
+                            if (e.message === 'JSF_SESSION_EXPIRED' || e.message.includes('servidor retornou')) {
+                                await popup.close();
+                                throw e;
+                            }
+                            console.error(`Popup reload error reading file for validation (attempt ${i + 1}/5):`, e.message);
+                            await new Promise(r => setTimeout(r, 200));
                         }
-                    } catch (e: any) {
-                        if (e.message === 'JSF_SESSION_EXPIRED' || e.message.includes('servidor retornou')) {
-                            await popup.close();
-                            throw e;
-                        }
+                    }
+                    if (!successReadReload) {
+                        console.warn('Could not validate popup reload file due to lock errors.');
                     }
 
                     console.log(`Downloaded after popup reload: ${finalPath}`);
                     await popup.close();
                     return { success: true, filePath: finalPath };
-                } catch (e) {
+                } catch (e: any) {
+                    if (e.message === 'JSF_SESSION_EXPIRED' || e.message.includes('servidor retornou')) {
+                        throw e; // BUBBLE IT UP!
+                    }
                     console.log(`Reload strategy failed: ${e}`);
                     await popup.close();
                     return { success: false, error: 'Could not force download from popup' };
@@ -270,6 +355,9 @@ export class DownloadService {
 
         } catch (error: any) {
             console.error(`Download failed for ${fileName}:`, error);
+            if (error.message === 'JSF_SESSION_EXPIRED') {
+                throw error;
+            }
             return { success: false, error: error.message };
         }
     }
@@ -346,9 +434,9 @@ export class DownloadService {
                         const result = await this.downloadFile(workerPage, file.url, file.name, courseName, basePath, file.script);
 
                         if (result.success) {
-                        downloaded++;
-                        results.push({ fileName: file.name, status: 'downloaded', filePath: result.filePath });
-                        if (onProgress) onProgress(file.name, 'downloaded');
+                            downloaded++;
+                            results.push({ fileName: file.name, status: 'downloaded', filePath: result.filePath });
+                            if (onProgress) onProgress(file.name, 'downloaded');
                         } else {
                             failed++;
                             results.push({ fileName: file.name, status: 'failed' });
