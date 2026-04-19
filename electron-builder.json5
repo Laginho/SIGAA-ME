@@ -15,10 +15,11 @@
     "target": [
       "dmg"
     ],
+    "icon": "public/icon.ico",
     "artifactName": "${productName}-Mac-${version}-Installer.${ext}"
   },
   "win": {
-    "icon": "build/icon.png",
+    "icon": "public/icon.ico",
     "target": [
       {
         "target": "nsis",
