@@ -179,7 +179,12 @@ export class DownloadService {
 
                     let finalPath = filePath;
                     const suggestedFilename = download.suggestedFilename();
-                    const ext = path.extname(suggestedFilename);
+                    let ext = path.extname(suggestedFilename);
+                    
+                    if (ext === '.html' || ext === '.htm') {
+                        ext = '.pdf';
+                    }
+
                     if (ext && !path.extname(finalPath)) {
                         finalPath += ext;
                     }
