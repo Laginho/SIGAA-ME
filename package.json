@@ -1,7 +1,7 @@
 {
   "name": "sigaa-me",
   "private": true,
-  "version": "1.0.10",
+  "version": "1.0.2",
   "description": "Desktop app for UFC's SIGAA",
   "author": "Bruno Lage",
   "license": "MIT",
