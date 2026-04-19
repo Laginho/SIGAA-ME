@@ -113,12 +113,35 @@ export class DownloadService {
                     ext = '.pdf';
                 }
 
-                if (ext && !path.extname(finalPath)) {
-                    finalPath += ext;
+                let downloadedExt = ext && !path.extname(finalPath) ? ext : '';
+                if (downloadedExt) {
+                    finalPath += downloadedExt;
                 }
 
                 await page.unroute('**/*');
                 await download.saveAs(finalPath);
+                
+                // --- JSF Error Page Detection ---
+                try {
+                    const stats = fs.statSync(finalPath);
+                    // If it's a tiny file (< 50KB) and starts with HTML, it's almost certainly an error/expired page
+                    if (stats.size < 50000) {
+                        const content = fs.readFileSync(finalPath, 'utf8');
+                        if (content.toLowerCase().includes('<!doctype html>') || content.toLowerCase().includes('<html')) {
+                            fs.unlinkSync(finalPath); // Delete the fake file
+                            if (content.includes('ViewExpiredException') || content.includes('Expira') || content.includes('expira')) {
+                                throw new Error('JSF_SESSION_EXPIRED');
+                            } else {
+                                throw new Error('O servidor retornou uma página de erro ao invés do arquivo.');
+                            }
+                        }
+                    }
+                } catch (e: any) {
+                    if (e.message === 'JSF_SESSION_EXPIRED' || e.message.includes('servidor retornou')) {
+                        throw e; // Bubble up
+                    }
+                }
+
                 console.log(`Downloaded: ${finalPath}`);
                 return { success: true, filePath: finalPath };
 
@@ -141,6 +164,27 @@ export class DownloadService {
                     }
 
                     await popupDownload.saveAs(finalPath);
+                    
+                    try {
+                        const stats = fs.statSync(finalPath);
+                        if (stats.size < 50000) {
+                            const content = fs.readFileSync(finalPath, 'utf8');
+                            if (content.toLowerCase().includes('<!doctype html>') || content.toLowerCase().includes('<html')) {
+                                fs.unlinkSync(finalPath);
+                                if (content.includes('ViewExpiredException') || content.includes('Expira') || content.includes('expira')) {
+                                    throw new Error('JSF_SESSION_EXPIRED');
+                                } else {
+                                    throw new Error('O servidor retornou uma página de erro.');
+                                }
+                            }
+                        }
+                    } catch (e: any) {
+                        if (e.message === 'JSF_SESSION_EXPIRED' || e.message.includes('servidor retornou')) {
+                            await popup.close();
+                            throw e;
+                        }
+                    }
+
                     console.log(`Downloaded from popup: ${finalPath}`);
                     await popup.close();
                     return { success: true, filePath: finalPath };
@@ -190,6 +234,27 @@ export class DownloadService {
                     }
 
                     await download.saveAs(finalPath);
+                    
+                    try {
+                        const stats = fs.statSync(finalPath);
+                        if (stats.size < 50000) {
+                            const content = fs.readFileSync(finalPath, 'utf8');
+                            if (content.toLowerCase().includes('<!doctype html>') || content.toLowerCase().includes('<html')) {
+                                fs.unlinkSync(finalPath);
+                                if (content.includes('ViewExpiredException') || content.includes('Expira') || content.includes('expira')) {
+                                    throw new Error('JSF_SESSION_EXPIRED');
+                                } else {
+                                    throw new Error('O servidor retornou uma página de erro.');
+                                }
+                            }
+                        }
+                    } catch (e: any) {
+                        if (e.message === 'JSF_SESSION_EXPIRED' || e.message.includes('servidor retornou')) {
+                            await popup.close();
+                            throw e;
+                        }
+                    }
+
                     console.log(`Downloaded after popup reload: ${finalPath}`);
                     await popup.close();
                     return { success: true, filePath: finalPath };
@@ -248,6 +313,7 @@ export class DownloadService {
 
         const courseUrl = page.url();
         const CONCURRENCY = 3;
+        let globalError: string | null = null;
 
         const processQueue = async (workerId: number) => {
             // Worker 0 uses the main page, others create new pages
@@ -264,6 +330,11 @@ export class DownloadService {
                     const file = queue.shift();
                     if (!file) break;
 
+                    if (globalError) {
+                        console.log(`[Worker ${workerId}] Aborting nicely due to global error.`);
+                        break;
+                    }
+
                     console.log(`[Worker ${workerId}] Processing ${file.name}...`);
 
                     // Ensure we are on the right page
@@ -271,16 +342,30 @@ export class DownloadService {
                         await workerPage.goto(courseUrl, { waitUntil: 'domcontentloaded' });
                     }
 
-                    const result = await this.downloadFile(workerPage, file.url, file.name, courseName, basePath, file.script);
+                    try {
+                        const result = await this.downloadFile(workerPage, file.url, file.name, courseName, basePath, file.script);
 
-                    if (result.success) {
+                        if (result.success) {
                         downloaded++;
                         results.push({ fileName: file.name, status: 'downloaded', filePath: result.filePath });
                         if (onProgress) onProgress(file.name, 'downloaded');
-                    } else {
-                        failed++;
-                        results.push({ fileName: file.name, status: 'failed' });
-                        if (onProgress) onProgress(file.name, 'failed');
+                        } else {
+                            failed++;
+                            results.push({ fileName: file.name, status: 'failed' });
+                            if (onProgress) onProgress(file.name, 'failed');
+                        }
+                    } catch (e: any) {
+                        if (e.message === 'JSF_SESSION_EXPIRED') {
+                            globalError = 'JSF_SESSION_EXPIRED';
+                            // Put file back in queue so it can be retried by the upper layer if needed
+                            queue.unshift(file);
+                            console.log(`[Worker ${workerId}] Detected session expiration! Aborting queue.`);
+                            break;
+                        } else {
+                            failed++;
+                            results.push({ fileName: file.name, status: 'failed' });
+                            if (onProgress) onProgress(file.name, 'failed');
+                        }
                     }
                 }
             } catch (e) {
@@ -301,6 +386,10 @@ export class DownloadService {
         }
 
         await Promise.all(workers);
+
+        if (globalError === 'JSF_SESSION_EXPIRED') {
+            throw new Error('JSF_SESSION_EXPIRED');
+        }
 
         return { downloaded, skipped, failed, results };
     }
