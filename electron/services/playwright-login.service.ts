@@ -771,48 +771,76 @@ export class PlaywrightLoginService {
         failed: number;
         results: any[];
     }> {
-        let localBrowser: Browser | null = null;
-        try {
-            const { DownloadService } = await import('./download.service');
+        let maxRetries = 1;
+        let attempt = 0;
 
-            // Launch a dedicated browser for this batch download
-            localBrowser = await chromium.launch({ channel: 'chrome', headless: false });
-            const downloadService = new DownloadService(localBrowser);
+        while (attempt <= maxRetries) {
+            let localBrowser: Browser | null = null;
+            try {
+                const { DownloadService } = await import('./download.service');
 
-            const context = await localBrowser.newContext();
-            // Inject stored cookies
-            if (this.storedCookies.length > 0) {
-                await context.addCookies(this.storedCookies);
-            }
+                // Launch a dedicated browser for this batch download
+                localBrowser = await chromium.launch({ channel: 'chrome', headless: false });
+                const downloadService = new DownloadService(localBrowser);
 
-            const page = await context.newPage();
+                const context = await localBrowser.newContext();
+                // Inject stored cookies
+                if (this.storedCookies.length > 0) {
+                    await context.addCookies(this.storedCookies);
+                }
 
-            // Navigate to course page first
-            const navigated = await this.navigateToCourse(page, courseId);
-            if (!navigated) {
+                const page = await context.newPage();
+
+                // If this is a retry due to session timeout, we must force a fresh entry to the course
+                if (attempt > 0) {
+                    console.log(`Playwright: Download retry attempt ${attempt}. Forcing course re-entry...`);
+                    // Perform the robust course entry login process
+                    const enterResult = await this.enterCourseAndGetHTML(courseId, courseName);
+                    if (!enterResult.success) {
+                        await localBrowser.close();
+                        throw new Error('Could not re-enter course for download retry.');
+                    }
+                    // Since we re-entered in the main browser, our main cookies are updated.
+                    // Copy them to localBrowser
+                    const freshCookies = await this.context!.cookies();
+                    await context.addCookies(freshCookies);
+                }
+
+                // Navigate to course page first
+                const navigated = await this.navigateToCourse(page, courseId);
+                if (!navigated) {
+                    await localBrowser.close();
+                    return { downloaded: 0, skipped: 0, failed: files.length, results: [] };
+                }
+
+                const result = await downloadService.downloadCourseFiles(
+                    page,
+                    courseId,
+                    courseName,
+                    files,
+                    basePath,
+                    downloadedFiles,
+                    onProgress
+                );
+
                 await localBrowser.close();
+                return result;
+            } catch (error: any) {
+                if (localBrowser) {
+                    await localBrowser.close();
+                }
+
+                if (error.message === 'JSF_SESSION_EXPIRED' && attempt < maxRetries) {
+                    console.log(`Playwright: Session expired during download batch. Restarting batch...`);
+                    attempt++;
+                    continue;
+                }
+
+                console.error('Playwright: Download all error:', error);
                 return { downloaded: 0, skipped: 0, failed: files.length, results: [] };
             }
-
-            const result = await downloadService.downloadCourseFiles(
-                page,
-                courseId,
-                courseName,
-                files,
-                basePath,
-                downloadedFiles,
-                onProgress
-            );
-
-            await localBrowser.close();
-            return result;
-        } catch (error: any) {
-            console.error('Playwright: Download all error:', error);
-            if (localBrowser) {
-                await localBrowser.close();
-            }
-            return { downloaded: 0, skipped: 0, failed: files.length, results: [] };
         }
+        return { downloaded: 0, skipped: 0, failed: files.length, results: [] };
     }
 
     async getNewsDetail(courseId: string, courseName: string, newsId: string): Promise<{ success: boolean; news?: any; error?: string }> {
