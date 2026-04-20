@@ -1,4 +1,4 @@
-import { app, Notification } from 'electron';
+import { app, Notification, safeStorage } from 'electron';
 import { SigaaService } from './sigaa.service';
 import { persistenceService } from './persistence.service';
 import { cacheService } from './cache.service';
@@ -39,10 +39,6 @@ export class BackgroundSyncService {
     private loadCredentials() {
         const credPath = path.join(app.getPath('userData'), 'credentials.json');
         if (fs.existsSync(credPath)) {
-            // Using a simple read since safeStorage decryption is needed...
-            // It might be better to expose a helper in main, but since safeStorage
-            // is available in main process context:
-            const { safeStorage } = require('electron');
             try {
                 const data = JSON.parse(fs.readFileSync(credPath, 'utf-8'));
                 const password = safeStorage.decryptString(Buffer.from(data.password, 'base64'));
@@ -96,7 +92,10 @@ export class BackgroundSyncService {
                 return;
             }
 
-            let notificationsTriggered = 0;
+            let totalNewFiles = 0;
+            let totalNewNews = 0;
+            let coursesWithUpdates = 0;
+            let singleCourseUpdateName = '';
 
             for (const course of courses) {
                 console.log(`[BackgroundSync] Checking course: ${course.name}`);
@@ -115,20 +114,10 @@ export class BackgroundSyncService {
                     if (diff.newFiles.length > 0 || diff.newNews.length > 0) {
                         console.log(`[BackgroundSync] Found ${diff.newFiles.length} new files and ${diff.newNews.length} new news in ${course.name}`);
                         
-                        let body = '';
-                        if (diff.newFiles.length > 0) body += `${diff.newFiles.length} novo(s) arquivo(s). `;
-                        if (diff.newNews.length > 0) body += `${diff.newNews.length} nova(s) notícia(s).`;
-
-                        // Send OS Notification
-                        if (Notification.isSupported()) {
-                            const notification = new Notification({
-                                title: `SIGAA-ME: ${course.name.substring(0, 30)}...`,
-                                body: body,
-                                icon: path.join(process.env.VITE_PUBLIC || path.join(app.getAppPath(), 'dist'), 'icon.png')
-                            });
-                            notification.show();
-                            notificationsTriggered++;
-                        }
+                        totalNewFiles += diff.newFiles.length;
+                        totalNewNews += diff.newNews.length;
+                        coursesWithUpdates++;
+                        singleCourseUpdateName = course.name;
 
                         // Auto-download new files
                         if (settings.autoDownloadUpdates && diff.newFiles.length > 0 && settings.lastDownloadPath) {
@@ -154,7 +143,29 @@ export class BackgroundSyncService {
                 }
             }
 
-            console.log(`[BackgroundSync] Sync complete. Triggered ${notificationsTriggered} notifications.`);
+            console.log(`[BackgroundSync] Sync complete.`);
+
+            // Aggregated Notification
+            if (totalNewFiles > 0 || totalNewNews > 0) {
+                let body = '';
+                if (totalNewFiles > 0) body += `${totalNewFiles} novo(s) arquivo(s). `;
+                if (totalNewNews > 0) body += `${totalNewNews} nova(s) notícia(s).`;
+
+                let title = 'SIGAA-ME - Atualizações';
+                if (coursesWithUpdates === 1) {
+                    title = `SIGAA-ME: ${singleCourseUpdateName.substring(0, 30)}...`;
+                }
+
+                if (Notification.isSupported()) {
+                    const notification = new Notification({
+                        title: title,
+                        body: body,
+                        icon: path.join(process.env.VITE_PUBLIC || path.join(app.getAppPath(), 'dist'), 'icon.png')
+                    });
+                    notification.show();
+                    console.log(`[BackgroundSync] Triggered generic notification for ${coursesWithUpdates} course(s).`);
+                }
+            }
 
         } catch (error) {
             console.error('[BackgroundSync] Error during sync:', error);
