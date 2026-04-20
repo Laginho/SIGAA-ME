@@ -144,6 +144,7 @@ export class BackgroundSyncService {
             }
 
             console.log(`[BackgroundSync] Sync complete.`);
+            persistenceService.updateSetting('lastBackgroundSync', Date.now());
 
             // Aggregated Notification
             if (totalNewFiles > 0 || totalNewNews > 0) {

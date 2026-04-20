@@ -46,6 +46,19 @@ export async function renderSettingsPage(container: HTMLDivElement) {
             </div>
           </div>
 
+          <div class="setting-item ${!settings.runInBackground ? 'disabled-item' : ''}" id="openAtLoginContainer">
+            <div class="setting-info">
+              <span class="setting-label">Iniciar com o Windows</span>
+              <span class="setting-description">Executar o app silenciosamente na bandeja ao ligar o PC.</span>
+            </div>
+            <div class="setting-control">
+              <label class="switch">
+                <input type="checkbox" id="openAtLoginToggle" ${settings.openAtLogin ? 'checked' : ''} ${!settings.runInBackground ? 'disabled' : ''}>
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+
           <div class="setting-item ${!settings.runInBackground ? 'disabled-item' : ''}" id="syncIntervalContainer">
             <div class="setting-info">
               <span class="setting-label">Intervalo de Busca</span>
@@ -128,6 +141,8 @@ export async function renderSettingsPage(container: HTMLDivElement) {
 
   // Background Sync Logic
   const runInBackgroundToggle = document.getElementById('runInBackgroundToggle') as HTMLInputElement;
+  const openAtLoginContainer = document.getElementById('openAtLoginContainer');
+  const openAtLoginToggle = document.getElementById('openAtLoginToggle') as HTMLInputElement;
   const syncIntervalContainer = document.getElementById('syncIntervalContainer');
   const syncIntervalSelect = document.getElementById('syncIntervalSelect') as HTMLSelectElement;
   const autoDownloadContainer = document.getElementById('autoDownloadContainer');
@@ -139,17 +154,31 @@ export async function renderSettingsPage(container: HTMLDivElement) {
     
     // Toggle UI State
     if (isEnabled) {
+      openAtLoginContainer?.classList.remove('disabled-item');
       syncIntervalContainer?.classList.remove('disabled-item');
       autoDownloadContainer?.classList.remove('disabled-item');
+      if (openAtLoginToggle) openAtLoginToggle.disabled = false;
       if (syncIntervalSelect) syncIntervalSelect.disabled = false;
       if (autoDownloadToggle) autoDownloadToggle.disabled = false;
-      toast.success('Sincronização em segundo plano ativada.');
+      toast.success('Sincronização ativada.');
     } else {
+      openAtLoginContainer?.classList.add('disabled-item');
       syncIntervalContainer?.classList.add('disabled-item');
       autoDownloadContainer?.classList.add('disabled-item');
+      if (openAtLoginToggle) openAtLoginToggle.disabled = true;
       if (syncIntervalSelect) syncIntervalSelect.disabled = true;
       if (autoDownloadToggle) autoDownloadToggle.disabled = true;
       toast.info('Sincronização em segundo plano desativada.');
+    }
+  });
+
+  openAtLoginToggle?.addEventListener('change', async (e) => {
+    const isEnabled = (e.target as HTMLInputElement).checked;
+    await window.api.updateSetting('openAtLogin', isEnabled);
+    if (isEnabled) {
+      toast.success('SIGAA-ME iniciará com o Windows.');
+    } else {
+      toast.info('Inicialização com o Windows desativada.');
     }
   });
 

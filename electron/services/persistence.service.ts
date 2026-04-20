@@ -9,6 +9,8 @@ export interface AppSettings {
     runInBackground: boolean;
     syncInterval: number; // in minutes
     autoDownloadUpdates: boolean;
+    lastBackgroundSync?: number;
+    openAtLogin: boolean;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -17,7 +19,8 @@ const DEFAULT_SETTINGS: AppSettings = {
     lastDownloadPath: null,
     runInBackground: true,
     syncInterval: 60,
-    autoDownloadUpdates: false
+    autoDownloadUpdates: false,
+    openAtLogin: false
 };
 
 

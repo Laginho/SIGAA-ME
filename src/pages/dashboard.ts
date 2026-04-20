@@ -40,7 +40,10 @@ export function renderDashboardPage(app: HTMLDivElement, account: UserAccount) {
           </div>
         </div>
         <div class="header-actions">
-          <span id="syncStatus" class="sync-status"></span>
+          <div class="sync-status-container" style="display: flex; flex-direction: column; align-items: flex-end; justify-content: center; margin-right: 1rem; gap: 4px;">
+            <span id="syncStatusManual" class="sync-status" style="margin: 0; line-height: 1.2;"></span>
+            <span id="syncStatusAuto" class="sync-status" style="margin: 0; line-height: 1.2;"></span>
+          </div>
           <button id="refreshBtn" class="btn-refresh" title="Sincronizar">🔄</button>
           <button id="settingsBtn" class="btn-settings" title="Configurações">⚙️</button>
           <button id="clearDataBtn" class="btn-clear-data" title="Limpar todos os dados locais">🗑️</button>
@@ -124,7 +127,8 @@ export function renderDashboardPage(app: HTMLDivElement, account: UserAccount) {
 
 function loadCoursesFromCache() {
   const coursesListElement = document.getElementById('coursesList');
-  const syncStatus = document.getElementById('syncStatus');
+  const syncStatusManual = document.getElementById('syncStatusManual');
+  const syncStatusAuto = document.getElementById('syncStatusAuto');
   if (!coursesListElement) return;
 
   try {
@@ -136,10 +140,17 @@ function loadCoursesFromCache() {
       const coursesWithFiles = JSON.parse(cachedData);
       displayCourses(coursesWithFiles, coursesListElement);
 
-      if (cacheTimestamp && syncStatus) {
-        syncStatus.textContent = `Último sync: ${formatSyncLabel(parseInt(cacheTimestamp))}`;
-        syncStatus.className = 'sync-status';
+      if (cacheTimestamp && syncStatusManual) {
+        syncStatusManual.textContent = `Sync manual: ${formatSyncLabel(parseInt(cacheTimestamp)).replace('hoje às ', '')}`;
       }
+
+      // Load and display auto sync status
+      window.api.getSettings().then(settings => {
+        if (settings.lastBackgroundSync && syncStatusAuto) {
+          syncStatusAuto.textContent = `Sync automático: ${formatSyncLabel(settings.lastBackgroundSync).replace('hoje às ', '')}`;
+        }
+      }).catch(console.error);
+
     } else {
       // Should normally be handled by main.ts redirect, but just in case:
       coursesListElement.innerHTML = '<div class="no-courses">Nenhum dado encontrado. <a href="#/sync-selection">Sincronizar agora</a></div>';
