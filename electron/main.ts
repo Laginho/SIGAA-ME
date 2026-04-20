@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, safeStorage } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, safeStorage, Tray, Menu } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import fs from 'node:fs'
@@ -6,6 +6,7 @@ import { SigaaService } from './services/sigaa.service'
 import { autoUpdater } from 'electron-updater'
 import { execSync } from 'child_process'
 import { persistenceService } from './services/persistence.service'
+import { BackgroundSyncService } from './services/background-sync.service'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -59,7 +60,9 @@ export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 'public') : RENDERER_DIST
 
 let win: BrowserWindow | null
+let tray: Tray | null = null
 const sigaaService = new SigaaService()
+const backgroundSyncService = new BackgroundSyncService(sigaaService)
 
 function createWindow() {
   win = new BrowserWindow({
@@ -78,6 +81,14 @@ function createWindow() {
   } else {
     win.loadFile(path.join(RENDERER_DIST, 'index.html'))
   }
+
+  win.on('close', (e) => {
+    const settings = persistenceService.getSettings();
+    if (settings.runInBackground && !isQuitting) {
+      e.preventDefault();
+      win?.hide();
+    }
+  });
 }
 
 const CREDENTIALS_PATH = path.join(app.getPath('userData'), 'credentials.json');
@@ -211,6 +222,9 @@ ipcMain.handle('get-app-settings', async () => {
 
 ipcMain.handle('update-app-setting', async (_, { key, value }) => {
   persistenceService.updateSetting(key, value);
+  if (['runInBackground', 'syncInterval'].includes(key)) {
+    backgroundSyncService.restart();
+  }
   return { success: true };
 });
 
@@ -259,7 +273,8 @@ app.on('before-quit', async (e) => {
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
+  const settings = persistenceService.getSettings();
+  if (!settings.runInBackground && process.platform !== 'darwin') {
     app.quit()
     win = null
   }
@@ -304,6 +319,24 @@ app.whenReady().then(() => {
   }
 
   createWindow();
+  
+  // Tray Setup
+  const iconPath = path.join(process.env.VITE_PUBLIC, 'icon.png');
+  tray = new Tray(iconPath);
+  const contextMenu = Menu.buildFromTemplate([
+    { label: 'Abrir SIGAA-ME', click: () => win?.show() },
+    { label: 'Sincronizar Agora', click: () => backgroundSyncService.syncNow() },
+    { type: 'separator' },
+    { label: 'Sair', click: () => { isQuitting = true; app.quit(); } }
+  ]);
+  tray.setToolTip('SIGAA-ME Background Sync');
+  tray.setContextMenu(contextMenu);
+  
+  tray.on('double-click', () => {
+    win?.show();
+  });
+  
+  backgroundSyncService.start();
   
   // Update Management
   autoUpdater.on('update-available', () => {

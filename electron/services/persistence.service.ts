@@ -6,13 +6,20 @@ export interface AppSettings {
     theme: 'light' | 'dark';
     autoSync: boolean;
     lastDownloadPath: string | null;
+    runInBackground: boolean;
+    syncInterval: number; // in minutes
+    autoDownloadUpdates: boolean;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
     theme: 'light',
     autoSync: true,
-    lastDownloadPath: null
+    lastDownloadPath: null,
+    runInBackground: true,
+    syncInterval: 60,
+    autoDownloadUpdates: false
 };
+
 
 export class PersistenceService {
     private settingsPath: string;
