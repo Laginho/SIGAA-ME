@@ -234,7 +234,8 @@ ipcMain.handle('update-app-setting', async (_, { key, value }) => {
   if (key === 'openAtLogin') {
     app.setLoginItemSettings({
       openAtLogin: value as boolean,
-      args: ['--hidden']
+      path: process.execPath,
+      args: app.isPackaged ? ['--hidden'] : [app.getAppPath(), '--hidden']
     });
   }
   if (['runInBackground', 'syncInterval'].includes(key)) {
