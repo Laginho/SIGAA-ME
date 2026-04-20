@@ -7,6 +7,7 @@ import { autoUpdater } from 'electron-updater'
 import { execSync } from 'child_process'
 import { persistenceService } from './services/persistence.service'
 import { BackgroundSyncService } from './services/background-sync.service'
+import { cacheService } from './services/cache.service'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -326,6 +327,25 @@ app.whenReady().then(() => {
   const contextMenu = Menu.buildFromTemplate([
     { label: 'Abrir SIGAA-ME', click: () => win?.show() },
     { label: 'Sincronizar Agora', click: () => backgroundSyncService.syncNow() },
+    { type: 'separator' },
+    { label: '[Dev] Simular Arquivo Novo', click: () => {
+        const cacheData = cacheService['cache'];
+        const courseIds = Object.keys(cacheData);
+        if (courseIds.length > 0) {
+            for (const cId of courseIds) {
+                if (cacheData[cId].files && cacheData[cId].files.length > 0) {
+                    const removed = cacheData[cId].files.pop();
+                    cacheService['saveCache']();
+                    console.log(`[Dev] Removido do cache o arquivo ${removed}. Iniciando Sync...`);
+                    backgroundSyncService.syncNow();
+                    return;
+                }
+            }
+            console.log('[Dev] Nenhum arquivo salvo no cache para simular.');
+        } else {
+            console.log('[Dev] Cache vazio. Clique em Sincronizar Agora primeiro.');
+        }
+    }},
     { type: 'separator' },
     { label: 'Sair', click: () => { isQuitting = true; app.quit(); } }
   ]);
