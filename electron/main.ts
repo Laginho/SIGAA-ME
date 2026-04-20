@@ -11,6 +11,11 @@ import { cacheService } from './services/cache.service'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
+// Isolate Dev environment from Production database to prevent lock collisions
+if (!app.isPackaged) {
+  app.setPath('userData', path.join(app.getPath('appData'), `${app.getName()}-dev`));
+}
+
 // ===== FILE LOGGER SETUP =====
 const logsDir = path.join(app.getPath('userData'), 'logs');
 if (!fs.existsSync(logsDir)) {
@@ -66,7 +71,10 @@ const sigaaService = new SigaaService()
 const backgroundSyncService = new BackgroundSyncService(sigaaService)
 
 function createWindow() {
+  const isHiddenStartup = process.argv.includes('--hidden');
+  
   win = new BrowserWindow({
+    show: !isHiddenStartup,
     icon: path.join(process.env.VITE_PUBLIC, 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
@@ -223,6 +231,12 @@ ipcMain.handle('get-app-settings', async () => {
 
 ipcMain.handle('update-app-setting', async (_, { key, value }) => {
   persistenceService.updateSetting(key, value);
+  if (key === 'openAtLogin') {
+    app.setLoginItemSettings({
+      openAtLogin: value as boolean,
+      args: ['--hidden']
+    });
+  }
   if (['runInBackground', 'syncInterval'].includes(key)) {
     backgroundSyncService.restart();
   }
