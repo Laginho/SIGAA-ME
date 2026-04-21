@@ -119,6 +119,17 @@ export function renderDashboardPage(app: HTMLDivElement, account: UserAccount) {
     window.location.hash = '#/sync-selection';
   });
 
+  // Listen for background sync updates to refresh dashboard in real-time
+  window.api.onBackgroundSyncUpdate((data: any) => {
+    console.log('[Dashboard] Received background sync update:', data.courses?.length, 'courses');
+    if (data.courses && data.courses.length > 0) {
+      localStorage.setItem('coursesWithFiles', JSON.stringify(data.courses));
+      localStorage.setItem('cacheTimestamp', data.timestamp.toString());
+      loadCoursesFromCache();
+      toast.info('Dashboard atualizado com novos dados.');
+    }
+  });
+
   // Load courses from cache
   loadCoursesFromCache();
 }

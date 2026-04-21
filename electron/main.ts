@@ -68,7 +68,7 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 
 let win: BrowserWindow | null
 let tray: Tray | null = null
 const sigaaService = new SigaaService()
-const backgroundSyncService = new BackgroundSyncService(sigaaService)
+const backgroundSyncService = new BackgroundSyncService(sigaaService, () => win)
 
 function createWindow() {
   const isHiddenStartup = process.argv.includes('--hidden');

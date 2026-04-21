@@ -45,5 +45,12 @@ contextBridge.exposeInMainWorld('api', {
 
   // App Settings
   getSettings: () => ipcRenderer.invoke('get-app-settings'),
-  updateSetting: (key: string, value: any) => ipcRenderer.invoke('update-app-setting', { key, value })
+  updateSetting: (key: string, value: any) => ipcRenderer.invoke('update-app-setting', { key, value }),
+
+  // Background Sync Updates
+  onBackgroundSyncUpdate: (callback: (data: any) => void) => {
+    const subscription = (_event: any, data: any) => callback(data)
+    ipcRenderer.on('background-sync-update', subscription)
+    return () => ipcRenderer.off('background-sync-update', subscription)
+  }
 })
