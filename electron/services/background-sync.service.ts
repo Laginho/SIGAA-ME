@@ -1,4 +1,4 @@
-import { app, Notification, safeStorage } from 'electron';
+import { app, BrowserWindow, Notification, safeStorage } from 'electron';
 import { SigaaService } from './sigaa.service';
 import { persistenceService } from './persistence.service';
 import { cacheService } from './cache.service';
@@ -9,9 +9,11 @@ export class BackgroundSyncService {
     private sigaaService: SigaaService;
     private intervalId: NodeJS.Timeout | null = null;
     private isSyncing = false;
+    private getWindow: () => BrowserWindow | null;
 
-    constructor(sigaaService: SigaaService) {
+    constructor(sigaaService: SigaaService, getWindow?: () => BrowserWindow | null) {
         this.sigaaService = sigaaService;
+        this.getWindow = getWindow || (() => null);
     }
 
     public start() {
@@ -96,6 +98,7 @@ export class BackgroundSyncService {
             let totalNewNews = 0;
             let coursesWithUpdates = 0;
             let singleCourseUpdateName = '';
+            const allCoursesData: any[] = [];
 
             for (const course of courses) {
                 console.log(`[BackgroundSync] Checking course: ${course.name}`);
@@ -108,6 +111,14 @@ export class BackgroundSyncService {
                 if (contentResult.success) {
                     const currentFiles = contentResult.files || [];
                     const currentNews = contentResult.news || [];
+
+                    // Collect full course data for frontend update
+                    allCoursesData.push({
+                        ...course,
+                        files: currentFiles,
+                        news: currentNews,
+                        fileCount: currentFiles.length
+                    });
 
                     const diff = cacheService.diffCourseState(course.id, currentFiles, currentNews);
 
@@ -145,6 +156,18 @@ export class BackgroundSyncService {
 
             console.log(`[BackgroundSync] Sync complete.`);
             persistenceService.updateSetting('lastBackgroundSync', Date.now());
+
+            // Push updated data to renderer
+            if (allCoursesData.length > 0) {
+                const window = this.getWindow();
+                if (window && !window.isDestroyed()) {
+                    window.webContents.send('background-sync-update', {
+                        courses: allCoursesData,
+                        timestamp: Date.now()
+                    });
+                    console.log(`[BackgroundSync] Pushed ${allCoursesData.length} courses to renderer.`);
+                }
+            }
 
             // Aggregated Notification
             if (totalNewFiles > 0 || totalNewNews > 0) {
