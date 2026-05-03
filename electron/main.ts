@@ -12,8 +12,12 @@ import { cacheService } from './services/cache.service'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // Isolate Dev environment from Production database to prevent lock collisions
+// But respect custom user-data-dir passed by Playwright E2E tests!
 if (!app.isPackaged) {
-  app.setPath('userData', path.join(app.getPath('appData'), `${app.getName()}-dev`));
+  const hasCustomUserData = process.argv.some(arg => arg.startsWith('--user-data-dir='));
+  if (!hasCustomUserData) {
+    app.setPath('userData', path.join(app.getPath('appData'), `${app.getName()}-dev`));
+  }
 }
 
 // ===== FILE LOGGER SETUP =====
@@ -243,6 +247,25 @@ ipcMain.handle('update-app-setting', async (_, { key, value }) => {
   }
   return { success: true };
 });
+
+if (!app.isPackaged) {
+  ipcMain.handle('test-simulate-new-file', async () => {
+    const cacheData = cacheService['cache'];
+    const courseIds = Object.keys(cacheData);
+    if (courseIds.length > 0) {
+      for (const cId of courseIds) {
+        if (cacheData[cId].files && cacheData[cId].files.length > 0) {
+          cacheData[cId].files.pop();
+          cacheService['saveCache']();
+          console.log(`[E2E Test] Simulated new file by popping cache for ${cId}. Starting syncNow...`);
+          await backgroundSyncService.syncNow();
+          return true;
+        }
+      }
+    }
+    return false;
+  });
+}
 
 ipcMain.handle('logout', async () => {
   console.log('Logout: Clearing credentials and closing session...');

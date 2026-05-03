@@ -1,6 +1,7 @@
 import { _electron as electron, test, expect, ElectronApplication, Page } from '@playwright/test';
 import { config } from 'dotenv';
 import path from 'path';
+import fs from 'fs';
 
 config({ path: path.resolve(process.cwd(), '.env') });
 
@@ -17,6 +18,12 @@ test.describe('App E2E', () => {
     test.beforeAll(async () => {
         // Use a temporary user-data-dir so tests don't share your real app session/cache
         const testUserDataDir = path.resolve(process.cwd(), '.test-user-data');
+        
+        // Ensure a complete clean slate by deleting the folder if it exists
+        if (fs.existsSync(testUserDataDir)) {
+            fs.rmSync(testUserDataDir, { recursive: true, force: true });
+        }
+
         electronApp = await electron.launch({
             args: ['.', `--user-data-dir=${testUserDataDir}`]
         });
@@ -69,6 +76,12 @@ describeOrSkip('App E2E (With Credentials)', () => {
 
     test.beforeAll(async () => {
         const testUserDataDir = path.resolve(process.cwd(), '.test-user-data-auth');
+        
+        // Ensure a complete clean slate
+        if (fs.existsSync(testUserDataDir)) {
+            fs.rmSync(testUserDataDir, { recursive: true, force: true });
+        }
+
         electronApp = await electron.launch({
             args: ['.', `--user-data-dir=${testUserDataDir}`]
         });
@@ -172,6 +185,33 @@ describeOrSkip('App E2E (With Credentials)', () => {
             await expect(modal).toBeHidden();
         } else {
             console.log('E2E: No news found in this course to test the modal.');
+        }
+    });
+
+    test('background sync updates the dashboard in real-time', async () => {
+        // Return to dashboard
+        await window.evaluate(() => { window.location.hash = '#/dashboard'; });
+        await window.waitForSelector('#coursesList', { timeout: 15000 });
+
+        // Grab initial file counts
+        const fileCounts = window.locator('.course-files-count');
+        expect(await fileCounts.count()).toBeGreaterThan(0);
+        const initialText = await fileCounts.first().textContent();
+
+        // Trigger simulation via the hidden dev IPC
+        console.log('E2E: Triggering simulated background sync new file...');
+        const isSimulated = await window.evaluate(() => window.api.simulateNewFile());
+        
+        if (isSimulated) {
+            // Wait for the toast notification to appear, meaning the IPC arrived and dashboard updated
+            const updateToast = window.locator('.toast--info');
+            await expect(updateToast).toBeVisible({ timeout: 90000 }); // Wait for the sync sweep
+            
+            // Wait for the text to change from the initial value
+            await expect(fileCounts.first()).not.toHaveText(initialText || '');
+            console.log('E2E: Verified real-time dashboard update!');
+        } else {
+            console.log('E2E: Cache was empty. Skipping background sync real-time test.');
         }
     });
 });

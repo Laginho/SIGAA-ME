@@ -47,6 +47,9 @@ contextBridge.exposeInMainWorld('api', {
   getSettings: () => ipcRenderer.invoke('get-app-settings'),
   updateSetting: (key: string, value: any) => ipcRenderer.invoke('update-app-setting', { key, value }),
 
+  // Dev Testing
+  simulateNewFile: () => ipcRenderer.invoke('test-simulate-new-file'),
+
   // Background Sync Updates
   onBackgroundSyncUpdate: (callback: (data: any) => void) => {
     const subscription = (_event: any, data: any) => callback(data)

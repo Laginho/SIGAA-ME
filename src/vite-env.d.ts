@@ -18,6 +18,7 @@ interface Window {
         clearAllData: () => Promise<any>;
         getSettings: () => Promise<any>;
         updateSetting: (key: string, value: any) => Promise<any>;
+        simulateNewFile: () => Promise<boolean>;
         onBackgroundSyncUpdate: (callback: (data: any) => void) => () => void;
     };
     ipcRenderer: any;
