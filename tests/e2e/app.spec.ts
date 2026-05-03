@@ -18,7 +18,7 @@ test.describe('App E2E', () => {
     test.beforeAll(async () => {
         // Use a temporary user-data-dir so tests don't share your real app session/cache
         const testUserDataDir = path.resolve(process.cwd(), '.test-user-data');
-        
+
         // Ensure a complete clean slate by deleting the folder if it exists
         if (fs.existsSync(testUserDataDir)) {
             fs.rmSync(testUserDataDir, { recursive: true, force: true });
@@ -76,7 +76,7 @@ describeOrSkip('App E2E (With Credentials)', () => {
 
     test.beforeAll(async () => {
         const testUserDataDir = path.resolve(process.cwd(), '.test-user-data-auth');
-        
+
         // Ensure a complete clean slate
         if (fs.existsSync(testUserDataDir)) {
             fs.rmSync(testUserDataDir, { recursive: true, force: true });
@@ -190,8 +190,7 @@ describeOrSkip('App E2E (With Credentials)', () => {
 
     test('background sync updates the dashboard in real-time', async () => {
         // Return to dashboard
-        await window.evaluate(() => { window.location.hash = '#/dashboard'; });
-        await window.waitForSelector('#coursesList', { timeout: 15000 });
+        await window.locator('#coursesList').waitFor({ state: 'visible' });
 
         // Grab initial file counts
         const fileCounts = window.locator('.course-files-count');
@@ -200,13 +199,13 @@ describeOrSkip('App E2E (With Credentials)', () => {
 
         // Trigger simulation via the hidden dev IPC
         console.log('E2E: Triggering simulated background sync new file...');
-        const isSimulated = await window.evaluate(() => window.api.simulateNewFile());
-        
+        const isSimulated = await window.evaluate(() => (window as any).api.simulateNewFile());
+
         if (isSimulated) {
             // Wait for the toast notification to appear, meaning the IPC arrived and dashboard updated
             const updateToast = window.locator('.toast--info');
             await expect(updateToast).toBeVisible({ timeout: 90000 }); // Wait for the sync sweep
-            
+
             // Wait for the text to change from the initial value
             await expect(fileCounts.first()).not.toHaveText(initialText || '');
             console.log('E2E: Verified real-time dashboard update!');
