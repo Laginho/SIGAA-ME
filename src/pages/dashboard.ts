@@ -1,6 +1,16 @@
 import '../styles/dashboard.css';
 import { toast } from '../components/toast';
 import { formatSyncLabel } from '../utils/ui-helpers';
+import {
+  seedExistingItemsAsRead,
+  pushNotifications,
+  getAllNotifications,
+  getUnreadCount,
+  markAllAsRead,
+  markAsRead,
+  courseHasUnread,
+  NotificationItem
+} from '../utils/notification-store';
 
 interface UserAccount {
   name: string;
@@ -8,6 +18,9 @@ interface UserAccount {
 }
 
 export function renderDashboardPage(app: HTMLDivElement, account: UserAccount) {
+  // Seed read state for items that existed before this feature was added
+  seedExistingItemsAsRead();
+
   // Title Case Helper
   const toTitleCase = (str: string) => {
     return str.toLowerCase().split(' ').map(word => {
@@ -26,6 +39,8 @@ export function renderDashboardPage(app: HTMLDivElement, account: UserAccount) {
   }
 
   let name: string = toTitleCase(account.name);
+  const unreadCount = getUnreadCount();
+
   app.innerHTML = `
     <div class="dashboard-container">
       <header class="dashboard-header"> 
@@ -43,6 +58,21 @@ export function renderDashboardPage(app: HTMLDivElement, account: UserAccount) {
           <div class="sync-status-container" style="display: flex; flex-direction: column; align-items: flex-end; justify-content: center; margin-right: 1rem; gap: 4px;">
             <span id="syncStatusManual" class="sync-status" style="margin: 0; line-height: 1.2;"></span>
             <span id="syncStatusAuto" class="sync-status" style="margin: 0; line-height: 1.2;"></span>
+          </div>
+          <div class="notification-bell-wrapper">
+            <button id="notificationBellBtn" class="btn-notification-bell" title="Notificações">
+              🔔
+              ${unreadCount > 0 ? `<span class="notification-badge">${unreadCount > 9 ? '9+' : unreadCount}</span>` : ''}
+            </button>
+            <div id="notificationDropdown" class="notification-dropdown">
+              <div class="notification-dropdown-header">
+                <span class="notification-dropdown-title">Notificações</span>
+                <button id="markAllReadBtn" class="btn-mark-all-read" title="Marcar tudo como lido">Marcar como lido</button>
+              </div>
+              <div id="notificationList" class="notification-list">
+                <!-- Populated dynamically -->
+              </div>
+            </div>
           </div>
           <button id="refreshBtn" class="btn-refresh" title="Sincronizar">🔄</button>
           <button id="settingsBtn" class="btn-settings" title="Configurações">⚙️</button>
@@ -62,7 +92,37 @@ export function renderDashboardPage(app: HTMLDivElement, account: UserAccount) {
     </div>
   `;
 
-  // Settings handler
+  // ─── Notification Bell Logic ───────────────────────────
+  const bellBtn = document.getElementById('notificationBellBtn');
+  const dropdown = document.getElementById('notificationDropdown');
+  const markAllBtn = document.getElementById('markAllReadBtn');
+
+  bellBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    dropdown?.classList.toggle('open');
+    if (dropdown?.classList.contains('open')) {
+      renderNotificationList();
+    }
+  });
+
+  // Close dropdown when clicking outside
+  document.addEventListener('click', (e) => {
+    if (dropdown?.classList.contains('open') && !dropdown.contains(e.target as Node) && e.target !== bellBtn) {
+      dropdown.classList.remove('open');
+    }
+  });
+
+  markAllBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    markAllAsRead();
+    updateBellBadge();
+    renderNotificationList();
+    // Also refresh course cards to remove unread dots
+    loadCoursesFromCache();
+    toast.info('Todas as notificações marcadas como lidas.');
+  });
+
+  // ─── Settings handler ─────────────────────────────────
   document.getElementById('settingsBtn')?.addEventListener('click', () => {
     window.location.hash = '#/settings';
   });
@@ -126,12 +186,77 @@ export function renderDashboardPage(app: HTMLDivElement, account: UserAccount) {
       localStorage.setItem('coursesWithFiles', JSON.stringify(data.courses));
       localStorage.setItem('cacheTimestamp', data.timestamp.toString());
       loadCoursesFromCache();
-      toast.info('Dashboard atualizado com novos dados.');
+    }
+
+    // Push notification items from the sync
+    if (data.notifications && data.notifications.length > 0) {
+      pushNotifications(data.notifications);
+      updateBellBadge();
+      toast.info(`${data.notifications.length} nova(s) atualização(ões) encontrada(s).`);
     }
   });
 
   // Load courses from cache
   loadCoursesFromCache();
+}
+
+/** Update the bell badge count */
+function updateBellBadge() {
+  const bellBtn = document.getElementById('notificationBellBtn');
+  if (!bellBtn) return;
+  const count = getUnreadCount();
+  const existingBadge = bellBtn.querySelector('.notification-badge');
+  if (existingBadge) existingBadge.remove();
+  if (count > 0) {
+    const badge = document.createElement('span');
+    badge.className = 'notification-badge';
+    badge.textContent = count > 9 ? '9+' : String(count);
+    bellBtn.appendChild(badge);
+  }
+}
+
+/** Render the notification dropdown list */
+function renderNotificationList() {
+  const listEl = document.getElementById('notificationList');
+  if (!listEl) return;
+
+  const notifications = getAllNotifications();
+  if (notifications.length === 0) {
+    listEl.innerHTML = '<div class="notification-empty">Nenhuma notificação recente</div>';
+    return;
+  }
+
+  listEl.innerHTML = notifications.map((n: NotificationItem) => `
+    <div class="notification-item ${n.read ? '' : 'notification-item--unread'}" 
+         data-type="${n.type}" data-course-id="${n.courseId}" data-item-id="${n.itemId}">
+      <span class="notification-item-icon">${n.type === 'file' ? '📄' : '📰'}</span>
+      <div class="notification-item-content">
+        <span class="notification-item-title">${n.itemTitle}</span>
+        <span class="notification-item-course">${n.courseName}</span>
+      </div>
+      ${!n.read ? '<span class="notification-unread-dot"></span>' : ''}
+    </div>
+  `).join('');
+
+  // Add click listeners for shortcuts
+  listEl.querySelectorAll('.notification-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const type = item.getAttribute('data-type') as 'file' | 'news';
+      const courseId = item.getAttribute('data-course-id')!;
+      const itemId = item.getAttribute('data-item-id')!;
+
+      // Mark as read
+      markAsRead(type, courseId, itemId);
+      updateBellBadge();
+      item.classList.remove('notification-item--unread');
+      item.querySelector('.notification-unread-dot')?.remove();
+
+      // Navigate to the course detail page
+      const dropdown = document.getElementById('notificationDropdown');
+      dropdown?.classList.remove('open');
+      window.location.hash = `#/course/${courseId}`;
+    });
+  });
 }
 
 
@@ -182,13 +307,19 @@ function displayCourses(coursesWithFiles: any[], coursesListElement: HTMLElement
       <div class="no-courses">Nenhuma disciplina ativa encontrada</div>
     `;
   } else {
-    coursesListElement.innerHTML = coursesWithFiles.map((course: any) => `
+    coursesListElement.innerHTML = coursesWithFiles.map((course: any) => {
+      const hasUnread = courseHasUnread(course.id);
+      return `
       <div class="course-card" onclick="window.location.hash='#/course/${course.id}'">
-        <h3>${course.name}</h3>
+        <div class="course-card-header">
+          <h3>${course.name}</h3>
+          ${hasUnread ? '<span class="course-unread-dot" title="Novidades"></span>' : ''}
+        </div>
         <p class="course-code">${course.code || 'Sem código'}</p>
         <p class="course-period">${course.period || 'Período não especificado'}</p>
         <p class="course-files-count">${course.fileCount || course.files?.length || 0} arquivos</p>
       </div>
-    `).join('');
+    `}).join('');
   }
 }
+

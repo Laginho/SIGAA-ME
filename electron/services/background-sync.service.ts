@@ -99,6 +99,7 @@ export class BackgroundSyncService {
             let coursesWithUpdates = 0;
             let singleCourseUpdateName = '';
             const allCoursesData: any[] = [];
+            const newNotifications: any[] = []; // Structured notifications for the bell
 
             for (const course of courses) {
                 console.log(`[BackgroundSync] Checking course: ${course.name}`);
@@ -112,14 +113,6 @@ export class BackgroundSyncService {
                     const currentFiles = contentResult.files || [];
                     const currentNews = contentResult.news || [];
 
-                    // Collect full course data for frontend update
-                    allCoursesData.push({
-                        ...course,
-                        files: currentFiles,
-                        news: currentNews,
-                        fileCount: currentFiles.length
-                    });
-
                     const diff = cacheService.diffCourseState(course.id, currentFiles, currentNews);
 
                     if (diff.newFiles.length > 0 || diff.newNews.length > 0) {
@@ -130,10 +123,35 @@ export class BackgroundSyncService {
                         coursesWithUpdates++;
                         singleCourseUpdateName = course.name;
 
+                        // Build notification items for the bell
+                        for (const f of diff.newFiles) {
+                            newNotifications.push({
+                                id: `file-${course.id}-${f.name}`,
+                                type: 'file',
+                                courseId: course.id,
+                                courseName: course.name,
+                                itemId: f.name,
+                                itemTitle: f.name,
+                                timestamp: Date.now(),
+                                read: false
+                            });
+                        }
+                        for (const n of diff.newNews) {
+                            newNotifications.push({
+                                id: `news-${course.id}-${n.id}`,
+                                type: 'news',
+                                courseId: course.id,
+                                courseName: course.name,
+                                itemId: n.id,
+                                itemTitle: n.title || 'Nova notícia',
+                                timestamp: Date.now(),
+                                read: false
+                            });
+                        }
+
                         // Auto-download new files
                         if (settings.autoDownloadUpdates && diff.newFiles.length > 0 && settings.lastDownloadPath) {
                             console.log('[BackgroundSync] Auto-downloading new files...');
-                            // Create mini queue
                             const filesToDownload = diff.newFiles.map(f => ({ name: f.name, url: f.url, script: f.script }));
                             await this.sigaaService.downloadAllFiles(
                                 course.id,
@@ -144,11 +162,40 @@ export class BackgroundSyncService {
                             );
                         }
 
+                        // Auto-fetch news content for offline access
+                        if (settings.autoDownloadUpdates && diff.newNews.length > 0) {
+                            console.log(`[BackgroundSync] Auto-fetching content for ${diff.newNews.length} new news items...`);
+                            for (const newsItem of diff.newNews) {
+                                try {
+                                    await new Promise(resolve => setTimeout(resolve, 1500));
+                                    const detail = await this.sigaaService.getNewsDetail(course.id, course.name, newsItem.id);
+                                    if (detail.success && detail.news) {
+                                        // Inject content into the news array so it's cached
+                                        const target = currentNews.find((n: any) => n.id === newsItem.id);
+                                        if (target) {
+                                            target.content = detail.news.content;
+                                            console.log(`[BackgroundSync] Cached content for news "${newsItem.title}"`);
+                                        }
+                                    }
+                                } catch (e) {
+                                    console.warn(`[BackgroundSync] Failed to fetch content for news "${newsItem.title}":`, e);
+                                }
+                            }
+                        }
+
                         // Update cache
                         const allFileIds = currentFiles.map(f => String(f.id)).filter(id => id && id !== 'undefined');
                         const allNewsIds = currentNews.map(n => String(n.id)).filter(id => id && id !== 'undefined');
                         cacheService.updateCourseState(course.id, allFileIds, allNewsIds);
                     }
+
+                    // Collect full course data for frontend update (after content enrichment)
+                    allCoursesData.push({
+                        ...course,
+                        files: currentFiles,
+                        news: currentNews,
+                        fileCount: currentFiles.length
+                    });
                 } else {
                     console.warn(`[BackgroundSync] Failed to fetch content for ${course.name}: ${contentResult.message}`);
                 }
@@ -163,13 +210,14 @@ export class BackgroundSyncService {
                 if (window && !window.isDestroyed()) {
                     window.webContents.send('background-sync-update', {
                         courses: allCoursesData,
+                        notifications: newNotifications,
                         timestamp: Date.now()
                     });
-                    console.log(`[BackgroundSync] Pushed ${allCoursesData.length} courses to renderer.`);
+                    console.log(`[BackgroundSync] Pushed ${allCoursesData.length} courses and ${newNotifications.length} notifications to renderer.`);
                 }
             }
 
-            // Aggregated Notification
+            // Aggregated OS Notification
             if (totalNewFiles > 0 || totalNewNews > 0) {
                 let body = '';
                 if (totalNewFiles > 0) body += `${totalNewFiles} novo(s) arquivo(s). `;

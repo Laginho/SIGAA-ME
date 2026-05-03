@@ -380,3 +380,48 @@
     color: #333;
     white-space: pre-wrap;
 }
+
+/* ── Unread Indicators ─────────────────────────────────── */
+.item-unread-dot {
+    position: absolute;
+    left: 0.35rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #f59e0b;
+    box-shadow: 0 0 6px rgba(245, 158, 11, 0.5);
+    animation: dot-glow-detail 2s ease-in-out infinite alternate;
+    flex-shrink: 0;
+    z-index: 1;
+}
+
+.item-unread-dot--fading {
+    animation: dot-fade-out 0.3s ease forwards;
+}
+
+@keyframes dot-glow-detail {
+    0% { box-shadow: 0 0 3px rgba(245, 158, 11, 0.3); }
+    100% { box-shadow: 0 0 10px rgba(245, 158, 11, 0.7); }
+}
+
+@keyframes dot-fade-out {
+    0% { opacity: 1; transform: translateY(-50%) scale(1); }
+    100% { opacity: 0; transform: translateY(-50%) scale(0); }
+}
+
+.news-item--unread {
+    border-left: 3px solid #f59e0b;
+    padding-left: calc(1rem + 8px);
+}
+
+.file-item--unread {
+    border-left: 3px solid #f59e0b;
+    padding-left: calc(1rem + 8px);
+}
+
+.news-item,
+.file-item {
+    position: relative;
+}

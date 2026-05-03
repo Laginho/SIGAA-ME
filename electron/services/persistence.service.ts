@@ -19,7 +19,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     lastDownloadPath: null,
     runInBackground: true,
     syncInterval: 60,
-    autoDownloadUpdates: false,
+    autoDownloadUpdates: true,
     openAtLogin: false
 };
 

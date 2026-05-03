@@ -1,6 +1,7 @@
 import '../styles/course-detail.css'
 import { toast } from '../components/toast'
 import { isNewsCached } from '../utils/ui-helpers'
+import { isItemRead, markAsRead } from '../utils/notification-store'
 
 export function renderCourseDetailPage(container: HTMLDivElement, courseId: string) {
   container.innerHTML = `
@@ -171,13 +172,16 @@ async function fetchCourseFiles(courseId: string) {
         <div class="no-news">Nenhuma notícia recente</div>
       `
     } else {
-      newsListElement.innerHTML = course.news.map((item: any) => `
-        <div class="news-item" data-id="${item.id}">
+      newsListElement.innerHTML = course.news.map((item: any) => {
+        const unread = !isItemRead('news', courseId, item.id);
+        return `
+        <div class="news-item ${unread ? 'news-item--unread' : ''}" data-id="${item.id}">
+          ${unread ? '<span class="item-unread-dot"></span>' : ''}
           <div class="news-title">${item.title}</div>
           <div class="news-date">${item.date}</div>
           ${item.notification === 'Sim' ? '<div class="news-notification" title="O professor enviou um email sobre esta notícia">📧 Email Enviado</div>' : ''}
         </div>
-      `).join('')
+      `}).join('')
 
       // Add click listeners
       const newsItems = newsListElement.querySelectorAll('.news-item')
@@ -185,6 +189,14 @@ async function fetchCourseFiles(courseId: string) {
         item.addEventListener('click', () => {
           const newsId = item.getAttribute('data-id')
           if (newsId) {
+            // Mark as read and remove dot
+            markAsRead('news', courseId, newsId);
+            item.classList.remove('news-item--unread');
+            const dot = item.querySelector('.item-unread-dot');
+            if (dot) {
+              dot.classList.add('item-unread-dot--fading');
+              setTimeout(() => dot.remove(), 300);
+            }
             openNewsModal(courseId, course.name, newsId)
           }
         })
@@ -230,9 +242,11 @@ async function fetchCourseFiles(courseId: string) {
 
       filesListElement.innerHTML = course.files.map((file: any) => {
         const isDownloaded = !!courseDownloads[file.name];
+        const unread = !isItemRead('file', courseId, file.name);
 
         return `
-        <div class="file-item">
+        <div class="file-item ${unread ? 'file-item--unread' : ''}" data-file-id="${file.name}">
+          ${unread ? '<span class="item-unread-dot"></span>' : ''}
           <div class="file-icon">📄</div>
           <div class="file-info">
             <div class="file-name">${file.name}</div>
@@ -258,6 +272,18 @@ async function fetchCourseFiles(courseId: string) {
           const script = target.getAttribute('data-file-script');
 
           if (fileName && (fileUrl || script)) {
+            // Mark as read and remove dot
+            markAsRead('file', courseId, fileName);
+            const fileItem = target.closest('.file-item');
+            if (fileItem) {
+              fileItem.classList.remove('file-item--unread');
+              const dot = fileItem.querySelector('.item-unread-dot');
+              if (dot) {
+                dot.classList.add('item-unread-dot--fading');
+                setTimeout(() => dot.remove(), 300);
+              }
+            }
+
             // Show spinner immediately
             target.innerHTML = '🔄';
             target.classList.add('spinning');

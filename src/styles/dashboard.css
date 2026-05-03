@@ -372,3 +372,210 @@ input:checked+.slider:before {
 .live-sync-control.scanning .slider {
     animation: pulse-blue 1.5s infinite;
 }
+
+/* ── Notification Bell ─────────────────────────────────── */
+.notification-bell-wrapper {
+    position: relative;
+}
+
+.btn-notification-bell {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 1.2rem;
+    color: var(--color-text-main);
+    position: relative;
+}
+
+.btn-notification-bell:hover {
+    background-color: var(--color-background);
+    border-color: var(--color-primary);
+}
+
+.notification-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    background: #ef4444;
+    color: white;
+    font-size: 0.65rem;
+    font-weight: 700;
+    min-width: 16px;
+    height: 16px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+    line-height: 1;
+    box-shadow: 0 1px 3px rgba(239, 68, 68, 0.4);
+    animation: badge-pop 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+}
+
+@keyframes badge-pop {
+    0% { transform: scale(0); }
+    100% { transform: scale(1); }
+}
+
+/* ── Notification Dropdown ─────────────────────────────── */
+.notification-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    width: 340px;
+    max-height: 420px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
+    z-index: 100;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-8px) scale(0.97);
+    transition: opacity 0.2s ease, visibility 0.2s ease, transform 0.2s ease;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.notification-dropdown.open {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0) scale(1);
+}
+
+.notification-dropdown-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-background);
+}
+
+.notification-dropdown-title {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--color-text-main);
+}
+
+.btn-mark-all-read {
+    background: none;
+    border: none;
+    color: var(--color-primary);
+    font-size: 0.8rem;
+    cursor: pointer;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    transition: background 0.15s;
+}
+
+.btn-mark-all-read:hover {
+    background: rgba(0, 86, 163, 0.08);
+}
+
+.notification-list {
+    overflow-y: auto;
+    max-height: 350px;
+    flex: 1;
+}
+
+.notification-empty {
+    padding: 2rem 1rem;
+    text-align: center;
+    color: var(--color-text-muted);
+    font-size: 0.875rem;
+}
+
+.notification-item {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.7rem 1rem;
+    cursor: pointer;
+    transition: background 0.15s;
+    border-bottom: 1px solid var(--color-border);
+    position: relative;
+}
+
+.notification-item:last-child {
+    border-bottom: none;
+}
+
+.notification-item:hover {
+    background: var(--color-background);
+}
+
+.notification-item--unread {
+    background: rgba(59, 130, 246, 0.04);
+}
+
+.notification-item--unread:hover {
+    background: rgba(59, 130, 246, 0.08);
+}
+
+.notification-item-icon {
+    font-size: 1.2rem;
+    flex-shrink: 0;
+}
+
+.notification-item-content {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.notification-item-title {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--color-text-main);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.notification-item-course {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.notification-unread-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #f59e0b;
+    flex-shrink: 0;
+    box-shadow: 0 0 6px rgba(245, 158, 11, 0.5);
+}
+
+/* ── Course Card Unread Dot ────────────────────────────── */
+.course-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.course-unread-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #f59e0b;
+    flex-shrink: 0;
+    margin-top: 0.35rem;
+    box-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
+    animation: dot-glow 2s ease-in-out infinite alternate;
+}
+
+@keyframes dot-glow {
+    0% { box-shadow: 0 0 4px rgba(245, 158, 11, 0.4); }
+    100% { box-shadow: 0 0 12px rgba(245, 158, 11, 0.8); }
+}
