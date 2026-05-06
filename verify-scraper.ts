@@ -186,7 +186,7 @@ async function main() {
         const newsItem = newsItems[0];
         console.log(`Attempting to fetch details for news: "${newsItem.title}" (ID: ${newsItem.id})`);
 
-        const newsResult = await sigaa.getNewsDetail(courseWithNews.id, newsItem.id);
+        const newsResult = await sigaa.getNewsDetail(courseWithNews.id, courseWithNews.name, newsItem.id);
         if (newsResult.success && newsResult.news) {
             console.log('News detail fetched successfully!');
             console.log('Title:', newsResult.news.title);
