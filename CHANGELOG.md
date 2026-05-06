@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.1.0-beta.2](https://github.com/Laginho/SIGAA-ME/compare/v1.1.0-beta.1...v1.1.0-beta.2) (2026-05-06)
+
+
+### Bug Fixes
+
+* bug fixes to auto-sync and news cache persistence ([5872638](https://github.com/Laginho/SIGAA-ME/commit/5872638222096cd6bafa396dafb95a3377988e76))
+
 ## [1.1.0-beta.1](https://github.com/Laginho/SIGAA-ME/compare/v1.1.0-beta.0...v1.1.0-beta.1) (2026-05-06)
 
 ## [1.1.0-beta.0](https://github.com/Laginho/SIGAA-ME/compare/v1.1.0-beta1...v1.1.0-beta.0) (2026-05-03)
