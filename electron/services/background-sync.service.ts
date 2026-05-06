@@ -113,9 +113,22 @@ export class BackgroundSyncService {
                     const currentFiles = contentResult.files || [];
                     const currentNews = contentResult.news || [];
 
+                    // Check if this is a cold-start (first sync for this course, no prior cache).
+                    // On cold-start, all items appear "new" in the diff, but they're not truly new —
+                    // we just populate the baseline and skip notifications.
+                    const cachedState = cacheService.getCourseState(course.id);
+                    const isColdStart = cachedState.files.length === 0 && cachedState.news.length === 0;
+
                     const diff = cacheService.diffCourseState(course.id, currentFiles, currentNews);
 
-                    if (diff.newFiles.length > 0 || diff.newNews.length > 0) {
+                    // Always update the cache so subsequent syncs have a proper baseline
+                    const allFileIds = currentFiles.map(f => String(f.id)).filter(id => id && id !== 'undefined');
+                    const allNewsIds = currentNews.map(n => String(n.id)).filter(id => id && id !== 'undefined');
+                    cacheService.updateCourseState(course.id, allFileIds, allNewsIds);
+
+                    if (isColdStart) {
+                        console.log(`[BackgroundSync] Cold start for ${course.name} — populating baseline (${currentFiles.length} files, ${currentNews.length} news). No notifications.`);
+                    } else if (diff.newFiles.length > 0 || diff.newNews.length > 0) {
                         console.log(`[BackgroundSync] Found ${diff.newFiles.length} new files and ${diff.newNews.length} new news in ${course.name}`);
                         
                         totalNewFiles += diff.newFiles.length;
@@ -182,11 +195,6 @@ export class BackgroundSyncService {
                                 }
                             }
                         }
-
-                        // Update cache
-                        const allFileIds = currentFiles.map(f => String(f.id)).filter(id => id && id !== 'undefined');
-                        const allNewsIds = currentNews.map(n => String(n.id)).filter(id => id && id !== 'undefined');
-                        cacheService.updateCourseState(course.id, allFileIds, allNewsIds);
                     }
 
                     // Collect full course data for frontend update (after content enrichment)
