@@ -1,5 +1,14 @@
 # SIGAA-ME Architecture
 
+## Active engineering documents
+
+- [Hardening Tracker](docs/HARDENING_TRACKER.md) — implementation status,
+  dependencies, acceptance criteria, verification, and multi-agent handoff.
+- [Portal Compatibility Playbook](docs/PORTAL_COMPATIBILITY.md) — selector
+  registry, state classification, fixtures, live canary, diagnostics, and SIGAA
+  drift response.
+- [Code Review](CODE_REVIEW.md) — originating security and release assessment.
+
 ## Scraping Strategy: Hybrid Approach
 
 SIGAA-ME uses a **hybrid Playwright + HTTP** approach to interact with SIGAA (UFC's academic system).
