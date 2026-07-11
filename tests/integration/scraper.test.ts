@@ -8,10 +8,11 @@
  *   2. Fill in SIGAA_USER and SIGAA_PASS in `.env`
  *   3. Have Google Chrome installed
  *
- * Run with: npm test (or npm run test:watch for watch mode)
+ * Run explicitly with PowerShell:
+ *   $env:RUN_LIVE_SIGAA_TESTS='true'; npx.cmd vitest run tests/integration/scraper.test.ts
  *
- * ⚠️  These tests are SKIPPED automatically if credentials are not set.
- *     This means they are safe to run in CI without secrets.
+ * These tests are opt-in: credentials and RUN_LIVE_SIGAA_TESTS=true are both
+ * required, so the default suite remains offline and CI-safe.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -44,15 +45,16 @@ vi.mock('fs', async (importOriginal) => {
 });
 
 // ============================================================
-// CONDITIONAL SKIP: skip all live tests if no credentials
+// CONDITIONAL SKIP: credentials and explicit opt-in are both required.
 // ============================================================
 const SIGAA_USER = process.env.SIGAA_USER;
 const SIGAA_PASS = process.env.SIGAA_PASS;
 
 const hasCredentials = !!SIGAA_USER && !!SIGAA_PASS
     && SIGAA_USER !== 'your_sigaa_username';
+const runLiveSmokeTests = process.env.RUN_LIVE_SIGAA_TESTS === 'true';
 
-const describeOrSkip = hasCredentials ? describe : describe.skip;
+const describeOrSkip = hasCredentials && runLiveSmokeTests ? describe : describe.skip;
 
 // ============================================================
 // LIVE TESTS
@@ -116,8 +118,11 @@ describeOrSkip('🌐 Live SIGAA Smoke Tests (requires .env)', () => {
 // ============================================================
 describe('Test Environment', () => {
     it('shows credentials status', () => {
-        if (hasCredentials) {
-            console.log('✅ .env found — live tests will run.');
+        if (hasCredentials && runLiveSmokeTests) {
+            console.log('✅ .env found and live SIGAA tests are enabled.');
+        } else if (hasCredentials) {
+            console.warn('⚠️  .env credentials found, but live SIGAA tests are disabled by default.');
+            console.warn("   Set RUN_LIVE_SIGAA_TESTS='true' to run them intentionally.");
         } else {
             console.warn('⚠️  No .env credentials found — live tests are SKIPPED.');
             console.warn('   Copy .env.example to .env and fill in your SIGAA credentials to enable them.');

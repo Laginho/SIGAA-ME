@@ -1,8 +1,7 @@
-import { app, BrowserWindow, Notification, safeStorage } from 'electron';
+import { app, BrowserWindow, Notification } from 'electron';
 import { SigaaService } from './sigaa.service';
 import { persistenceService } from './persistence.service';
 import { cacheService } from './cache.service';
-import * as fs from 'fs';
 import * as path from 'path';
 
 export class BackgroundSyncService {
@@ -38,20 +37,6 @@ export class BackgroundSyncService {
         this.start();
     }
 
-    private loadCredentials() {
-        const credPath = path.join(app.getPath('userData'), 'credentials.json');
-        if (fs.existsSync(credPath)) {
-            try {
-                const data = JSON.parse(fs.readFileSync(credPath, 'utf-8'));
-                const password = safeStorage.decryptString(Buffer.from(data.password, 'base64'));
-                return { username: data.username, password };
-            } catch (e) {
-                console.error('[BackgroundSync] Failed to load credentials', e);
-            }
-        }
-        return null;
-    }
-
     public async syncNow() {
         if (this.isSyncing) {
             console.log('[BackgroundSync] Already syncing, skipping...');
@@ -66,7 +51,7 @@ export class BackgroundSyncService {
 
         try {
             // 1. Ensure logged in
-            const creds = this.loadCredentials();
+            const creds = persistenceService.loadCredentials();
             if (!creds) {
                 console.log('[BackgroundSync] No credentials found. Aborting sync.');
                 return;

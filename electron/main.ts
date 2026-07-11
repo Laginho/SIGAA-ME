@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, safeStorage, Tray, Menu } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, Tray, Menu } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import fs from 'node:fs'
@@ -104,46 +104,25 @@ function createWindow() {
   });
 }
 
-const CREDENTIALS_PATH = path.join(app.getPath('userData'), 'credentials.json');
-
-function saveCredentials(username: string, password: string) {
-  if (safeStorage.isEncryptionAvailable()) {
-    const encrypted = safeStorage.encryptString(password);
-    fs.writeFileSync(CREDENTIALS_PATH, JSON.stringify({
-      username,
-      password: encrypted.toString('base64')
-    }));
-  }
-}
-
-function loadCredentials() {
-  if (fs.existsSync(CREDENTIALS_PATH) && safeStorage.isEncryptionAvailable()) {
-    try {
-      const data = JSON.parse(fs.readFileSync(CREDENTIALS_PATH, 'utf-8'));
-      const password = safeStorage.decryptString(Buffer.from(data.password, 'base64'));
-      return { username: data.username, password };
-    } catch (e) {
-      console.error('Failed to load credentials', e);
-    }
-  }
-  return null;
-}
-
 // IPC Handlers
 ipcMain.handle('login-request', async (_event, { username, password, rememberMe }) => {
   const result = await sigaaService.login(username, password)
   if (result.success && rememberMe) {
-    saveCredentials(username, password);
-  } else if (result.success && !rememberMe) {
-    if (fs.existsSync(CREDENTIALS_PATH)) {
-      fs.unlinkSync(CREDENTIALS_PATH);
+    try {
+      persistenceService.saveCredentials(username, password);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('Failed to save remembered credentials:', message);
+      return { success: false, message: `Login succeeded, but the session could not be remembered: ${message}` };
     }
+  } else if (result.success && !rememberMe) {
+    persistenceService.clearCredentials();
   }
   return result;
 })
 
 ipcMain.handle('try-auto-login', async () => {
-  const creds = loadCredentials();
+  const creds = persistenceService.loadCredentials();
   if (creds) {
     console.log('Auto-login: Found credentials for', creds.username);
     return await sigaaService.login(creds.username, creds.password);
@@ -270,9 +249,7 @@ if (!app.isPackaged) {
 ipcMain.handle('logout', async () => {
   console.log('Logout: Clearing credentials and closing session...');
   try {
-    if (fs.existsSync(CREDENTIALS_PATH)) {
-      fs.unlinkSync(CREDENTIALS_PATH);
-    }
+    persistenceService.clearCredentials();
     await sigaaService.logout();
     return { success: true };
   } catch (error: any) {
@@ -284,9 +261,7 @@ ipcMain.handle('logout', async () => {
 ipcMain.handle('clear-all-data', async () => {
   console.log('Clear all data: Clearing credentials and closing session...');
   try {
-    if (fs.existsSync(CREDENTIALS_PATH)) {
-      fs.unlinkSync(CREDENTIALS_PATH);
-    }
+    persistenceService.clearCredentials();
     await sigaaService.logout();
     return { success: true };
   } catch (error: any) {
