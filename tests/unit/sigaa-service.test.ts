@@ -196,3 +196,4 @@ describe('SigaaService (Unit)', () => {
             expect(result.success).toBe(false);
         });
 });
+});

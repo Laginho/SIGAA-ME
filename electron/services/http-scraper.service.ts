@@ -268,6 +268,13 @@ export class HttpScraperService {
             let filesPageData = coursePageData;
             let conteudoLink: any = null;
 
+            if ($('input[name="user.login"]').length > 0 || coursePageData.includes('verTelaLogin.do')) {
+                return {
+                    success: false,
+                    error: 'Session expired: SIGAA returned the login page instead of course content. Re-authenticate before requesting files.'
+                };
+            }
+
             // Skip navigation if using Playwright HTML (already navigated)
             if (preFetchedHtml) {
                 try {
@@ -369,6 +376,17 @@ export class HttpScraperService {
             if (filesForm.length === 0) {
                 // Fallback to first form if formAva not found
                 filesForm = $files('form').first();
+            }
+
+            if (!viewState || filesForm.length === 0) {
+                const missingSelectors = [
+                    !viewState ? 'input[name="javax.faces.ViewState"]' : null,
+                    filesForm.length === 0 ? 'form[name="formAva"] (or another course form)' : null
+                ].filter(Boolean).join(', ');
+                return {
+                    success: false,
+                    error: `SIGAA course selector drift: required JSF structure is missing (${missingSelectors}). The page may no longer be a course files page.`
+                };
             }
 
             const formAction = filesForm.attr('action') || '/sigaa/ava/index.jsf';

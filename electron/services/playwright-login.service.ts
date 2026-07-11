@@ -19,6 +19,26 @@ export class PlaywrightLoginService {
     private storedUsername: string | null = null;
     private storedPassword: string | null = null;
 
+    private formatLoginFailure(error: unknown): string {
+        const message = error instanceof Error ? error.message : String(error);
+        const selectorLabels: Array<[string, string]> = [
+            ['input[name="user.login"]', 'username field'],
+            ['input[name="user.senha"]', 'password field'],
+            ['input[name="entrar"]', 'login button']
+        ];
+        const selector = selectorLabels.find(([candidate]) => message.includes(candidate));
+
+        if (selector) {
+            return `SIGAA login selector drift: the ${selector[1]} (${selector[0]}) was not found or did not become usable. The SIGAA login page may have changed. Playwright: ${message}`;
+        }
+
+        if (/timeout/i.test(message)) {
+            return `SIGAA login navigation timed out. Check portal availability or recent page changes. Playwright: ${message}`;
+        }
+
+        return message;
+    }
+
     async login(username: string, password: string): Promise<{ success: boolean; cookies?: any[]; userName?: string; photoUrl?: string; error?: string }> {
         try {
             console.log('Playwright: Launching browser...');
@@ -110,7 +130,7 @@ export class PlaywrightLoginService {
         } catch (error: any) {
             console.error('Playwright: Error during login:', error);
             await this.close();
-            return { success: false, error: error.message };
+            return { success: false, error: this.formatLoginFailure(error) };
         }
     }
 
@@ -239,7 +259,7 @@ export class PlaywrightLoginService {
 
             // Extract courses with robust selector-based logic
             console.log('Playwright: Extracting courses from page...');
-            const courses = await page.evaluate(() => {
+            const courseExtraction = await page.evaluate(() => {
                 const results: any[] = [];
                 // Find all rows that might contain courses
                 const rows = document.querySelectorAll('tr');
@@ -273,8 +293,23 @@ export class PlaywrightLoginService {
                     }
                 }
 
-                return results;
+                return {
+                    courses: results,
+                    selectorDiagnostics: {
+                        courseIdInputs: document.querySelectorAll('input[name="idTurma"]').length,
+                        virtualClassroomLinks: document.querySelectorAll('a[id*="turmaVirtual"]').length
+                    }
+                };
             });
+
+            const { courses, selectorDiagnostics } = courseExtraction;
+            if (selectorDiagnostics.courseIdInputs === 0 || selectorDiagnostics.virtualClassroomLinks === 0) {
+                const missingSelectors = [
+                    selectorDiagnostics.courseIdInputs === 0 ? 'input[name="idTurma"]' : null,
+                    selectorDiagnostics.virtualClassroomLinks === 0 ? 'a[id*="turmaVirtual"]' : null
+                ].filter(Boolean).join(', ');
+                throw new Error(`SIGAA portal selector drift: the course list is missing ${missingSelectors}. The portal layout may have changed.`);
+            }
 
             console.log('Playwright: Found courses:', courses.length);
 
@@ -628,7 +663,7 @@ export class PlaywrightLoginService {
                 // Log page state for debugging
                 const allMenuText = await page.locator('.itemMenu, a').allTextContents();
                 logger.warn(`Playwright: Available text contents: (truncated) ${allMenuText.join(', ').substring(0, 300)}`);
-                return { success: false, error: 'Conteúdo link not found' };
+                return { success: false, error: 'SIGAA selector drift: the "Conteúdo" files navigation link was not found. Open the saved portal diagnostics and update the portal selectors.' };
             }
 
             // 3. JSF uses AJAX partial updates. networkidle fires too early.
@@ -640,9 +675,13 @@ export class PlaywrightLoginService {
                     return links.length > 0;
                 }, { timeout: 8000 });
                 logger.info('Playwright: Files content detected (found jsfcljs links).');
-            } catch {
-                logger.warn('Playwright: Timeout waiting for jsfcljs links. Falling back to 4s wait.');
-                await page.waitForTimeout(4000);
+            } catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
+                logger.warn(`Playwright: Files content selector timed out: ${message}`);
+                return {
+                    success: false,
+                    error: `SIGAA selector drift: the files section did not render a[onclick*="jsfcljs"][onclick*=",id,"] before the timeout. The course layout may have changed. Playwright: ${message}`
+                };
             }
 
             const html = await page.content();
