@@ -38,7 +38,7 @@ export function renderDashboardPage(app: HTMLDivElement, account: UserAccount) {
     }
   }
 
-  let name: string = toTitleCase(account.name);
+  const name: string = toTitleCase(account.name);
   const unreadCount = getUnreadCount();
 
   app.innerHTML = `

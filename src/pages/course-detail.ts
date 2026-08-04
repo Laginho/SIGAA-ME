@@ -211,7 +211,7 @@ async function fetchCourseFiles(courseId: string) {
     } else {
       // Get downloaded status
       const downloadedFiles = JSON.parse(localStorage.getItem('downloadedFiles') || '{}');
-      let courseDownloads = downloadedFiles[courseId] || {};
+      const courseDownloads = downloadedFiles[courseId] || {};
 
       // Verify existence
       const filePaths = Object.values(courseDownloads).map((f: any) => f.path).filter(p => p);
@@ -369,7 +369,7 @@ async function downloadSingleFile(course: any, fileName: string, fileUrl: string
 
       toast.success(`Download concluído: ${fileName}`);
     } else {
-      toast.error(`Erro no download: ${result.error || 'Erro desconhecido'}`);
+      toast.error(`Erro no download: ${result.message || 'Erro desconhecido'}`);
       btnElement.innerHTML = '❌';
       btnElement.classList.remove('spinning');
     }
@@ -434,15 +434,22 @@ async function testDownloadAll(courseId: string) {
       downloadedFiles
     });
 
-    if (result.success || result.downloaded > 0 || result.skipped > 0) {
-      if (result.failed === 0) {
-        toast.success(`Download concluído! ${result.downloaded} baixados, ${result.skipped} já existiam.`);
+    // O main omite os contadores quando falha antes de entrar na disciplina,
+    // então o contrato os declara opcionais. Normalizar aqui evita quatro
+    // `?? 0` espalhados pelas interpolações.
+    const downloaded = result.downloaded ?? 0;
+    const skipped = result.skipped ?? 0;
+    const failed = result.failed ?? 0;
+
+    if (result.success || downloaded > 0 || skipped > 0) {
+      if (failed === 0) {
+        toast.success(`Download concluído! ${downloaded} baixados, ${skipped} já existiam.`);
       } else {
-        toast.error(`${result.downloaded} baixados, ${result.failed} falharam. Tente novamente mais tarde.`);
+        toast.error(`${downloaded} baixados, ${failed} falharam. Tente novamente mais tarde.`);
       }
 
       if (result.results) {
-        result.results.forEach((r: any) => {
+        result.results.forEach((r) => {
           if (r.status === 'downloaded' && r.filePath) {
             if (!downloadedFiles[courseId]) downloadedFiles[courseId] = {};
             downloadedFiles[courseId][r.fileName] = {
