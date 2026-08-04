@@ -8,6 +8,14 @@ import { execSync } from 'child_process'
 import { persistenceService } from './services/persistence.service'
 import { BackgroundSyncService } from './services/background-sync.service'
 import { cacheService } from './services/cache.service'
+import type {
+  DownloadAllFilesPayload,
+  DownloadFilePayload,
+  DownloadProgress,
+  DownloadStatus,
+  LoginCredentials,
+  SettingUpdate,
+} from '../shared/ipc'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -34,7 +42,7 @@ const originalConsoleLog = console.log;
 const originalConsoleError = console.error;
 const originalConsoleWarn = console.warn;
 
-const formatLog = (level: string, args: any[]) => {
+const formatLog = (level: string, args: unknown[]) => {
   const timestamp = new Date().toISOString();
   const message = args.map(arg =>
     typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
@@ -42,17 +50,17 @@ const formatLog = (level: string, args: any[]) => {
   return `[${timestamp}] [${level}] ${message}\n`;
 };
 
-console.log = (...args: any[]) => {
+console.log = (...args: unknown[]) => {
   originalConsoleLog.apply(console, args);
   logStream.write(formatLog('INFO', args));
 };
 
-console.error = (...args: any[]) => {
+console.error = (...args: unknown[]) => {
   originalConsoleError.apply(console, args);
   logStream.write(formatLog('ERROR', args));
 };
 
-console.warn = (...args: any[]) => {
+console.warn = (...args: unknown[]) => {
   originalConsoleWarn.apply(console, args);
   logStream.write(formatLog('WARN', args));
 };
@@ -105,7 +113,7 @@ function createWindow() {
 }
 
 // IPC Handlers
-ipcMain.handle('login-request', async (_event, { username, password, rememberMe }) => {
+ipcMain.handle('login-request', async (_event, { username, password, rememberMe }: LoginCredentials) => {
   const result = await sigaaService.login(username, password)
   if (result.success && rememberMe) {
     try {
@@ -151,15 +159,7 @@ ipcMain.handle('select-download-folder', async () => {
   return { success: true, folderPath: result.filePaths[0] };
 })
 
-ipcMain.handle('download-file', async (_, data: {
-  courseId: string;
-  courseName: string;
-  fileName: string;
-  fileUrl: string;
-  basePath: string;
-  downloadedFiles: Record<string, any>;
-  script?: string;
-}) => {
+ipcMain.handle('download-file', async (_, data: DownloadFilePayload) => {
   return await sigaaService.downloadFile(
     data.courseId,
     data.courseName,
@@ -171,15 +171,10 @@ ipcMain.handle('download-file', async (_, data: {
   );
 })
 
-ipcMain.handle('download-all-files', async (_, data: {
-  courseId: string;
-  courseName: string;
-  files: Array<{ name: string; url: string; script?: string }>;
-  basePath: string;
-  downloadedFiles: Record<string, any>;
-}) => {
-  const onProgress = (fileName: string, status: 'downloaded' | 'skipped' | 'failed') => {
-    win?.webContents.send('download-progress', { fileName, status });
+ipcMain.handle('download-all-files', async (_, data: DownloadAllFilesPayload) => {
+  const onProgress = (fileName: string, status: DownloadStatus) => {
+    const progress: DownloadProgress = { fileName, status };
+    win?.webContents.send('download-progress', progress);
   };
 
   return await sigaaService.downloadAllFiles(
@@ -212,16 +207,16 @@ ipcMain.handle('get-app-settings', async () => {
   return persistenceService.getSettings();
 });
 
-ipcMain.handle('update-app-setting', async (_, { key, value }) => {
-  persistenceService.updateSetting(key, value);
-  if (key === 'openAtLogin') {
+ipcMain.handle('update-app-setting', async (_, update: SettingUpdate) => {
+  persistenceService.applySetting(update);
+  if (update.key === 'openAtLogin') {
     app.setLoginItemSettings({
-      openAtLogin: value as boolean,
+      openAtLogin: update.value,
       path: process.execPath,
       args: app.isPackaged ? ['--hidden'] : [app.getAppPath(), '--hidden']
     });
   }
-  if (['runInBackground', 'syncInterval'].includes(key)) {
+  if (update.key === 'runInBackground' || update.key === 'syncInterval') {
     backgroundSyncService.restart();
   }
   return { success: true };
@@ -252,9 +247,10 @@ ipcMain.handle('logout', async () => {
     persistenceService.clearCredentials();
     await sigaaService.logout();
     return { success: true };
-  } catch (error: any) {
-    console.error('Logout error:', error);
-    return { success: false, message: error.message };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('Logout error:', message);
+    return { success: false, message };
   }
 });
 
@@ -264,9 +260,10 @@ ipcMain.handle('clear-all-data', async () => {
     persistenceService.clearCredentials();
     await sigaaService.logout();
     return { success: true };
-  } catch (error: any) {
-    console.error('Clear all data error:', error);
-    return { success: false, message: error.message };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('Clear all data error:', message);
+    return { success: false, message };
   }
 });
 
@@ -302,24 +299,29 @@ app.on('activate', () => {
 
 app.whenReady().then(() => {
   try {
-    let chromeExists = false;
-    if (process.platform === 'win32') {
+    // Chrome ausente não é erro: é o caso que estamos detectando. Por isso os
+    // catch abaixo não engolem falha — a ausência É a informação, e ela vira o
+    // dialog logo adiante. (Regra 3 do CLAUDE.md se aplica a erro ignorado,
+    // não a sondagem cujo fracasso é resultado válido.)
+    const commandSucceeds = (command: string): boolean => {
       try {
-        execSync('reg query "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\chrome.exe"');
-        chromeExists = true;
-      } catch (e) {
-        try {
-          execSync('reg query "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\App Paths\\chrome.exe"');
-          chromeExists = true;
-        } catch (e2) {}
+        execSync(command, { stdio: 'ignore' });
+        return true;
+      } catch {
+        return false;
       }
+    };
+
+    let chromeExists: boolean;
+    if (process.platform === 'win32') {
+      const appPaths = 'Software\\Microsoft\\Windows\\CurrentVersion\\App Paths\\chrome.exe';
+      chromeExists =
+        commandSucceeds(`reg query "HKEY_LOCAL_MACHINE\\${appPaths}"`) ||
+        commandSucceeds(`reg query "HKEY_CURRENT_USER\\${appPaths}"`);
     } else if (process.platform === 'darwin') {
       chromeExists = fs.existsSync('/Applications/Google Chrome.app');
     } else {
-      try {
-        execSync('which google-chrome');
-        chromeExists = true;
-      } catch (e) {}
+      chromeExists = commandSucceeds('which google-chrome');
     }
 
     if (!chromeExists) {

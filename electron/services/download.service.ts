@@ -90,7 +90,7 @@ export class DownloadService {
                     if (!link) continue;
                     
                     const desc = link.querySelector('.descricao-form-disciplina') || link;
-                    let text = (desc.textContent || '').trim().replace(/[\n\r]/g, '').trim();
+                    const text = (desc.textContent || '').trim().replace(/[\n\r]/g, '').trim();
                     
                     if (text === fname || text.includes(fname) || fname.includes(text)) {
                         const onclick = link.getAttribute('onclick');
@@ -156,7 +156,7 @@ export class DownloadService {
                     ext = '.pdf';
                 }
 
-                let downloadedExt = ext && !path.extname(finalPath) ? ext : '';
+                const downloadedExt = ext && !path.extname(finalPath) ? ext : '';
                 if (downloadedExt) {
                     finalPath += downloadedExt;
                 }
@@ -166,7 +166,7 @@ export class DownloadService {
 
                 // --- JSF Error Page Detection ---
                 try {
-                    let successRead = false;
+                    const successRead = false;
                     for (let i = 0; i < 5; i++) {
                         try {
                             const stats = fs.statSync(finalPath);
@@ -222,7 +222,7 @@ export class DownloadService {
 
                     await popupDownload.saveAs(finalPath);
 
-                    let successReadPopup = false;
+                    const successReadPopup = false;
                     for (let i = 0; i < 5; i++) {
                         try {
                             const stats = fs.statSync(finalPath);
@@ -306,7 +306,7 @@ export class DownloadService {
 
                     await download.saveAs(finalPath);
 
-                    let successReadReload = false;
+                    const successReadReload = false;
                     for (let i = 0; i < 5; i++) {
                         try {
                             const stats = fs.statSync(finalPath);
@@ -405,7 +405,7 @@ export class DownloadService {
 
         const processQueue = async (workerId: number) => {
             // Worker 0 uses the main page, others create new pages
-            let workerPage = workerId === 0 ? page : await page.context().newPage();
+            const workerPage = workerId === 0 ? page : await page.context().newPage();
 
             try {
                 // If new page, navigate to course

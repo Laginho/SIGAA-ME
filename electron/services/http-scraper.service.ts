@@ -236,7 +236,7 @@ export class HttpScraperService {
             this.log(`[HttpScraper] Fetching course page for ${courseName || courseId}...`);
 
             let coursePageData = '';
-            let currentUrl = `${this.baseUrl}/sigaa/ava/index.jsf`;
+            const currentUrl = `${this.baseUrl}/sigaa/ava/index.jsf`;
 
             if (preFetchedHtml) {
                 this.log(`[HttpScraper] Using pre-fetched HTML from Playwright. Length: ${preFetchedHtml.length}`);
@@ -702,7 +702,7 @@ export class HttpScraperService {
                     const text = $news(el).text().trim().replace(':', '');
                     if (text === label) {
                         // Try next sibling
-                        let next = $news(el).next();
+                        const next = $news(el).next();
                         if (next.length > 0) {
                             result = next.text().trim();
                             return false;

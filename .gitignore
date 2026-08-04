@@ -55,3 +55,8 @@ playwright-report/
 .test-user-data/
 .test-user-data-auth/
 test_error.png
+
+# Resíduo de ferramenta de agente (tarballs, saídas temporárias)
+_agent_tmp/
+_to_delete/
+quality.txt

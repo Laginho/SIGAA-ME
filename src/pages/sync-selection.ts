@@ -1,5 +1,20 @@
 import '../styles/sync-selection.css';
 
+/**
+ * Forma mínima que esta página precisa de uma disciplina.
+ *
+ * `getCourses` devolve `unknown[]` de propósito: modelar `CourseSummary`
+ * inteiro é o `ARCH-001`. Até lá, validar na fronteira é o que o `unknown`
+ * existe para forçar — e tem um efeito colateral útil: se o SIGAA mudar e o
+ * parser passar a devolver outra forma, isso aparece aqui como falha
+ * explícita, em vez de `undefined` vazando para dentro do localStorage.
+ */
+function isCourseLike(value: unknown): value is { id: string; name: string } {
+  if (typeof value !== 'object' || value === null) return false;
+  const candidate = value as { id?: unknown; name?: unknown };
+  return typeof candidate.id === 'string' && typeof candidate.name === 'string';
+}
+
 
 export function renderSyncSelectionPage(app: HTMLDivElement) {
   // Check if user has cached data (meaning they can go back)
@@ -130,8 +145,24 @@ async function startSync(app: HTMLDivElement, mode: 'fast' | 'full') {
       throw new Error(result.message || 'Falha ao buscar disciplinas');
     }
 
-    const courses = result.courses;
+    const courses = result.courses.filter(isCourseLike);
     const coursesWithContent: any[] = [];
+
+    // Zero disciplinas utilizáveis num retorno não vazio significa que o
+    // formato mudou — deriva de seletor, não "aluno sem matrícula". Falhar
+    // alto aqui é melhor que sincronizar dados vazios em cima do cache bom.
+    if (courses.length === 0 && result.courses.length > 0) {
+      throw new Error(
+        `O SIGAA devolveu ${result.courses.length} disciplina(s) em formato desconhecido. ` +
+        'O app provavelmente precisa ser atualizado.'
+      );
+    }
+
+    if (courses.length < result.courses.length) {
+      console.warn(
+        `${result.courses.length - courses.length} de ${result.courses.length} disciplinas ignoradas por não terem id/name utilizáveis.`
+      );
+    }
 
     // Persist photo URL if returned
     if (result.photoUrl) {

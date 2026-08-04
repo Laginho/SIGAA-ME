@@ -2,16 +2,11 @@ import { app, safeStorage } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 
-export interface AppSettings {
-    theme: 'light' | 'dark';
-    autoSync: boolean;
-    lastDownloadPath: string | null;
-    runInBackground: boolean;
-    syncInterval: number; // in minutes
-    autoDownloadUpdates: boolean;
-    lastBackgroundSync?: number;
-    openAtLogin: boolean;
-}
+// AppSettings vive em shared/ipc.ts porque atravessa o IPC (o renderer lê via
+// getSettings e escreve via updateSetting). Reexportado aqui para não quebrar
+// os imports existentes.
+export type { AppSettings } from '../../shared/ipc';
+import type { AppSettings, SettingUpdate } from '../../shared/ipc';
 
 export interface StoredCredentials {
     username: string;
@@ -58,6 +53,20 @@ export class PersistenceService {
 
     public updateSetting<K extends keyof AppSettings>(key: K, value: AppSettings[K]) {
         this.settings[key] = value;
+        this.saveSettings();
+    }
+
+    /**
+     * Aplica uma alteração vinda do renderer.
+     *
+     * Existe separado de `updateSetting` por uma limitação do TypeScript: ele
+     * não correlaciona `key` e `value` quando os dois vêm de uma união
+     * discriminada, então `updateSetting(update.key, update.value)` não
+     * compila. `Object.assign` resolve sem precisar de cast — e a fronteira,
+     * que é o que importa, continua estritamente tipada.
+     */
+    public applySetting(update: SettingUpdate) {
+        Object.assign(this.settings, { [update.key]: update.value });
         this.saveSettings();
     }
 

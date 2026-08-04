@@ -102,7 +102,7 @@ export class PlaywrightLoginService {
 
             // Note: Photo is only available on portal page, not login page
             // Will extract it during getCourses instead
-            let photoUrl: string | null = null;
+            const photoUrl: string | null = null;
 
             console.log('Playwright: Extracted user name:', userName);
             console.log('Playwright: Photo will be extracted from portal page during sync');
@@ -754,7 +754,7 @@ export class PlaywrightLoginService {
         _downloadedFiles: Record<string, any>,
         script?: string
     ): Promise<{ success: boolean; filePath?: string; error?: string }> {
-        let maxRetries = 1;
+        const maxRetries = 1;
         let attempt = 0;
 
         while (attempt <= maxRetries) {
@@ -874,7 +874,7 @@ export class PlaywrightLoginService {
         failed: number;
         results: any[];
     }> {
-        let maxRetries = 1;
+        const maxRetries = 1;
         let attempt = 0;
 
         while (attempt <= maxRetries) {
