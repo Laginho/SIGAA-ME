@@ -53,12 +53,7 @@ export function renderCourseDetailPage(container: HTMLDivElement, courseId: stri
   // Back button handler
   const backButton = document.getElementById('backButton')
   backButton?.addEventListener('click', () => {
-    // Resume sync when leaving
-    try {
-      (window as any).api.resumeSync();
-    } catch (e) {
-      console.error('Failed to resume sync:', e);
-    }
+    // Não existe retomada de sync — ver a nota sobre `pauseSync` mais abaixo.
     window.location.hash = '#/dashboard'
   })
 
@@ -119,12 +114,12 @@ export function renderCourseDetailPage(container: HTMLDivElement, courseId: stri
   // Fetch course files
   fetchCourseFiles(courseId)
 
-  // Pause sync while viewing course details
-  try {
-    (window as any).api.pauseSync();
-  } catch (e) {
-    console.error('Failed to pause sync:', e);
-  }
+  // Não existe pausa de sync. Havia aqui uma chamada a `api.pauseSync()` com
+  // cast `as any` e try/catch: nem o preload expõe isso, nem o main tem handler
+  // `pause-sync`. O cast calava o typecheck e o catch calava o runtime, então o
+  // código parecia proteger contra sync concorrente e não fazia nada.
+  // Se a proteção for necessária, ela precisa ser implementada de verdade —
+  // handler no main, ponte no preload, teste que falhe sem ela.
 }
 
 async function fetchCourseFiles(courseId: string) {

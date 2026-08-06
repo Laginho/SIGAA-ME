@@ -501,7 +501,11 @@ export class HttpScraperService {
                             const onclick = link.attr('onclick');
 
                             if (title && date && onclick) {
-                                const idMatch = onclick.match(/['"](\\d+)['"]/);
+                                // Era /['"](\\d+)['"]/ — dentro de literal de regex, `\\d` é
+                                // barra invertida seguida de "d", não dígito. Nunca casava, e
+                                // esta estratégia devolvia zero notícia silenciosamente. O id
+                                // vem do onclick do JSF como `...,id,777,...`.
+                                const idMatch = onclick.match(/,id,([^,'"]+)/);
                                 if (idMatch) {
                                     news.push({
                                         title,

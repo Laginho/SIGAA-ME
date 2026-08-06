@@ -5,7 +5,7 @@ import type {
   DownloadFilePayload,
   DownloadProgress,
   LoginCredentials,
-  SettingUpdate,
+  RendererApi,
 } from '../shared/ipc'
 
 // --------- Expose some API to the Renderer process ---------
@@ -31,7 +31,20 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
   },
 })
 
-contextBridge.exposeInMainWorld('api', {
+/**
+ * A anotação `: RendererApi` é a verificação que faltava nesta fronteira.
+ *
+ * O tipo vem de `shared/ipc.ts` e é o mesmo que `src/vite-env.d.ts` usa para
+ * declarar `window.api`. Ponte que falta virou erro de compilação: foi assim que
+ * `getSettings` conseguiu ficar declarada, atendida pelo main, e sem ponte aqui
+ * (`BUG-008`). Não troque por `satisfies` nem tire a anotação — é ela que
+ * amarra as duas pontas.
+ *
+ * O que isto **não** cobre: se o canal invocado abaixo não tiver
+ * `ipcMain.handle` do outro lado, o `tsc` não vê. Essa metade é verificada por
+ * `tests/unit/preload-contract.test.ts`, que lê o `main.ts`.
+ */
+const api: RendererApi = {
   login: (credentials: LoginCredentials) => ipcRenderer.invoke('login-request', credentials),
   tryAutoLogin: () => ipcRenderer.invoke('try-auto-login'),
   getCourses: () => ipcRenderer.invoke('get-courses'),
@@ -55,11 +68,12 @@ contextBridge.exposeInMainWorld('api', {
   clearAllData: () => ipcRenderer.invoke('clear-all-data'),
 
   // App Settings
-  // A união discriminada amarra cada chave ao tipo do seu valor (SEC-002).
-  updateSetting: <K extends SettingUpdate['key']>(
-    key: K,
-    value: Extract<SettingUpdate, { key: K }>['value'],
-  ) => ipcRenderer.invoke('update-app-setting', { key, value }),
+  getSettings: () => ipcRenderer.invoke('get-app-settings'),
+  // A união discriminada amarra cada chave ao tipo do seu valor (SEC-002); a
+  // assinatura genérica vem do `RendererApi` por tipagem contextual. Repeti-la
+  // aqui não compila: duas assinaturas genéricas com `Extract<...>` diferido não
+  // se provam equivalentes.
+  updateSetting: (key, value) => ipcRenderer.invoke('update-app-setting', { key, value }),
 
   // Dev Testing
   simulateNewFile: () => ipcRenderer.invoke('test-simulate-new-file'),
@@ -70,4 +84,6 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.on('background-sync-update', subscription)
     return () => ipcRenderer.off('background-sync-update', subscription)
   }
-})
+}
+
+contextBridge.exposeInMainWorld('api', api)
