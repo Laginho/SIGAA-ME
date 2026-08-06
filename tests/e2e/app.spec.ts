@@ -25,7 +25,8 @@ test.describe('App E2E', () => {
         }
 
         electronApp = await electron.launch({
-            args: ['.', `--user-data-dir=${testUserDataDir}`]
+            // `--no-sandbox`: obrigatório para rodar como root (CI/agente).
+            args: ['.', '--no-sandbox', `--user-data-dir=${testUserDataDir}`]
         });
         window = await electronApp.firstWindow();
         window.on('console', msg => console.log('RENDERER:', msg.type(), msg.text()));

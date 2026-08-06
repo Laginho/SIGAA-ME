@@ -2,6 +2,9 @@ import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
     testDir: './tests/e2e',
+    // Só `.spec.ts`: `tests/e2e/*.test.ts` são testes de vitest (jsdom) e o
+    // Playwright morre ao transformá-los, zerando a coleta inteira.
+    testMatch: '**/*.spec.ts',
     timeout: 60000,
     expect: {
         timeout: 10000
