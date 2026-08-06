@@ -18,11 +18,22 @@ export function formatSyncLabel(timestampMs: number, now: Date = new Date()): st
     if (diffMin < 1) return 'agora mesmo';
     if (diffMin < 60) return `há ${diffMin} min`;
     if (cacheDate.toDateString() === now.toDateString()) {
-        return `hoje às ${cacheDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+        return `hoje às ${formatClock(cacheDate)}`;
     }
     const day = cacheDate.getDate().toString().padStart(2, '0');
     const month = (cacheDate.getMonth() + 1).toString().padStart(2, '0');
-    return `${day}/${month} às ${cacheDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    return `${day}/${month} às ${formatClock(cacheDate)}`;
+}
+
+/**
+ * Relógio 24h fixo no locale pt-BR.
+ *
+ * `toLocaleTimeString([], ...)` usa o locale da máquina: num sistema en-US isso
+ * vira "12:30 PM" no meio de uma string em português. O app é pt-BR, então o
+ * formato não deve depender de como o usuário configurou o sistema dele.
+ */
+function formatClock(date: Date): string {
+    return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
 /**

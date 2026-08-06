@@ -142,6 +142,56 @@ export type SettingUpdate = {
   [K in RendererSettingKey]: { key: K; value: Required<AppSettings>[K] }
 }[RendererSettingKey]
 
+// -------------------------------------------------------- contrato do preload
+
+/**
+ * O que o renderer pode chamar. **Uma declaração, dois usos:**
+ *
+ * - `electron/preload.ts` anota o objeto do `contextBridge` com este tipo, então
+ *   ponte faltando é erro de compilação;
+ * - `src/vite-env.d.ts` declara `Window.api` com este tipo, então o renderer vê
+ *   exatamente o que a ponte implementa.
+ *
+ * Antes disso a forma era escrita à mão nos dois lugares, e as duas cópias
+ * divergiram: `getSettings` estava declarada e não estava na ponte. Cinco call
+ * sites quebravam em runtime com o `tsc` verde (`BUG-008`). Não volte a
+ * descrever esta forma em nenhum outro arquivo — a duplicação **é** o bug.
+ *
+ * Por que declarar o tipo em vez de derivar da implementação com
+ * `typeof api`: `ipcRenderer.invoke` devolve `Promise<any>`, então derivar
+ * apagaria todos os retornos e reabriria a porta do `BUG-006` (campo lido que o
+ * main nunca devolveu). O retorno anotado é o que o typecheck tem para conferir.
+ *
+ * Os retornos ainda usam `unknown` em vários pontos: o `ARCH-001` vai modelar
+ * `CourseSummary`, `CourseFile` e um `AppResult<T>` discriminado. Até então
+ * `unknown` é honesto — obriga o consumidor a validar — enquanto `any` mentia
+ * dizendo que o formato era conhecido. Os PAYLOADS (renderer -> main) já estão
+ * estritos, porque é a direção por onde dado não confiável entra no processo
+ * privilegiado.
+ */
+export interface RendererApi {
+  login: (credentials: LoginCredentials) => Promise<{ success: boolean; message?: string; account?: AccountSummary }>
+  tryAutoLogin: () => Promise<{ success: boolean; message?: string; account?: AccountSummary }>
+  getCourses: () => Promise<{ success: boolean; courses?: unknown[]; photoUrl?: string; message?: string }>
+  getCourseFiles: (courseId: string, courseName?: string) => Promise<{ success: boolean; files?: unknown[]; news?: unknown[]; message?: string }>
+  selectDownloadFolder: () => Promise<{ success: true; folderPath: string } | { success: false }>
+  downloadFile: (data: DownloadFilePayload) => Promise<{ success: boolean; filePath?: string; message?: string }>
+  downloadAllFiles: (data: DownloadAllFilesPayload) => Promise<{ success: boolean; message?: string; downloaded?: number; skipped?: number; failed?: number; results?: DownloadResultItem[] }>
+  checkFilesExistence: (filePaths: string[]) => Promise<{ path: string; exists: boolean }[]>
+  onDownloadProgress: (callback: (data: DownloadProgress) => void) => () => void
+  getNewsDetail: (courseId: string, courseName: string, newsId: string) => Promise<{ success: boolean; news?: NewsDetail; message?: string }>
+  loadAllNews: (courseId: string, courseName: string) => Promise<{ success: boolean; news?: unknown[]; message?: string }>
+  logout: () => Promise<{ success: boolean; message?: string }>
+  clearAllData: () => Promise<{ success: boolean; message?: string }>
+  getSettings: () => Promise<AppSettings>
+  updateSetting: <K extends SettingUpdate['key']>(
+    key: K,
+    value: Extract<SettingUpdate, { key: K }>['value'],
+  ) => Promise<{ success: boolean }>
+  simulateNewFile: () => Promise<boolean>
+  onBackgroundSyncUpdate: (callback: (data: BackgroundSyncUpdate) => void) => () => void
+}
+
 // ------------------------------------------------------------------- eventos
 
 /**
