@@ -29,7 +29,34 @@ Use these for testing new features before the official launch.
 1. **Automatic Versioning**: It updates `package.json`.
 2. **Changelog**: It automatically appends to `CHANGELOG.md`.
 3. **Git Tagging**: It creates a tag (e.g., `v1.2.0-beta.0`).
-4. **Trigger**: The command automatically pushes to GitHub, which starts the **GitHub Actions** build.
+4. **Push**: The command pushes the commit and the tag to GitHub.
+
+O push **não publica nada** — ver abaixo.
+
+---
+
+## 📦 Publicar é um segundo passo, manual
+
+Mudou em 2026-08-05 (`PIPE-001`/`PIPE-004`). Antes, o push da tag disparava o
+build e o `electron-builder` publicava incondicionalmente: um `npm run
+release:patch` podia substituir o app dos usuários por auto-update sem que
+nenhum teste tivesse rodado.
+
+Agora o fluxo é:
+
+1. `npm run release:patch` (ou a variante que você quer) — versiona, gera
+   changelog, cria a tag e empurra.
+2. GitHub → **Actions** → **Release SIGAA-ME** → **Run workflow**.
+3. O workflow roda o gate (`typecheck`, `lint`, `test`) **antes** de compilar. Se
+   algum falhar, não existe binário nem release.
+4. A caixa **Publicar no GitHub Releases** decide o resto:
+   - **desmarcada** (padrão): compila e guarda o instalador como artefato do
+     workflow, para você baixar e testar. Nada vai para os usuários.
+   - **marcada**: publica no GitHub Releases, e aí o auto-update alcança quem já
+     tem o app instalado.
+
+`npm run release` na sua máquina compila e **não** publica (`--publish never`).
+A flag que publica existe só dentro do `release.yml`.
 
 > [!TIP]
 > Always make sure your working directory is clean (`git status`) before running a release command!

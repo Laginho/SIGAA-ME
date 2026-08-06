@@ -1,10 +1,23 @@
 name: Release SIGAA-ME
 
+# PIPE-001: publicar é um ato deliberado, não uma consequência de `git push`.
+#
+# Antes: `push: tags: v*.*.*` disparava este workflow, e `npm run release`
+# terminava em `electron-builder --publish always`. Como `npm run release:patch`
+# faz `git push --follow-tags`, existia um caminho sem freio entre "rodei um
+# script" e "o app de todo mundo foi substituído por auto-update" — sem que
+# nenhum teste tivesse rodado.
+#
+# Agora só `workflow_dispatch`: Actions → Release SIGAA-ME → Run workflow.
+# Continue usando `npm run release:patch` para versionar e empurrar a tag;
+# publicar virou o passo separado. O build local (`npm run build`) não mudou.
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - 'v*.*.*' # Trigger on tags like v1.0.0
+    inputs:
+      publish:
+        description: 'Publicar no GitHub Releases (desmarcado = só compila e guarda o instalador como artefato)'
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -26,12 +39,53 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
+      # Ver o comentário do `quality.yml`: `npm ci` não roda enquanto o lock
+      # estiver fora de sincronia com o `package.json` (DEP-002).
       - name: Install Dependencies
         run: npm install
 
-      - name: Build and Publish
+      # PIPE-004: o gate roda aqui dentro, antes do build.
+      #
+      # Não é `needs:` do job do `quality.yml` — o GitHub não permite depender de
+      # um job de outro workflow. Repetir os três comandos é a forma barata; a
+      # alternativa (workflow reutilizável com `workflow_call`) é mais máquina do
+      # que este projeto precisa hoje.
+      #
+      # Se qualquer um falhar, o job para e nada é publicado.
+      - name: Gate — typecheck
+        run: npm run typecheck
+
+      - name: Gate — lint
+        run: npm run lint
+
+      - name: Gate — testes
+        run: npm test
+
+      # `--publish always` vive aqui, e só aqui. Fora do `package.json`,
+      # `npm run release` na sua máquina compila e **não** publica: a flag que
+      # substitui o app dos usuários passou a existir num arquivo que exige um
+      # clique consciente para executar.
+      - name: Build
+        run: npm run release
+
+      # Isto empacota uma segunda vez (a saída do `vite build` já está aqui), o
+      # que custa ~1-2 min. Aceito de propósito: a alternativa é repetir os
+      # passos do script `release` dentro deste YAML, e aí passam a existir duas
+      # descrições do build que podem divergir — exatamente o defeito que o
+      # `ARCH-003` acabou de eliminar em outro lugar.
+      - name: Publish
+        if: ${{ inputs.publish }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DEBUG: electron-builder
-        run: npm run release
+        run: npx electron-builder --win --publish always
+
+      - name: Guardar o instalador como artefato
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: release/**/*.exe
+          retention-days: 14
+          if-no-files-found: warn

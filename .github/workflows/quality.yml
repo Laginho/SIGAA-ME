@@ -1,0 +1,84 @@
+name: Quality
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+# Um push novo cancela a execução anterior do mesmo branch.
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: Typecheck, lint e testes
+    # Windows é a autoridade deste projeto: `npm install` baixa binário nativo
+    # por plataforma (Electron, Playwright) e o autor desenvolve no Windows.
+    # Rodar o gate em Linux mudaria o que está sendo verificado.
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      # `npm ci` não roda aqui: o package-lock.json está fora de sincronia com o
+      # package.json (vitest@4 puxa vite@8, o lock só tem vite@5). Quando o lock
+      # for regerado, troque por `npm ci` — é mais rápido e mais reprodutível.
+      - name: Install
+        run: npm install
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit e integration
+        run: npm test
+
+  e2e:
+    name: E2E sem credencial
+    runs-on: windows-latest
+    # Não bloqueia o gate: se o Electron não subir no runner, o resultado do
+    # typecheck/lint/testes continua legível.
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install
+        run: npm install
+
+      # Sem SIGAA_USER/SIGAA_PASS no ambiente, os 3 testes que fazem login real
+      # entram em skip pelo `describeOrSkip` do app.spec.ts. É intencional:
+      # credencial de portal universitário não vai para secret de CI, e o CI não
+      # deve ficar logando na conta de ninguém a cada push.
+      - name: E2E
+        run: npm run test:e2e
+
+      - name: Guardar relatório e screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report
+          path: |
+            playwright-report/
+            test-results/
+            _agent_tmp/shots/
+          retention-days: 7
+          if-no-files-found: ignore
