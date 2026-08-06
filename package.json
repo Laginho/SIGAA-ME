@@ -13,7 +13,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build && electron-builder",
-    "release": "tsc && vite build && electron-builder --win --publish always",
+    "release": "tsc && vite build && electron-builder --win --publish never",
     "release:patch": "standard-version --release-as patch && git push --follow-tags origin HEAD",
     "release:minor": "standard-version --release-as minor && git push --follow-tags origin HEAD",
     "release:major": "standard-version --release-as major && git push --follow-tags origin HEAD",
