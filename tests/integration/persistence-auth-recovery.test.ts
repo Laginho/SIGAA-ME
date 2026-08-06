@@ -3,7 +3,17 @@
  * encrypted separately from settings; Playwright cookies are not persisted.
  */
 
+import path from 'path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+/**
+ * `userData` sem letra de drive, e chaves montadas com o mesmo `path.join` que o
+ * serviço usa. Um literal `C:\...\credentials.json` só casa no Windows: fora
+ * dele o serviço grava `C:\...` + `/credentials.json` e a chave nunca bate — o
+ * teste não falha só de mentira, ele para de exercitar o caminho que testa.
+ */
+const USER_DATA = 'sigaa-me-persistence-tests';
+const credentialsFile = path.join(USER_DATA, 'credentials.json');
 
 const storage = vi.hoisted(() => {
     const files = new Map<string, string>();
@@ -17,7 +27,7 @@ const storage = vi.hoisted(() => {
 });
 
 vi.mock('electron', () => ({
-    app: { getPath: vi.fn(() => 'C:\\tmp\\sigaa-me-persistence-tests') },
+    app: { getPath: vi.fn(() => 'sigaa-me-persistence-tests') },
     safeStorage: storage.safeStorage
 }));
 vi.mock('fs', () => ({
@@ -59,7 +69,7 @@ describe('PersistenceService remembered-login recovery', () => {
     it('does not attempt auto-login from a corrupt credential payload and leaves normal settings usable', () => {
         const service = new PersistenceService();
         service.updateSetting('theme', 'dark');
-        storage.files.set('C:\\tmp\\sigaa-me-persistence-tests\\credentials.json', '{not-json');
+        storage.files.set(credentialsFile, '{not-json');
         const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
         expect(service.loadCredentials()).toBeNull();
