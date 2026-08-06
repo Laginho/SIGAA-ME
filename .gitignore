@@ -60,3 +60,11 @@ test_error.png
 _agent_tmp/
 _to_delete/
 quality.txt
+
+# Debug HTML que o HttpScraperService grava no cwd (ver linha ~281)
+debug_playwright_*.html
+
+# Saída do loop visual e dos user-data-dir temporários de teste
+.test-user-data*/
+test-results/
+playwright-report/

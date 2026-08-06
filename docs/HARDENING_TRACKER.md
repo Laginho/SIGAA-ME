@@ -55,6 +55,14 @@ Agents must not delete completed tasks. The history is part of the handoff.
 - `CODE_REVIEW.md` is the originating review; this tracker supersedes it for
   implementation status.
 
+**Atualização 2026-08-05** (working tree sobre `38ff29b`, ainda não commitado):
+
+- A suíte deixou de depender do ambiente (`QA-002` fechada) e roda num Linux.
+- Novo tier de testes: parser real contra fixture, contrato do `window.api`,
+  E2E de Electron e loop de verificação visual (`QA-004`).
+- `npm ci` **não roda neste repositório** — lock fora de sincronia com o
+  `package.json`. Ver `DEP-002`; é o bloqueio atual do `PIPE-003`.
+
 ## Master dependency order
 
 > **REVISADO 2026-08-02.** A ordem abaixo é a de *dependência técnica* e
@@ -306,9 +314,9 @@ julgamento do projeto num lugar que agentes futuros herdam automaticamente.
 
 ### PIPE-001 — Pausar a publicação automática
 
-- Status: `NOT STARTED`
+- Status: `DONE` — implementado na sessão 2026-08-05
 - Priority: `P0`
-- Owner: —
+- Owner: Claude
 - Dependencies: none
 - Primary files: `.github/workflows/release.yml`, `package.json`
 
@@ -327,6 +335,32 @@ substituído" — sem que teste algum tenha rodado.
 #### Verification
 
 Push de tag de teste não gera release publicado.
+
+#### Implementation notes (2026-08-05)
+
+Duas mudanças, e a segunda é a que importa:
+
+1. `release.yml` perdeu o gatilho `push: tags: v*.*.*` e ficou só com
+   `workflow_dispatch`, com um input booleano `publish` que **começa
+   desmarcado**. Desmarcado, o workflow compila e sobe o instalador como
+   artefato; marcado, publica no GitHub Releases.
+2. O `package.json` trocou `--publish always` por `--publish never` no script
+   `release`. A flag que substitui o app dos usuários passou a existir **só**
+   dentro do `release.yml`.
+
+Por que as duas: tirar só o gatilho deixaria `npm run release` publicando da
+máquina do autor sem cerimônia. Tirar só a flag deixaria o push de tag rodando um
+build inútil a cada versão. O caminho perigoso era a **combinação**
+`release:patch` (que faz `git push --follow-tags`) + gatilho de tag + `always`.
+
+`RELEASE_GUIDE.md` foi atualizado no mesmo commit — ele descrevia o fluxo antigo
+("o push inicia o build"), e guia que mente sobre publicação é pior que guia
+ausente.
+
+**Passo manual necessário:** `.github/workflows/` é protegido contra escrita por
+ferramenta remota (é a superfície com que um agente poderia se dar permissões no
+CI). O `release.yml` foi **entregue no chat** e precisa ser salvo por cima do
+arquivo à mão. Confirme o diff antes de commitar.
 
 ### PIPE-002 — Criar os scripts npm que faltam
 
@@ -434,11 +468,12 @@ teste:
 
 ### PIPE-003 — CI de pull request
 
-- Status: `NOT STARTED`
+- Status: `DONE` — implementado na sessão 2026-08-05
 - Priority: `P0`
-- Owner: —
+- Owner: Claude
 - Dependencies: `PIPE-002`
-- Primary files: New: `.github/workflows/ci.yml`
+- Primary files: `.github/workflows/quality.yml` (o nome ficou `quality`, não
+  `ci`)
 
 #### Problem
 
@@ -451,11 +486,37 @@ de tag. Nenhum PR jamais foi verificado.
 - Não requer credenciais do SIGAA — só testes determinísticos.
 - Um PR com teste quebrado mostra falha visível.
 
+#### Implementation notes (2026-08-05)
+
+`quality.yml` roda em `push` de qualquer branch, em `pull_request` e por
+`workflow_dispatch`, com `concurrency` cancelando execução anterior do mesmo
+branch. Dois jobs:
+
+- `gate` — `windows-latest`, typecheck → lint → testes, em passos separados para
+  que a aba do Actions diga **qual** falhou.
+- `e2e` — os specs de Playwright que não precisam de credencial, com
+  `continue-on-error: true` e upload de `playwright-report/`,
+  `test-results/` e `_agent_tmp/shots/`. Não bloqueia o gate: se o Electron não
+  subir no runner, o resultado do typecheck/lint/testes continua legível.
+
+Por que `windows-latest` e não `ubuntu`: é a plataforma do autor e a que baixa os
+binários nativos que o app usa de verdade. Rodar o gate num Linux verificaria
+uma árvore de dependências que ninguém executa.
+
+Sem credencial no ambiente, os 3 testes de login real entram em skip pelo
+`describeOrSkip`. É intencional — credencial de portal universitário não vai para
+secret de CI, e o CI não deve logar na conta de ninguém a cada push.
+
+**Ressalva registrada no próprio YAML:** o passo de instalação usa
+`npm install`, não `npm ci`, por causa do `DEP-002`. O CI existe e roda; o que
+ele não é ainda é **reproduzível** — ele resolve versões por conta própria em vez
+de instalar o que o lock descreve.
+
 ### PIPE-004 — Gate no release
 
-- Status: `NOT STARTED`
+- Status: `DONE` — implementado na sessão 2026-08-05
 - Priority: `P0`
-- Owner: —
+- Owner: Claude
 - Dependencies: `PIPE-002`, `PIPE-003`
 - Primary files: `.github/workflows/release.yml`
 
@@ -465,7 +526,25 @@ de tag. Nenhum PR jamais foi verificado.
 - É impossível publicar com teste falhando.
 - Checksums SHA-256 gerados no release (ver `REL-001` revisado).
 
-**Marco da Fase 1:** a partir daqui, nada piora sem alguém perceber.
+#### Implementation notes (2026-08-05)
+
+Atendido, mas **não** com `needs:` entre jobs — o GitHub não permite depender de
+um job de outro workflow, e o gate vive no `quality.yml`. O gate roda como passos
+dentro do próprio job de release, antes do build: `typecheck` → `lint` → `test` →
+`Build` → `Publish` (condicional). Falha em qualquer um interrompe o job, então
+não existe binário nem release.
+
+Custo aceito: os três comandos aparecem em dois arquivos. A alternativa
+(`workflow_call` reutilizável) é mais máquina do que este projeto precisa hoje —
+e a duplicação aqui é de *invocação*, não de *definição*: os dois chamam os
+mesmos scripts do `package.json`, que continuam sendo a única descrição do gate.
+Se algum dia o gate mudar de forma, muda no `package.json`.
+
+O passo `Publish` empacota uma segunda vez (~1-2 min a mais), e isso está
+comentado no YAML: a alternativa era repetir os passos do script `release` dentro
+do workflow, criando duas descrições do build que podem divergir.
+
+**Não atendido:** checksums SHA-256. Continua no `REL-001`.
 
 ---
 
@@ -779,9 +858,9 @@ mas com sintoma silencioso em vez de no-op. Ninguém ia achar isso lendo código
 
 ### QA-002 — A suíte não é portável: locale e caminho absoluto do Windows
 
-- Status: `NOT STARTED`
-- Priority: `P1` — **bloqueia o `PIPE-003`**
-- Owner: —
+- Status: `DONE` — corrigido na sessão 2026-08-05
+- Priority: `P1` — não bloqueia mais o `PIPE-003`; o bloqueio agora é o `DEP-002`
+- Owner: Claude
 - Dependencies: `PIPE-002`
 - Primary files: `src/utils/ui-helpers.ts`,
   `tests/unit/ui-helpers.test.ts`,
@@ -823,6 +902,25 @@ Windows: ele não está exercitando o que diz exercitar.
 
 Teste que depende do ambiente da máquina do autor não é gate, é coincidência.
 Consertar isto é pré-requisito do `PIPE-003` — sem isso o CI reprova PRs bons.
+
+#### Implementation notes (2026-08-05)
+
+**a) Locale.** `ui-helpers.ts` agora tem uma função `formatClock` única, com
+locale explícito: `toLocaleTimeString('pt-BR', { hour: '2-digit',
+minute: '2-digit', hour12: false })`. O comentário no arquivo registra o motivo.
+Note que a correção **não** foi no teste: era bug de UI real (um Windows em
+inglês mostrava `hoje às 12:30 PM` no meio de uma frase em português), e o teste
+só o tornou visível.
+
+**b) Caminho absoluto.** `persistence-auth-recovery.test.ts` não escreve mais em
+disco: o `fs` é mockado por um `storage.files` em memória e os dois testes leem
+de lá. Não sobrou nenhum literal `C:\` na suíte — o caminho deixou de existir em
+vez de ficar portável, que é a correção mais forte das duas.
+
+**O que isto prova:** o gate rodou verde num Linux (ver `CLAUDE.md`, tabela do
+container), o que é exatamente a condição que faltava. **O que não prova:** a
+execução no Windows para este lote ainda não aconteceu — e ela continua sendo a
+autoridade. Rodar antes de commitar.
 
 ---
 
@@ -878,6 +976,382 @@ verificador de tipos, no minuto em que o retorno deixou de ser `any`. Tipo e
 teste provam coisas diferentes — tipo prova que o campo existe, teste prova que
 o valor certo chega na tela. Os dois são necessários porque nenhum cobre o
 outro.
+
+---
+
+### BUG-007 — Parser de notícias devolvia zero item, em silêncio
+
+- Status: `DONE` — corrigido na sessão 2026-08-05
+- Priority: `P1`
+- Owner: Claude
+- Dependencies: none
+- Primary files: `electron/services/http-scraper.service.ts`,
+  `tests/integration/parser-real.test.ts`
+
+#### Problem
+
+Uma das estratégias de extração de notícia casava o id assim:
+
+```ts
+const idMatch = onclick.match(/['"](\\d+)['"]/)
+```
+
+Dentro de um literal de regex, `\\d` é **barra invertida seguida da letra d**,
+não "um dígito". A expressão nunca casava. A estratégia devolvia zero notícia e
+não registrava erro — o app simplesmente mostrava a turma sem avisos.
+
+Havia 14 testes verdes em cima disso. Eles passavam porque
+`tests/unit/parser.test.ts` testa uma **cópia** do parser mantida dentro do
+próprio teste, e a cópia não tinha o defeito.
+
+#### Fix
+
+O id vem do `onclick` do JSF na forma `...,id,777,...`, então o padrão correto é
+`/,id,([^,'"]+)/`. O comentário acima da linha explica o escape duplo, para que a
+próxima pessoa não o reintroduza.
+
+#### Verificação
+
+`tests/integration/parser-real.test.ts` chama `getCourseFiles()` de verdade com
+`preFetchedHtml` e afirma `result.news.every(n => !!n.id)`. Esse teste falha se a
+correção for revertida — regra 5 do `CLAUDE.md` cumprida.
+
+#### Por que registrar isto
+
+É o caso mais claro do repositório de **suíte verde que não protege nada**: o
+teste e o código sob teste eram arquivos diferentes. Ver `QA-004` para a regra
+que saiu daqui.
+
+---
+
+### BUG-008 — `getSettings` declarado, com handler, e sem ponte no preload
+
+- Status: `DONE` — corrigido na sessão 2026-08-05
+- Priority: `P1`
+- Owner: Claude
+- Dependencies: none
+- Primary files: `electron/preload.ts`, `tests/unit/preload-contract.test.ts`
+
+#### Problem
+
+`src/vite-env.d.ts` declarava `getSettings`, o `main.ts` atendia o canal
+`get-app-settings`, e o `contextBridge` do preload **não expunha a ponte**. As
+duas extremidades existiam e o meio não. Cinco call sites do renderer lançavam
+`window.api.getSettings is not a function` em runtime, com `tsc` verde — porque
+o `.d.ts` é uma declaração, não uma verificação.
+
+#### Fix
+
+`getSettings: () => ipcRenderer.invoke('get-app-settings')` no preload.
+
+#### Por que registrar isto
+
+Mesmo mecanismo do `BUG-002` (`pauseSync`) e do `BUG-006`: a fronteira IPC tem
+três pontas — declaração, ponte e handler — e o TypeScript só olha a primeira.
+Uma ponta solta é invisível para o compilador e para a suíte. Foi o que motivou
+o teste de contrato do `QA-004`.
+
+---
+
+### QA-004 — Tiers de teste: parser real, contrato do preload, E2E e loop visual
+
+- Status: `DONE` — implementado na sessão 2026-08-05
+- Priority: `P1`
+- Owner: Claude
+- Dependencies: `PIPE-002`, `QA-002`
+- Primary files: `playwright.config.ts`,
+  `tests/integration/parser-real.test.ts`, `tests/fixtures/` (+ `README.md`),
+  `tests/unit/preload-contract.test.ts`,
+  `tests/e2e/app.spec.ts`, `tests/e2e/visual.spec.ts`,
+  `tests/e2e/helpers/launch.ts`
+
+#### Por que esta tarefa existe
+
+O `BUG-007` e o `BUG-008` foram encontrados **fora** da suíte, e nenhum dos dois
+poderia ter sido encontrado dentro dela: um porque o teste exercitava uma cópia
+do código, o outro porque nenhuma camada verificava a fronteira do `window.api`.
+Corrigir os dois bugs sem fechar essas duas lacunas deixaria a próxima
+ocorrência igualmente invisível.
+
+#### O que foi construído
+
+| Tier | Arquivo | Precisa de | Runner |
+|---|---|---|---|
+| Parser contra fixture | `tests/integration/parser-real.test.ts` | nada | vitest |
+| Contrato do `window.api` | `tests/unit/preload-contract.test.ts` | nada | vitest |
+| Visual | `tests/e2e/visual.spec.ts` | nada | playwright |
+| E2E sem credencial | `app.spec.ts` (2 testes) | nada | playwright |
+| E2E fluxo completo | `app.spec.ts` (3 testes) | `.env` | playwright |
+
+- **Parser real.** Usa o parâmetro `preFetchedHtml` de `getCourseFiles()` para
+  curto-circuitar a rede, então roda o mesmo caminho de código de produção sem
+  credencial. As fixtures foram extraídas dos literais que estavam dentro do
+  `parser.test.ts`.
+- **Contrato do preload.** Lê `preload.ts`, `main.ts` e `vite-env.d.ts` como
+  texto e cruza as três pontas: canal invocado sem handler, membro chamado pelo
+  renderer sem ponte (inclusive escondido atrás de `as any`), ponte não
+  declarada. Tem um teste de sanidade do próprio parser, para não passar vazio.
+- **Loop visual.** `visual.spec.ts` abre o app de verdade, navega por hash em
+  todas as rotas em tema claro e escuro, falha se alguma renderizar vazia e
+  falha se sobrou erro no console. PNGs em `_agent_tmp/shots/` para inspeção
+  humana — **não** são snapshots comparados automaticamente.
+
+#### Regras que saíram daqui (já no `CLAUDE.md`)
+
+- **`tests/e2e/` é só `*.spec.ts`.** O `playwright.config.ts` fixa
+  `testMatch: '**/*.spec.ts'`. Sem isso o Playwright coletava os `*.test.ts` de
+  vitest, morria na transformação e **zerava a coleta inteira** — 0 testes, sem
+  erro óbvio.
+- **Teste não espelha implementação.** Teste novo chama o código de produção.
+- **Tier com credencial não roda em loop.** É login real na conta do aluno no
+  portal da universidade; rodar em ciclo é dezenas de logins automatizados e
+  risco de bloqueio. Manual, antes de release.
+
+#### Limites conhecidos
+
+- As fixtures são **sintéticas** — HTML escrito à mão imitando o SIGAA. Provam
+  que o parser casa com a estrutura que assumimos, não que a estrutura assumida
+  seja a verdadeira. Procedimento de gravação manual em
+  `tests/fixtures/README.md`; gravador automatizado foi deliberadamente adiado
+  (script de login não verificado apontado para o portal = risco de bloqueio de
+  conta).
+- O contrato do preload é checado por **regex sobre o texto** dos arquivos. É
+  frágil a mudança de formatação; o teste de sanidade limita o estrago a um
+  falso verde improvável, não impossível.
+- O loop visual não roda no CI e não compara imagens. Ele responde "renderizou?",
+  não "ficou certo?".
+- **Conflito a resolver com o `BUG-003`:** o terceiro teste E2E depende de
+  `window.api.simulateNewFile()`, que é exatamente a ação de desenvolvimento que
+  o `BUG-003` quer remover de produção. Quando o `BUG-003` for feito, esse teste
+  precisa de outro gancho ou sai junto.
+
+---
+
+### DEP-002 — `npm ci` não roda: lock fora de sincronia com o `package.json`
+
+- Status: `NOT STARTED`
+- Priority: `P1` — **não bloqueia** o `PIPE-003`; degrada. Ver nota de 2026-08-05
+  no fim desta tarefa
+- Owner: Bruno (só resolve no Windows)
+- Dependencies: none
+- Primary files: `package-lock.json`, `package.json`
+
+#### Problem
+
+Descoberto na sessão 2026-08-05, ao montar o ambiente do gate num Linux:
+`npm ci` falha porque o lock não descreve a árvore que o `package.json` pede.
+`vitest@4.1.4` exige `vite@^6 || ^7 || ^8`; o lock tem `vite@5.4.21`.
+
+Isso não é problema de plataforma — **quebra em qualquer máquina, inclusive no
+Windows**. A consequência prática é dupla:
+
+1. `PIPE-003` não pode usar `npm ci`, que é o comando que existe justamente para
+   dar instalação reproduzível no CI. Com `npm install` o CI resolve versões por
+   conta própria e deixa de testar o que o lock descreve.
+2. As versões instaladas divergem do lock. Foi assim que uma execução de agente
+   acusou erros de tipo do `axios` que **não existem** no repositório real —
+   sinal falso vindo de árvore diferente.
+
+#### Acceptance criteria
+
+- `npm ci` completa numa árvore limpa.
+- `npm run quality` passa depois dele, no Windows.
+- O lock commitado corresponde ao `package.json` (`vite` numa major que o
+  `vitest` aceite).
+
+#### Rationale
+
+Sem `npm ci` o CI não é reproduzível, e um gate não reproduzível reprova PRs bons
+e aprova ruins sem padrão discernível. Fica com o autor porque mexer em `vite`
+major toca o build do Electron, e build é Windows.
+
+#### Correção de 2026-08-05: bloqueio → degradação
+
+Escrito antes como "bloqueia o `PIPE-003`". Errado, e o erro foi meu: eu não
+tinha listado `.github/` e não vi que o `quality.yml` já existia. Ele resolve o
+problema com `npm install` e um comentário apontando para esta tarefa.
+
+A distinção importa: **o CI existe e roda**. O que falta é reprodutibilidade — o
+CI instala uma árvore que pode não ser a do lock, então um verde no CI não prova
+que a árvore do autor está verde, nem o contrário. É degradação silenciosa, que é
+pior que bloqueio ruidoso, mas não impede a Fase 1 de fechar.
+
+---
+
+### ARCH-003 — Uma declaração para o contrato do preload
+
+- Status: `DONE` — implementado na sessão 2026-08-05
+- Priority: `P1`
+- Owner: Claude
+- Dependencies: `PIPE-002`
+- Primary files: `shared/ipc.ts`, `electron/preload.ts`, `src/vite-env.d.ts`,
+  `tests/unit/preload-contract.test.ts`
+
+#### Por que esta tarefa existe
+
+Correção de raiz para a classe de bug que produziu `BUG-002`, `BUG-006`,
+`BUG-007` e `BUG-008`: **duas pontas que deveriam se corresponder, e nada
+verificando a correspondência.** Corrigir os quatro individualmente deixaria o
+quinto igualmente possível.
+
+No caso do `window.api`, a forma do contrato era escrita à mão em **dois**
+arquivos — `src/vite-env.d.ts` (o que o renderer pode chamar) e
+`electron/preload.ts` (o que a ponte implementa). Nada comparava os dois. Foi
+assim que `getSettings` ficou declarada sem ponte.
+
+#### Fix
+
+`shared/ipc.ts` passou a exportar `RendererApi`, e as duas pontas o usam:
+
+```ts
+// electron/preload.ts
+const api: RendererApi = { ... }
+contextBridge.exposeInMainWorld('api', api)
+
+// src/vite-env.d.ts
+interface Window { api: RendererApi }
+```
+
+Ponte faltando deixou de ser bug de runtime e virou erro de compilação.
+
+#### Por que não derivar o tipo da implementação
+
+`api: typeof import('../electron/preload').api` seria menos código ainda e foi
+descartado: `ipcRenderer.invoke` devolve `Promise<any>`, então derivar apagaria
+todos os retornos declarados e reabriria a porta do `BUG-006` — campo lido que o
+main nunca devolveu. O retorno anotado é justamente o que o typecheck confere.
+Uma declaração explícita, verificada contra a implementação, é o ponto de
+equilíbrio.
+
+#### Detalhe que o compilador cobrou
+
+Repetir a assinatura genérica de `updateSetting` na implementação **não compila**:
+duas assinaturas genéricas com `Extract<...>` diferido não se provam
+equivalentes. A solução é omitir os tipos na implementação e deixar a tipagem
+contextual vir do `RendererApi` — menos código e mais estrito.
+
+#### Verificação (mutação, não leitura)
+
+| Mutação | Resultado |
+|---|---|
+| Remover a ponte `getSettings` do preload | `tsc` falha: `TS2741: Property 'getSettings' is missing in type ... but required in type 'RendererApi'` |
+| Trocar o canal por `'get-app-settingz'` | `preload-contract.test.ts` falha, listando o canal órfão |
+| Nenhuma mutação | `tsc` limpo, `eslint` 0 erros / 123 avisos, 64 passed / 4 skipped |
+
+#### O que continua fora do alcance do tipo
+
+O canal é uma string passada ao `ipcRenderer.invoke`; o `tsc` não sabe se existe
+`ipcMain.handle` do outro lado. Amarrar isso exigiria uma **terceira** lista
+escrita à mão — mais um par para divergir — ou reestruturar o `main.ts` para um
+`Record<Channel, Handler>` exaustivo, que é escopo do `SEC-002`. Até lá, essa
+metade fica com `tests/unit/preload-contract.test.ts`, que lê o `main.ts` (a
+fonte da verdade) como texto.
+
+Consequência: o teste de contrato perdeu o caso "declara no `vite-env.d.ts` tudo
+que o preload expõe" — agora impossível por construção — e ficou com os dois que
+o tipo não cobre: canal sem handler, e chamada escondida atrás de `as any`.
+
+---
+
+### QA-005 — Apagar o parser espelhado em vez de mantê-lo
+
+- Status: `DONE` — implementado na sessão 2026-08-05
+- Priority: `P1`
+- Owner: Claude
+- Dependencies: `QA-004`
+- Primary files: `tests/unit/parser.test.ts` (**apagado**),
+  `tests/integration/parser-real.test.ts`
+
+#### Por que esta tarefa existe
+
+A outra metade da correção de raiz. `tests/unit/parser.test.ts` mantinha uma
+cópia do parser dentro do próprio arquivo de teste — 11 testes verdes sobre
+código que não é o de produção. Foi o que permitiu o `BUG-007` passar.
+
+Manter as duas coisas seria manter o problema: enquanto a cópia existe, ela pode
+voltar a divergir, e um verde nela continua não significando nada.
+
+#### Fix
+
+Arquivo apagado (241 linhas). As asserções que valiam a pena foram para
+`parser-real.test.ts`, que chama o `HttpScraperService` de verdade:
+
+| Asserção da cópia | Destino |
+|---|---|
+| nomes de arquivo, página vazia, títulos de notícia | já existiam no `parser-real` |
+| ids de arquivo (`555`/`556`) | **trazida** — e revelou o `BUG-009` |
+| ids de notícia exatos (`777`/`778`), data | **trazidas** |
+| 2 testes de ViewState | **descartados** — afirmavam que o cheerio lê um atributo de um literal declarado no mesmo arquivo; não exercitavam código do projeto |
+
+Saldo: 11 testes que não provavam nada → 4 testes sobre o código de produção.
+A suíte caiu de 76 para 64, e cobre estritamente mais.
+
+#### Rationale
+
+Teste que espelha implementação é pior que teste ausente: ausente não mente.
+
+---
+
+### BUG-009 — Id de arquivo capturado com o apóstrofo do JSF
+
+- Status: `NOT STARTED`
+- Priority: `P2`
+- Owner: —
+- Dependencies: none
+- Primary files: `electron/services/http-scraper.service.ts` (linhas ~428 e
+  ~467), `electron/services/cache.service.ts`,
+  `tests/integration/parser-real.test.ts`
+
+#### Problem
+
+Descoberto em 2026-08-05 pela asserção de id trazida do parser espelhado
+(`QA-005`): o id de **arquivo** sai como `555'`, com apóstrofo.
+
+```ts
+const idMatch  = onclick.match(/,id,([^,]+)/);      // captura `555'`
+const keyMatch = onclick.match(/,key,([^,'"]+)/);   // classe correta, linha seguinte
+```
+
+A classe certa está literalmente na linha de baixo, no mesmo bloco. O `onclick`
+termina em `...,id,555','');`, então `[^,]+` engole a quote. Acontece nas duas
+estratégias de detecção de arquivo (~428 e ~467). O parser de **notícia** já foi
+corrigido no `BUG-007`.
+
+#### Por que não foi corrigido junto
+
+O download não usa esse id — ele reparseia o `script` inteiro
+(`http-scraper.service.ts:829`), e é por isso que o defeito nunca apareceu como
+falha de download. Mas o id **é** usado como identidade do arquivo:
+`background-sync.service.ts:110` grava `allFileIds` no `cache.json`, e
+`cacheService.diffCourseState` compara os ids da varredura nova com os
+armazenados.
+
+Corrigir a regex muda a identidade de todo arquivo já em cache. Na primeira
+sincronização depois da atualização, todos aparecem como novos — e para quem tem
+`autoDownloadUpdates` ligado, isso dispara **re-download de tudo**, com o
+`BUG-001` (download apagando arquivo válido) ainda aberto no caminho.
+
+Ou seja: a correção de uma linha tem consequência de migração de dados. É
+decisão do autor, não de quem passava por perto.
+
+#### Acceptance criteria
+
+- As duas ocorrências passam a usar uma extração única e correta (uma função,
+  não três cópias da mesma regra).
+- Existe migração ou tolerância no `cache.service.ts`: ou os ids em cache são
+  normalizados na leitura, ou o diff compara id sem a quote — de modo que a
+  atualização **não** produza uma enxurrada de "arquivo novo".
+- A ordem é: fechar o `BUG-001` **antes**, para que um re-download acidental não
+  possa apagar arquivo válido.
+- `parser-real.test.ts` passa a afirmar `'555'`; o assert atual fixa o valor
+  defeituoso de propósito e falha quando a correção chegar.
+
+#### Rationale
+
+Registrado em vez de corrigido porque a mudança é barata no parser e caríssima
+no cache. Vale como exemplo do padrão: **três cópias da mesma regra de
+extração**, duas com uma classe de caracteres e uma com outra. Mesma família do
+`BUG-007`, mesma família do `ARCH-003`.
 
 ---
 
@@ -1922,38 +2396,90 @@ reavaliação não é decisão, é esquecimento.
 
 ### Próximo passo imediato
 
-**Commitar o working tree.** O `PIPE-002` está fechado: `npm run quality` verde
-no Windows em 2026-08-04 (0 erros de tipo, 0 erros de lint, 125 avisos,
-68 passed / 4 skipped).
-
-O working tree acumula `PIPE-002` + `DOC-002` + `BUG-006` + a criação de
-`shared/` e `eslint.config.js`. Sugestão de mensagem:
+**Rodar o gate no Windows e commitar o lote de 2026-08-05.** Há um working tree
+acumulado sobre `38ff29b` que ainda não passou pela execução autoritativa:
 
 ```
-chore: add quality gate and type the renderer<->main boundary
+shared/ipc.ts                                    ARCH-003 (RendererApi)
+electron/preload.ts                              BUG-008 + ARCH-003
+src/vite-env.d.ts                                ARCH-003
+tests/unit/parser.test.ts                        QA-005 — APAGADO (git rm)
+electron/services/http-scraper.service.ts        BUG-007
+src/utils/ui-helpers.ts                          QA-002 (locale pt-BR explícito)
+tests/integration/persistence-auth-recovery.test.ts   QA-002 (fs em memória)
+playwright.config.ts                             QA-004 (novo)
+tests/e2e/app.spec.ts, visual.spec.ts, helpers/launch.ts   QA-004 (novos)
+tests/integration/parser-real.test.ts            QA-004 (novo)
+tests/unit/preload-contract.test.ts              QA-004 (novo)
+tests/fixtures/*.html, tests/fixtures/README.md  QA-004 (novos)
+.github/workflows/quality.yml                    PIPE-003 (novo)
+.github/workflows/release.yml                    PIPE-001 + PIPE-004  ⚠️ ver abaixo
+package.json                                     PIPE-001 (--publish never)
+RELEASE_GUIDE.md                                 PIPE-001 (fluxo novo)
+CLAUDE.md, .gitignore                            documentação do loop de verificação
 ```
 
-Depois do commit, o `PIPE-001` é o próximo (é pequeno, e é o que tira o dedo do
-gatilho da publicação automática).
+⚠️ **O `release.yml` não foi escrito no disco.** `.github/workflows/` é protegido
+contra escrita por ferramenta remota. O arquivo foi entregue no chat da sessão
+2026-08-05 e precisa ser salvo à mão por cima do atual. Se ele ainda tiver
+`push: tags:` no topo, a substituição não aconteceu e o `PIPE-001` não está de
+pé.
 
-**Limpeza:** existe um `_agent_tmp/repo.tar.gz` na raiz, resíduo de agente
-(usado para rodar lint/testes fora do Windows). Apagar — não está no
-`.gitignore`.
+Ordem sugerida:
+
+1. `npm run quality` — precisa passar no Windows. O gate rodou verde num Linux
+   nesta sessão, o que é sinal, não autoridade.
+2. `npx playwright test visual.spec.ts` (opcional, mas é o que prova que o app
+   ainda abre e renderiza).
+3. `git rm tests/unit/parser.test.ts` — o agente não tem permissão de apagar na
+   pasta montada, então o arquivo ainda está lá. Ver `QA-005`.
+4. Quatro commits, porque são quatro coisas distintas:
+
+```
+fix: extract news ids and bridge getSettings across the preload
+
+test: add fixture parser, preload contract, and playwright e2e tiers
+
+refactor: derive window.api from a single RendererApi contract
+
+ci: gate the release and require an explicit publish step
+```
+
+Separar importa: o primeiro é correção de comportamento com teste que falha sem
+ela; o segundo é infraestrutura de verificação; o terceiro é a correção de raiz
+que torna o primeiro impossível de repetir. Misturados, um `git revert` do bug
+arrasta os tiers de teste.
 
 ### Depois disso, em ordem
 
-1. `PIPE-001` — tirar `--publish always` do fluxo automático.
-2. `QA-002` — tornar a suíte portável (locale + caminho `C:\`).
-   **Antes do `PIPE-003`**, senão o CI nasce vermelho por motivo alheio ao PR.
-3. `PIPE-003` / `PIPE-004` — CI de PR e gate no release. Inclui o scanner de
-   segredo (gitleaks) que fecha a prevenção do `SEC-000`.
-4. **Nível 1 da `docs/AUDITORIA_COMPLEXIDADE.md`** — ~700 linhas de remoção com
+> **A Fase 1 fechou em 2026-08-05.** `PIPE-001`..`PIPE-004` estão `DONE`, com a
+> ressalva do `release.yml` acima. O marco declarado no `PIPE-004` — "nada piora
+> sem alguém perceber" — vale a partir do primeiro push depois do commit.
+
+1. `DEP-002` — regerar o `package-lock.json` (Windows, Bruno). Não bloqueia mais
+   nada, mas enquanto ele existir o verde do CI não prova o verde da sua máquina.
+   Depois disso, trocar `npm install` por `npm ci` nos dois workflows (o
+   comentário no `quality.yml` marca o lugar).
+2. **gitleaks no `quality.yml`** — é o que fecha a prevenção do `SEC-000`, e era
+   parte do `PIPE-003` que não entrou. Tarefa pequena, alto valor: hoje nada
+   impede uma segunda credencial de entrar no repositório.
+3. **Nível 1 da `docs/AUDITORIA_COMPLEXIDADE.md`** — ~700 linhas de remoção com
    prova por busca, num único commit, com `quality` antes e depois.
-5. `BUG-001` — download apagando arquivos válidos. **É o exercício de TDD**:
+4. `BUG-001` — download apagando arquivos válidos. **É o exercício de TDD**:
    escrever primeiro o teste que baixa um `.txt` servido como `octet-stream` e
    afirma que o arquivo sobrevive; ele deve falhar antes da correção.
-6. `BUG-004` — ligar o fallback Playwright, depois de medir a taxa de falha
+5. `BUG-009` — id de arquivo capturado com o apóstrofo do JSF. **Depois do
+   `BUG-001`**, porque a correção invalida o `cache.json` e pode disparar
+   re-download geral em quem tem `autoDownloadUpdates` ligado.
+6. `QA-003` — os dois testes que faltam (curso malformado no `startSync`; falha
+   de download exibindo a `message` real). O tier novo do `QA-004` **não** cobre
+   nenhum dos dois.
+7. `BUG-004` — ligar o fallback Playwright, depois de medir a taxa de falha
    remanescente.
+
+Atenção ao fazer o `BUG-003`: o terceiro teste E2E depende de
+`window.api.simulateNewFile()`, que é a ação que o `BUG-003` remove. Ver limites
+conhecidos do `QA-004`.
 
 ### Pendente fora do código (Bruno)
 
@@ -1961,28 +2487,89 @@ gatilho da publicação automática).
   no `SEC-000`. **Fazer backup da pasta antes.** A senha já foi trocada, então
   isso é higiene, não urgência.
 
+- **Apagar `_to_delete/` e `_agent_tmp/`.** Resíduo de ferramenta de agente: 11
+  arquivos em `_to_delete/` (inclui um zip de 734 KB e cinco `index.lock`
+  residuais) e um tarball em `_agent_tmp/`. Os dois já estão no `.gitignore`,
+  então é limpeza de disco, não de repositório. Fica com você porque o agente não
+  tem permissão de apagar na pasta montada — só de mover para `_to_delete/`.
+
+- **Triagem do `.claude/skills/`: encerrada por decisão sua.** As skills foram
+  vendorizadas no commit `38ff29b` (`chore: vendor claude skills used in this
+  project`). Registrado aqui para o item não voltar como pendência: a decisão foi
+  versionar, não mover para escopo de usuário.
+
 ### Recently completed
 
-- `PIPE-002` — **`DONE`** (sessão 2026-08-04). `npm run quality` verde no
-  Windows. Contrato do `window.api`
-  corrigido contra o que o main devolve de fato, união discriminada em
-  `selectDownloadFolder`, type guard `isCourseLike` no `sync-selection`,
-  13 `prefer-const`. `tsc` 0 erros, `eslint` 0 erros / 125 avisos
-  (era 34 / 149). Falta só `vitest run` no Windows.
+- `PIPE-001` / `PIPE-004` — **`DONE`** (2026-08-05). Release só por
+  `workflow_dispatch`, com input `publish` desmarcado por padrão; gate
+  (`typecheck`/`lint`/`test`) como passos antes do build; `--publish always` fora
+  do `package.json`, que agora usa `--publish never`. `RELEASE_GUIDE.md`
+  atualizado. **Pendente:** salvar o `release.yml` à mão (pasta protegida).
+- `PIPE-003` — **`DONE`** (2026-08-05, sessão anterior). `.github/workflows/quality.yml`:
+  gate em `windows-latest` em push/PR, mais job de E2E sem credencial com
+  artefatos. Usa `npm install` por causa do `DEP-002`.
+- `ARCH-003` — **`DONE`** (sessão 2026-08-05). `RendererApi` em `shared/ipc.ts`,
+  usada pela ponte e pela declaração. Ponte faltando virou erro de compilação;
+  provado por mutação (remover `getSettings` → `TS2741`).
+- `QA-005` — **`DONE`** (sessão 2026-08-05). `tests/unit/parser.test.ts` apagado
+  (241 linhas, parser espelhado). Asserções úteis migradas para o
+  `parser-real.test.ts`. Suíte 76 → 64 testes, cobrindo estritamente mais.
+- `QA-004` — **`DONE`** (sessão 2026-08-05). Tier de parser real contra fixture,
+  teste de contrato do `window.api`, E2E de Electron e loop de verificação
+  visual. Saiu como resposta direta ao `BUG-007` e ao `BUG-008`.
+- `BUG-008` — **`DONE`** (2026-08-05). `getSettings` declarado no `.d.ts` e
+  atendido pelo main, sem ponte no preload. Cinco call sites quebrados em runtime
+  com `tsc` verde. Encontrado pelo teste de contrato.
+- `BUG-007` — **`DONE`** (2026-08-05). Regex de id de notícia com `\\d` dentro de
+  literal (barra invertida + "d", não dígito): nunca casava, e a estratégia
+  devolvia zero notícia em silêncio, com 14 testes verdes em cima — porque os
+  testes exercitavam uma **cópia** do parser.
+- `QA-002` — **`DONE`** (2026-08-05). Locale fixado em `pt-BR` no `ui-helpers`
+  (era bug de UI real, não só de teste) e o teste de persistência passou a usar
+  `fs` mockado em memória. A suíte deixou de depender do ambiente.
+- `PIPE-002` — **`DONE`** (2026-08-04). `npm run quality` verde no Windows.
+  Contrato do `window.api` corrigido contra o que o main devolve de fato, união
+  discriminada em `selectDownloadFolder`, type guard `isCourseLike` no
+  `sync-selection`, 13 `prefer-const`. `tsc` 0 erros, `eslint` 0 erros /
+  125 avisos (era 34 / 149).
 - `BUG-006` — falha de download mostrava sempre "Erro desconhecido"
   (`result.error` num objeto que devolve `message`). Encontrado **pelo
   typecheck**, no minuto em que o retorno deixou de ser `any`.
-- `PIPE-002` — implementado (sessão 2026-08-02). Scripts de
-  qualidade, ESLint por zona, fronteira `preload`/`main` tipada, `shared/ipc.ts`
-  criado, `verify-scraper.ts` removido.
 - `SEC-000` — senha trocada e repositório fechado. Limpeza de histórico pendente.
 - `DOC-001` — documentos de auditoria corrigidos.
 - `DOC-002` — `CLAUDE.md` escrito.
+- Commits: `58983c2` (`PIPE-002` + `DOC-002` + `BUG-006`), `38ff29b` (skills
+  vendorizadas). Antes disso, `5968a40` era o baseline.
 - Unit-suite unmatched closure fixed in commit `5968a40`.
 - Live SIGAA smoke tests made opt-in in commit `5968a40`.
 - Selector-drift and persistence recovery tests added in commit `5968a40`.
 
-### Três erros de análise cometidos nesta sessão, para não repetir
+### O padrão que aparece em todo bug deste repositório
+
+> **Fechado na raiz em 2026-08-05** pelo `ARCH-003` (uma declaração para o
+> contrato do preload) e pelo `QA-005` (apagar o parser espelhado). O que sobrou
+> sem verificação de tipo — canal sem handler — está em
+> `tests/unit/preload-contract.test.ts`, e o caminho para tipá-lo é o `SEC-002`.
+
+
+Quatro dos bugs registrados aqui — `BUG-002` (`pauseSync`), `BUG-006`
+(`result.error`), `BUG-007` (regex de notícia) e `BUG-008` (`getSettings`) —
+têm a mesma forma: **duas pontas que deveriam se corresponder, e nada
+verificando a correspondência.**
+
+| Bug | As duas pontas | Quem devia ter pegado |
+|---|---|---|
+| `BUG-002` | chamada no renderer ↔ método que não existe | o `tsc`, desligado por `as any` |
+| `BUG-006` | campo lido ↔ campo devolvido | o `tsc`, desligado por `any` |
+| `BUG-007` | teste ↔ código de produção (eram arquivos diferentes) | um teste que chamasse o parser real |
+| `BUG-008` | declaração `.d.ts` ↔ ponte do preload ↔ handler do main | nada olhava as três |
+
+A lição de processo: quando você encontrar um bug aqui, a pergunta útil não é
+"onde está o erro" — é **"que verificação estava ausente para isso ser
+possível"**. Nos quatro casos a correção do código levou minutos e a correção da
+verificação foi o trabalho de verdade.
+
+### Três erros de análise cometidos na sessão 2026-08-04, para não repetir
 
 Registrados porque cada um quase virou uma mudança errada no código:
 
@@ -2001,27 +2588,32 @@ e 2, foi o autor conhecendo o comportamento real do app que pegou o erro.
 
 ### Restrição de ambiente (importante para agentes)
 
-O `npm install` **deve ser rodado pelo autor, no Windows**. O app depende de
-binários nativos por plataforma (Electron, Playwright). Instalar de um ambiente
-Linux para dentro da pasta do projeto baixaria binários de Linux e quebraria o
-setup local.
+**A tabela canônica está no `CLAUDE.md`** (seções "Comandos" e "Loop de
+verificação visual"). Resumo do que mudou desde 2026-08-04, para não deixar
+informação errada aqui:
 
-**O que um agente consegue rodar** (medido na sessão 2026-08-04, de um Linux com
-a pasta do projeto montada):
+- `npm install` continua sendo do autor, no Windows: o app depende de binários
+  nativos por plataforma (Electron, Playwright).
+- **Copiar o repositório (sem `node_modules`) para o ambiente do agente e
+  instalar as dev-deps lá é o caminho bom** — o gate inteiro em ~12s, contra
+  ~40s **por arquivo** de `eslint` na pasta montada (limitado por I/O da
+  montagem, não por CPU).
+- **Correção do que estava escrito aqui:** o `vitest` **não** é impossível fora
+  do Windows. Ele falhava porque o `node_modules` montado foi instalado no
+  Windows e só tem o binding `win32`; o lock lista as 15 plataformas. Instalado
+  num Linux, roda (68 passed em 5,8s, medido em 2026-08-05).
+- O que não sai de um Linux: `npm run build` (`electron-builder --win` pediria
+  wine) e o empacotamento. O E2E **sai**, com `xvfb-run` e um `google-chrome` no
+  PATH.
+- `npm ci` não roda em lugar nenhum — ver `DEP-002`.
+- Na sessão 2026-08-05 o `device_bash` da máquina do autor ficou indisponível
+  ("Workspace unavailable"), então o agente leu os arquivos por staging e **não**
+  conseguiu rodar `git status`. Estado do working tree inferido de mtimes e do
+  reflog: isso mostra quando cada arquivo foi tocado, não que o índice esteja
+  limpo. Conferir com `git status` antes de commitar.
 
-| Comando | Funciona? | Detalhe |
-|---|---|---|
-| `tsc --noEmit` | **Sim** | JS puro. ~20s. É o loop de feedback útil |
-| `eslint .` | Sim, mas inútil | ~40s **por arquivo**: ligado por I/O na montagem, não por CPU. `user 1.5s`, `real 40s` |
-| `vitest run` | **Não** | `rolldown` exige binário nativo win32: `MODULE_NOT_FOUND` |
-| `npm install` | Não fazer | Baixaria binários de Linux |
-
-Para lint e testes, o caminho que funcionou foi copiar o repositório (sem
-`node_modules`) para o ambiente do agente e instalar as dev-deps lá. Duas
-ressalvas: as versões instaladas assim podem divergir do `package-lock.json`
-(o `tsc` de lá acusou erros de tipo do `axios` que **não existem** no repo real),
-e o resultado só vale como sinal — **a execução no Windows do autor é a
-autoridade**.
+**A execução no Windows do autor continua sendo a autoridade** para build, E2E,
+empacotamento e para fechar qualquer tarefa.
 
 ### Known blockers and cautions
 
@@ -2031,6 +2623,8 @@ autoridade**.
 - Do not commit real SIGAA HTML until it has passed the fixture sanitization
   checklist in `docs/PORTAL_COMPATIBILITY.md`.
 - Do not treat fixture tests as proof that the live portal is unchanged.
+- Fixtures atuais são sintéticas: elas concordam com o parser por construção.
+  Ver limites conhecidos do `QA-004`.
 
 ## Verification ledger
 
@@ -2042,6 +2636,14 @@ Append results here after meaningful milestones.
 | 2026-08-04 | working tree | `tsc --noEmit` (agente, pasta montada) | Pass | 0 erros. Eram 30 antes do ajuste dos consumidores de `window.api`. |
 | 2026-08-04 | working tree | `eslint .` (agente, cópia do repo) | Pass | 0 erros, 125 avisos. Baseline: 34 erros, 149 avisos. Zona de fronteira limpa. |
 | 2026-08-04 | working tree | `npm run quality` (**Bruno, Windows — autoridade**) | **Pass** | 9 arquivos, 68 passed, 4 skipped. Fecha o `PIPE-002`. |
+| 2026-08-05 | working tree | `tsc --noEmit`; `eslint .`; `vitest run` (agente, cópia do repo num Linux) | Pass | 3,1s / 2,8s / 5,8s. 0 erros, 125 warnings, 68 passed, 4 skipped. Prova que a suíte não depende mais do ambiente (`QA-002`). |
+| 2026-08-05 | working tree | `xvfb-run npx playwright test visual.spec.ts` (agente, Linux) | Pass | Todas as rotas renderizam em tema claro e escuro, sem erro de console. PNGs em `_agent_tmp/shots/`. |
+| 2026-08-05 | working tree | `npm ci` | **Fail** | Lock fora de sincronia com o `package.json` (`vitest@4.1.4` pede `vite@^6\|\|^7\|\|^8`, lock tem `5.4.21`). Ver `DEP-002`. |
+| 2026-08-05 | working tree | `tsc --noEmit`; `eslint .`; `vitest run` (agente, container, **depois** do `ARCH-003`/`QA-005`) | Pass | tsc limpo, 0 erros / 123 avisos, 64 passed / 4 skipped. A queda de 76 → 64 é a remoção do parser espelhado. |
+| 2026-08-05 | working tree | Mutação: remover a ponte `getSettings` do preload | **Falha esperada** | `TS2741: Property 'getSettings' is missing ... but required in type 'RendererApi'`. É a prova do `ARCH-003`. |
+| 2026-08-05 | working tree | Mutação: canal `get-app-settingz` no preload | **Falha esperada** | `preload-contract.test.ts` lista o canal órfão. Prova a metade que o tipo não cobre. |
+| 2026-08-05 | working tree | `yaml.safe_load` nos dois workflows + `grep` por `--publish always` | Pass | YAML válido; a flag só existe no `release.yml`, no passo condicional. **Nenhum workflow foi executado** — isso só acontece no GitHub, depois do commit. |
+| 2026-08-05 | working tree | `npm run quality` (Windows) | **Não rodado** | Lote de 2026-08-05 ainda sem execução autoritativa. É o próximo passo. |
 
 ## Task change log
 
@@ -2066,4 +2668,20 @@ Record status or scope changes that affect other agents.
 | 2026-08-04 | `BUG-006` | Criada e concluída — `result.error` num retorno que só tem `message`. Encontrado pelo typecheck. **Sem teste** — ver `QA-003`. | Claude |
 | 2026-08-04 | `QA-002` | Criada, `P1`, **bloqueia o `PIPE-003`** — 3 testes dependem do locale e de um caminho `C:\` literal. Descoberto ao rodar a suíte fora do Windows. | Claude |
 | 2026-08-04 | `QA-003` | Criada, `P2` — o que a suíte de 68 testes **não** cobre. Registrado para que "quality verde" não seja lido como "comportamento verificado". | Claude |
+| 2026-08-05 | `QA-002` | `NOT STARTED` → `DONE`. Locale explícito `pt-BR` no `ui-helpers` (bug de UI real, não só de teste) e `fs` mockado em memória no teste de persistência. Deixa de bloquear o `PIPE-003`. | Claude |
+| 2026-08-05 | `BUG-007` | Criada e concluída, `P1` — regex de id de notícia com escape duplo (`\\d`) nunca casava; zero notícia em silêncio. Encontrado ao escrever teste contra o parser real. | Claude |
+| 2026-08-05 | `BUG-008` | Criada e concluída, `P1` — `getSettings` sem ponte no preload; 5 call sites quebrados em runtime com `tsc` verde. Encontrado pelo teste de contrato. | Claude |
+| 2026-08-05 | `QA-004` | Criada e concluída, `P1` — tiers de teste: parser real contra fixture, contrato do `window.api`, E2E de Electron, loop visual. Resposta direta ao `BUG-007`/`BUG-008`. | Claude |
+| 2026-08-05 | `DEP-002` | Criada, `P1`, **passa a ser o bloqueio do `PIPE-003`** no lugar do `QA-002` — `npm ci` não roda: lock fora de sincronia com o `package.json`. Quebra em qualquer máquina. Owner: Bruno (Windows). | Claude |
+| 2026-08-05 | `BUG-003` | Escopo anotado: ao remover `simulateNewFile` da produção, o terceiro teste E2E do `QA-004` perde o gancho e precisa de substituto ou remoção. Sem mudança de status. | Claude |
+| 2026-08-05 | Tracker | Seção "Restrição de ambiente" corrigida: `vitest` **não** é impossível fora do Windows (o bloqueio era o binding `win32` do `node_modules` montado, não o `rolldown`). Registrado também que o `device_bash` local ficou indisponível nesta sessão, então o estado do working tree foi inferido de mtimes + reflog, não de `git status`. | Claude |
+| 2026-08-05 | `ARCH-003` | Criada e concluída, `P1` — correção de raiz da classe "duas pontas sem verificação": `RendererApi` em `shared/ipc.ts` usada pela ponte e pela declaração. Provada por mutação. | Claude |
+| 2026-08-05 | `QA-005` | Criada e concluída, `P1` — `tests/unit/parser.test.ts` apagado; asserções úteis migradas para o parser real. Deleção como correção. | Claude |
+| 2026-08-05 | `BUG-009` | Criada, `P2` — id de arquivo capturado com apóstrofo (`[^,]+` em vez de `[^,'"]+`). **Não corrigida de propósito**: o id é identidade no `cache.json`, então a correção precisa de migração e deve vir depois do `BUG-001`. | Claude |
+| 2026-08-05 | `PIPE-001` | `NOT STARTED` → `DONE`. Gatilho de tag removido do `release.yml`; input `publish` desmarcado por padrão; `--publish never` no `package.json`. `RELEASE_GUIDE.md` atualizado no mesmo passo. | Claude |
+| 2026-08-05 | `PIPE-004` | `NOT STARTED` → `DONE`. Gate como passos dentro do job de release (não `needs:` — o GitHub não permite depender de job de outro workflow). Checksums SHA-256 continuam no `REL-001`. | Claude |
+| 2026-08-05 | `PIPE-003` | `NOT STARTED` → `DONE`. O `quality.yml` já existia desde a sessão anterior e não tinha sido registrado; o status estava errado, não a implementação. Nome ficou `quality.yml`, não `ci.yml`. | Claude |
+| 2026-08-05 | `DEP-002` | Corrigida a caracterização: **não bloqueia** o `PIPE-003` (o CI existe e usa `npm install`), degrada a reprodutibilidade. O erro veio de eu não ter listado `.github/` ao levantar o estado. | Claude |
+| 2026-08-05 | Tracker | Registrado que `.github/workflows/` é protegido contra escrita remota: YAML de workflow precisa ser salvo pelo autor. | Claude |
+| 2026-08-05 | Tracker | Triagem do `.claude/skills/` encerrada: decisão de Bruno foi versionar (commit `38ff29b`), não mover para escopo de usuário. Item removido das pendências. | Claude |
 

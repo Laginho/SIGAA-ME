@@ -29,13 +29,96 @@ O que um agente com esta pasta montada de um Linux consegue rodar, medido em
 |---|---|---|
 | `tsc --noEmit` | **Sim** | JS puro, ~20s. É o loop de feedback útil |
 | `eslint .` | Inviável | ~40s **por arquivo** — ligado por I/O na montagem, não por CPU |
-| `vitest run` | **Não** | `rolldown` exige binário nativo win32 |
+| `vitest run` | **Não** | o `node_modules` montado é do Windows: `.bin/vitest` chama `node.exe` |
 
-Para lint e testes, copie o repositório (sem `node_modules`) para o ambiente do
-agente e instale as dev-deps lá. Duas ressalvas: as versões podem divergir do
-lock (o `tsc` de lá acusou erros de `axios` que não existem no repo real), e
-3 testes falham fora do Windows pt-BR por dependerem de locale e de um caminho
-`C:\` literal (tarefa `QA-002`). **A execução no Windows é a autoridade.**
+O `vitest` não falha por incompatibilidade do `rolldown` — ele publica binding
+por plataforma, e o lock lista todas as 15, `linux-x64-gnu` inclusive. O que
+existe na montagem é só a `win32` porque foi lá que o `npm install` rodou.
+Instalado no Linux, o `vitest` roda.
+
+**Copiar o repositório (sem `node_modules`) para o ambiente do agente e instalar
+as dev-deps lá é o caminho bom, e é bem mais rápido que a montagem.** Medido em
+2026-08-05, num container Linux:
+
+| Comando | Tempo | Resultado |
+|---|---|---|
+| `tsc --noEmit` | 3,1s | limpo |
+| `eslint .` | 2,8s no repo **inteiro** | 0 erros, 125 warnings (`no-explicit-any`) |
+| `vitest run` | 5,8s | 68 passed, 4 skipped |
+
+O gate inteiro em ~12s. O que **não** sai de um Linux: `npm run build`
+(`electron-builder --win` precisaria de wine) e `test:e2e`. O binário do Electron
+para Linux baixa normalmente, e o app abre com
+`xvfb-run electron --no-sandbox` — dá para inspecionar a UI, não para gerar
+instalador.
+
+Uma ressalva que sobra: **`npm ci` não roda neste repo.** O lock está fora de
+sincronia com o `package.json` (`vitest@4.1.4` puxa `vite@8.2.0`, o lock só tem
+`vite@5.4.21`), então sobra `npm install`, que resolve por conta própria — daí as
+versões poderem divergir do lock. Isso quebra CI em qualquer máquina, não só num
+Linux. Regerar o lock é tarefa para o Windows.
+
+**A execução no Windows continua sendo a autoridade** para build, E2E e empacotamento.
+
+### Loop de verificação visual (num Linux)
+
+O gate prova que nada quebrou; ele não mostra como ficou. Para trabalho de UI,
+depois de copiar o repo e instalar as dev-deps:
+
+```bash
+npx tsc --noEmit && npx eslint . && npx vitest run       # ~12s
+npx vite build                                           # ~7s, não precisa do Electron
+node node_modules/electron/install.js                    # baixa o binário Linux
+xvfb-run -a npx playwright test visual.spec.ts           # ~16s, screenshots por rota
+```
+
+`tests/e2e/visual.spec.ts` abre o app de verdade, navega por hash em todas as
+rotas em tema claro e escuro, falha se alguma renderizar vazia, e no final falha
+se qualquer navegação deixou erro no console. Os PNGs ficam em
+`_agent_tmp/shots/` para alguém olhar — não são snapshots comparados
+automaticamente.
+
+Duas armadilhas medidas em 2026-08-05, ambas custam meia hora se você não souber:
+
+1. **Precisa de um `google-chrome` no PATH.** O `whenReady` do `main.ts` procura o
+   Chrome e, se não achar, chama `dialog.showErrorBox` — um modal que **bloqueia
+   antes de `createWindow()`**. Sem window, o Playwright dá timeout e não diz por
+   quê. Num container com Playwright: `ln -s <chromium do playwright> ~/bin/google-chrome`.
+2. **Não espere o boot real.** O boot chama `window.api.tryAutoLogin()`, que faz
+   login de verdade no SIGAA. Para inspecionar UI isso é ruído: plante fixture em
+   `sessionStorage.account` e `localStorage.coursesWithFiles` e navegue por hash,
+   como o spec faz.
+
+### Os tiers de teste
+
+| Tier | Onde | Precisa de | Runner |
+|---|---|---|---|
+| Unit + integração mockada | `tests/unit/`, `tests/integration/` | nada | vitest |
+| Parser contra fixture | `tests/integration/parser-real.test.ts` | nada | vitest |
+| Visual | `tests/e2e/visual.spec.ts` | nada | playwright |
+| E2E sem credencial | `tests/e2e/app.spec.ts` (2 testes) | nada | playwright |
+| Live smoke do scraper | `tests/integration/scraper.test.ts` | `.env` **+** `RUN_LIVE_SIGAA_TESTS=true` | vitest |
+| E2E fluxo completo | `app.spec.ts` (3 testes) | `.env` | playwright |
+
+Regras que sustentam isso:
+
+- **`tests/e2e/` é só `*.spec.ts`.** O `playwright.config.ts` fixa
+  `testMatch: '**/*.spec.ts'` porque o vitest inclui `tests/**/*.test.ts` e o
+  Playwright, pelo padrão dele, pegava os dois. Um teste de vitest em
+  `tests/e2e/` fazia o Playwright morrer na transformação e **zerar a coleta
+  inteira** — 0 testes, sem erro óbvio.
+- **Os tiers com credencial não entram em loop.** São login real na conta do
+  usuário no portal da universidade: rodar em ciclo é dezenas de logins
+  automatizados e risco de bloqueio. Manual, antes de release.
+- **Teste não espelha implementação.** `tests/unit/parser.test.ts` declara que
+  suas funções "mirror the parsing logic in the service" — ele testa uma cópia,
+  e a cópia não tem a detecção de selector drift que o serviço real tem. Foi
+  assim que um `/['"](\\d+)['"]/` (barra invertida literal, não dígito) ficou
+  quebrado no parser real com 14 testes verdes em cima. Teste novo chama o
+  código de produção; ver `tests/fixtures/README.md`.
+
+O que este loop **não** cobre: empacotamento, assinatura, e qualquer coisa que
+dependa de sync real contra o `si3.ufc.br`.
 
 ## Arquitetura em uma frase
 
