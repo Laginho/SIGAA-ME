@@ -18,6 +18,9 @@ jobs:
     # por plataforma (Electron, Playwright) e o autor desenvolve no Windows.
     # Rodar o gate em Linux mudaria o que está sendo verificado.
     runs-on: windows-latest
+    # O gate leva ~1m26s; 15 min dá folga sem aceitar o default de 360 min.
+    # O run #1 já pendurou, e windows-latest custa 2x em repositório privado.
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
@@ -47,9 +50,9 @@ jobs:
   e2e:
     name: E2E sem credencial
     runs-on: windows-latest
-    # Não bloqueia o gate: se o Electron não subir no runner, o resultado do
-    # typecheck/lint/testes continua legível.
-    continue-on-error: true
+    # O E2E leva ~1m45s; 15 min dá folga sem aceitar o default de 360 min.
+    # O run #1 já pendurou, e windows-latest custa 2x em repositório privado.
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
