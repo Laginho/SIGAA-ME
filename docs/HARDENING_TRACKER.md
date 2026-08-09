@@ -48,10 +48,11 @@ Agents must not delete completed tasks. The history is part of the handoff.
 - Typecheck: passing at the baseline.
 - Deterministic Vitest suite: 68 passed, 4 live tests skipped.
 - Live SIGAA smoke tests: opt-in with `RUN_LIVE_SIGAA_TESTS=true`.
-- Production dependency audit on 2026-07-10: 4 vulnerable packages,
-  including 3 high-severity findings.
-- Installed Vite/Vitest mismatch: Vite `5.4.21`; Vitest `4.1.4` declares
-  Vite `^6 || ^7 || ^8` as its peer range.
+- Production dependency audit on 2026-08-09: 5 high-severity production
+  packages; full tree has 18 findings (1 low, 15 high, 2 critical). Ver
+  `DEP-001`.
+- Vite/Vitest aligned: Vite `6.4.3`; Vitest `4.1.4`. Clean `npm ci`, quality
+  gate and Windows packaging passed (`DEP-002`).
 - `CODE_REVIEW.md` is the originating review; this tracker supersedes it for
   implementation status.
 
@@ -61,7 +62,7 @@ Agents must not delete completed tasks. The history is part of the handoff.
 - Novo tier de testes: parser real contra fixture, contrato do `window.api`,
   E2E de Electron e loop de verificação visual (`QA-004`).
 - `npm ci` **não roda neste repositório** — lock fora de sincronia com o
-  `package.json`. Ver `DEP-002`; é o bloqueio atual do `PIPE-003`.
+  `package.json`. Registro histórico; resolvido pelo `DEP-002` em 2026-08-09.
 
 ## Master dependency order
 
@@ -532,6 +533,10 @@ secret de CI, e o CI não deve logar na conta de ninguém a cada push.
 ele não é ainda é **reproduzível** — ele resolve versões por conta própria em vez
 de instalar o que o lock descreve.
 
+**Follow-up 2026-08-09:** ressalva resolvida. O `DEP-002` alinhou Vite/Vitest,
+regenerou o lock e trocou os passos para `npm ci`. O `PIPE-005` tornou o E2E
+bloqueante e o `PIPE-006` adicionou o terceiro job, de scanner de segredo.
+
 ### PIPE-004 — Gate no release
 
 - Status: `DONE` — implementado na sessão 2026-08-05
@@ -986,7 +991,8 @@ mas com sintoma silencioso em vez de no-op. Ninguém ia achar isso lendo código
 ### QA-002 — A suíte não é portável: locale e caminho absoluto do Windows
 
 - Status: `DONE` — corrigido na sessão 2026-08-05
-- Priority: `P1` — não bloqueia mais o `PIPE-003`; o bloqueio agora é o `DEP-002`
+- Priority: `P1` — não bloqueia mais o `PIPE-003`; `DEP-002` também fechou em
+  2026-08-09
 - Owner: Claude
 - Dependencies: `PIPE-002`
 - Primary files: `src/utils/ui-helpers.ts`,
@@ -1254,14 +1260,15 @@ ocorrência igualmente invisível.
 
 ---
 
-### DEP-002 — `npm ci` não roda: lock fora de sincronia com o `package.json`
+### DEP-002 — `npm ci` não rodava: lock fora de sincronia com o `package.json`
 
-- Status: `NOT STARTED`
-- Priority: `P1` — **não bloqueia** o `PIPE-003`; degrada. Ver nota de 2026-08-05
-  no fim desta tarefa
-- Owner: Bruno (só resolve no Windows)
+- Status: `DONE` — implementado e verificado no Windows em 2026-08-09
+- Priority: `P1` — degradação de reprodutibilidade resolvida; ver nota histórica
+  de 2026-08-05 no fim desta tarefa
+- Owner: Bruno + Codex (execução no Windows)
 - Dependencies: none
-- Primary files: `package-lock.json`, `package.json`
+- Primary files: `package-lock.json`, `package.json`,
+  `.github/workflows/quality.yml`, `.github/workflows/release.yml`, `CLAUDE.md`
 
 #### Problem
 
@@ -1285,6 +1292,45 @@ Windows**. A consequência prática é dupla:
 - `npm run quality` passa depois dele, no Windows.
 - O lock commitado corresponde ao `package.json` (`vite` numa major que o
   `vitest` aceite).
+
+#### Fix (2026-08-09)
+
+- Vite `5.4.21` → `6.4.3`, a menor major aceita pelo Vitest `4.1.4`.
+- Os plugins instalados `vite-plugin-electron@0.28.8` e
+  `vite-plugin-electron-renderer@0.14.6` não declaram peer range de Vite; não foi
+  necessária uma migração dos plugins para suas majors novas.
+- Lock regenerado no Windows e os três passos de instalação dos workflows
+  trocados de `npm install` para `npm ci`.
+- `CLAUDE.md` atualizado para tratar `npm ci` como caminho autoritativo.
+
+#### Verification (Windows)
+
+| Comando | Resultado |
+|---|---|
+| `npm ci` | Pass — 675 pacotes instalados a partir do lock |
+| `npm ls` | Pass — árvore válida, sem peer inválido |
+| `npm run quality` | Pass — typecheck limpo, lint 0 erros/123 avisos, 64 passed/4 skipped |
+| `npm run build` | Pass — Vite 6.4.3 compilou renderer/main/preload; NSIS e portátil gerados |
+| `npm audit --omit=dev` | 5 high, 0 critical — registrado para `DEP-001` |
+| `npm audit` | 18 total: 1 low, 15 high, 2 critical — registrado para `DEP-001` |
+
+Artefatos gerados:
+
+- `release/1.1.0-beta.2/SIGAA-ME-Windows-1.1.0-beta.2-Setup.exe`
+- `release/1.1.0-beta.2/SIGAA-ME-Windows-1.1.0-beta.2-Portable.exe`
+
+#### Remaining risk
+
+O lock agora é reproduzível, mas isso não torna as dependências seguras. A
+auditoria de produção ainda aponta `axios`, `electron-updater` e três transitivas
+com severidade alta. Correção de vulnerabilidades e atualização de Electron
+continuam no `DEP-001`; não foram misturadas nesta migração de build.
+
+#### Implementation notes
+
+- Commit: —
+- Decisão: menor major compatível (`vite@6.4.3`), sem atualizar os plugins
+  Electron junto.
 
 #### Rationale
 
@@ -2576,12 +2622,12 @@ reavaliação não é decisão, é esquecimento.
 > removido como previsto; as decisões e evidências definitivas estão nas tarefas
 > e no ledger deste tracker.
 >
-> **Próxima ação manual: `DEP-002` (Bruno, Windows).** Conferir os peer ranges
-> dos plugins Electron, atualizar o Vite para uma major aceita pelo Vitest,
-> regenerar o lock e provar `npm ci`, `npm run quality` e o empacotamento. Até
-> isso fechar, árvores locais podem divergir do CI. Neste fechamento, o
-> typecheck e os 64 testes passaram, mas `npm run quality` parou porque a árvore
-> local não contém o executável do ESLint.
+> **`DEP-002` concluído no Windows em 2026-08-09.** Vite `6.4.3`, lock
+> regenerado, `npm ci`, gate e empacotamento passaram; os workflows agora usam
+> instalação reproduzível. Após revisão/commit deste lote, a ordem do plano volta
+> ao `BUG-001` (download apagando arquivos válidos). As 5 vulnerabilidades altas
+> de produção encontradas na auditoria ficam registradas separadamente no
+> `DEP-001` e não foram misturadas nesta migração.
 
 **Registro — rodar o gate no Windows e commitar o lote de 2026-08-05.** Havia um
 working tree acumulado sobre `38ff29b` que ainda não tinha passado pela execução
@@ -2644,13 +2690,10 @@ arrasta os tiers de teste.
 > ressalva do `release.yml` acima. O marco declarado no `PIPE-004` — "nada piora
 > sem alguém perceber" — vale a partir do primeiro push depois do commit.
 
-1. `DEP-002` — regerar o `package-lock.json` (Windows, Bruno). Não bloqueia mais
-   nada, mas enquanto ele existir o verde do CI não prova o verde da sua máquina.
-   Depois disso, trocar `npm install` por `npm ci` nos dois workflows (o
-   comentário no `quality.yml` marca o lugar).
-2. **gitleaks no `quality.yml`** — é o que fecha a prevenção do `SEC-000`, e era
-   parte do `PIPE-003` que não entrou. Tarefa pequena, alto valor: hoje nada
-   impede uma segunda credencial de entrar no repositório.
+1. ~~`DEP-002` — regerar o lock e trocar os workflows para `npm ci`.~~ **DONE
+   2026-08-09:** Vite 6.4.3, instalação limpa, gate e build Windows verdes.
+2. ~~**gitleaks no `quality.yml`** — prevenção do `SEC-000`.~~ **DONE
+   2026-08-09 (`PIPE-006`)**, com prova por mutação no GitHub Actions.
 3. **Nível 1 da `docs/AUDITORIA_COMPLEXIDADE.md`** — ~700 linhas de remoção com
    prova por busca, num único commit, com `quality` antes e depois.
 4. `BUG-001` — download apagando arquivos válidos. **É o exercício de TDD**:
@@ -2695,7 +2738,8 @@ conhecidos do `QA-004`.
   atualizado. **Pendente:** salvar o `release.yml` à mão (pasta protegida).
 - `PIPE-003` — **`DONE`** (2026-08-05, sessão anterior). `.github/workflows/quality.yml`:
   gate em `windows-latest` em push/PR, mais job de E2E sem credencial com
-  artefatos. Usa `npm install` por causa do `DEP-002`.
+  artefatos. Desde o `DEP-002` usa `npm ci`; `PIPE-005` tornou o E2E bloqueante
+  e `PIPE-006` acrescentou o scanner de segredo.
 - `ARCH-003` — **`DONE`** (sessão 2026-08-05). `RendererApi` em `shared/ipc.ts`,
   usada pela ponte e pela declaração. Ponte faltando virou erro de compilação;
   provado por mutação (remover `getSettings` → `TS2741`).
@@ -2793,7 +2837,8 @@ informação errada aqui:
 - O que não sai de um Linux: `npm run build` (`electron-builder --win` pediria
   wine) e o empacotamento. O E2E **sai**, com `xvfb-run` e um `google-chrome` no
   PATH.
-- `npm ci` não roda em lugar nenhum — ver `DEP-002`.
+- ~~`npm ci` não roda em lugar nenhum.~~ Resolvido no Windows em 2026-08-09;
+  workflows e desenvolvimento usam o lock regenerado (`DEP-002`).
 - Na sessão 2026-08-05 o `device_bash` da máquina do autor ficou indisponível
   ("Workspace unavailable"), então o agente leu os arquivos por staging e **não**
   conseguiu rodar `git status`. Estado do working tree inferido de mtimes e do
@@ -2838,6 +2883,8 @@ Append results here after meaningful milestones.
 | 2026-08-09 | [`4860c95`](https://github.com/Laginho/SIGAA-ME/actions/runs/31323088727) (branch descartável) | Mutação: token falso em arquivo temporário | **Falha esperada** | Gate e E2E verdes; scanner vermelho com `generic-api-key` e `github-pat`; workflow `failure`. Branch removido após a verificação. |
 | 2026-08-09 | working tree | `npm run quality` (Windows) | **Falha de ambiente** | `tsc --noEmit` passou; o lint não iniciou porque `eslint` não existe no `node_modules` local. A cadeia parou antes dos testes. Não foi feito `npm install`; ver `DEP-002`. |
 | 2026-08-09 | working tree | `npx.cmd tsc --noEmit`; `npx.cmd vitest run`; parse YAML com `js-yaml` (Windows) | Pass | Typecheck limpo; 10 arquivos, 64 passed / 4 skipped; jobs `gate`, `e2e` e `secrets` presentes em YAML válido. |
+| 2026-08-09 | working tree | `npm ci`; `npm ls`; `npm run quality`; `npm run build` (Windows) | Pass | `DEP-002`: Vite 6.4.3, árvore reproduzível; 0 erros/123 avisos, 64 passed/4 skipped; instalador NSIS e portátil gerados. |
+| 2026-08-09 | working tree | `npm audit --omit=dev`; `npm audit` | **Fail — dívida registrada** | Produção: 5 high/0 critical. Árvore completa: 1 low/15 high/2 critical. Correções pertencem ao `DEP-001`, não ao `DEP-002`. |
 
 ## Task change log
 
@@ -2882,4 +2929,5 @@ Record status or scope changes that affect other agents.
 | 2026-08-09 | `PIPE-005` | Criada e concluída, `P1` — E2E passou a bloquear o workflow e os dois jobs receberam teto de 15 minutos. Comportamento provado por mutação no GitHub Actions. | Codex |
 | 2026-08-09 | `PIPE-006` | Criada e concluída, `P1` — job Gitleaks bloqueia novas credenciais. A premissa de que `fetch-depth: 0` reauditaria o histórico foi refutada pelo log (`--log-opts=-1`) e registrada sem ampliar a configuração. | Codex |
 | 2026-08-09 | Lote agêntico | `QA-006`, `PIPE-005` e `PIPE-006` aprovadas pelo Claude; ordem de trabalho temporária encerrada. `DEP-002` permanece como próxima ação manual do Bruno. | Codex |
+| 2026-08-09 | `DEP-002` | `NOT STARTED` → `DONE`. Vite 5.4.21 → 6.4.3, lock regenerado, workflows em `npm ci`; instalação limpa, quality e build Windows verificados. Auditorias pendentes encaminhadas ao `DEP-001`. | Bruno + Codex |
 

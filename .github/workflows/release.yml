@@ -39,10 +39,8 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
-      # Ver o comentário do `quality.yml`: `npm ci` não roda enquanto o lock
-      # estiver fora de sincronia com o `package.json` (DEP-002).
       - name: Install Dependencies
-        run: npm install
+        run: npm ci
 
       # PIPE-004: o gate roda aqui dentro, antes do build.
       #
