@@ -763,50 +763,82 @@ export class HttpScraperService {
         }
     }
 
-    private async verifyFileContent(filePath: string, expectedExtension: string): Promise<boolean> {
+    // Magic Bytes signatures.
+    //
+    // BUG-001: esta tabela é a ÚNICA fonte, usada tanto para nomear o arquivo
+    // (`detectExtension`) quanto para verificá-lo (`verifyHead`). Duas tabelas
+    // que precisam concordar é o padrão que já quebrou este repositório duas
+    // vezes — ver `QA-005` e `BUG-007`.
+    private static readonly SIGNATURES: Record<string, string[]> = {
+        '.pdf': ['25504446'], // %PDF
+        '.zip': ['504B0304'], // PK..
+        '.docx': ['504B0304'], // PK..
+        '.xlsx': ['504B0304'], // PK..
+        '.pptx': ['504B0304'], // PK..
+        '.png': ['89504E47'], // .PNG
+        '.jpg': ['FFD8FF'],
+        '.jpeg': ['FFD8FF'],
+        '.gif': ['47494638'], // GIF8
+        '.rar': ['52617221'], // Rar!
+    };
+
+    // Ordem de tentativa ao deduzir a extensão a partir do conteúdo. `.zip` vem
+    // por último de propósito: docx/xlsx/pptx têm a MESMA assinatura, então sem
+    // `Content-Disposition` não há como distingui-los, e `.zip` é a resposta
+    // honesta em vez de um chute entre os três.
+    private static readonly DETECT_ORDER = ['.pdf', '.png', '.jpg', '.gif', '.rar', '.zip'];
+
+    /** Primeiros 8 bytes do arquivo — o suficiente para toda assinatura da tabela. */
+    private async readHead(filePath: string): Promise<Buffer> {
+        const handle = await fs.promises.open(filePath, 'r');
         try {
-            const handle = await fs.promises.open(filePath, 'r');
             const buffer = Buffer.alloc(8);
             await handle.read(buffer, 0, 8, 0);
+            return buffer;
+        } finally {
             await handle.close();
-
-            const hex = buffer.toString('hex').toUpperCase();
-
-            // Magic Bytes signatures
-            const signatures: Record<string, string[]> = {
-                '.pdf': ['25504446'], // %PDF
-                '.zip': ['504B0304'], // PK..
-                '.docx': ['504B0304'], // PK..
-                '.xlsx': ['504B0304'], // PK..
-                '.pptx': ['504B0304'], // PK..
-                '.png': ['89504E47'], // .PNG
-                '.jpg': ['FFD8FF'],
-                '.jpeg': ['FFD8FF'],
-                '.gif': ['47494638'], // GIF8
-                '.rar': ['52617221'], // Rar!
-            };
-
-            // If we have a signature for this extension, check it
-            if (signatures[expectedExtension]) {
-                const isValid = signatures[expectedExtension].some(sig => hex.startsWith(sig));
-                if (!isValid) {
-                    this.log(`[HttpScraper] Magic Byte mismatch for ${expectedExtension}. Found: ${hex}`);
-                    return false;
-                }
-            }
-
-            // Check for HTML error pages (often start with <html, <!DOC, or whitespace then <)
-            const contentStart = buffer.toString('utf8').trim().substring(0, 5).toLowerCase();
-            if (contentStart.startsWith('<html') || contentStart.startsWith('<!doc')) {
-                this.log(`[HttpScraper] File appears to be HTML (likely error page)`);
-                return false;
-            }
-
-            return true;
-        } catch (error) {
-            this.log(`[HttpScraper] Verification error: ${error}`);
-            return false; // Assume invalid if we can't read it
         }
+    }
+
+    /**
+     * Extensão deduzida do conteúdo, ou `''` quando nenhuma assinatura casa.
+     *
+     * BUG-001: string vazia é resposta válida e deliberada. Antes daqui existia
+     * um fallback que assumia `.pdf` para conteúdo desconhecido; a verificação
+     * seguinte então exigia `%PDF`, não achava, e **apagava um arquivo íntegro**.
+     * Um `.txt` sem extensão é inconveniente; um `.txt` deletado é perda de dado.
+     */
+    private detectExtension(head: Buffer): string {
+        const hex = head.toString('hex').toUpperCase();
+        for (const ext of HttpScraperService.DETECT_ORDER) {
+            if (HttpScraperService.SIGNATURES[ext].some(sig => hex.startsWith(sig))) {
+                this.log(`[HttpScraper] Extension detected from content: ${ext}`);
+                return ext;
+            }
+        }
+        return '';
+    }
+
+    private verifyHead(head: Buffer, expectedExtension: string): boolean {
+        const hex = head.toString('hex').toUpperCase();
+
+        // Só há o que contradizer se a extensão tiver assinatura conhecida. Um
+        // binário legítimo sem assinatura registrada passa — rejeitá-lo seria
+        // repetir o BUG-001 por outro caminho.
+        const expected = HttpScraperService.SIGNATURES[expectedExtension];
+        if (expected && !expected.some(sig => hex.startsWith(sig))) {
+            this.log(`[HttpScraper] Magic Byte mismatch for ${expectedExtension}. Found: ${hex}`);
+            return false;
+        }
+
+        // Check for HTML error pages (often start with <html, <!DOC, or whitespace then <)
+        const contentStart = head.toString('utf8').trim().substring(0, 5).toLowerCase();
+        if (contentStart.startsWith('<html') || contentStart.startsWith('<!doc')) {
+            this.log(`[HttpScraper] File appears to be HTML (likely error page)`);
+            return false;
+        }
+
+        return true;
     }
 
     async downloadFile(
@@ -918,12 +950,10 @@ export class HttpScraperService {
                         this.log(`[HttpScraper] Extracted extension from mime-type: ${detectedExtension}`);
                     }
                 }
-                
-                // 3. Ultimate Fallback: if it's application/octet-stream with NO extension, assume it's a PDF.
-                if (!detectedExtension) {
-                    detectedExtension = '.pdf';
-                    this.log('[HttpScraper] Ultimate fallback: Assigned .pdf since extension is unknown');
-                }
+                // 3. Se nada disso resolveu, a extensão sai do CONTEÚDO, depois
+                //    do download — ver `detectExtension`. Aqui havia um fallback
+                //    para `.pdf` que fazia o app apagar `.txt`, `.csv` e `.odt`
+                //    servidos como octet-stream (`BUG-001`).
             }
 
             // Apply the requested extension if the filename doesn't already have it
@@ -937,8 +967,12 @@ export class HttpScraperService {
             finalFileName = finalFileName.replace(/[<>:"/\\|?*\x00-\x1F]/g, '_').trim();
 
 
-            const filePath = path.join(basePath, finalFileName);
-            const writer = fs.createWriteStream(filePath);
+            // BUG-001: o download vai para `.part` e só ganha o nome definitivo
+            // depois de verificado. Duas coisas dependem disso: a extensão pode
+            // vir do conteúdo (que só existe depois de gravado), e um download
+            // interrompido nunca deixa um arquivo com o nome final no lugar.
+            const partPath = path.join(basePath, finalFileName + '.part');
+            const writer = fs.createWriteStream(partPath);
 
             const totalLength = parseInt(response.headers['content-length'] || '0', 10);
             let downloadedLength = 0;
@@ -952,36 +986,67 @@ export class HttpScraperService {
 
             response.data.pipe(writer);
 
+            const descartarParcial = async (motivo: string) => {
+                try {
+                    await fs.promises.unlink(partPath);
+                    this.log(`[HttpScraper] Discarded partial file (${motivo}): ${partPath}`);
+                } catch (unlinkErr) {
+                    this.log(`[HttpScraper] Failed to discard partial file: ${String(unlinkErr)}`);
+                }
+            };
+
             return new Promise((resolve, reject) => {
                 writer.on('finish', async () => {
-                    // Check file size first
-                    const stats = await fs.promises.stat(filePath);
+                    try {
+                        const stats = await fs.promises.stat(partPath);
+                        const head = await this.readHead(partPath);
 
-                    // Perform robust verification for ALL files
-                    const ext = path.extname(filePath).toLowerCase();
-                    const isValid = await this.verifyFileContent(filePath, ext);
-
-                    if (!isValid) {
-                        this.log(`[HttpScraper] ERROR: File verification failed. Size: ${stats.size} bytes.`);
-
-                        // Delete the invalid file
-                        try {
-                            await fs.promises.unlink(filePath);
-                            this.log(`[HttpScraper] Deleted invalid file: ${filePath}`);
-                        } catch (unlinkErr: any) {
-                            this.log(`[HttpScraper] Failed to delete invalid file: ${unlinkErr.message}`);
+                        // Se nem a UI, nem o Content-Disposition, nem o MIME deram
+                        // extensão, ela sai do conteúdo. Nunca de um chute: a
+                        // verificação abaixo lê os mesmos bytes, então detecção e
+                        // verificação não têm como se contradizer.
+                        if (!path.extname(finalFileName)) {
+                            finalFileName += this.detectExtension(head);
                         }
 
-                        resolve({ success: false, error: 'Downloaded file failed verification (Invalid signature or HTML error page).' });
-                        return;
-                    }
+                        const ext = path.extname(finalFileName).toLowerCase();
+                        if (!this.verifyHead(head, ext)) {
+                            this.log(`[HttpScraper] ERROR: File verification failed. Size: ${stats.size} bytes.`);
+                            await descartarParcial('verificação falhou');
+                            resolve({ success: false, error: 'Downloaded file failed verification (Invalid signature or HTML error page).' });
+                            return;
+                        }
 
-                    this.log(`[HttpScraper] Download complete: ${filePath} (Size: ${stats.size} bytes)`);
-                    resolve({ success: true, filePath });
+                        const filePath = path.join(basePath, finalFileName);
+                        await fs.promises.rename(partPath, filePath);
+
+                        this.log(`[HttpScraper] Download complete: ${filePath} (Size: ${stats.size} bytes)`);
+                        resolve({ success: true, filePath });
+                    } catch (err) {
+                        // Falha ao ler, verificar ou renomear. O parcial não pode
+                        // ficar para trás se apresentando como download bom.
+                        const message = err instanceof Error ? err.message : String(err);
+                        this.log(`[HttpScraper] Post-download error: ${message}`);
+                        await descartarParcial('erro pós-download');
+                        resolve({ success: false, error: message });
+                    }
                 });
-                writer.on('error', (err) => {
+                writer.on('error', async (err) => {
                     this.log(`[HttpScraper] File write error: ${err.message}`);
+                    await descartarParcial('erro de escrita');
                     reject({ success: false, error: err.message });
+                });
+                // Erro NA ORIGEM (conexão caiu no meio do stream). Sem isto o
+                // `writer` nunca emite `finish` nem `error`, e esta Promise nunca
+                // resolve: a UI fica em "baixando" para sempre e o `.part` fica no
+                // disco. `pipe()` não propaga erro do source para o destino.
+                response.data.on('error', (err: Error) => {
+                    this.log(`[HttpScraper] Download stream error: ${err.message}`);
+                    writer.destroy();
+                    writer.once('close', async () => {
+                        await descartarParcial('conexão interrompida');
+                        resolve({ success: false, error: err.message });
+                    });
                 });
             });
 
