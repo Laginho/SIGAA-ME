@@ -14,7 +14,7 @@ concurrency:
 jobs:
   gate:
     name: Typecheck, lint e testes
-    # Windows é a autoridade deste projeto: `npm install` baixa binário nativo
+    # Windows é a autoridade deste projeto: `npm ci` baixa binário nativo
     # por plataforma (Electron, Playwright) e o autor desenvolve no Windows.
     # Rodar o gate em Linux mudaria o que está sendo verificado.
     runs-on: windows-latest
@@ -32,11 +32,8 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
-      # `npm ci` não roda aqui: o package-lock.json está fora de sincronia com o
-      # package.json (vitest@4 puxa vite@8, o lock só tem vite@5). Quando o lock
-      # for regerado, troque por `npm ci` — é mais rápido e mais reprodutível.
       - name: Install
-        run: npm install
+        run: npm ci
 
       - name: Typecheck
         run: npm run typecheck
@@ -65,7 +62,7 @@ jobs:
           cache: 'npm'
 
       - name: Install
-        run: npm install
+        run: npm ci
 
       # Sem SIGAA_USER/SIGAA_PASS no ambiente, os 3 testes que fazem login real
       # entram em skip pelo `describeOrSkip` do app.spec.ts. É intencional:

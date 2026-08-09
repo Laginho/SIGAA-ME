@@ -52,11 +52,11 @@ para Linux baixa normalmente, e o app abre com
 `xvfb-run electron --no-sandbox` — dá para inspecionar a UI, não para gerar
 instalador.
 
-Uma ressalva que sobra: **`npm ci` não roda neste repo.** O lock está fora de
-sincronia com o `package.json` (`vitest@4.1.4` puxa `vite@8.2.0`, o lock só tem
-`vite@5.4.21`), então sobra `npm install`, que resolve por conta própria — daí as
-versões poderem divergir do lock. Isso quebra CI em qualquer máquina, não só num
-Linux. Regerar o lock é tarefa para o Windows.
+**`npm ci` voltou a ser o caminho autoritativo em 2026-08-09 (`DEP-002`).** O
+Vite subiu de 5.4.21 para 6.4.3, major aceita pelo Vitest 4.1.4, e o lock foi
+regenerado no Windows. Uma instalação limpa, `npm run quality` e o empacotamento
+Windows passaram. Os workflows usam `npm ci`; não troque de volta para
+`npm install`, que resolveria versões fora do lock.
 
 **A execução no Windows continua sendo a autoridade** para build, E2E e empacotamento.
 
