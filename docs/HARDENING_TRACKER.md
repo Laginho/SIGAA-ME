@@ -137,7 +137,7 @@ manutenção corretiva.
 | Remover `verify-scraper.ts` + `tsconfig.verify.json` do HEAD | **Feito** |
 | Regra de lint contra credencial com fallback | **Feito** (`eslint.config.js`) |
 | Limpar credencial do histórico | Pendente — via `git filter-repo` |
-| Scanner de segredo no CI | Pendente (`PIPE-003`) |
+| Scanner de segredo no CI | **Feito** (`PIPE-006`) — previne reincidência; não substitui a limpeza do histórico |
 
 > **Cuidado ao documentar incidente de credencial:** a primeira versão desta
 > tarefa transcreveu a senha real como exemplo. Isso anularia o `filter-repo` —
@@ -180,7 +180,7 @@ protege segredo colocado onde não devia estar.
    `docs/AUDITORIA_COMPLEXIDADE.md` (é código morto: nenhum script npm o usa).
 4. Limpar o histórico — **decisão: `git filter-repo`**, não repo novo. Preserva
    os 269 commits e remove o arquivo de todos eles. Procedimento abaixo.
-5. Prevenção no CI (`PIPE-002`).
+5. Prevenção no CI (`PIPE-002` e `PIPE-006`).
 
 #### Procedimento de limpeza de histórico
 
@@ -203,11 +203,21 @@ git log --all -p -S 'COLE_A_SENHA_ANTIGA_AQUI'   # deve retornar vazio
 # (não deixe a senha escrita neste arquivo — rode o comando e apague do terminal)
 git log --all --oneline -- verify-scraper.ts   # deve retornar vazio
 
-# 3. o filter-repo remove o remote por segurança; recolocar e forçar
+# 3. auditar uma vez todo o histórico reescrito
+#    o relatório é local e pode conter achados sensíveis; não o commite
+gitleaks detect --source . --log-opts="--all" --report-path gitleaks-history.json
+
+# 4. o filter-repo remove o remote por segurança; recolocar e forçar
 git remote add origin https://github.com/Laginho/SIGAA-ME.git
 git push --force --all
 git push --force --tags
 ```
+
+**Hipótese não testada:** as regras padrão do Gitleaks miram strings com formato
+de chave ou token, enquanto o vazamento do `SEC-000` era uma senha comum. É
+possível que a auditoria retroativa não a reconheça. Portanto, `no leaks found`
+não prova que o histórico está limpo; para este incidente, a busca explícita com
+`git log -S` pela senha antiga continua sendo a verificação determinante.
 
 Efeitos colaterais esperados:
 
@@ -229,12 +239,15 @@ resposta: repo fechado, senha trocada, causa entendida, prevenção adicionada.
 Remover a credencial do histórico é higiene. Apagar o registro de que houve um
 incidente seria perder a única parte com valor.
 
-#### Prevenção (entra no `PIPE-002`)
+#### Prevenção (`PIPE-002` e `PIPE-006`)
 
 - Regra de lint proibindo string literal em variável chamada `password`,
   `senha`, `secret`, `token`.
-- Alternativa mais robusta: scanner de segredo no CI (`gitleaks` ou
-  `trufflehog`) rodando em todo PR. Barato e pega o caso genérico.
+- Scanner de segredo no CI com Gitleaks, implementado no `PIPE-006`. A prova por
+  mutação bloqueou um token falso. Em `push`, a action executou com
+  `--log-opts=-1`, então o checkout completo não transformou a primeira execução
+  numa auditoria dos 269 commits: a limpeza histórica continua sendo o
+  `git filter-repo` acima.
 - Regra no `CLAUDE.md`: credencial só via `process.env`, **sem valor de
   fallback**. Se a variável não existir, o programa deve falhar, não usar um
   padrão.
@@ -248,9 +261,16 @@ incidente seria perder a única parte com valor.
 
 #### Implementation notes
 
-- Commit: —
+- Commit da prevenção no CI: `30dcbcd`
 - Data da troca de senha: —
 - Decisão sobre histórico: —
+- Scanner: run-base
+  [`31322967979`](https://github.com/Laginho/SIGAA-ME/actions/runs/31322967979)
+  verde, sem licença exigida e sem achado porque a action usou `--log-opts=-1`;
+  mutação no run
+  [`31323088727`](https://github.com/Laginho/SIGAA-ME/actions/runs/31323088727)
+  bloqueada com dois achados no arquivo falso. Nenhum valor de segredo foi
+  transcrito neste documento.
 
 ---
 
@@ -545,6 +565,113 @@ comentado no YAML: a alternativa era repetir os passos do script `release` dentr
 do workflow, criando duas descrições do build que podem divergir.
 
 **Não atendido:** checksums SHA-256. Continua no `REL-001`.
+
+---
+
+### PIPE-005 — Tornar o E2E bloqueante e limitar o tempo dos jobs
+
+- Status: `DONE` — implementado e verificado em 2026-08-09
+- Priority: `P1`
+- Owner: Codex
+- Dependencies: `QA-006`
+- Primary files: `.github/workflows/quality.yml`
+
+#### Problem
+
+O job `e2e` tinha `continue-on-error: true`, então uma regressão que impedisse o
+Electron de subir ainda deixava o workflow verde. Os jobs `gate` e `e2e` também
+não tinham `timeout-minutes` e herdavam o teto padrão de seis horas do GitHub.
+
+#### Fix
+
+- Removidos `continue-on-error: true` e o comentário que o justificava.
+- Adicionado `timeout-minutes: 15` aos jobs `gate` e `e2e`.
+- Preservado `if: always()` no upload do relatório e dos screenshots.
+
+#### Acceptance criteria
+
+- Uma falha no E2E deixa o workflow `Quality` vermelho.
+- Os dois jobs têm teto de 15 minutos.
+- O artefato de diagnóstico continua sendo enviado mesmo quando o E2E falha.
+
+#### Verification
+
+Prova por mutação no branch descartável `codex/pipe-005-proof`, commit
+`142c48e`: o helper de lançamento do E2E lançou um erro deliberado, sem alterar
+nenhum spec do Playwright. O run
+[`31322548186`](https://github.com/Laginho/SIGAA-ME/actions/runs/31322548186)
+concluiu com `failure`; `Typecheck, lint e testes` passou e
+`E2E sem credencial` falhou. O branch foi removido depois da prova.
+
+#### Implementation notes
+
+- Commit da implementação: `b4656c0`
+- O commit `142c48e` existiu apenas no branch de mutação descartável.
+- Divergências da especificação: nenhuma.
+
+---
+
+### PIPE-006 — Bloquear novos segredos no CI
+
+- Status: `DONE` — implementado e verificado em 2026-08-09
+- Priority: `P1`
+- Owner: Codex
+- Dependencies: none
+- Primary files: `.github/workflows/quality.yml`
+
+#### Problem
+
+A regra de ESLint do `SEC-000` só reconhece o padrão específico de credencial em
+fallback. Nada no CI detectava uma credencial genérica adicionada em outro
+formato ou arquivo.
+
+#### Fix
+
+Adicionado o job separado `secrets`, em `ubuntu-latest`, com teto de 10 minutos,
+checkout de histórico completo (`fetch-depth: 0`) e
+`gitleaks/gitleaks-action@v2`. A action usa o `GITHUB_TOKEN` efêmero do próprio
+run. Nenhuma licença adicional foi necessária para a conta individual
+`Laginho`.
+
+#### Acceptance criteria
+
+- O scanner executa em push e pull request sem credencial externa.
+- Um novo token detectável deixa o workflow vermelho.
+- O resultado e o limite da primeira execução estão registrados no `SEC-000`.
+
+#### Verification
+
+1. Run-base
+   [`31322967979`](https://github.com/Laginho/SIGAA-ME/actions/runs/31322967979),
+   commit descartável `4a149b6`: os três jobs passaram e o Gitleaks informou
+   `no leaks found`.
+2. Mutação
+   [`31323088727`](https://github.com/Laginho/SIGAA-ME/actions/runs/31323088727),
+   commit descartável `4860c95`: gate e E2E passaram; o scanner falhou com dois
+   achados (`generic-api-key` e `github-pat`) no arquivo falso
+   `tests/fixtures/pipe-006-fake-secret.ts`. O workflow concluiu com `failure`.
+3. O branch `codex/pipe-006-proof` foi removido depois da prova.
+
+#### Divergência da especificação
+
+A primeira execução deveria ficar vermelha por causa da credencial antiga do
+`SEC-000`, mas ficou verde. O log mostra que `gitleaks-action@v2` acrescentou
+`--log-opts=-1`, analisando apenas o commit mais recente nesse evento `push`.
+Assim, `fetch-depth: 0` disponibiliza o histórico, mas não ordena uma auditoria
+integral. Não foi adicionada uma flag não especificada para mudar esse
+comportamento. O `PIPE-006` fecha a prevenção de novos segredos; a remoção do
+segredo antigo continua sendo o `git filter-repo` do Bruno.
+
+Decisão do arquiteto em 2026-08-09: manter assim. Guarda do futuro roda em todo
+push; auditoria do passado roda uma vez, manualmente, junto do `filter-repo`.
+Fazer o CI reauditar o histórico antes da limpeza deixaria o gate
+permanentemente vermelho e ensinaria o projeto a ignorá-lo.
+
+#### Implementation notes
+
+- Commit da implementação: `30dcbcd`
+- Os commits `4a149b6` e `4860c95` existiram apenas no branch descartável.
+- Nenhum valor de segredo real foi exibido ou registrado.
 
 ---
 
@@ -1289,6 +1416,53 @@ A suíte caiu de 76 para 64, e cobre estritamente mais.
 #### Rationale
 
 Teste que espelha implementação é pior que teste ausente: ausente não mente.
+
+---
+
+### QA-006 — Teste de download escrevia no filesystem real
+
+- Status: `DONE` — implementado e verificado em 2026-08-09
+- Priority: `P1`
+- Owner: Codex
+- Dependencies: none
+- Primary files: `tests/unit/sigaa-service.test.ts`
+
+#### Problem
+
+Os testes de `SigaaService.downloadFile()` passavam `/mock/downloads` como
+`basePath`, mas não mockavam o módulo `fs`. O serviço executava `existsSync` e
+`mkdirSync` de verdade antes do download: no Windows o caminho era criado em
+`C:\mock\downloads`, enquanto num sistema POSIX sem acesso à raiz os testes
+falhavam com `EACCES` antes das asserções relevantes.
+
+#### Fix
+
+O teste agora mocka `fs` antes de importar o serviço. `existsSync` retorna
+`false` e `mkdirSync` é inerte. O retorno `false` mantém o cenário padrão de
+arquivo ainda não baixado e evita que testes futuros de download em lote pulem
+o caminho exercitado.
+
+#### Acceptance criteria
+
+- `npx vitest run` produz 64 passed / 4 skipped no Windows e no Linux.
+- Nenhum teste de unidade ou integração escreve no filesystem real; os specs de
+  E2E apagam `.test-user-data` de propósito, e devem.
+- `electron/services/sigaa.service.ts` permanece inalterado.
+
+#### Verification
+
+- Linux, medido pelo Claude antes da implementação: 10 arquivos, 64 passed / 4
+  skipped.
+- Windows, medido pelo Codex depois da implementação: 10 arquivos, 64 passed /
+  4 skipped.
+- `rg -n "mkdirSync|writeFileSync" tests` encontrou quatro ocorrências, todas
+  em mocks de unidade ou integração. Essa busca não cobre `rmSync`: os três
+  usos em `tests/e2e/` removem `.test-user-data` deliberadamente.
+
+#### Implementation notes
+
+- Commit: `f93b2a5`
+- Divergências da especificação: nenhuma.
 
 ---
 
@@ -2396,8 +2570,22 @@ reavaliação não é decisão, é esquecimento.
 
 ### Próximo passo imediato
 
-**Rodar o gate no Windows e commitar o lote de 2026-08-05.** Há um working tree
-acumulado sobre `38ff29b` que ainda não passou pela execução autoritativa:
+> **Atualizado em 2026-08-09.** O lote agêntico foi fechado: `QA-006`,
+> `PIPE-005` e `PIPE-006` estão `DONE`, revisados pelo Claude e provados no
+> Windows/GitHub Actions. O documento temporário `docs/ORDEM_DE_TRABALHO.md` foi
+> removido como previsto; as decisões e evidências definitivas estão nas tarefas
+> e no ledger deste tracker.
+>
+> **Próxima ação manual: `DEP-002` (Bruno, Windows).** Conferir os peer ranges
+> dos plugins Electron, atualizar o Vite para uma major aceita pelo Vitest,
+> regenerar o lock e provar `npm ci`, `npm run quality` e o empacotamento. Até
+> isso fechar, árvores locais podem divergir do CI. Neste fechamento, o
+> typecheck e os 64 testes passaram, mas `npm run quality` parou porque a árvore
+> local não contém o executável do ESLint.
+
+**Registro — rodar o gate no Windows e commitar o lote de 2026-08-05.** Havia um
+working tree acumulado sobre `38ff29b` que ainda não tinha passado pela execução
+autoritativa:
 
 ```
 shared/ipc.ts                                    ARCH-003 (RendererApi)
@@ -2644,6 +2832,12 @@ Append results here after meaningful milestones.
 | 2026-08-05 | working tree | Mutação: canal `get-app-settingz` no preload | **Falha esperada** | `preload-contract.test.ts` lista o canal órfão. Prova a metade que o tipo não cobre. |
 | 2026-08-05 | working tree | `yaml.safe_load` nos dois workflows + `grep` por `--publish always` | Pass | YAML válido; a flag só existe no `release.yml`, no passo condicional. **Nenhum workflow foi executado** — isso só acontece no GitHub, depois do commit. |
 | 2026-08-05 | working tree | `npm run quality` (Windows) | **Não rodado** | Lote de 2026-08-05 ainda sem execução autoritativa. É o próximo passo. |
+| 2026-08-09 | working tree | `npx.cmd vitest run`; `rg -n "mkdirSync\|writeFileSync" tests`; `rg -n "rmSync" tests/e2e` (Codex, Windows) | Pass | `QA-006`: 10 arquivos, 64 passed / 4 skipped; `mkdirSync`/`writeFileSync` só aparecem em mocks de unidade/integração. Três `rmSync` de E2E apagam `.test-user-data` de propósito. Resultado igual ao Linux. |
+| 2026-08-09 | [`142c48e`](https://github.com/Laginho/SIGAA-ME/actions/runs/31322548186) (branch descartável) | Mutação: erro deliberado no helper E2E com `continue-on-error` removido | **Falha esperada** | `PIPE-005`: workflow `failure`; gate `success`; E2E `failure`. Prova de que o E2E agora bloqueia. Branch removido após a verificação. |
+| 2026-08-09 | [`4a149b6`](https://github.com/Laginho/SIGAA-ME/actions/runs/31322967979) (branch descartável) | Primeira execução do Gitleaks com `fetch-depth: 0` | Pass | Scanner executou sem licença e não achou o segredo histórico: a action usou `--log-opts=-1`. Resultado contrário à previsão, registrado no `SEC-000`/`PIPE-006`. |
+| 2026-08-09 | [`4860c95`](https://github.com/Laginho/SIGAA-ME/actions/runs/31323088727) (branch descartável) | Mutação: token falso em arquivo temporário | **Falha esperada** | Gate e E2E verdes; scanner vermelho com `generic-api-key` e `github-pat`; workflow `failure`. Branch removido após a verificação. |
+| 2026-08-09 | working tree | `npm run quality` (Windows) | **Falha de ambiente** | `tsc --noEmit` passou; o lint não iniciou porque `eslint` não existe no `node_modules` local. A cadeia parou antes dos testes. Não foi feito `npm install`; ver `DEP-002`. |
+| 2026-08-09 | working tree | `npx.cmd tsc --noEmit`; `npx.cmd vitest run`; parse YAML com `js-yaml` (Windows) | Pass | Typecheck limpo; 10 arquivos, 64 passed / 4 skipped; jobs `gate`, `e2e` e `secrets` presentes em YAML válido. |
 
 ## Task change log
 
@@ -2678,10 +2872,14 @@ Record status or scope changes that affect other agents.
 | 2026-08-05 | `ARCH-003` | Criada e concluída, `P1` — correção de raiz da classe "duas pontas sem verificação": `RendererApi` em `shared/ipc.ts` usada pela ponte e pela declaração. Provada por mutação. | Claude |
 | 2026-08-05 | `QA-005` | Criada e concluída, `P1` — `tests/unit/parser.test.ts` apagado; asserções úteis migradas para o parser real. Deleção como correção. | Claude |
 | 2026-08-05 | `BUG-009` | Criada, `P2` — id de arquivo capturado com apóstrofo (`[^,]+` em vez de `[^,'"]+`). **Não corrigida de propósito**: o id é identidade no `cache.json`, então a correção precisa de migração e deve vir depois do `BUG-001`. | Claude |
+| 2026-08-09 | `QA-006` | Criada e concluída, `P1` — `SigaaService` agora usa `fs` mockado no teste e deixa de criar diretórios reais ou falhar por permissão fora do Windows. | Codex |
 | 2026-08-05 | `PIPE-001` | `NOT STARTED` → `DONE`. Gatilho de tag removido do `release.yml`; input `publish` desmarcado por padrão; `--publish never` no `package.json`. `RELEASE_GUIDE.md` atualizado no mesmo passo. | Claude |
 | 2026-08-05 | `PIPE-004` | `NOT STARTED` → `DONE`. Gate como passos dentro do job de release (não `needs:` — o GitHub não permite depender de job de outro workflow). Checksums SHA-256 continuam no `REL-001`. | Claude |
 | 2026-08-05 | `PIPE-003` | `NOT STARTED` → `DONE`. O `quality.yml` já existia desde a sessão anterior e não tinha sido registrado; o status estava errado, não a implementação. Nome ficou `quality.yml`, não `ci.yml`. | Claude |
 | 2026-08-05 | `DEP-002` | Corrigida a caracterização: **não bloqueia** o `PIPE-003` (o CI existe e usa `npm install`), degrada a reprodutibilidade. O erro veio de eu não ter listado `.github/` ao levantar o estado. | Claude |
 | 2026-08-05 | Tracker | Registrado que `.github/workflows/` é protegido contra escrita remota: YAML de workflow precisa ser salvo pelo autor. | Claude |
 | 2026-08-05 | Tracker | Triagem do `.claude/skills/` encerrada: decisão de Bruno foi versionar (commit `38ff29b`), não mover para escopo de usuário. Item removido das pendências. | Claude |
+| 2026-08-09 | `PIPE-005` | Criada e concluída, `P1` — E2E passou a bloquear o workflow e os dois jobs receberam teto de 15 minutos. Comportamento provado por mutação no GitHub Actions. | Codex |
+| 2026-08-09 | `PIPE-006` | Criada e concluída, `P1` — job Gitleaks bloqueia novas credenciais. A premissa de que `fetch-depth: 0` reauditaria o histórico foi refutada pelo log (`--log-opts=-1`) e registrada sem ampliar a configuração. | Codex |
+| 2026-08-09 | Lote agêntico | `QA-006`, `PIPE-005` e `PIPE-006` aprovadas pelo Claude; ordem de trabalho temporária encerrada. `DEP-002` permanece como próxima ação manual do Bruno. | Codex |
 
