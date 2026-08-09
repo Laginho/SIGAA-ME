@@ -684,11 +684,13 @@ permanentemente vermelho e ensinaria o projeto a ignorá-lo.
 
 ### BUG-001 — Download apaga arquivos válidos
 
-- Status: `NOT STARTED`
+- Status: `IN REVIEW` — corrigido por TDD e gate verde num Linux em 2026-08-09;
+  falta a execução autoritativa no Windows e o commit
 - Priority: `P0` (**promovido** de P2 no review original)
-- Owner: —
+- Owner: Claude (sessão 2026-08-09)
 - Dependencies: `PIPE-002`
-- Primary files: `electron/services/http-scraper.service.ts`
+- Primary files: `electron/services/http-scraper.service.ts`,
+  `tests/integration/download-real.test.ts` (novo)
 
 #### Problem
 
@@ -724,6 +726,129 @@ afirma que o arquivo sobrevive. Ele **deve falhar** antes da correção.
 - Fixture de octet-stream não-PDF sobrevive à validação.
 - HTML disfarçado de PDF continua sendo rejeitado e o temporário é removido.
 - Download falho não deixa arquivo final parcial.
+
+#### Implementation notes (2026-08-09)
+
+**A correção não foi apagar o fallback.** Apagar as cinco linhas do chute faria
+o `.txt` sobreviver e faria **todo PDF voltar a cair sem extensão** — consertaria
+o caso raro quebrando o comum. O fallback existia porque a maioria dos anexos de
+um portal universitário é PDF e o SIGAA serve muitos deles como `octet-stream`
+sem `Content-Disposition`. Ele acertou o problema; o defeito era o passo
+seguinte tratar o palpite como fato.
+
+A raiz: **o passo 1 inventava um tipo e o passo 6 punia a invenção.** Enquanto
+os dois existissem, era uma contradição esperando o arquivo errado.
+
+O que foi feito:
+
+1. A extensão passa a ser **deduzida do conteúdo** (`detectExtension`), usando a
+   mesma tabela de magic bytes que a verificação usa. Detecção e verificação
+   leem os mesmos bytes, então não têm como se contradizer. `''` é resposta
+   válida quando nenhuma assinatura casa — sem extensão é inconveniente, apagado
+   é perda de dado.
+2. A tabela `SIGNATURES` virou campo único da classe. Duas tabelas que precisam
+   concordar é o padrão que já quebrou este repositório em `QA-005` e `BUG-007`.
+3. O download grava em **`.part`** e só é renomeado depois de verificado. Isso é
+   o que permite (1) — a extensão vem de bytes que só existem depois de gravados
+   — e é o que atende o terceiro critério de aceitação: um download interrompido
+   nunca deixa um arquivo com o nome final.
+4. `verifyFileContent` foi dividida em `readHead` + `verifyHead`, para o arquivo
+   ser lido uma vez só. Único chamador, refatoração contida.
+
+**`.zip` vem por último na ordem de detecção**, de propósito: docx/xlsx/pptx têm
+a mesma assinatura, então sem `Content-Disposition` não há como distinguir, e
+`.zip` é a resposta honesta em vez de um chute entre os três.
+
+#### Achado durante o teste do terceiro critério
+
+`pipe()` **não propaga erro do source para o destino.** Se a conexão caísse no
+meio do stream, o `writer` nunca emitia `finish` nem `error`, e a Promise do
+`downloadFile` **nunca resolvia** — a UI ficava em "baixando" para sempre e o
+parcial ficava no disco. Não era o `BUG-001`, mas está no mesmo bloco e cabe no
+mesmo critério de aceitação, então foi corrigido junto: handler de `error` no
+`response.data`, que destrói o writer, descarta o parcial e resolve.
+
+#### Verification
+
+Ciclo vermelho-verde, como o `PLANO.md` pedia para esta tarefa. O teste foi
+escrito **antes** e falhou pelo motivo previsto — o log da execução vermelha
+registra `Deleted invalid file: .../LISTA 1.pdf`.
+
+`tests/integration/download-real.test.ts`, 6 testes, chamando o
+`downloadFile` de produção com só o `axios` mockado:
+
+| Teste | Critério |
+|---|---|
+| `.txt` como octet-stream sobrevive | 1 |
+| PDF como octet-stream ganha `.pdf` pelo conteúdo | regressão do caso comum |
+| extensão que já veio da UI é respeitada | regressão |
+| HTML com `Content-Disposition: .pdf` é rejeitado, destino vazio | 2 |
+| HTML sem `Content-Disposition` é rejeitado, destino vazio | 2 |
+| conexão interrompida: sem arquivo e sem Promise pendurada | 3 |
+
+**Prova por mutação** (regra 5 do `CLAUDE.md`), duas, em cópia descartável:
+
+1. Devolver o chute (`this.detectExtension(head) || '.pdf'`) → **só** o primeiro
+   teste fica vermelho. Os outros cinco continuam verdes, o que mostra que a
+   asserção é específica.
+2. Desligar o handler de erro do stream (`'error'` → `'erro-desligado'`) → o
+   sexto teste estoura por timeout em 8s, que é exatamente a Promise nunca
+   resolvendo.
+
+Gate no container Linux (o Windows continua sendo a autoridade):
+
+| Comando | Resultado |
+|---|---|
+| `npx tsc --noEmit` | limpo |
+| `npx eslint .` | 0 erros, **115 avisos** (eram 116 depois do `CLEAN-001`, 125 no início da sessão) |
+| `npx vitest run` | **70 passed, 4 skipped** (eram 64 + 4) |
+
+#### O que este trabalho NÃO fechou
+
+- **`DL-001` (path containment) continua aberto.** O `.part` + rename é parte da
+  mecânica que o `DL-001` pede, mas a validação estrutural com
+  `path.resolve` + `path.relative` **não foi feita**. A única defesa contra
+  traversal continua sendo a lista negra de caracteres.
+- **`DL-002`** se sobrepõe a esta tarefa e precisa de releitura: parte do que ele
+  descreve foi feito aqui.
+- As fixtures de resposta são sintéticas. Isto prova que a lógica de tipo e
+  verificação está correta contra as respostas que **assumimos** que o SIGAA dá.
+  Gravar uma resposta real do portal é o passo que prova a suposição.
+
+#### Pendente (Bruno)
+
+Mesma lista do `CLEAN-001` — apagar o `.git/index.lock`, rodar `npm run quality`
+no Windows. Commit separado do `CLEAN-001`:
+
+```
+fix: stop deleting valid downloads with an unknown content type
+
+A file with no extension in its UI name, served as octet-stream with no
+Content-Disposition, was assigned .pdf by a fallback. The next step then
+checked magic bytes against that guess, found no %PDF, and unlinked the
+file. Any .txt, .csv or .odt served that way was downloaded and
+immediately destroyed.
+
+The fix is not removing the fallback: most attachments in a university
+portal really are PDFs served as octet-stream, so removing it would fix
+the rare case and break the common one. Instead the extension is now
+derived from the magic bytes, using the same table the verification
+uses, so detection and verification read the same bytes and cannot
+contradict each other. Unknown content gets no extension rather than a
+lie.
+
+Downloads now stream to .part and are renamed only after verification.
+That is what lets the extension come from content, and it means an
+interrupted download never leaves a file under the final name.
+
+Fixed alongside, found while testing that last point: pipe() does not
+forward source errors to the destination, so a connection dropped
+mid-stream left the downloadFile promise pending forever and the UI
+stuck on "downloading".
+
+Red-green: tests/integration/download-real.test.ts was written first and
+failed with "Deleted invalid file: LISTA 1.pdf".
+```
 
 ### BUG-002 — Remover o `pauseSync()` morto
 
@@ -953,6 +1078,179 @@ grande.
   carrega e a partir de qual ponto de entrada, para que busca estática futura não
   chegue a conclusão errada.
 - Só se aplica ao que sobrar depois da decisão do `BUG-004`.
+
+### CLEAN-001 — Nível 1 da auditoria de complexidade
+
+- Status: `IN REVIEW` — corte feito e gate verde num Linux em 2026-08-09;
+  falta a execução autoritativa no Windows e o commit
+- Priority: `P3`
+- Owner: Claude (sessão 2026-08-09)
+- Dependencies: `PIPE-002`
+- Primary files: `electron/services/sigaa-login-ufc.ts` (removido),
+  `electron/services/playwright-login.service.ts`
+
+#### O que foi removido
+
+| Alvo | Linhas | Prova de inalcançabilidade |
+|---|---|---|
+| `electron/services/sigaa-login-ufc.ts` (arquivo todo) | −111 | Única ocorrência de `SigaaLoginUFC` no repo é a própria `export class`. Prova extra: depende de `sigaa-api`, que **não está no `package.json`** — não rodaria nem se fosse chamado |
+| `PlaywrightLoginService.enterCourseDirect` | −91 | Única ocorrência é a própria assinatura. É a "Headless API Entry", abandonada; a entrada real é sempre `enterCourseAndGetHTML` |
+
+Total: **−202 linhas, zero adições.** O `import * as cheerio` do
+`playwright-login.service.ts` saiu junto: o `enterCourseDirect` era o único
+consumidor, e o `noUnusedLocals` teria reprovado.
+
+#### Como a prova foi feita (e por que busca por nome não bastou)
+
+O caso do `download.service.ts` (ver `BUG-004`) já produziu três conclusões
+erradas neste repositório. Então, além da busca por nome, foram feitas duas
+verificações que aquele caso ensinou:
+
+1. **Import dinâmico.** `await import(` aparece em quatro lugares no projeto:
+   `playwright-login.service.ts:763,883` (ambos para `download.service`) e
+   `tests/integration/scraper.test.ts:68,82`. Nenhum toca os alvos.
+2. **Despacho por string.** Se algo fizesse `servico[nomeDoMetodo]()`, nenhuma
+   busca por nome acharia. Zero ocorrências do padrão no repo.
+
+**O que a prova não cobre:** ela é estática. Se algum desses caminhos já foi
+alcançado por algo que não está mais no repositório, a busca não vê.
+
+#### Alvo retirado do escopo por decisão do autor
+
+`HttpScraperService.enterCourseHTTP` (−102 linhas) estava na lista e **não foi
+removido**. Decisão do Bruno em 2026-08-09, depois de o `tsc` revelar o efeito
+colateral: o método é o único leitor de `this.userAgent`, e removê-lo mata uma
+cadeia de quatro saltos inteira. Ver `BUG-010`.
+
+#### Verification
+
+Container Linux, `npm install` limpo (a execução no Windows continua sendo a
+autoridade):
+
+| Comando | Antes | Depois |
+|---|---|---|
+| `npx tsc --noEmit` | limpo | **limpo** |
+| `npx eslint .` | 0 erros, 125 avisos | **0 erros, 116 avisos** |
+| `npx vitest run` | 64 passed, 4 skipped | **64 passed, 4 skipped** |
+
+A catraca de avisos do `PIPE-002` foi respeitada: 125 → 116.
+
+O número de testes não mudar é o resultado esperado e é o próprio argumento do
+corte — código inalcançável não tem teste que o exercite, por definição.
+
+#### Pendente (Bruno)
+
+1. **Apagar `.git/index.lock`.** Um `git checkout` meu falhou no meio (a pasta
+   montada não permite `unlink`) e deixou o lock para trás, o que bloqueia
+   `git add`/`git commit`. É arquivo vazio e sem processo git rodando.
+2. **`_to_delete/sigaa-login-ufc.ts`** — o agente não tem permissão de apagar na
+   pasta montada, só de mover. O git já vê o arquivo como `D`; apagar a pasta é
+   limpeza de disco.
+3. `npm run quality` no Windows.
+4. Commit único:
+
+```
+refactor: remove two unreachable scraping paths
+
+SigaaLoginUFC depends on sigaa-api, which is not in package.json, so it
+could not run even if it were called. PlaywrightLoginService
+.enterCourseDirect is the abandoned "Headless API Entry"; course entry
+always goes through enterCourseAndGetHTML.
+
+Both have zero callers, verified against dynamic import and string
+dispatch as well, not just by name search. -202 lines, lint warnings
+125 -> 116.
+
+This is level 1 of docs/AUDITORIA_COMPLEXIDADE.md minus enterCourseHTTP,
+kept on purpose because it anchors the User-Agent chain. See BUG-010.
+```
+
+#### Nota sobre line endings
+
+`http-scraper.service.ts` aparece como `M` no `git status`, mas
+`git diff --exit-code` confirma conteúdo **idêntico ao HEAD**. Só o line ending
+do working tree mudou (CRLF → LF), efeito de eu ter restaurado o arquivo com
+`git show > arquivo` depois da decisão de manter o `enterCourseHTTP`. O
+`text=auto` do `.gitattributes` normaliza na entrada, então nada disso chega ao
+commit; um `git checkout` no Windows devolve o CRLF.
+
+### BUG-010 — O User-Agent real do navegador é buscado e descartado
+
+- Status: `NOT STARTED`
+- Priority: `P2`
+- Owner: —
+- Dependencies: `BUG-001` (não mexer no caminho de download antes)
+- Primary files: `electron/services/http-scraper.service.ts:118-123,198,254,351,685,870`,
+  `electron/services/sigaa.service.ts:104-105`,
+  `electron/services/playwright-login.service.ts:1131`
+
+#### Problem
+
+A arquitetura do projeto é "o Playwright mantém a sessão JSF, o HTTP pega os
+cookies emprestados". O empréstimo dos cookies funciona. O do **User-Agent**
+não.
+
+Existe uma cadeia de quatro saltos construída exatamente para isso:
+
+```
+playwright-login.service.ts:1131   getUserAgent()        ← 1 chamador
+        ↓
+sigaa.service.ts:104-105           setUserAgent(ua)      ← 1 chamador
+        ↓
+http-scraper.service.ts:118        this.userAgent        ← 1 leitor
+        ↓
+                                   enterCourseHTTP       ← 0 chamadores
+```
+
+O único leitor de `this.userAgent` é o `enterCourseHTTP`, que é inalcançável
+(ver `CLEAN-001`). Os **cinco requests que rodam de verdade** — linhas 198, 254,
+351, 685 e 870 — hardcodam:
+
+```
+'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+```
+
+Isso é um User-Agent **truncado**: falta o sufixo `Chrome/xxx Safari/537.36` que
+qualquer navegador real envia. Ou seja, os requests HTTP se apresentam ao SIGAA
+com uma identidade que não bate com a do navegador que criou aquela sessão.
+
+#### Por que isto importa mais do que parece
+
+Bruno relatou que **o download por HTTP falha com frequência e de forma
+imprevisível** — foi o dado que decidiu o `BUG-004` (ligar o fallback Playwright
+em vez de apagá-lo). Um portal JSF que valide consistência entre a sessão e o
+cliente que a criou é um candidato plausível a essa causa, e é barato de testar.
+
+Não é prova. É a hipótese mais barata disponível para uma falha que hoje não tem
+explicação.
+
+#### Ordem
+
+Depois do `BUG-001`. Mesmo motivo do `BUG-004`: enquanto o app apagar arquivos
+que baixaram com sucesso, a taxa de falha observada não é confiável para julgar
+se o UA mudou alguma coisa.
+
+#### Required behavior
+
+- Os cinco requests usam `this.userAgent` em vez da string literal.
+- Existe teste que afirma que o header `User-Agent` enviado é o que foi
+  configurado por `setUserAgent`, e que falharia se alguém reintroduzisse a
+  string literal (regra 5 do `CLAUDE.md`).
+
+#### Acceptance criteria
+
+- Nenhum User-Agent literal restante em `http-scraper.service.ts`.
+- Teste do parágrafo acima existe e passa.
+- Medida a taxa de falha de download antes e depois, registrada aqui. Se não
+  mudar nada, isso também é resultado e deve ficar escrito — a hipótese fica
+  descartada em vez de voltar daqui a seis meses.
+
+#### Decisão relacionada (Bruno, 2026-08-09)
+
+O `enterCourseHTTP` foi **mantido** por causa desta tarefa, mesmo sendo
+inalcançável. Removê-lo levaria a cadeia do UA junto, e o `BUG-010` viraria
+"reconstruir e ligar" em vez de "ligar". Custo aceito: 102 linhas de código
+morto de pé até esta tarefa fechar.
 
 ---
 
@@ -2694,11 +2992,15 @@ arrasta os tiers de teste.
    2026-08-09:** Vite 6.4.3, instalação limpa, gate e build Windows verdes.
 2. ~~**gitleaks no `quality.yml`** — prevenção do `SEC-000`.~~ **DONE
    2026-08-09 (`PIPE-006`)**, com prova por mutação no GitHub Actions.
-3. **Nível 1 da `docs/AUDITORIA_COMPLEXIDADE.md`** — ~700 linhas de remoção com
-   prova por busca, num único commit, com `quality` antes e depois.
-4. `BUG-001` — download apagando arquivos válidos. **É o exercício de TDD**:
-   escrever primeiro o teste que baixa um `.txt` servido como `octet-stream` e
-   afirma que o arquivo sobrevive; ele deve falhar antes da correção.
+3. ~~**Nível 1 da `docs/AUDITORIA_COMPLEXIDADE.md`**~~ — **`IN REVIEW`
+   2026-08-09 (`CLEAN-001`).** −202 linhas, gate verde num Linux. Menor que as
+   ~700 previstas: `verify-scraper.ts` e `sync-selection.dark.css` já tinham
+   saído, e o `enterCourseHTTP` foi retirado do escopo (`BUG-010`). Falta rodar
+   o `quality` no Windows, apagar o `.git/index.lock` e commitar.
+4. ~~`BUG-001` — download apagando arquivos válidos.~~ **`IN REVIEW`
+   2026-08-09.** Ciclo vermelho-verde cumprido, 6 testes novos, duas provas por
+   mutação, gate verde num Linux (avisos 116 → 115). Falta o Windows e o commit.
+   A correção **não** foi apagar o fallback `.pdf` — ver as notas da tarefa.
 5. `BUG-009` — id de arquivo capturado com o apóstrofo do JSF. **Depois do
    `BUG-001`**, porque a correção invalida o `cache.json` e pode disparar
    re-download geral em quem tem `autoDownloadUpdates` ligado.
