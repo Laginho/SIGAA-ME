@@ -10,6 +10,14 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+// QA-006: o serviço faz mkdir de verdade antes de baixar. Sem este mock o teste
+// cria C:\mock\downloads no Windows (onde passa por acidente) e falha com
+// EACCES em qualquer outro sistema. Nenhuma asserção aqui olha o disco.
+vi.mock('fs', () => ({
+    existsSync: vi.fn(() => false),
+    mkdirSync: vi.fn(),
+}));
+
 // 1. Mock the dependencies before importing the service
 vi.mock('../../electron/services/playwright-login.service', () => {
     return {
