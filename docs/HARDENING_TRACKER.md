@@ -684,8 +684,7 @@ permanentemente vermelho e ensinaria o projeto a ignorá-lo.
 
 ### BUG-001 — Download apaga arquivos válidos
 
-- Status: `IN REVIEW` — corrigido por TDD e gate verde num Linux em 2026-08-09;
-  falta a execução autoritativa no Windows e o commit
+- Status: `DONE` — 2026-08-09, commit `700de9a`
 - Priority: `P0` (**promovido** de P2 no review original)
 - Owner: Claude (sessão 2026-08-09)
 - Dependencies: `PIPE-002`
@@ -815,10 +814,29 @@ Gate no container Linux (o Windows continua sendo a autoridade):
   verificação está correta contra as respostas que **assumimos** que o SIGAA dá.
   Gravar uma resposta real do portal é o passo que prova a suposição.
 
-#### Pendente (Bruno)
+#### Fechamento
 
-Mesma lista do `CLEAN-001` — apagar o `.git/index.lock`, rodar `npm run quality`
-no Windows. Commit separado do `CLEAN-001`:
+`npm run quality` rodado no Windows por Bruno, e commitado em `700de9a`.
+
+**O commit ficou único, e isto é um desvio do planejado.** O plano eram três
+commits — remoção, correção, documentação —, para que um `git revert` da
+correção do download não arrastasse junto a remoção de código morto nem 300
+linhas de markdown. Na prática o `git commit` sem `-m` abriu o editor, o buffer
+saiu sem conteúdo (o git remove toda linha iniciada por `#` antes de validar, e
+o que sobrou foi string vazia), e o lote acabou num commit só.
+
+Consequência aceita: o `700de9a` é indivisível. Se algum dia for preciso
+reverter só o `BUG-001`, será um revert manual do
+`electron/services/http-scraper.service.ts`, não um `git revert` do commit.
+
+O commit foi amendado depois para que a mensagem descrevesse o conteúdo real —
+ela dizia `docs:` enquanto continha uma correção P0. Um commit que mente no
+`git log` é o mesmo problema que o `RELEASE_GUIDE` desatualizado e o
+`ARCHITECTURE.md` descrevendo um fallback desligado: documento que engana custa
+mais que documento ausente.
+
+Mensagem original planejada para esta tarefa, preservada porque descreve a
+correção melhor que a mensagem consolidada:
 
 ```
 fix: stop deleting valid downloads with an unknown content type
@@ -1081,8 +1099,7 @@ grande.
 
 ### CLEAN-001 — Nível 1 da auditoria de complexidade
 
-- Status: `IN REVIEW` — corte feito e gate verde num Linux em 2026-08-09;
-  falta a execução autoritativa no Windows e o commit
+- Status: `DONE` — 2026-08-09, commit `700de9a`
 - Priority: `P3`
 - Owner: Claude (sessão 2026-08-09)
 - Dependencies: `PIPE-002`
@@ -1138,32 +1155,11 @@ A catraca de avisos do `PIPE-002` foi respeitada: 125 → 116.
 O número de testes não mudar é o resultado esperado e é o próprio argumento do
 corte — código inalcançável não tem teste que o exercite, por definição.
 
-#### Pendente (Bruno)
+#### Fechamento
 
-1. **Apagar `.git/index.lock`.** Um `git checkout` meu falhou no meio (a pasta
-   montada não permite `unlink`) e deixou o lock para trás, o que bloqueia
-   `git add`/`git commit`. É arquivo vazio e sem processo git rodando.
-2. **`_to_delete/sigaa-login-ufc.ts`** — o agente não tem permissão de apagar na
-   pasta montada, só de mover. O git já vê o arquivo como `D`; apagar a pasta é
-   limpeza de disco.
-3. `npm run quality` no Windows.
-4. Commit único:
-
-```
-refactor: remove two unreachable scraping paths
-
-SigaaLoginUFC depends on sigaa-api, which is not in package.json, so it
-could not run even if it were called. PlaywrightLoginService
-.enterCourseDirect is the abandoned "Headless API Entry"; course entry
-always goes through enterCourseAndGetHTML.
-
-Both have zero callers, verified against dynamic import and string
-dispatch as well, not just by name search. -202 lines, lint warnings
-125 -> 116.
-
-This is level 1 of docs/AUDITORIA_COMPLEXIDADE.md minus enterCourseHTTP,
-kept on purpose because it anchors the User-Agent chain. See BUG-010.
-```
+`npm run quality` rodado no Windows por Bruno, e commitado em `700de9a` —
+**junto com o `BUG-001` e com esta documentação**, não em três commits separados
+como estava planejado. Ver a nota abaixo.
 
 #### Nota sobre line endings
 
@@ -2927,7 +2923,16 @@ reavaliação não é decisão, é esquecimento.
 > de produção encontradas na auditoria ficam registradas separadamente no
 > `DEP-001` e não foram misturadas nesta migração.
 
-**Registro — rodar o gate no Windows e commitar o lote de 2026-08-05.** Havia um
+> **Atualizado em 2026-08-09, fim da sessão.** A Fase 2 começou: `CLEAN-001` e
+> `BUG-001` estão `DONE` no commit `700de9a`, com o gate rodado no Windows. O
+> `BUG-010` (User-Agent real buscado e descartado) foi aberto e é o candidato
+> mais barato para a falha imprevisível de download por HTTP.
+>
+> **Próximo:** `BUG-009` — id de arquivo capturado com o apóstrofo do JSF.
+> Precisa de conversa antes de começar: a correção invalida o `cache.json` e pode
+> disparar re-download geral em quem tem `autoDownloadUpdates` ligado.
+
+**Registro histórico — rodar o gate no Windows e commitar o lote de 2026-08-05.** Havia um
 working tree acumulado sobre `38ff29b` que ainda não tinha passado pela execução
 autoritativa:
 
@@ -2992,15 +2997,14 @@ arrasta os tiers de teste.
    2026-08-09:** Vite 6.4.3, instalação limpa, gate e build Windows verdes.
 2. ~~**gitleaks no `quality.yml`** — prevenção do `SEC-000`.~~ **DONE
    2026-08-09 (`PIPE-006`)**, com prova por mutação no GitHub Actions.
-3. ~~**Nível 1 da `docs/AUDITORIA_COMPLEXIDADE.md`**~~ — **`IN REVIEW`
-   2026-08-09 (`CLEAN-001`).** −202 linhas, gate verde num Linux. Menor que as
-   ~700 previstas: `verify-scraper.ts` e `sync-selection.dark.css` já tinham
-   saído, e o `enterCourseHTTP` foi retirado do escopo (`BUG-010`). Falta rodar
-   o `quality` no Windows, apagar o `.git/index.lock` e commitar.
-4. ~~`BUG-001` — download apagando arquivos válidos.~~ **`IN REVIEW`
-   2026-08-09.** Ciclo vermelho-verde cumprido, 6 testes novos, duas provas por
-   mutação, gate verde num Linux (avisos 116 → 115). Falta o Windows e o commit.
-   A correção **não** foi apagar o fallback `.pdf` — ver as notas da tarefa.
+3. ~~**Nível 1 da `docs/AUDITORIA_COMPLEXIDADE.md`**~~ — **`DONE` 2026-08-09
+   (`CLEAN-001`, commit `700de9a`).** −202 linhas. Menor que as ~700 previstas:
+   `verify-scraper.ts` e `sync-selection.dark.css` já tinham saído, e o
+   `enterCourseHTTP` foi retirado do escopo (`BUG-010`).
+4. ~~`BUG-001` — download apagando arquivos válidos.~~ **`DONE` 2026-08-09
+   (commit `700de9a`).** Ciclo vermelho-verde cumprido, 6 testes novos, duas
+   provas por mutação, avisos de lint 125 → 115 na sessão. A correção **não** foi
+   apagar o fallback `.pdf` — ver as notas da tarefa.
 5. `BUG-009` — id de arquivo capturado com o apóstrofo do JSF. **Depois do
    `BUG-001`**, porque a correção invalida o `cache.json` e pode disparar
    re-download geral em quem tem `autoDownloadUpdates` ligado.
@@ -3020,11 +3024,15 @@ conhecidos do `QA-004`.
   no `SEC-000`. **Fazer backup da pasta antes.** A senha já foi trocada, então
   isso é higiene, não urgência.
 
-- **Apagar `_to_delete/` e `_agent_tmp/`.** Resíduo de ferramenta de agente: 11
-  arquivos em `_to_delete/` (inclui um zip de 734 KB e cinco `index.lock`
-  residuais) e um tarball em `_agent_tmp/`. Os dois já estão no `.gitignore`,
-  então é limpeza de disco, não de repositório. Fica com você porque o agente não
-  tem permissão de apagar na pasta montada — só de mover para `_to_delete/`.
+- ~~**Apagar `_to_delete/` e `_agent_tmp/`.**~~ **Feito** — as duas pastas não
+  existem mais em 2026-08-09.
+
+  Fica registrado o motivo de o item recorrer: **o agente não tem permissão de
+  `unlink` na pasta montada**, só de escrever e mover. Apagar arquivo é sempre
+  seu. Consequência colateral vista nesta sessão: um `git checkout --` do agente
+  falha no meio e deixa `.git/index.lock` para trás, o que bloqueia `git add` e
+  `git commit` até alguém apagar o lock à mão. Se o git reclamar de "another git
+  process seems to be running" sem processo nenhum rodando, é isso.
 
 - **Triagem do `.claude/skills/`: encerrada por decisão sua.** As skills foram
   vendorizadas no commit `38ff29b` (`chore: vendor claude skills used in this
@@ -3032,6 +3040,14 @@ conhecidos do `QA-004`.
   versionar, não mover para escopo de usuário.
 
 ### Recently completed
+
+- `BUG-001` / `CLEAN-001` / `BUG-010` — **`700de9a`** (2026-08-09). O download
+  parou de apagar arquivo válido: a extensão passou a sair dos magic bytes em vez
+  de um chute `.pdf`, e o arquivo vai para `.part` até ser verificado. Achado de
+  brinde, corrigido junto: `pipe()` não propaga erro do source, então conexão
+  caída no meio deixava a Promise do `downloadFile` pendurada para sempre.
+  −202 linhas de código inalcançável no mesmo lote. `BUG-010` aberto.
+  **Os três num commit só** — ver a nota de fechamento do `BUG-001`.
 
 - `PIPE-001` / `PIPE-004` — **`DONE`** (2026-08-05). Release só por
   `workflow_dispatch`, com input `publish` desmarcado por padrão; gate
