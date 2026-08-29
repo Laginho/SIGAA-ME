@@ -16,6 +16,7 @@
  * passo que prova que a estrutura assumida é a verdadeira.
  */
 
+import * as fs from 'fs';
 import { readFileSync } from 'fs';
 import path from 'path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -28,7 +29,11 @@ vi.mock('../../electron/services/logger.service', () => ({
 }));
 vi.mock('fs', async importOriginal => {
     const actual = await importOriginal<typeof import('fs')>();
-    return { ...actual, createWriteStream: vi.fn(() => ({ writable: true, write: vi.fn(), on: vi.fn() })) };
+    return {
+        ...actual,
+        createWriteStream: vi.fn(() => ({ writable: true, write: vi.fn(), on: vi.fn() })),
+        promises: { ...actual.promises, writeFile: vi.fn() }
+    };
 });
 
 import { HttpScraperService } from '../../electron/services/http-scraper.service';
@@ -90,5 +95,19 @@ describe('HttpScraperService.getCourseFiles com HTML de fixture', () => {
 
         expect(result.success).toBe(false);
         expect(result.error).toMatch(/login/i);
+    });
+
+    it('não grava dump de debug em build empacotado (plan 005)', async () => {
+        // Regressão: o dump de `preFetchedHtml` era incondicional e usava caminho
+        // relativo (`debug_playwright_${courseId}.html`, resolvido contra
+        // process.cwd()) — em produção isso escreve fora do userData, sem limpeza
+        // possível. Antes da correção este teste chamava fs.promises.writeFile de
+        // verdade e deixava debug_playwright_99999.html no repo.
+        vi.mocked(fs.promises.writeFile).mockClear();
+
+        const result = await scraper.getCourseFiles('99999', 'Cálculo I', fixture('course-page-with-files.html'));
+
+        expect(result.success).toBe(true);
+        expect(fs.promises.writeFile).not.toHaveBeenCalled();
     });
 });

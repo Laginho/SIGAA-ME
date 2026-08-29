@@ -18,7 +18,7 @@ source of truth for the hardening program).
 | 002  | Characterize the sync/notification pipeline with tests | P1 | M | — | DONE |
 | 003  | Never mark an item "seen" before the user was told | P1 | M | 002 | TODO |
 | 004  | Manual sync merges into the cache instead of overwriting | P1 | M | 002 (soft) | TODO |
-| 005  | Gate debug dumps of authenticated pages; unlog username | P1 | S | — | TODO |
+| 005  | Gate debug dumps of authenticated pages; unlog username | P1 | S | — | DONE |
 | 006  | Consent-gated updates + truthful release docs | P1 | S | — | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
