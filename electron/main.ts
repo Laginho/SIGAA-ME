@@ -132,7 +132,7 @@ ipcMain.handle('login-request', async (_event, { username, password, rememberMe 
 ipcMain.handle('try-auto-login', async () => {
   const creds = persistenceService.loadCredentials();
   if (creds) {
-    console.log('Auto-login: Found credentials for', creds.username);
+    console.log('Auto-login: stored credentials found');
     return await sigaaService.login(creds.username, creds.password);
   }
   return { success: false };

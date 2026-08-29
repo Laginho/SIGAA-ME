@@ -146,9 +146,15 @@ export class HttpScraperService {
             if (idInput.length === 0) {
                 const title = $('title').text().trim();
                 this.log(`[HttpScraper] Error: Course ID ${courseId} not found. Page Title: "${title}"`);
-                try {
-                    await fs.promises.writeFile(`debug_portal_fail_${courseId}.html`, portalResponse.data);
-                } catch (e) { console.error('Failed to save debug file', e); }
+                if (!app.isPackaged) {
+                    try {
+                        const safeId = String(courseId).replace(/[^a-zA-Z0-9_-]/g, '_');
+                        await fs.promises.writeFile(
+                            path.join(app.getPath('userData'), `debug_portal_fail_${safeId}.html`),
+                            portalResponse.data
+                        );
+                    } catch (e) { console.error('Failed to save debug file', e); }
+                }
                 return { success: false, error: `Course ID input not found in portal (Title: ${title})` };
             }
 
@@ -213,9 +219,15 @@ export class HttpScraperService {
             } else {
                 // Sometimes it redirects to a frameset or something else
                 this.log('[HttpScraper] Warning: Response does not look like a course page. Saving debug file.');
-                try {
-                    await fs.promises.writeFile(`debug_http_entry_${courseId}.html`, enterResponse.data);
-                } catch (e) { }
+                if (!app.isPackaged) {
+                    try {
+                        const safeId = String(courseId).replace(/[^a-zA-Z0-9_-]/g, '_');
+                        await fs.promises.writeFile(
+                            path.join(app.getPath('userData'), `debug_http_entry_${safeId}.html`),
+                            enterResponse.data
+                        );
+                    } catch (e) { }
+                }
                 return { success: false, error: 'Failed to verify course entry (unexpected response content)' };
             }
 
@@ -277,11 +289,17 @@ export class HttpScraperService {
 
             // Skip navigation if using Playwright HTML (already navigated)
             if (preFetchedHtml) {
-                try {
-                    await fs.promises.writeFile(`debug_playwright_${courseId}.html`, preFetchedHtml);
-                    this.log('[HttpScraper] Saved Playwright HTML to debug_playwright.html');
-                } catch (e) {
-                    this.log('[HttpScraper] Failed to save debug file');
+                if (!app.isPackaged) {
+                    try {
+                        const safeId = String(courseId).replace(/[^a-zA-Z0-9_-]/g, '_');
+                        await fs.promises.writeFile(
+                            path.join(app.getPath('userData'), `debug_playwright_${safeId}.html`),
+                            preFetchedHtml
+                        );
+                        this.log('[HttpScraper] Saved Playwright HTML debug dump');
+                    } catch (e) {
+                        this.log('[HttpScraper] Failed to save debug file');
+                    }
                 }
                 this.log('[HttpScraper] Using Playwright HTML directly.');
             } else {
@@ -477,10 +495,14 @@ export class HttpScraperService {
                             });
                         }
                     } else if (href && !href.startsWith('#') && !href.startsWith('javascript')) {
+                        const url = href.startsWith('http') ? href : this.baseUrl + href;
                         files.push({
                             name: text,
                             type: 'link',
-                            url: href.startsWith('http') ? href : this.baseUrl + href
+                            // Deterministic id so cache diffing and notifications can see
+                            // link materials; id-less items are invisible to diffCourseState.
+                            id: `link:${url}`,
+                            url
                         });
                     }
                 }
@@ -692,10 +714,16 @@ export class HttpScraperService {
             this.updateCookies(newsResponse);
 
             // DEBUG: Save the news page
-            try {
-                await fs.promises.writeFile(`debug_news_content_${newsId}.html`, newsResponse.data);
-                this.log(`[HttpScraper] Saved debug_news_content_${newsId}.html`);
-            } catch (e) { console.error(e); }
+            if (!app.isPackaged) {
+                try {
+                    const safeId = String(newsId).replace(/[^a-zA-Z0-9_-]/g, '_');
+                    await fs.promises.writeFile(
+                        path.join(app.getPath('userData'), `debug_news_content_${safeId}.html`),
+                        newsResponse.data
+                    );
+                    this.log(`[HttpScraper] Saved debug_news_content_${safeId}.html`);
+                } catch (e) { console.error(e); }
+            }
 
             const $news = cheerio.load(newsResponse.data);
 
