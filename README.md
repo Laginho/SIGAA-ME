@@ -28,7 +28,10 @@ Aplicativo desktop para o SIGAA da UFC, que visa proporcionar uma experiência m
 4. Se o Windows mostrar o aviso "O Windows protegeu seu computador", clique em **"Mais informações"** → **"Executar assim mesmo"**. Isso é normal para apps que ainda não possuem um certificado pago.
 5. O app abrirá. Insira suas credenciais do SIGAA UFC e pronto.
 
-> O app irá **se atualizar automaticamente** em segundo plano quando uma nova versão for lançada.
+> O app confere se há uma nova versão a cada abertura, mas nunca baixa ou
+> instala nada sem perguntar: ele avisa a versão disponível e pede
+> confirmação antes de baixar, e pede confirmação de novo antes de reiniciar
+> para instalar.
 
 ---
 
