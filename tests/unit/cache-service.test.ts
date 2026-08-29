@@ -1,7 +1,7 @@
 /**
  * Characterizes CacheService (electron/services/cache.service.ts) — the
  * seen-items baseline behind sync notifications. See plans/002 for context;
- * plan 003 will change the quirks marked "Characterization:" below.
+ * plan 003 fixed the upstream parser instead (see the id-less-item test below).
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'path';
@@ -62,7 +62,7 @@ describe('CacheService', () => {
         expect(diff.newFiles).toEqual([]);
     });
 
-    it('Characterization: an item without an id is never reported as new, even against an empty baseline. Plan 003 changes this (link-type materials from parser Strategy 2 have no id and are invisible to the diff).', () => {
+    it('never reports an id-less item as new, even against an empty baseline — the parser is responsible for always supplying an id (link-type materials get a deterministic `link:<url>` id since plan 003), and this filter stays as a guard against the case where it does not', () => {
         const service = new CacheService();
 
         const diff = service.diffCourseState('c1', [{ name: 'Lista', type: 'link', url: 'http://example.com' }], []);
