@@ -15,7 +15,7 @@ source of truth for the hardening program).
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
 | 001  | Stop leaking a Chrome per sync; bound quit teardown | P1 | S | — | DONE |
-| 002  | Characterize the sync/notification pipeline with tests | P1 | M | — | TODO |
+| 002  | Characterize the sync/notification pipeline with tests | P1 | M | — | DONE |
 | 003  | Never mark an item "seen" before the user was told | P1 | M | 002 | TODO |
 | 004  | Manual sync merges into the cache instead of overwriting | P1 | M | 002 (soft) | TODO |
 | 005  | Gate debug dumps of authenticated pages; unlog username | P1 | S | — | TODO |
