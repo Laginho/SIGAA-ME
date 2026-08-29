@@ -19,7 +19,7 @@ source of truth for the hardening program).
 | 003  | Never mark an item "seen" before the user was told | P1 | M | 002 | DONE |
 | 004  | Manual sync merges into the cache instead of overwriting | P1 | M | 002 (soft) | TODO |
 | 005  | Gate debug dumps of authenticated pages; unlog username | P1 | S | — | DONE |
-| 006  | Consent-gated updates + truthful release docs | P1 | S | — | TODO |
+| 006  | Consent-gated updates + truthful release docs | P1 | S | — | DONE |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
 REJECTED (with one-line rationale).

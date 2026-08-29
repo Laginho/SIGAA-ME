@@ -52,11 +52,27 @@ Agora o fluxo é:
 4. A caixa **Publicar no GitHub Releases** decide o resto:
    - **desmarcada** (padrão): compila e guarda o instalador como artefato do
      workflow, para você baixar e testar. Nada vai para os usuários.
-   - **marcada**: publica no GitHub Releases, e aí o auto-update alcança quem já
-     tem o app instalado.
+   - **marcada**: roda `electron-builder --publish always`, que cria a release
+     no GitHub — mas como **rascunho (draft)**, porque
+     `electron-builder.json5` tem `releaseType: "draft"`. Um rascunho é
+     intencional: dá uma última checagem antes de qualquer usuário ver a
+     versão.
+5. A release marcada como "publish" ainda não chegou a ninguém. Vá em GitHub →
+   **Releases** → abra o rascunho → confira os artefatos e o `latest.yml` →
+   **Publish release**. Só a partir desse clique manual o `electron-updater`
+   (que só enxerga releases **publicadas**, nunca rascunhos) passa a oferecer
+   a versão para quem já tem o app instalado.
 
 `npm run release` na sua máquina compila e **não** publica (`--publish never`).
 A flag que publica existe só dentro do `release.yml`.
+
+### Comportamento do cliente desde a tarefa `006`
+
+O app não instala nada sem perguntar: ele confere por atualizações ao abrir,
+pergunta antes de baixar (mostrando a versão) e pergunta de novo antes de
+reiniciar para instalar. Ninguém recebe update silencioso — mesmo depois do
+`Publish release` acima, cada usuário ainda precisa clicar "Baixar" e depois
+"Reiniciar e Instalar".
 
 > [!TIP]
 > Always make sure your working directory is clean (`git status`) before running a release command!
