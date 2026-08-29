@@ -1,6 +1,6 @@
 import '../styles/dashboard.css';
 import { toast } from '../components/toast';
-import { formatSyncLabel } from '../utils/ui-helpers';
+import { formatSyncLabel, mergeCoursesIntoCache } from '../utils/ui-helpers';
 import {
   seedExistingItemsAsRead,
   pushNotifications,
@@ -183,38 +183,7 @@ export function renderDashboardPage(app: HTMLDivElement, account: UserAccount) {
   window.api.onBackgroundSyncUpdate((data: any) => {
     console.log('[Dashboard] Received background sync update:', data.courses?.length, 'courses');
     if (data.courses && data.courses.length > 0) {
-      // Merge with existing cache to preserve previously fetched news content
-      const existingRaw = localStorage.getItem('coursesWithFiles');
-      if (existingRaw) {
-        try {
-          const existingCourses = JSON.parse(existingRaw);
-          // Build a lookup of cached news content: "courseId-newsId" -> content
-          const contentMap = new Map<string, string>();
-          for (const course of existingCourses) {
-            if (course.news) {
-              for (const n of course.news) {
-                if (n.content) {
-                  contentMap.set(`${course.id}-${n.id}`, n.content);
-                }
-              }
-            }
-          }
-          // Re-inject cached content into incoming data where missing
-          for (const course of data.courses) {
-            if (course.news) {
-              for (const n of course.news) {
-                if (!n.content) {
-                  const cached = contentMap.get(`${course.id}-${n.id}`);
-                  if (cached) n.content = cached;
-                }
-              }
-            }
-          }
-        } catch { /* ignore parse errors */ }
-      }
-
-      localStorage.setItem('coursesWithFiles', JSON.stringify(data.courses));
-      localStorage.setItem('cacheTimestamp', data.timestamp.toString());
+      mergeCoursesIntoCache(data.courses, { replaceSet: true }, data.timestamp);
       loadCoursesFromCache();
     }
 
