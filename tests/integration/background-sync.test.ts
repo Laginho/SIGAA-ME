@@ -1,13 +1,14 @@
 /**
  * Characterizes BackgroundSyncService.syncNow() (electron/services/background-sync.service.ts) —
  * the sync loop that decides what's new and pushes it to the renderer + OS
- * notifications. See plans/002 for context. Several cases here pin CURRENT
- * (buggy) behavior that plan 003 will deliberately invert — those carry a
- * `// Characterization:` comment naming it.
+ * notifications. See plans/002 for context; plan 003 fixed the two bugs this
+ * suite originally pinned (commit-before-delivery ordering, discarded retry
+ * result) and this file now asserts the corrected behavior.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SigaaService } from '../../electron/services/sigaa.service';
 import type { BrowserWindow } from 'electron';
+import type { AppSettings } from '../../shared/ipc';
 
 vi.mock('electron', () => ({
     app: {
@@ -54,8 +55,8 @@ vi.mock('../../electron/services/cache.service', () => ({
     }
 }));
 
-const settings = {
-    theme: 'light' as const,
+const settings: AppSettings = {
+    theme: 'light',
     autoSync: true,
     lastDownloadPath: null,
     runInBackground: true,
@@ -155,7 +156,7 @@ describe('BackgroundSyncService.syncNow', () => {
         expect(payload.notifications[0]).toMatchObject({ type: 'file', id: 'file-c1-f2.pdf' });
     });
 
-    it('Characterization: commits the cache baseline before delivering to the renderer — a crash in between loses the notification forever. Plan 003 reorders this; this test is EXPECTED to be inverted there.', async () => {
+    it('commits the cache baseline only after delivering to the renderer, so a crash in between re-notifies next sync instead of losing the item', async () => {
         const sigaaService = makeSigaaService({
             getCourses: vi.fn(async () => ({ success: true, courses: [{ id: 'c1', name: 'Course 1' }] })),
             getCourseFiles: vi.fn(async () => ({ success: true, files: [{ id: '1', name: 'f1.pdf' }], news: [] }))
@@ -171,10 +172,43 @@ describe('BackgroundSyncService.syncNow', () => {
         const sendIndex = cacheState.callLog.indexOf('send');
         expect(updateIndex).toBeGreaterThanOrEqual(0);
         expect(sendIndex).toBeGreaterThanOrEqual(0);
-        expect(updateIndex).toBeLessThan(sendIndex);
+        expect(sendIndex).toBeLessThan(updateIndex);
     });
 
-    it("Characterization: a failed retry's success flag is discarded — syncNow aborts silently instead of surfacing the failure. Plan 003 makes this an explicit abort.", async () => {
+    it('never commits the baseline or delivers to the renderer when auto-download throws mid-course, so the next sync retries the whole course', async () => {
+        settings.autoDownloadUpdates = true;
+        settings.lastDownloadPath = '/downloads';
+        // Pre-seed a non-empty baseline so this course is a warm diff, not a cold
+        // start — the cold-start branch skips auto-download entirely (else-if).
+        cacheState.baselines.set('c1', { files: ['0'], news: [] });
+        try {
+            const sigaaService = makeSigaaService({
+                getCourses: vi.fn(async () => ({ success: true, courses: [{ id: 'c1', name: 'Course 1' }] })),
+                getCourseFiles: vi.fn(async () => ({
+                    success: true,
+                    files: [{ id: '1', name: 'f1.pdf', url: 'http://x/f1.pdf' }],
+                    news: []
+                })),
+                downloadAllFiles: vi.fn(async () => {
+                    throw new Error('disk full');
+                })
+            });
+            const window = makeWindow();
+            const service = new BackgroundSyncService(sigaaService, () => window);
+
+            const p = service.syncNow();
+            await vi.runAllTimersAsync();
+            await expect(p).resolves.toBeUndefined();
+
+            expect(cacheState.callLog).not.toContain('updateCourseState');
+            expect(window.webContents.send).not.toHaveBeenCalled();
+        } finally {
+            settings.autoDownloadUpdates = false;
+            settings.lastDownloadPath = null;
+        }
+    });
+
+    it('aborts explicitly when the post-re-login retry also fails, without touching a single course', async () => {
         const sigaaService = makeSigaaService({
             getCourses: vi.fn(async () => ({ success: false })),
             login: vi.fn(async () => ({ success: true }))
@@ -188,6 +222,7 @@ describe('BackgroundSyncService.syncNow', () => {
 
         expect(sigaaService.getCourses).toHaveBeenCalledTimes(2);
         expect(sigaaService.login).toHaveBeenCalledTimes(1);
+        expect(sigaaService.getCourseFiles).not.toHaveBeenCalled();
         expect(window.webContents.send).not.toHaveBeenCalled();
         expect(cacheState.callLog).not.toContain('updateCourseState');
     });

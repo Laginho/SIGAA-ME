@@ -71,6 +71,10 @@ export class BackgroundSyncService {
                     return;
                 }
                 const retryCourses = await this.sigaaService.getCourses();
+                if (!retryCourses.success) {
+                    console.error('[BackgroundSync] Retry after re-login failed:', retryCourses.message ?? 'unknown');
+                    return;
+                }
                 courses = retryCourses.courses;
             }
 
@@ -85,6 +89,7 @@ export class BackgroundSyncService {
             let singleCourseUpdateName = '';
             const allCoursesData: any[] = [];
             const newNotifications: any[] = []; // Structured notifications for the bell
+            const pendingCommits: { courseId: string; fileIds: string[]; newsIds: string[] }[] = [];
 
             for (const course of courses) {
                 console.log(`[BackgroundSync] Checking course: ${course.name}`);
@@ -106,10 +111,12 @@ export class BackgroundSyncService {
 
                     const diff = cacheService.diffCourseState(course.id, currentFiles, currentNews);
 
-                    // Always update the cache so subsequent syncs have a proper baseline
+                    // Defer the baseline commit until after delivery (see flush below) —
+                    // committing here would mark items "seen" even if a later throw in
+                    // this course (auto-download, news fetch) aborts before the user is told.
                     const allFileIds = currentFiles.map(f => String(f.id)).filter(id => id && id !== 'undefined');
                     const allNewsIds = currentNews.map(n => String(n.id)).filter(id => id && id !== 'undefined');
-                    cacheService.updateCourseState(course.id, allFileIds, allNewsIds);
+                    pendingCommits.push({ courseId: course.id, fileIds: allFileIds, newsIds: allNewsIds });
 
                     if (isColdStart) {
                         console.log(`[BackgroundSync] Cold start for ${course.name} — populating baseline (${currentFiles.length} files, ${currentNews.length} news). No notifications.`);
@@ -232,7 +239,17 @@ export class BackgroundSyncService {
                 }
             }
 
+            // Commit the baseline only after the user had every chance to be told.
+            // A crash before this point means re-notifying next sync — the renderer
+            // dedupes notification ids, so duplicates are absorbed (notification-store.ts:111-118).
+            for (const c of pendingCommits) {
+                cacheService.updateCourseState(c.courseId, c.fileIds, c.newsIds);
+            }
+
         } catch (error) {
+            // Load-bearing: a throw here means the baseline flush above never ran,
+            // so items involved in this sync stay un-committed and get re-diffed
+            // (and re-notified) on the next sync instead of being silently marked seen.
             console.error('[BackgroundSync] Error during sync:', error);
         } finally {
             this.isSyncing = false;
