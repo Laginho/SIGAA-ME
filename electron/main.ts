@@ -275,7 +275,15 @@ app.on('before-quit', async (e) => {
     console.log('App is closing. Cleaning up background processes...');
     isQuitting = true;
     try {
-      await sigaaService.logout();
+      // A wedged Chrome can make browser.close() hang forever; quitting must
+      // not depend on it. 5s is generous for a healthy teardown.
+      await Promise.race([
+        sigaaService.logout(),
+        new Promise<void>((resolve) => setTimeout(() => {
+          console.warn('Cleanup timed out after 5s; quitting anyway.');
+          resolve();
+        }, 5000))
+      ]);
     } catch (err) {
       console.error('Cleanup error:', err);
     }
