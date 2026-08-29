@@ -42,6 +42,10 @@ export class PlaywrightLoginService {
         try {
             console.log('Playwright: Launching browser...');
 
+            // A previous browser may still be running (earlier sync or login).
+            // Launching over it leaks the whole Chrome process tree.
+            await this.close();
+
             this.browser = await chromium.launch({
                 channel: 'chrome',
                 headless: true
@@ -196,6 +200,10 @@ export class PlaywrightLoginService {
             if (!this.storedCookies || this.storedCookies.length === 0) {
                 return { success: false, error: 'No stored session - please login first' };
             }
+
+            // A previous browser may still be running (earlier sync or login).
+            // Launching over it leaks the whole Chrome process tree.
+            await this.close();
 
             this.browser = await chromium.launch({
                 channel: 'chrome',
@@ -1124,9 +1132,17 @@ export class PlaywrightLoginService {
     async close() {
         if (this.browser) {
             console.log('Playwright: Closing browser...');
-            await this.browser.close();
+            try {
+                await this.browser.close();
+            } catch (err) {
+                // Teardown only: the browser may already be dead; the goal
+                // (releasing the handles) is achieved either way.
+                console.warn('Playwright: browser.close() failed during teardown:', err);
+            }
             this.browser = null;
         }
+        this.context = null;
+        this.page = null;
     }
     async getUserAgent(): Promise<string> {
         if (this.page) {
