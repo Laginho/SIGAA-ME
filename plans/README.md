@@ -14,12 +14,14 @@ source of truth for the hardening program).
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
-| 001  | Stop leaking a Chrome per sync; bound quit teardown | P1 | S | — | TODO |
-| 002  | Characterize the sync/notification pipeline with tests | P1 | M | — | TODO |
-| 003  | Never mark an item "seen" before the user was told | P1 | M | 002 | TODO |
-| 004  | Manual sync merges into the cache instead of overwriting | P1 | M | 002 (soft) | TODO |
-| 005  | Gate debug dumps of authenticated pages; unlog username | P1 | S | — | TODO |
-| 006  | Consent-gated updates + truthful release docs | P1 | S | — | TODO |
+| 001  | Stop leaking a Chrome per sync; bound quit teardown | P1 | S | — | DONE |
+| 002  | Characterize the sync/notification pipeline with tests | P1 | M | — | DONE |
+| 003  | Never mark an item "seen" before the user was told | P1 | M | 002 | DONE |
+| 004  | Manual sync merges into the cache instead of overwriting | P1 | M | 002 (soft) | DONE |
+| 005  | Gate debug dumps of authenticated pages; unlog username | P1 | S | — | DONE |
+| 006  | Consent-gated updates + truthful release docs | P1 | S | — | DONE |
+| 007  | Review fixes for `2393da7` (`traycer/noble-hawk` ONLY) | P1 | S-M | 001–006 (that branch) | TODO |
+| 008  | Review fixes for `8ca473c` (`master` ONLY) | P1 | S-M | 001–006 (master) | DONE |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
 REJECTED (with one-line rationale).

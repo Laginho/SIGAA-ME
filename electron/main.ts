@@ -132,7 +132,7 @@ ipcMain.handle('login-request', async (_event, { username, password, rememberMe 
 ipcMain.handle('try-auto-login', async () => {
   const creds = persistenceService.loadCredentials();
   if (creds) {
-    console.log('Auto-login: Found credentials for', creds.username);
+    console.log('Auto-login: stored credentials found');
     return await sigaaService.login(creds.username, creds.password);
   }
   return { success: false };
@@ -275,7 +275,15 @@ app.on('before-quit', async (e) => {
     console.log('App is closing. Cleaning up background processes...');
     isQuitting = true;
     try {
-      await sigaaService.logout();
+      // A wedged Chrome can make browser.close() hang forever; quitting must
+      // not depend on it. 5s is generous for a healthy teardown.
+      await Promise.race([
+        sigaaService.logout(),
+        new Promise<void>((resolve) => setTimeout(() => {
+          console.warn('Cleanup timed out after 5s; quitting anyway.');
+          resolve();
+        }, 5000))
+      ]);
     } catch (err) {
       console.error('Cleanup error:', err);
     }
@@ -373,9 +381,32 @@ app.whenReady().then(() => {
   
   backgroundSyncService.start();
   
+  setupAutoUpdater();
+})
+
+export function setupAutoUpdater(): void {
+  // Unsigned binaries + automatic install = anyone with write access to the
+  // GitHub Releases page ships code to every install. Consent first.
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = false;
+
   // Update Management
-  autoUpdater.on('update-available', () => {
-    console.log('[Updater] Update available!');
+  autoUpdater.on('update-available', (info) => {
+    console.log('[Updater] Update available:', info.version);
+    dialog.showMessageBox({
+      type: 'info',
+      title: 'Atualização Disponível',
+      message: `Uma nova versão do SIGAA-ME está disponível (${info.version}). Deseja baixá-la agora?`,
+      detail: 'O download vem do GitHub Releases do projeto. Nada será instalado sem a sua confirmação.',
+      buttons: ['Baixar', 'Agora não'],
+      cancelId: 1
+    }).then(result => {
+      if (result.response === 0) {
+        autoUpdater.downloadUpdate().catch(err => {
+          console.error('[Updater] Download failed:', err);
+        });
+      }
+    }).catch(err => console.error('[Updater] Dialog failed:', err));
   });
   autoUpdater.on('update-not-available', () => {
     console.log('[Updater] App is up to date.');
@@ -395,10 +426,10 @@ app.whenReady().then(() => {
         // Force the app to quit and install using our graceful before-quit logic
         autoUpdater.quitAndInstall();
       }
-    });
+    }).catch(err => console.error('[Updater] Dialog failed:', err));
   });
 
-  autoUpdater.checkForUpdatesAndNotify().catch(err => {
+  autoUpdater.checkForUpdates().catch(err => {
     console.error('Failed to check for updates:', err);
   });
-})
+}

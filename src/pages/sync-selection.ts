@@ -1,4 +1,5 @@
 import '../styles/sync-selection.css';
+import { mergeCoursesIntoCache } from '../utils/ui-helpers';
 
 /**
  * Forma mínima que esta página precisa de uma disciplina.
@@ -196,17 +197,21 @@ async function startSync(app: HTMLDivElement, mode: 'fast' | 'full') {
         }
       }
 
-      coursesWithContent.push({
+      const synced = {
         ...course,
         files: filesResult.success ? filesResult.files : [],
         news,
         fileCount: filesResult.success ? filesResult.files?.length || 0 : 0
-      });
+      };
+      coursesWithContent.push(synced);
 
-      // ✅ Write after every course: partial data always survives a crash
-      localStorage.setItem('coursesWithFiles', JSON.stringify(coursesWithContent));
-      localStorage.setItem('cacheTimestamp', Date.now().toString());
+      // Merge: preserves courses not yet processed this run and previously
+      // downloaded news content (a fast sync must not wipe the offline corpus).
+      mergeCoursesIntoCache([synced]);
     }
+
+    // Full pass succeeded: the synced set IS the enrollment; drop stale courses.
+    mergeCoursesIntoCache(coursesWithContent, { replaceSet: true });
 
     updateProgress(100, 'Finalizado!', `${courses.length} disciplinas sincronizadas.`);
     setTimeout(() => { window.location.hash = '#/dashboard'; }, 600);

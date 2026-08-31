@@ -1,0 +1,23 @@
+<html><body>
+  <form name="formAva" action="/sigaa/ava/index.jsf">
+    <input name="javax.faces.ViewState" value="VIEWSTATE_STRATEGY2" />
+    <table>
+      <tr>
+        <td><input type="hidden" name="idTurma" value="88888" />
+          <a id="turmaVirtual_88888" href="#" onclick="jsfcljs(document.forms['formAva'],'formAva:acessar,formAva:acessar','');">Física II</a>
+        </td>
+      </tr>
+    </table>
+    <!-- Files table with Strategy-2 link (real href, no jsfcljs onclick with id) -->
+    <table>
+      <tr>
+        <td></td>
+        <td><a href="/sigaa/ava/material/download.jsf?id=12345" onclick="return false;">Lista 4.pdf</a></td>
+      </tr>
+      <tr>
+        <td></td>
+        <td><a href="https://si3.ufc.br/sigaa/ava/material/arquivo.jsf?key=abcde" onclick="return false;">Material Extra.zip</a></td>
+      </tr>
+    </table>
+  </form>
+</body></html>
