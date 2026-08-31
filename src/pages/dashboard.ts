@@ -12,6 +12,29 @@ import {
   NotificationItem
 } from '../utils/notification-store';
 
+/** Handle a background sync update — exported for unit testing. */
+export function handleBackgroundSyncUpdate(data: any): void {
+  console.log('[Dashboard] Received background sync update:', data.courses?.length, 'courses');
+  if (data.courses && data.courses.length > 0) {
+    try {
+      mergeCoursesIntoCache(data.courses, { replaceSet: true }, data.timestamp);
+    } catch (error) {
+      // Quota: the sync result could not be saved. The user must know —
+      // silently dropping a sync is how stale data masquerades as fresh.
+      toast.error(error instanceof Error ? error.message : 'Falha ao salvar a sincronização.');
+      return;
+    }
+    loadCoursesFromCache();
+  }
+
+  // Push notification items from the sync
+  if (data.notifications && data.notifications.length > 0) {
+    pushNotifications(data.notifications);
+    updateBellBadge();
+    toast.info(`${data.notifications.length} nova(s) atualização(ões) encontrada(s).`);
+  }
+}
+
 interface UserAccount {
   name: string;
   photoUrl?: string;
@@ -180,20 +203,7 @@ export function renderDashboardPage(app: HTMLDivElement, account: UserAccount) {
   });
 
   // Listen for background sync updates to refresh dashboard in real-time
-  window.api.onBackgroundSyncUpdate((data: any) => {
-    console.log('[Dashboard] Received background sync update:', data.courses?.length, 'courses');
-    if (data.courses && data.courses.length > 0) {
-      mergeCoursesIntoCache(data.courses, { replaceSet: true }, data.timestamp);
-      loadCoursesFromCache();
-    }
-
-    // Push notification items from the sync
-    if (data.notifications && data.notifications.length > 0) {
-      pushNotifications(data.notifications);
-      updateBellBadge();
-      toast.info(`${data.notifications.length} nova(s) atualização(ões) encontrada(s).`);
-    }
-  });
+  window.api.onBackgroundSyncUpdate(handleBackgroundSyncUpdate);
 
   // Load courses from cache
   loadCoursesFromCache();

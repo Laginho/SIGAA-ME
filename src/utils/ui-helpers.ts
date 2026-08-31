@@ -60,6 +60,21 @@ export interface MergeOptions {
     replaceSet?: boolean;
 }
 
+interface IncomingNews {
+    id: string;
+    content?: string;
+}
+
+interface IncomingCourse {
+    id: string;
+    news?: unknown[];
+}
+
+function isIncomingNews(value: unknown): value is IncomingNews {
+    return typeof value === 'object' && value !== null
+        && typeof (value as { id?: unknown }).id === 'string';
+}
+
 /**
  * Utility: Merge Courses Into Cache
  *
@@ -73,23 +88,24 @@ export interface MergeOptions {
  * Shared by the manual sync loop (`sync-selection.ts`) and the background
  * sync push (`dashboard.ts`) — the two writers of this cache.
  */
-export function mergeCoursesIntoCache(incoming: any[], opts: MergeOptions = {}, timestamp: number = Date.now()): void {
+export function mergeCoursesIntoCache(incoming: IncomingCourse[], opts: MergeOptions = {}, timestamp: number = Date.now()): void {
     const existingRaw = localStorage.getItem('coursesWithFiles');
-    let existingCourses: any[] = [];
+    let existingCourses: IncomingCourse[] = [];
     if (existingRaw) {
         try {
-            existingCourses = JSON.parse(existingRaw);
+            existingCourses = JSON.parse(existingRaw) as IncomingCourse[];
         } catch {
             existingCourses = [];
         }
     }
-
     // Build a lookup of cached news content: "courseId-newsId" -> content
     const contentMap = new Map<string, string>();
     for (const course of existingCourses) {
         if (course.news) {
             for (const n of course.news) {
-                if (n.content) contentMap.set(`${course.id}-${n.id}`, n.content);
+                if (isIncomingNews(n) && typeof n.content === 'string' && n.content) {
+                    contentMap.set(`${course.id}-${n.id}`, n.content);
+                }
             }
         }
     }
@@ -97,7 +113,7 @@ export function mergeCoursesIntoCache(incoming: any[], opts: MergeOptions = {}, 
     for (const course of incoming) {
         if (course.news) {
             for (const n of course.news) {
-                if (!n.content) {
+                if (isIncomingNews(n) && !n.content) {
                     const cached = contentMap.get(`${course.id}-${n.id}`);
                     if (cached) n.content = cached;
                 }
@@ -105,7 +121,7 @@ export function mergeCoursesIntoCache(incoming: any[], opts: MergeOptions = {}, 
         }
     }
 
-    const merged: any[] = opts.replaceSet ? [...incoming] : [...existingCourses];
+    const merged: IncomingCourse[] = opts.replaceSet ? [...incoming] : [...existingCourses];
     if (!opts.replaceSet) {
         for (const course of incoming) {
             const idx = merged.findIndex((c) => c.id === course.id);
@@ -113,7 +129,6 @@ export function mergeCoursesIntoCache(incoming: any[], opts: MergeOptions = {}, 
             else merged.push(course);
         }
     }
-
     try {
         localStorage.setItem('coursesWithFiles', JSON.stringify(merged));
     } catch (err: any) {

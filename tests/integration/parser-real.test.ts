@@ -97,6 +97,24 @@ describe('HttpScraperService.getCourseFiles com HTML de fixture', () => {
         expect(result.error).toMatch(/login/i);
     });
 
+    it('extrai links Strategy-2 com type link e id determinístico', async () => {
+        const result = await scraper.getCourseFiles('88888', 'Física II', fixture('course-page-with-strategy2-link.html'));
+
+        expect(result.success).toBe(true);
+        const links = result.files?.filter((f: any) => f.type === 'link') ?? [];
+        expect(links).toHaveLength(2);
+        expect(links.map((l: any) => l.name)).toEqual(expect.arrayContaining(['Lista 4.pdf', 'Material Extra.zip']));
+        expect(links.map((l: any) => l.type)).toEqual(expect.arrayContaining(['link', 'link']));
+        expect(links.map((l: any) => l.id)).toEqual(expect.arrayContaining([
+            'link:https://si3.ufc.br/sigaa/ava/material/download.jsf?id=12345',
+            'link:https://si3.ufc.br/sigaa/ava/material/arquivo.jsf?key=abcde'
+        ]));
+        expect(links.map((l: any) => l.url)).toEqual(expect.arrayContaining([
+            'https://si3.ufc.br/sigaa/ava/material/download.jsf?id=12345',
+            'https://si3.ufc.br/sigaa/ava/material/arquivo.jsf?key=abcde'
+        ]));
+    });
+
     it('não grava dump de debug em build empacotado (plan 005)', async () => {
         // Regressão: o dump de `preFetchedHtml` era incondicional e usava caminho
         // relativo (`debug_playwright_${courseId}.html`, resolvido contra

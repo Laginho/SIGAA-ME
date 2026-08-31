@@ -381,6 +381,10 @@ app.whenReady().then(() => {
   
   backgroundSyncService.start();
   
+  setupAutoUpdater();
+})
+
+export function setupAutoUpdater(): void {
   // Unsigned binaries + automatic install = anyone with write access to the
   // GitHub Releases page ships code to every install. Consent first.
   autoUpdater.autoDownload = false;
@@ -402,7 +406,7 @@ app.whenReady().then(() => {
           console.error('[Updater] Download failed:', err);
         });
       }
-    });
+    }).catch(err => console.error('[Updater] Dialog failed:', err));
   });
   autoUpdater.on('update-not-available', () => {
     console.log('[Updater] App is up to date.');
@@ -422,10 +426,10 @@ app.whenReady().then(() => {
         // Force the app to quit and install using our graceful before-quit logic
         autoUpdater.quitAndInstall();
       }
-    });
+    }).catch(err => console.error('[Updater] Dialog failed:', err));
   });
 
   autoUpdater.checkForUpdates().catch(err => {
     console.error('Failed to check for updates:', err);
   });
-})
+}
