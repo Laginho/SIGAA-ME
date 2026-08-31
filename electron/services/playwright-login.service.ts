@@ -42,6 +42,10 @@ export class PlaywrightLoginService {
         try {
             console.log('Playwright: Launching browser...');
 
+            // A previous browser may still be running (earlier sync or login).
+            // Launching over it leaks the whole Chrome process tree.
+            await this.close();
+
             this.browser = await chromium.launch({
                 channel: 'chrome',
                 headless: true
@@ -196,6 +200,10 @@ export class PlaywrightLoginService {
             if (!this.storedCookies || this.storedCookies.length === 0) {
                 return { success: false, error: 'No stored session - please login first' };
             }
+
+            // A previous browser may still be running (earlier sync or login).
+            // Launching over it leaks the whole Chrome process tree.
+            await this.close();
 
             this.browser = await chromium.launch({
                 channel: 'chrome',
@@ -975,10 +983,13 @@ export class PlaywrightLoginService {
             }
 
             if (!found) {
+                if (!app.isPackaged) {
                     const html = await page.content();
-                const debugPath = path.join(app.getPath('userData'), `debug_playwright_news_fail_${newsId}.html`);
-                fs.writeFileSync(debugPath, html);
-                console.log(`Playwright: Saved debug HTML to ${debugPath}`);
+                    const safeId = String(newsId).replace(/[^a-zA-Z0-9_-]/g, '_');
+                    const debugPath = path.join(app.getPath('userData'), `debug_playwright_news_fail_${safeId}.html`);
+                    fs.writeFileSync(debugPath, html);
+                    console.log(`Playwright: Saved debug HTML to ${debugPath}`);
+                }
                 return { success: false, error: `News link with ID ${newsId} not found` };
             }
 
@@ -988,11 +999,14 @@ export class PlaywrightLoginService {
             await page.waitForLoadState('networkidle');
             await page.waitForTimeout(1000);
 
-            // DEBUG: Save news detail page HTML universally
-            const newsDetailHtml = await page.content();
-            const debugNewsPath = path.join(app.getPath('userData'), `debug_news_detail_${newsId}.html`);
-            fs.writeFileSync(debugNewsPath, newsDetailHtml);
-            console.log(`Playwright: Saved news detail page to ${debugNewsPath}`);
+            // DEBUG: Save news detail page HTML (dev only)
+            if (!app.isPackaged) {
+                const newsDetailHtml = await page.content();
+                const safeId = String(newsId).replace(/[^a-zA-Z0-9_-]/g, '_');
+                const debugNewsPath = path.join(app.getPath('userData'), `debug_news_detail_${safeId}.html`);
+                fs.writeFileSync(debugNewsPath, newsDetailHtml);
+                console.log(`Playwright: Saved news detail page to ${debugNewsPath}`);
+            }
 
             // 4. Parse the news content
             const newsData = await page.evaluate(() => {
@@ -1124,9 +1138,17 @@ export class PlaywrightLoginService {
     async close() {
         if (this.browser) {
             console.log('Playwright: Closing browser...');
-            await this.browser.close();
+            try {
+                await this.browser.close();
+            } catch (err) {
+                // Teardown only: the browser may already be dead; the goal
+                // (releasing the handles) is achieved either way.
+                console.warn('Playwright: browser.close() failed during teardown:', err);
+            }
             this.browser = null;
         }
+        this.context = null;
+        this.page = null;
     }
     async getUserAgent(): Promise<string> {
         if (this.page) {

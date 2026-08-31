@@ -53,3 +53,86 @@ export function isNewsCached(courseId: string, newsId: string): boolean {
         return false;
     }
 }
+
+export interface MergeOptions {
+    /** When true, courses absent from `incoming` are removed (use only after a
+     *  complete successful sync over the full enrollment). Default false. */
+    replaceSet?: boolean;
+}
+
+interface IncomingNews {
+    id: string;
+    content?: string;
+}
+
+interface IncomingCourse {
+    id: string;
+    news?: unknown[];
+}
+
+function isIncomingNews(value: unknown): value is IncomingNews {
+    return typeof value === 'object' && value !== null
+        && typeof (value as { id?: unknown }).id === 'string';
+}
+
+/**
+ * Utility: Merge Courses Into Cache
+ *
+ * Writes `incoming` courses into the `coursesWithFiles` blob without wiping
+ * data a partial or fast sync doesn't touch:
+ *   - News bodies (`content`) already cached are re-injected when the
+ *     incoming item lacks one (a fast sync only returns headers).
+ *   - Courses not present in `incoming` are kept unless `replaceSet: true`
+ *     (a partial sync must not drop the courses it hasn't reached yet).
+ *
+ * Shared by the manual sync loop (`sync-selection.ts`) and the background
+ * sync push (`dashboard.ts`) — the two writers of this cache.
+ */
+export function mergeCoursesIntoCache(incoming: IncomingCourse[], opts: MergeOptions = {}, timestamp: number = Date.now()): void {
+    const existingRaw = localStorage.getItem('coursesWithFiles');
+    let existingCourses: IncomingCourse[] = [];
+    if (existingRaw) {
+        try {
+            existingCourses = JSON.parse(existingRaw) as IncomingCourse[];
+        } catch {
+            existingCourses = [];
+        }
+    }
+    // Build a lookup of cached news content: "courseId-newsId" -> content
+    const contentMap = new Map<string, string>();
+    for (const course of existingCourses) {
+        if (course.news) {
+            for (const n of course.news) {
+                if (isIncomingNews(n) && typeof n.content === 'string' && n.content) {
+                    contentMap.set(`${course.id}-${n.id}`, n.content);
+                }
+            }
+        }
+    }
+    // Re-inject cached content into incoming data where missing
+    for (const course of incoming) {
+        if (course.news) {
+            for (const n of course.news) {
+                if (isIncomingNews(n) && !n.content) {
+                    const cached = contentMap.get(`${course.id}-${n.id}`);
+                    if (cached) n.content = cached;
+                }
+            }
+        }
+    }
+
+    const merged: IncomingCourse[] = opts.replaceSet ? [...incoming] : [...existingCourses];
+    if (!opts.replaceSet) {
+        for (const course of incoming) {
+            const idx = merged.findIndex((c) => c.id === course.id);
+            if (idx >= 0) merged[idx] = course;
+            else merged.push(course);
+        }
+    }
+    try {
+        localStorage.setItem('coursesWithFiles', JSON.stringify(merged));
+    } catch (err: any) {
+        throw new Error('Cache local cheio (localStorage) — ' + err.message);
+    }
+    localStorage.setItem('cacheTimestamp', timestamp.toString());
+}

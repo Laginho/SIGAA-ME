@@ -1,6 +1,6 @@
 import '../styles/dashboard.css';
 import { toast } from '../components/toast';
-import { formatSyncLabel } from '../utils/ui-helpers';
+import { formatSyncLabel, mergeCoursesIntoCache } from '../utils/ui-helpers';
 import {
   seedExistingItemsAsRead,
   pushNotifications,
@@ -11,6 +11,29 @@ import {
   courseHasUnread,
   NotificationItem
 } from '../utils/notification-store';
+
+/** Handle a background sync update — exported for unit testing. */
+export function handleBackgroundSyncUpdate(data: any): void {
+  console.log('[Dashboard] Received background sync update:', data.courses?.length, 'courses');
+  if (data.courses && data.courses.length > 0) {
+    try {
+      mergeCoursesIntoCache(data.courses, { replaceSet: true }, data.timestamp);
+    } catch (error) {
+      // Quota: the sync result could not be saved. The user must know —
+      // silently dropping a sync is how stale data masquerades as fresh.
+      toast.error(error instanceof Error ? error.message : 'Falha ao salvar a sincronização.');
+      return;
+    }
+    loadCoursesFromCache();
+  }
+
+  // Push notification items from the sync
+  if (data.notifications && data.notifications.length > 0) {
+    pushNotifications(data.notifications);
+    updateBellBadge();
+    toast.info(`${data.notifications.length} nova(s) atualização(ões) encontrada(s).`);
+  }
+}
 
 interface UserAccount {
   name: string;
@@ -180,51 +203,7 @@ export function renderDashboardPage(app: HTMLDivElement, account: UserAccount) {
   });
 
   // Listen for background sync updates to refresh dashboard in real-time
-  window.api.onBackgroundSyncUpdate((data: any) => {
-    console.log('[Dashboard] Received background sync update:', data.courses?.length, 'courses');
-    if (data.courses && data.courses.length > 0) {
-      // Merge with existing cache to preserve previously fetched news content
-      const existingRaw = localStorage.getItem('coursesWithFiles');
-      if (existingRaw) {
-        try {
-          const existingCourses = JSON.parse(existingRaw);
-          // Build a lookup of cached news content: "courseId-newsId" -> content
-          const contentMap = new Map<string, string>();
-          for (const course of existingCourses) {
-            if (course.news) {
-              for (const n of course.news) {
-                if (n.content) {
-                  contentMap.set(`${course.id}-${n.id}`, n.content);
-                }
-              }
-            }
-          }
-          // Re-inject cached content into incoming data where missing
-          for (const course of data.courses) {
-            if (course.news) {
-              for (const n of course.news) {
-                if (!n.content) {
-                  const cached = contentMap.get(`${course.id}-${n.id}`);
-                  if (cached) n.content = cached;
-                }
-              }
-            }
-          }
-        } catch { /* ignore parse errors */ }
-      }
-
-      localStorage.setItem('coursesWithFiles', JSON.stringify(data.courses));
-      localStorage.setItem('cacheTimestamp', data.timestamp.toString());
-      loadCoursesFromCache();
-    }
-
-    // Push notification items from the sync
-    if (data.notifications && data.notifications.length > 0) {
-      pushNotifications(data.notifications);
-      updateBellBadge();
-      toast.info(`${data.notifications.length} nova(s) atualização(ões) encontrada(s).`);
-    }
-  });
+  window.api.onBackgroundSyncUpdate(handleBackgroundSyncUpdate);
 
   // Load courses from cache
   loadCoursesFromCache();
