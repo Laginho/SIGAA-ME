@@ -220,6 +220,8 @@ app que lista arquivos — o problema não é falta de estrutura.
 3. Você não adicionou `any` em código de fronteira (`preload.ts`, handlers IPC).
 4. Você não adicionou `innerHTML` com dado externo.
 5. Se corrigiu um bug, existe um teste que falharia sem a correção.
+6. Cada implementação concluída vira um commit Conventional Commit próprio,
+   depois que o gate estiver verde.
 
 `npm run quality` verde prova que **as coisas cobertas pela suíte** continuam
 funcionando. Não prova que a sua mudança funciona, se nada exercita a sua
