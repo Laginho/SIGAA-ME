@@ -20,6 +20,8 @@ source of truth for the hardening program).
 | 004  | Manual sync merges into the cache instead of overwriting | P1 | M | 002 (soft) | DONE |
 | 005  | Gate debug dumps of authenticated pages; unlog username | P1 | S | — | DONE |
 | 006  | Consent-gated updates + truthful release docs | P1 | S | — | DONE |
+| 007  | Review fixes for `2393da7` (`traycer/noble-hawk` ONLY) | P1 | S-M | 001–006 (that branch) | TODO |
+| 008  | Review fixes for `8ca473c` (`master` ONLY) | P1 | S-M | 001–006 (master) | DONE |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
 REJECTED (with one-line rationale).
