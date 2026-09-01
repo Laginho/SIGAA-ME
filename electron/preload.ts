@@ -75,8 +75,9 @@ const api: RendererApi = {
   // se provam equivalentes.
   updateSetting: (key, value) => ipcRenderer.invoke('update-app-setting', { key, value }),
 
-  // Dev Testing
-  simulateNewFile: () => ipcRenderer.invoke('test-simulate-new-file'),
+  ...(process.argv.includes('--sigaa-dev')
+    ? { simulateNewFile: () => ipcRenderer.invoke('test-simulate-new-file') }
+    : {}),
 
   // Background Sync Updates
   onBackgroundSyncUpdate: (callback: (data: BackgroundSyncUpdate) => void) => {

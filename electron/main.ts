@@ -82,6 +82,17 @@ let tray: Tray | null = null
 const sigaaService = new SigaaService()
 const backgroundSyncService = new BackgroundSyncService(sigaaService, () => win)
 
+async function simulateNewFile(): Promise<boolean> {
+  const forgotten = cacheService.forgetLastFile();
+  if (!forgotten) {
+    console.log('[Dev] Nenhum arquivo em cache para simular.');
+    return false;
+  }
+  console.log(`[Dev] Esquecido ${forgotten.fileId} de ${forgotten.courseId}. Sincronizando...`);
+  await backgroundSyncService.syncNow();
+  return true;
+}
+
 function createWindow() {
   const isHiddenStartup = process.argv.includes('--hidden');
   
@@ -90,6 +101,7 @@ function createWindow() {
     icon: path.join(process.env.VITE_PUBLIC, 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
+      additionalArguments: app.isPackaged ? [] : ['--sigaa-dev'],
     },
   })
 
@@ -220,22 +232,7 @@ ipcMain.handle('update-app-setting', async (_, update: SettingUpdate) => {
 });
 
 if (!app.isPackaged) {
-  ipcMain.handle('test-simulate-new-file', async () => {
-    const cacheData = cacheService['cache'];
-    const courseIds = Object.keys(cacheData);
-    if (courseIds.length > 0) {
-      for (const cId of courseIds) {
-        if (cacheData[cId].files && cacheData[cId].files.length > 0) {
-          cacheData[cId].files.pop();
-          cacheService['saveCache']();
-          console.log(`[E2E Test] Simulated new file by popping cache for ${cId}. Starting syncNow...`);
-          await backgroundSyncService.syncNow();
-          return true;
-        }
-      }
-    }
-    return false;
-  });
+  ipcMain.handle('test-simulate-new-file', simulateNewFile);
 }
 
 ipcMain.handle('logout', async () => {
@@ -347,25 +344,7 @@ app.whenReady().then(() => {
   const contextMenu = Menu.buildFromTemplate([
     { label: 'Abrir SIGAA-ME', click: () => win?.show() },
     { label: 'Sincronizar Agora', click: () => backgroundSyncService.syncNow() },
-    { type: 'separator' },
-    { label: '[Dev] Simular Arquivo Novo', click: () => {
-        const cacheData = cacheService['cache'];
-        const courseIds = Object.keys(cacheData);
-        if (courseIds.length > 0) {
-            for (const cId of courseIds) {
-                if (cacheData[cId].files && cacheData[cId].files.length > 0) {
-                    const removed = cacheData[cId].files.pop();
-                    cacheService['saveCache']();
-                    console.log(`[Dev] Removido do cache o arquivo ${removed}. Iniciando Sync...`);
-                    backgroundSyncService.syncNow();
-                    return;
-                }
-            }
-            console.log('[Dev] Nenhum arquivo salvo no cache para simular.');
-        } else {
-            console.log('[Dev] Cache vazio. Clique em Sincronizar Agora primeiro.');
-        }
-    }},
+    ...(app.isPackaged ? [] : [{ type: 'separator' } as const, { label: '[Dev] Simular Arquivo Novo', click: () => { void simulateNewFile(); } } as const]),
     { type: 'separator' },
     { label: 'Sair', click: () => { isQuitting = true; app.quit(); } }
   ]);

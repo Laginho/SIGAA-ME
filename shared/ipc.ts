@@ -179,7 +179,7 @@ export interface RendererApi {
     key: K,
     value: Extract<SettingUpdate, { key: K }>['value'],
   ) => Promise<{ success: boolean }>
-  simulateNewFile: () => Promise<boolean>
+  simulateNewFile?: () => Promise<boolean>
   onBackgroundSyncUpdate: (callback: (data: BackgroundSyncUpdate) => void) => () => void
 }
 
