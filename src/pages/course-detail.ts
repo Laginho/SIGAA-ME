@@ -77,7 +77,7 @@ export function renderCourseDetailPage(container: HTMLDivElement, courseId: stri
       btn.innerHTML = '🔄 Carregando...';
       btn.disabled = true;
 
-      const result = await (window as any).api.loadAllNews(courseId, course?.name || 'Unknown Course');
+      const result = await window.api.loadAllNews(courseId, course?.name || 'Unknown Course');
 
       if (result.success && result.news) {
         // Find current cached course

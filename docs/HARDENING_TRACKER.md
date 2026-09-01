@@ -870,9 +870,9 @@ failed with "Deleted invalid file: LISTA 1.pdf".
 
 ### BUG-002 — Remover o `pauseSync()` morto
 
-- Status: `NOT STARTED`
+- Status: `DONE` — fechado na sessão 2026-09-01
 - Priority: `P1`
-- Owner: —
+- Owner: Claude (sessão 2026-09-01)
 - Dependencies: none
 - Primary files: `src/pages/course-detail.ts`
 
@@ -899,6 +899,20 @@ real é o `CONC-001`, na Fase 3.
 
 Código que mente sobre o que faz é pior que código ausente. Remover torna o
 débito visível. Ver anexo 7 de `docs/PLANO.md`.
+
+#### Implementation notes (2026-09-01)
+
+As chamadas a `pauseSync()` e seus `try/catch` já tinham sido removidas num
+commit anterior (o arquivo tem comentários no lugar explicando a ausência), mas
+a tarefa não foi marcada e **um critério ainda falhava**: restava um
+`(window as any).api.loadAllNews(...)` em `course-detail.ts:80`. O método já
+estava declarado no contrato `RendererApi` (`shared/ipc.ts`), então o cast era
+puro resíduo — trocado por `window.api.loadAllNews`. Os
+`(window as any).cleanupProgress` das linhas 292/294 não são acesso a `api` e
+ficam para o `ARCH-001`/`SEC-002`.
+
+A ausência da proteção contra concorrência está registrada no `CONC-001` (ver
+nota lá) e no `DÉBITO-03`.
 
 ### BUG-003 — `[Dev] Simular Arquivo Novo` funciona em produção
 
@@ -2260,7 +2274,11 @@ npm run test:e2e
 - Let interactive work cancel or supersede background work without corrupting
   cookies, ViewState, or page navigation.
 - Check cancellation between courses, news items, retry attempts, and downloads.
-- Remove nonexistent renderer calls to `pauseSync()` and `resumeSync()`.
+- ~~Remove nonexistent renderer calls to `pauseSync()` and `resumeSync()`.~~
+  **Feito no `BUG-002` (2026-09-01).** Registro: a proteção contra concorrência
+  que o `pauseSync` fingia dar está **ausente e é conhecida** — nada serializa
+  sync em background e ação do usuário sobre a mesma página Playwright até esta
+  tarefa ser implementada. Ver `DÉBITO-03`.
 - Return `OPERATION_CANCELLED` rather than a generic failure.
 
 #### Acceptance criteria
