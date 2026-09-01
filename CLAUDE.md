@@ -135,6 +135,16 @@ README dizer o contrário.
 
 Cada uma existe por causa de um bug real deste repositório.
 
+### Mensageria Traycer em subagentes OpenCode
+
+Quando um subagente OpenCode não receber as ferramentas nativas `traycer_*`, o
+coordenador deve recuperar o shim global em
+`C:\Users\bruno\.traycer\.opencode\traycer-a2a-recovery.md` e resetar somente a
+sessão/provedor OpenCode afetado. O subagente não deve tentar substituir a
+ferramenta por comandos de shell: a conclusão é ter, em uma sessão nova,
+`traycer_get_self`, `traycer_create_agent` e `traycer_send_message` disponíveis
+nativamente.
+
 ### 1. Nunca `innerHTML` com dado que veio do SIGAA
 
 Nome de disciplina, nome de arquivo, título de notícia, corpo de notícia, foto de
