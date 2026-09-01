@@ -44,12 +44,6 @@ function route() {
 // Listen for hash changes
 window.addEventListener('hashchange', route)
 
-// PROTÓTIPO (só dev): barra para alternar esquemas de dark mode candidatos.
-// O gate DEV garante que nada disso entra no bundle de produção.
-if (import.meta.env.DEV) {
-  import('./prototype/dark-scheme-switcher').then(m => m.mountSchemeSwitcher())
-}
-
 // Initial theme application
 window.api.getSettings().then((settings: any) => {
   document.documentElement.setAttribute('data-theme', settings.theme);

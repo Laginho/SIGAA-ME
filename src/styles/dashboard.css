@@ -232,6 +232,16 @@
     background: #f8d7da;
 }
 
+/* Dark mode: as pílulas e o hover do logout têm cores claras fixas acima */
+[data-theme="dark"] .sync-status { color: var(--color-text-muted); background: #0f172a; }
+[data-theme="dark"] .sync-status.syncing { color: #60a5fa; background: rgba(59, 130, 246, 0.15); }
+[data-theme="dark"] .sync-status.synced { color: #4ade80; background: rgba(74, 222, 128, 0.12); }
+[data-theme="dark"] .sync-status.error { color: #f87171; background: rgba(220, 53, 69, 0.15); }
+/* `transparent` é o valor inicial de background e não desliga a aparência
+   nativa do <button> — o widget continua branco. O fundo explícito desliga. */
+[data-theme="dark"] .btn-logout { background: var(--color-surface); border-color: var(--color-border); color: var(--color-text-main); }
+[data-theme="dark"] .btn-logout:hover { background: #334155; border-color: #475569; }
+
 .btn-refresh, .btn-settings, .btn-clear-data {
     padding: 0.5rem 0.75rem;
     border: 1px solid var(--color-border);
