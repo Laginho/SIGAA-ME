@@ -191,6 +191,7 @@ describeOrSkip('App E2E (With Credentials)', () => {
 
     test('background sync updates the dashboard in real-time', async () => {
         // Return to dashboard
+        await window.click('#backButton');
         await window.locator('#coursesList').waitFor({ state: 'visible' });
 
         // Grab initial file counts
