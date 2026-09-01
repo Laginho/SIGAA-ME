@@ -23,8 +23,15 @@ export class CacheService {
     private loadCache(): CacheData {
         try {
             if (fs.existsSync(this.cachePath)) {
-                const data = fs.readFileSync(this.cachePath, 'utf8');
-                return JSON.parse(data);
+                const data: CacheData = JSON.parse(fs.readFileSync(this.cachePath, 'utf8'));
+                // BUG-009: antes da correção do parser, ids de arquivo iam para o disco
+                // com a quote de fechamento do JSF (`555'`). Normaliza na leitura para
+                // que um cache antigo não faça todo arquivo parecer novo (e disparar
+                // re-download geral); a próxima gravação já persiste limpo.
+                for (const state of Object.values(data)) {
+                    state.files = state.files.map(id => id.replace(/['"]$/, ''));
+                }
+                return data;
             }
         } catch (error) {
             console.error('CacheService: Failed to load cache:', error);

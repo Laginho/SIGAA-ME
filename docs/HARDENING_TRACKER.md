@@ -1870,9 +1870,11 @@ o caminho exercitado.
 
 ### BUG-009 — Id de arquivo capturado com o apóstrofo do JSF
 
-- Status: `NOT STARTED`
+- Status: `IN REVIEW` — código e testes prontos (sessão 2026-09-01); falta uma
+  sincronização real com o `cache.json` antigo confirmando zero "arquivo novo",
+  que é do Bruno
 - Priority: `P2`
-- Owner: —
+- Owner: Claude (sessão 2026-09-01)
 - Dependencies: none
 - Primary files: `electron/services/http-scraper.service.ts` (linhas ~428 e
   ~467), `electron/services/cache.service.ts`,
@@ -1928,6 +1930,24 @@ Registrado em vez de corrigido porque a mudança é barata no parser e caríssim
 no cache. Vale como exemplo do padrão: **três cópias da mesma regra de
 extração**, duas com uma classe de caracteres e uma com outra. Mesma família do
 `BUG-007`, mesma família do `ARCH-003`.
+
+#### Resolution (2026-09-01)
+
+Decisão do Bruno: **normalizar na leitura**, sem versão de cache nem wipe.
+
+- `http-scraper.service.ts`: uma função de módulo `jsfParam(onclick, name)`
+  com a classe `[^,'"]+` substitui as três cópias (dois `id` de arquivo, um
+  `id` de notícia, mais os dois `key`).
+- `cache.service.ts#loadCache`: cada `files[]` passa por
+  `id.replace(/['"]$/, '')` ao carregar. Um `cache.json` gravado com `555'`
+  diffa limpo contra `555`; a próxima `updateCourseState` já persiste sem a
+  quote. Nenhum campo novo no arquivo.
+- Raio de efeito verificado: só o diff de sync usa o id. Download reparseia o
+  `script`; renderer e sino de notificação usam o **nome** do arquivo.
+- Vermelho-verde provado: `parser-real.test.ts` (`'555'`, `'556'`) e o teste
+  novo em `cache-service.test.ts` (cache semeado com `555'` × varredura `555`
+  → `newFiles: []`) falham com `git stash` das fontes e passam com a correção.
+- `npm run quality`: 0 erros de lint, 115 testes passando.
 
 ---
 
@@ -3007,6 +3027,11 @@ reavaliação não é decisão, é esquecimento.
 > tarefas médias em diante (`BUG-003`, `QA-003`, `BUG-004`, Fase 3) vão por
 > PTMR, com a tarefa do tracker como spec. O `BUG-009` continua sendo o item
 > bloqueado em conversa.
+>
+> **`BUG-009` desbloqueado e feito na mesma sessão** (decisão: normalizar ids na
+> leitura do `cache.json`, direto, sem PTMR). Está `IN REVIEW` até uma
+> sincronização real com cache antigo confirmar zero "arquivo novo". Próximo:
+> `setup-ptmr` no repositório e `BUG-003` como primeiro ciclo PTMR.
 
 **Registro histórico — rodar o gate no Windows e commitar o lote de 2026-08-05.** Havia um
 working tree acumulado sobre `38ff29b` que ainda não tinha passado pela execução

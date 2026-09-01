@@ -13,6 +13,15 @@ interface Cookie {
     expires?: Date;
 }
 
+/**
+ * Lê um parâmetro do `jsfcljs(...)` do onclick — `...,id,555','` devolve `555`.
+ * A classe exclui a quote de fechamento: era `[^,]+` em dois lugares e capturava
+ * `555'`, que virava identidade de arquivo no cache.json (BUG-009).
+ */
+function jsfParam(onclick: string, name: string): string | undefined {
+    return onclick.match(new RegExp(`,${name},([^,'"]+)`))?.[1];
+}
+
 export class HttpScraperService {
     private cookies: Cookie[] = [];
     private baseUrl: string = 'https://si3.ufc.br';
@@ -443,10 +452,10 @@ export class HttpScraperService {
 
                 // Strategy 1: Detect files by onclick pattern (jsfcljs with id parameter)
                 if (onclick && onclick.includes('jsfcljs') && onclick.includes(',id,')) {
-                    const idMatch = onclick.match(/,id,([^,]+)/);
-                    const keyMatch = onclick.match(/,key,([^,'"]+)/);
+                    const id = jsfParam(onclick, 'id');
+                    const key = jsfParam(onclick, 'key');
 
-                    if (idMatch) {
+                    if (id) {
                         // Try to find the actual filename in the surrounding context
                         // Files are typically in a table row where the filename is in a previous cell
                         let fileName = text;
@@ -464,12 +473,12 @@ export class HttpScraperService {
                             });
                         }
 
-                        // this.log(`[HttpScraper] Found file: "${fileName}" (ID: ${idMatch[1]})`);
+                        // this.log(`[HttpScraper] Found file: "${fileName}" (ID: ${id})`);
                         files.push({
                             name: fileName,
                             type: 'file',
-                            id: idMatch[1],
-                            key: keyMatch ? keyMatch[1] : undefined,
+                            id,
+                            key,
                             script: onclick
                         });
                     }
@@ -482,15 +491,15 @@ export class HttpScraperService {
                     text.toLowerCase().includes('material'))) {
 
                     if (onclick && onclick.includes('id')) {
-                        const idMatch = onclick.match(/,id,([^,]+)/);
-                        const keyMatch = onclick.match(/,key,([^,'"]+)/);
+                        const id = jsfParam(onclick, 'id');
+                        const key = jsfParam(onclick, 'key');
 
-                        if (idMatch) {
+                        if (id) {
                             files.push({
                                 name: text,
                                 type: 'file',
-                                id: idMatch[1],
-                                key: keyMatch ? keyMatch[1] : undefined,
+                                id,
+                                key,
                                 script: onclick
                             });
                         }
@@ -527,13 +536,13 @@ export class HttpScraperService {
                                 // barra invertida seguida de "d", não dígito. Nunca casava, e
                                 // esta estratégia devolvia zero notícia silenciosamente. O id
                                 // vem do onclick do JSF como `...,id,777,...`.
-                                const idMatch = onclick.match(/,id,([^,'"]+)/);
-                                if (idMatch) {
+                                const id = jsfParam(onclick, 'id');
+                                if (id) {
                                     news.push({
                                         title,
                                         date,
                                         notification,
-                                        id: idMatch[1],
+                                        id,
                                         script: onclick  // Capture the script for later use
                                     });
                                 }
