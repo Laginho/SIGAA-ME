@@ -92,4 +92,8 @@ describe('contrato window.api', () => {
 
         expect(orphans).toEqual([]);
     });
+
+    it('não acessa membros privados do CacheService por bracket notation no main', () => {
+        expect(mainSource).not.toMatch(/cacheService\['/);
+    });
 });
