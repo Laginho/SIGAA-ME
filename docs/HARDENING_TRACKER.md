@@ -1186,9 +1186,10 @@ commit; um `git checkout` no Windows devolve o CRLF.
 
 ### BUG-010 — O User-Agent real do navegador é buscado e descartado
 
-- Status: `NOT STARTED`
+- Status: `IN REVIEW` — código e testes prontos (sessão 2026-09-01); falta só a
+  medição de taxa de falha em uso real, que é do Bruno
 - Priority: `P2`
-- Owner: —
+- Owner: Claude (sessão 2026-09-01)
 - Dependencies: `BUG-001` (não mexer no caminho de download antes)
 - Primary files: `electron/services/http-scraper.service.ts:118-123,198,254,351,685,870`,
   `electron/services/sigaa.service.ts:104-105`,
@@ -1261,6 +1262,35 @@ O `enterCourseHTTP` foi **mantido** por causa desta tarefa, mesmo sendo
 inalcançável. Removê-lo levaria a cadeia do UA junto, e o `BUG-010` viraria
 "reconstruir e ligar" em vez de "ligar". Custo aceito: 102 linhas de código
 morto de pé até esta tarefa fechar.
+
+#### Implementation notes (2026-09-01)
+
+Os cinco requests reais (`http-scraper.service.ts` — entrar na disciplina,
+dashboard, abrir seção de arquivos, notícias, download) trocaram a string
+literal por `this.userAgent`. A cadeia `getUserAgent → setUserAgent →
+this.userAgent` já existia e já era chamada no login; ela só não tinha leitor
+vivo. Diff: 5 linhas.
+
+Dois testes novos em `tests/integration/download-real.test.ts`:
+
+1. **Comportamento** — `setUserAgent(ua)` e depois `downloadFile`; afirma que o
+   header `User-Agent` enviado ao axios é o `ua` configurado.
+2. **Tripwire de fonte** — nenhum `'User-Agent': '` literal restante no
+   serviço. Cobre os quatro call sites que o teste de comportamento não
+   exercita.
+
+**Prova vermelho-verde:** os dois testes rodaram contra o código sem a correção
+(2 failed, 6 passed — os testes do `BUG-001` continuam verdes, então a asserção
+é específica) e com ela (8 passed).
+
+**O que falta para `DONE`:** o terceiro critério — medir a taxa de falha de
+download antes/depois em uso real. Isso é observação do Bruno no dia a dia; se
+não mudar nada, registrar aqui e descartar a hipótese.
+
+O `enterCourseHTTP` continua de pé e continua sendo o único leitor *morto* da
+cadeia; agora que os requests vivos leem `this.userAgent`, remover o
+`enterCourseHTTP` (102 linhas) voltou a ser seguro — candidato a limpeza num
+`CLEAN-002` futuro.
 
 ---
 

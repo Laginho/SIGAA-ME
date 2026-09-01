@@ -201,7 +201,7 @@ export class HttpScraperService {
                 headers: {
                     'Cookie': this.getCookieHeader(actionUrl),
                     'Content-Type': 'application/x-www-form-urlencoded',
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'User-Agent': this.userAgent,
                     'Origin': this.baseUrl,
                     'Referer': portalUrl
                 },
@@ -263,7 +263,7 @@ export class HttpScraperService {
                 const dashboardResponse = await axios.get(dashboardUrl, {
                     headers: {
                         'Cookie': this.getCookieHeader(dashboardUrl),
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                        'User-Agent': this.userAgent,
                         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9',
                         'Accept-Language': 'pt-BR,pt;q=0.9',
                         'Referer': `${this.baseUrl}/sigaa/verPortalDiscente.do`,
@@ -366,7 +366,7 @@ export class HttpScraperService {
                             headers: {
                                 'Cookie': this.getCookieHeader(`${this.baseUrl}/sigaa/ava/index.jsf`),
                                 'Content-Type': 'application/x-www-form-urlencoded',
-                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                                'User-Agent': this.userAgent,
                                 'Referer': currentUrl,
                                 'Connection': 'keep-alive'
                             },
@@ -704,7 +704,7 @@ export class HttpScraperService {
                 headers: {
                     'Cookie': this.getCookieHeader(`${this.baseUrl}${courseInfo.action}`),
                     'Content-Type': 'application/x-www-form-urlencoded',
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'User-Agent': this.userAgent,
                     'Referer': `${this.baseUrl}${courseInfo.action}`,
                     'Connection': 'keep-alive'
                 },
@@ -927,7 +927,7 @@ export class HttpScraperService {
                 headers: {
                     'Cookie': this.getCookieHeader(`${this.baseUrl}${courseInfo.action}`),
                     'Content-Type': 'application/x-www-form-urlencoded',
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'User-Agent': this.userAgent,
                     'Referer': `${this.baseUrl}${courseInfo.action}`,
                     'Connection': 'keep-alive'
                 },
