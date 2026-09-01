@@ -122,6 +122,25 @@ export function renderCourseDetailPage(container: HTMLDivElement, courseId: stri
   // handler no main, ponte no preload, teste que falhe sem ela.
 }
 
+/** Marca o item como lido e some com a bolinha dourada. Idempotente. */
+function clearUnread(item: Element, type: 'file' | 'news', courseId: string, itemId: string) {
+  markAsRead(type, courseId, itemId);
+  item.classList.remove(type === 'news' ? 'news-item--unread' : 'file-item--unread');
+  const dot = item.querySelector('.item-unread-dot');
+  if (dot) {
+    dot.classList.add('item-unread-dot--fading');
+    setTimeout(() => dot.remove(), 300);
+  }
+}
+
+/**
+ * Marca o item como lido assim que o mouse passa por cima — ver a bolinha
+ * já conta como "vi que está ali"; não deve ser preciso baixar/abrir o item.
+ */
+function markSeenOnHover(item: Element, type: 'file' | 'news', courseId: string, itemId: string) {
+  item.addEventListener('mouseenter', () => clearUnread(item, type, courseId, itemId), { once: true });
+}
+
 async function fetchCourseFiles(courseId: string) {
   const filesListElement = document.getElementById('filesList')
   const newsListElement = document.getElementById('newsList')
@@ -178,22 +197,17 @@ async function fetchCourseFiles(courseId: string) {
         </div>
       `}).join('')
 
-      // Add click listeners
+      // Add click + hover listeners
       const newsItems = newsListElement.querySelectorAll('.news-item')
       newsItems.forEach(item => {
+        const newsId = item.getAttribute('data-id')
+        if (!newsId) return
+        if (item.classList.contains('news-item--unread')) {
+          markSeenOnHover(item, 'news', courseId, newsId)
+        }
         item.addEventListener('click', () => {
-          const newsId = item.getAttribute('data-id')
-          if (newsId) {
-            // Mark as read and remove dot
-            markAsRead('news', courseId, newsId);
-            item.classList.remove('news-item--unread');
-            const dot = item.querySelector('.item-unread-dot');
-            if (dot) {
-              dot.classList.add('item-unread-dot--fading');
-              setTimeout(() => dot.remove(), 300);
-            }
-            openNewsModal(courseId, course.name, newsId)
-          }
+          clearUnread(item, 'news', courseId, newsId)
+          openNewsModal(courseId, course.name, newsId)
         })
       })
     }
@@ -256,6 +270,12 @@ async function fetchCourseFiles(courseId: string) {
         </div>
       `}).join('')
 
+      // Hover on an unread item clears its dot
+      filesListElement.querySelectorAll('.file-item--unread').forEach(item => {
+        const fileName = item.getAttribute('data-file-id');
+        if (fileName) markSeenOnHover(item, 'file', courseId, fileName);
+      });
+
       // Add event listeners for individual buttons
       const downloadButtons = filesListElement.querySelectorAll('.btn-download-file');
       downloadButtons.forEach(btn => {
@@ -267,17 +287,8 @@ async function fetchCourseFiles(courseId: string) {
           const script = target.getAttribute('data-file-script');
 
           if (fileName && (fileUrl || script)) {
-            // Mark as read and remove dot
-            markAsRead('file', courseId, fileName);
             const fileItem = target.closest('.file-item');
-            if (fileItem) {
-              fileItem.classList.remove('file-item--unread');
-              const dot = fileItem.querySelector('.item-unread-dot');
-              if (dot) {
-                dot.classList.add('item-unread-dot--fading');
-                setTimeout(() => dot.remove(), 300);
-              }
-            }
+            if (fileItem) clearUnread(fileItem, 'file', courseId, fileName);
 
             // Show spinner immediately
             target.innerHTML = '🔄';
