@@ -164,9 +164,7 @@ ipcMain.handle('download-file', async (_, data: DownloadFilePayload) => {
     data.courseId,
     data.courseName,
     data.fileName,
-    data.fileUrl,
     data.basePath,
-    data.downloadedFiles,
     data.script
   );
 })
@@ -182,7 +180,6 @@ ipcMain.handle('download-all-files', async (_, data: DownloadAllFilesPayload) =>
     data.courseName,
     data.files,
     data.basePath,
-    data.downloadedFiles,
     onProgress
   );
 })

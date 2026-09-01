@@ -283,7 +283,7 @@ async function fetchCourseFiles(courseId: string) {
             target.innerHTML = '🔄';
             target.classList.add('spinning');
 
-            await downloadSingleFile(course, fileName, fileUrl || '', target, script || undefined);
+            await downloadSingleFile(course, fileName, target, script || undefined);
           }
         });
       });
@@ -319,7 +319,7 @@ async function fetchCourseFiles(courseId: string) {
   }
 }
 
-async function downloadSingleFile(course: any, fileName: string, fileUrl: string, btnElement: HTMLElement, script?: string) {
+async function downloadSingleFile(course: any, fileName: string, btnElement: HTMLElement, script?: string) {
   try {
     const settings = await window.api.getSettings();
     let folderPath = settings.lastDownloadPath;
@@ -342,9 +342,7 @@ async function downloadSingleFile(course: any, fileName: string, fileUrl: string
       courseId: course.id,
       courseName: course.name,
       fileName: fileName,
-      fileUrl: fileUrl,
       basePath: folderPath,
-      downloadedFiles,
       script
     });
 
@@ -425,8 +423,7 @@ async function testDownloadAll(courseId: string) {
       courseId: course.id,
       courseName: course.name,
       files: course.files,
-      basePath: folderPath,
-      downloadedFiles
+      basePath: folderPath
     });
 
     // O main omite os contadores quando falha antes de entrar na disciplina,

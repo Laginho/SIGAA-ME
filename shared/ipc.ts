@@ -47,14 +47,7 @@ export interface DownloadFilePayload {
   courseId: string
   courseName: string
   fileName: string
-  fileUrl: string
   basePath: string
-  /**
-   * Mapa de arquivos já baixados, vindo do localStorage.
-   * ponytail: o main recebe e ignora (`_downloadedFiles` em sigaa.service.ts).
-   * Encanamento morto — remover junto com `fileUrl`. Ver BUG-005.
-   */
-  downloadedFiles: Record<string, unknown>
   script?: string
 }
 
@@ -63,8 +56,6 @@ export interface DownloadAllFilesPayload {
   courseName: string
   files: CourseFileRef[]
   basePath: string
-  /** Mesma observação de `DownloadFilePayload.downloadedFiles`. Ver BUG-005. */
-  downloadedFiles: Record<string, unknown>
 }
 
 export type DownloadStatus = 'downloaded' | 'skipped' | 'failed'
