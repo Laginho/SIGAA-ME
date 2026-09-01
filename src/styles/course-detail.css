@@ -425,3 +425,68 @@
 .file-item {
     position: relative;
 }
+
+/* ── Dark mode ──────────────────────────────────────────────
+   Cabeçalho, notícias e modal seguem os tokens do design system; o card
+   de materiais usa o tratamento "meia-noite" (fundo mais profundo,
+   elevação por borda, acentos azuis). Combinação escolhida por
+   protótipo — o conjunto completo de esquemas está no branch
+   prototype/dark-schemes. */
+
+[data-theme="dark"] .course-header h1 { color: var(--color-text-main); }
+[data-theme="dark"] .back-button { color: var(--color-primary); }
+[data-theme="dark"] .back-button:hover { color: var(--color-primary-hover); }
+[data-theme="dark"] .course-code-header { color: var(--color-text-muted); }
+
+[data-theme="dark"] .course-content {
+    background: var(--color-surface);
+    box-shadow: var(--shadow-md);
+}
+[data-theme="dark"] .section-header { border-bottom-color: var(--color-border); }
+[data-theme="dark"] .section-header h2,
+[data-theme="dark"] .news-section h2 { color: var(--color-text-main); }
+[data-theme="dark"] .news-section h2 { border-bottom-color: var(--color-border); }
+
+[data-theme="dark"] .news-item { background: transparent; border-color: #f87171; }
+[data-theme="dark"] .news-title { color: #f87171; }
+[data-theme="dark"] .news-date { color: var(--color-text-muted); }
+[data-theme="dark"] .news-notification { background: rgba(39, 174, 96, 0.15); color: #4ade80; }
+
+/* Card de materiais — tratamento "meia-noite" */
+[data-theme="dark"] .course-content:has(.files-section) {
+    background: #131f35;
+    border: 1px solid #263752;
+    box-shadow: none;
+}
+[data-theme="dark"] .files-section .section-header { border-bottom-color: #263752; }
+[data-theme="dark"] .files-section h2 { color: #bfdbfe; border-bottom-color: #263752; }
+[data-theme="dark"] .file-item { background: #1a2848; }
+[data-theme="dark"] .file-item:hover { background: #223257; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4); }
+[data-theme="dark"] .file-name { color: #e2e8f0; }
+[data-theme="dark"] .file-meta { color: #7d8db1; }
+[data-theme="dark"] .btn-download-file {
+    background: transparent;
+    border-color: #3b82f6;
+    color: #93c5fd;
+}
+[data-theme="dark"] .btn-download-file:hover {
+    background: rgba(59, 130, 246, 0.15);
+    border-color: #60a5fa;
+    color: #bfdbfe;
+}
+
+[data-theme="dark"] .modal-content { background: var(--color-surface); }
+[data-theme="dark"] .modal-title { color: var(--color-primary); }
+[data-theme="dark"] .modal-body { color: var(--color-text-main); }
+[data-theme="dark"] .modal-close { color: var(--color-text-muted); }
+[data-theme="dark"] .modal-close:hover { color: var(--color-text-main); }
+[data-theme="dark"] .modal-header { border-bottom-color: var(--color-border); }
+
+[data-theme="dark"] .loading,
+[data-theme="dark"] .no-files,
+[data-theme="dark"] .no-news { color: var(--color-text-muted); }
+[data-theme="dark"] .error-message {
+    background: rgba(220, 53, 69, 0.12);
+    border-color: rgba(220, 53, 69, 0.4);
+    color: #f87171;
+}
