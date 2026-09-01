@@ -162,8 +162,7 @@ export class BackgroundSyncService {
                                 course.id,
                                 course.name,
                                 filesToDownload,
-                                settings.lastDownloadPath,
-                                {} // Empty downloaded files dict (handled by base path)
+                                settings.lastDownloadPath
                             );
                         }
 

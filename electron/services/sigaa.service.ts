@@ -133,14 +133,12 @@ export class SigaaService {
         courseId: string,
         courseName: string, // Changed from _courseName to use it
         fileName: string,
-        _fileUrl: string,
         basePath: string,
-        _downloadedFiles: Record<string, any>,
         script?: string
     ): Promise<{ success: boolean; filePath?: string; message?: string }> {
         this.startBusy();
         try {
-            return await this._downloadFileInternal(courseId, courseName, fileName, _fileUrl, basePath, _downloadedFiles, script);
+            return await this._downloadFileInternal(courseId, courseName, fileName, basePath, script);
         } finally {
             this.stopBusy();
         }
@@ -150,9 +148,7 @@ export class SigaaService {
         courseId: string,
         courseName: string,
         fileName: string,
-        _fileUrl: string,
         basePath: string,
-        _downloadedFiles: Record<string, any>,
         script?: string
     ): Promise<{ success: boolean; filePath?: string; message?: string }> {
         try {
@@ -284,7 +280,6 @@ export class SigaaService {
         courseName: string,
         files: Array<{ name: string; url: string; script?: string }>,
         basePath: string,
-        _downloadedFiles: Record<string, any>,
         onProgress?: (fileName: string, status: 'downloaded' | 'skipped' | 'failed') => void
     ): Promise<{ success: boolean; downloaded?: number; skipped?: number; failed?: number; results?: any[]; message?: string }> {
         try {

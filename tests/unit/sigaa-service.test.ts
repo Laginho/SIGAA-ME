@@ -174,8 +174,8 @@ describe('SigaaService (Unit)', () => {
                 filePath: '/mock/downloads/doc.pdf'
             });
 
-            // downloadFile(courseId, courseName, fileName, _fileUrl, basePath, _downloadedFiles, script)
-            const result = await service.downloadFile('C1', 'Math', 'doc.pdf', '', '/mock/downloads', {}, 'jsfcljs,id,123');
+            // downloadFile(courseId, courseName, fileName, basePath, script)
+            const result = await service.downloadFile('C1', 'Math', 'doc.pdf', '/mock/downloads', 'jsfcljs,id,123');
 
             expect(mockPlaywright.enterCourseAndGetHTML).toHaveBeenCalled();
             expect(mockHttp.downloadFile).toHaveBeenCalled();
@@ -195,7 +195,7 @@ describe('SigaaService (Unit)', () => {
                 error: 'HTTP Error 302'
             });
 
-            const result = await service.downloadFile('C1', 'Math', 'doc.pdf', '', '/mock/downloads', {}, 'jsfcljs,id,123');
+            const result = await service.downloadFile('C1', 'Math', 'doc.pdf', '/mock/downloads', 'jsfcljs,id,123');
 
             // It should have tried to enter the course twice (first try + retry)
             expect(mockPlaywright.enterCourseAndGetHTML).toHaveBeenCalledTimes(2);

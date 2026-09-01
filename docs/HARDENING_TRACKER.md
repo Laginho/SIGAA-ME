@@ -1062,9 +1062,10 @@ teste é o mesmo erro de apagar antes de ter dado, só mais devagar.
 
 ### BUG-005 — Encanamento morto no payload de download
 
-- Status: `NOT STARTED`
+- Status: `IN REVIEW` — implementado na sessão 2026-09-01; falta a verificação
+  de download manual no app (Bruno)
 - Priority: `P3`
-- Owner: —
+- Owner: Claude (sessão 2026-09-01)
 - Dependencies: none
 - Primary files:
   - `shared/ipc.ts` (`DownloadFilePayload`, `DownloadAllFilesPayload`)
@@ -1095,6 +1096,23 @@ grande.
   call sites em `course-detail.ts`.
 - `npm run quality` passa.
 - Download manual continua funcionando (verificação no app).
+
+#### Implementation notes (2026-09-01)
+
+Removidos `fileUrl` e `downloadedFiles` de `DownloadFilePayload` e
+`downloadedFiles` de `DownloadAllFilesPayload`, e os parâmetros
+correspondentes de `downloadFile`/`_downloadFileInternal`/`downloadAllFiles`
+no `sigaa.service.ts`, do handler em `main.ts` e dos call sites. Um call site
+a mais que o previsto: `background-sync.service.ts:161` passava `{}` como
+`downloadedFiles` no auto-download. O renderer continua lendo
+`downloadedFiles` do localStorage para a contabilidade local (marcar ✅ depois
+do sucesso) — o que morreu foi só o envio pelo IPC. O parâmetro `fileUrl` de
+`downloadSingleFile` saiu junto; o atributo `data-file-url` e a guarda
+`(fileUrl || script)` do click handler ficaram como estavam.
+
+Gate verde no Windows (typecheck, lint 0 erros/115 avisos, 109 passed +
+4 skipped). Falta o critério de verificação no app — download manual — que é
+do Bruno.
 
 ### DOC-003 — Anotar arquivos carregados por import dinâmico
 
