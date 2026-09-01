@@ -5,6 +5,23 @@ import { app } from 'electron';
 import { logger } from './logger.service';
 
 /**
+ * Decides whether the loaded turma virtual page belongs to the expected course,
+ * given the text of its `#nomeTurma` header (e.g. "TI0116 - SINAIS E SISTEMAS
+ * (2026.1 - T01)").
+ *
+ * The check MUST be scoped to that header: every turma page also embeds a
+ * hidden "Escolha uma Turma" panel listing ALL of the student's courses, so
+ * searching the whole page for the course name passes even when the JSF
+ * session served the wrong course — that was how one course's files and news
+ * got attributed to another after a silently failed course click.
+ */
+export function isExpectedCoursePage(nomeTurmaText: string, courseName: string): boolean {
+    const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const header = normalize(nomeTurmaText);
+    return header.length > 0 && header.includes(normalize(courseName));
+}
+
+/**
  * Uses Playwright to automate a real browser for UFC SIGAA login.
  * This handles all the complexity that the HTTP approach couldn't solve.
  */
@@ -490,21 +507,16 @@ export class PlaywrightLoginService {
             // Wait for dynamic content
             await page.waitForTimeout(1000);
 
-            // VERIFY: Check if we are actually in the correct course
-            const pageContent = await page.content();
-            // Normalize strings for comparison (remove special chars, case insensitive)
-            const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
-            const normalizedContent = normalize(pageContent);
-            const normalizedName = normalize(courseName);
-
-            // We check if the course name is present (Strict Check)
-            // Removing substring limit to ensure we distinguish between "Course I" and "Course II"
-            if (!normalizedContent.includes(normalizedName)) {
-                const errorMsg = `Playwright: Course verification failed! Page does not contain "${courseName}". We might be on the wrong course page.`;
+            // VERIFY: only the #nomeTurma header identifies the course actually
+            // loaded — see isExpectedCoursePage for why the whole page can't be used.
+            const nomeTurma = (await page.locator('#nomeTurma').textContent({ timeout: 5000 }).catch(() => '')) ?? '';
+            const nomeTurmaClean = nomeTurma.trim().replace(/\s+/g, ' ');
+            if (!isExpectedCoursePage(nomeTurma, courseName)) {
+                const errorMsg = `Playwright: Course verification failed! Page header shows "${nomeTurmaClean}" instead of "${courseName}" — the JSF session is likely still on the previous course.`;
                 console.error(errorMsg);
                 throw new Error(errorMsg);
             } else {
-                console.log(`Playwright: Verified we are in course "${courseName}"`);
+                console.log(`Playwright: Verified we are in course "${courseName}" (header: "${nomeTurmaClean}")`);
             }
 
 
