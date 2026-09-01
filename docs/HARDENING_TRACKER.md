@@ -2998,6 +2998,16 @@ reavaliação não é decisão, é esquecimento.
 > Precisa de conversa antes de começar: a correção invalida o `cache.json` e pode
 > disparar re-download geral em quem tem `autoDownloadUpdates` ligado.
 
+> **Atualizado em 2026-09-01.** Lote trivial fechado direto (decisão do Bruno:
+> tarefas pequenas sem PTMR): `BUG-002` `DONE` (restava um `(window as any)` e
+> a marcação), `BUG-010` `IN REVIEW` (5 requests usando `this.userAgent`,
+> vermelho-verde provado; falta a medição de taxa de falha em uso real) e
+> `BUG-005` `IN REVIEW` (encanamento morto removido; falta o download manual de
+> verificação no app). Três commits: `ff1d794`, `ddee28a`, `cf96bc6`. As
+> tarefas médias em diante (`BUG-003`, `QA-003`, `BUG-004`, Fase 3) vão por
+> PTMR, com a tarefa do tracker como spec. O `BUG-009` continua sendo o item
+> bloqueado em conversa.
+
 **Registro histórico — rodar o gate no Windows e commitar o lote de 2026-08-05.** Havia um
 working tree acumulado sobre `38ff29b` que ainda não tinha passado pela execução
 autoritativa:
