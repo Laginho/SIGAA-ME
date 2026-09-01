@@ -70,6 +70,19 @@ describe('CacheService', () => {
         expect(diff.newFiles).toEqual([]);
     });
 
+    it("normalizes ids persisted with the JSF closing quote (555') so a cache written before BUG-009 does not report every file as new", () => {
+        storage.files.set(
+            path.join('sigaa-me-cache-tests', 'cache.json'),
+            JSON.stringify({ c1: { files: ["555'", "556'"], news: ['9'] } })
+        );
+
+        const service = new CacheService();
+        const diff = service.diffCourseState('c1', [{ id: '555' }, { id: '556' }], [{ id: '9' }]);
+
+        expect(diff.newFiles).toEqual([]);
+        expect(diff.newNews).toEqual([]);
+    });
+
     it('recovers to an empty cache instead of throwing when cache.json on disk is corrupt', () => {
         storage.files.set(path.join('sigaa-me-cache-tests', 'cache.json'), '{not-json');
 

@@ -58,13 +58,9 @@ describe('HttpScraperService.getCourseFiles com HTML de fixture', () => {
         expect(result.files?.map((f: any) => f.name)).toEqual(
             expect.arrayContaining(['Lista 3.pdf', 'Exercicios.docx'])
         );
-        // ⚠️ O apóstrofo no fim NÃO é engano deste teste: `http-scraper` extrai o
-        // id de arquivo com `/,id,([^,]+)/` — sem excluir a quote —, então ele
-        // captura `555'`. Ver `BUG-009`. Está fixado aqui de propósito: o valor
-        // errado vai para o `cache.json` e é o que o diff de sync compara, então
-        // corrigir a regex invalida o cache de todo mundo. Quando o `BUG-009`
-        // for feito, este assert falha e é aqui que se muda.
-        expect(result.files?.map((f: any) => f.id)).toEqual(expect.arrayContaining(["555'", "556'"]));
+        // Sem a quote do JSF: o onclick termina em `,id,555','` e a extração
+        // antiga (`[^,]+`) capturava `555'`. Ver BUG-009.
+        expect(result.files?.map((f: any) => f.id)).toEqual(expect.arrayContaining(['555', '556']));
     });
 
     it('extrai as notícias com id, título e data', async () => {
