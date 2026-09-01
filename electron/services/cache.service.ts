@@ -68,6 +68,21 @@ export class CacheService {
 
         return { newFiles, newNews };
     }
+
+    /**
+     * Só para simulação em desenvolvimento: esquece o último arquivo da primeira
+     * turma que tiver algum, persiste, e devolve o que esqueceu (ou null).
+     */
+    public forgetLastFile(): { courseId: string; fileId: string } | null {
+        for (const [courseId, state] of Object.entries(this.cache)) {
+            if (state.files.length > 0) {
+                const fileId = state.files.pop()!;
+                this.saveCache();
+                return { courseId, fileId };
+            }
+        }
+        return null;
+    }
 }
 
 export const cacheService = new CacheService();
