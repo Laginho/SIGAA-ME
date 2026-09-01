@@ -112,6 +112,34 @@ describe('HttpScraperService.downloadFile — tipo de conteúdo (BUG-001)', () =
     });
 });
 
+describe('HttpScraperService — User-Agent emprestado do Playwright (BUG-010)', () => {
+    it('o request de download envia o User-Agent configurado por setUserAgent', async () => {
+        const uaReal = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
+        scraper.setUserAgent(uaReal);
+        vi.mocked(axios.post).mockResolvedValue(resposta(PDF_MINIMO, 'application/octet-stream'));
+
+        await scraper.downloadFile('99999', '555', 'LISTA 1', destino, DOWNLOAD_SCRIPT);
+
+        const calls = vi.mocked(axios.post).mock.calls;
+        expect(calls.length).toBeGreaterThan(0);
+        const [, , config] = calls[calls.length - 1];
+        expect(config?.headers?.['User-Agent']).toBe(uaReal);
+    });
+
+    it('nenhum request do serviço tem User-Agent literal — todos usam this.userAgent', () => {
+        // Tripwire de fonte: o teste acima só exercita o request de download; os
+        // outros quatro call sites (entrar na disciplina, dashboard, abrir
+        // arquivos, notícias) não têm teste de comportamento. Um literal
+        // reintroduzido em qualquer um deles volta a apresentar ao SIGAA uma
+        // identidade diferente da sessão que o Playwright criou.
+        const src = readFileSync(
+            path.join(process.cwd(), 'electron/services/http-scraper.service.ts'),
+            'utf8'
+        );
+        expect(src.match(/'User-Agent':\s*'/)).toBeNull();
+    });
+});
+
 describe('HttpScraperService.downloadFile — falhas não deixam resíduo (BUG-001)', () => {
     it('rejeita HTML disfarçado de PDF e não deixa nada no destino', async () => {
         // O SIGAA responde a sessão expirada com a página de login, status 200.
