@@ -101,4 +101,39 @@ describe('CacheService', () => {
         expect(() => service.updateCourseState('c1', ['1'], [])).not.toThrow();
         expect(errorSpy).toHaveBeenCalled();
     });
+
+    describe('forgetLastFile', () => {
+        it('pops the last file from the first course that has files and returns it', () => {
+            const service = new CacheService();
+            service.updateCourseState('c1', ['1', '2'], ['9']);
+
+            const result = service.forgetLastFile();
+
+            expect(result).toEqual({ courseId: 'c1', fileId: '2' });
+            expect(service.getCourseState('c1').files).toEqual(['1']);
+            expect(service.getCourseState('c1').news).toEqual(['9']);
+            expect(fs.writeFileSync).toHaveBeenCalled();
+        });
+
+        it('returns null and does not write when cache is empty', () => {
+            const service = new CacheService();
+
+            const result = service.forgetLastFile();
+
+            expect(result).toBeNull();
+            expect(fs.writeFileSync).not.toHaveBeenCalled();
+        });
+
+        it('skips courses with no files and returns the first course that has files', () => {
+            const service = new CacheService();
+            service.updateCourseState('c1', [], []);
+            service.updateCourseState('c2', ['7'], []);
+
+            const result = service.forgetLastFile();
+
+            expect(result).toEqual({ courseId: 'c2', fileId: '7' });
+            expect(service.getCourseState('c2').files).toEqual([]);
+            expect(fs.writeFileSync).toHaveBeenCalled();
+        });
+    });
 });
