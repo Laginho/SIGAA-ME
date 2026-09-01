@@ -916,9 +916,11 @@ nota lá) e no `DÉBITO-03`.
 
 ### BUG-003 — `[Dev] Simular Arquivo Novo` funciona em produção
 
-- Status: `IN REVIEW` — código e testes prontos (sessão 2026-09-01); falta validação do master dev (Bruno)
+- Status: `IN REVIEW` — código e testes prontos e validados pelo master dev
+  (sessão 2026-09-01, ciclo PTMR 01); falta o Bruno rodar um build empacotado
+  e conferir que o tray não tem `[Dev] Simular Arquivo Novo`
 - Priority: `P1` (**promovido** de P2)
-- Owner: Bruno (validação PTMR)
+- Owner: PTMR (PLAN 5.6 terra · TEST/READ mimo v2.5 · MAKE muse spark 1.2); master dev Claude
 - Dependencies: none
 - Primary files: `electron/main.ts`, `electron/preload.ts`
 
@@ -940,6 +942,27 @@ usuário não alcança e deixa livre a que ele vê e clica.
 - Preload de produção não expõe `simulateNewFile`.
 - Removido o acesso a membros privados por bracket notation
   (`cacheService['cache']`, `cacheService['saveCache']()`).
+
+#### Resolution (2026-09-01) — primeiro ciclo PTMR do repositório
+
+Ciclo limpo (ledger em `.scratch/bug-003/ledger.md`): três commits, um por fase,
+`Role:` no trailer. Desenho do handoff seguido sem desvio:
+
+- `cache.service.ts#forgetLastFile()` (público, retorna `{courseId, fileId} | null`)
+  substitui as duas cópias inline e apaga todo `cacheService['...']` do `main.ts`.
+- `main.ts`: uma função local `simulateNewFile()` alimenta o handler IPC (já
+  guardado) e o item do tray, que agora só entra no menu com `!app.isPackaged`.
+  `createWindow` passa `additionalArguments: ['--sigaa-dev']` só fora do pacote.
+- `preload.ts`: `simulateNewFile` só é incluído no `api` quando
+  `process.argv` tem `--sigaa-dev`; `RendererApi.simulateNewFile` virou opcional.
+  Nenhum código em `src/` chamava o método.
+- Conflito com o E2E (`QA-004`) resolvido sem tocar em `tests/e2e/`:
+  `electron .` é não empacotado, então o gancho continua existindo no E2E.
+- Testes: 3 em `cache-service.test.ts` (`forgetLastFile`), 2 em
+  `preload-dev-gate.test.ts` (ponte presente com o flag, ausente sem — importa o
+  preload de verdade com `electron` mockado), 1 em `preload-contract.test.ts`
+  (nenhum `cacheService['` no `main.ts`). Vermelho-verde provado por MAKE.
+- `npm run quality` no worktree: 0 erros de lint, 121 testes passando, 4 skipped.
 
 ### BUG-004 — O fallback Playwright de download não está ligado
 
@@ -3032,6 +3055,12 @@ reavaliação não é decisão, é esquecimento.
 > leitura do `cache.json`, direto, sem PTMR). Está `IN REVIEW` até uma
 > sincronização real com cache antigo confirmar zero "arquivo novo". Próximo:
 > `setup-ptmr` no repositório e `BUG-003` como primeiro ciclo PTMR.
+>
+> **`BUG-003` fechou o primeiro ciclo PTMR** (branch `traycer-bug-003-clean-base`,
+> ciclo 01 limpo, validado pelo master dev, fast-forward em `master`). Um worktree
+> `traycer/noble-hawk` de uma tentativa abandonada sobre base divergente ficou
+> para trás — não contém nada a aproveitar. Próximo pela ordem: `QA-003`, depois
+> `BUG-004`.
 
 **Registro histórico — rodar o gate no Windows e commitar o lote de 2026-08-05.** Havia um
 working tree acumulado sobre `38ff29b` que ainda não tinha passado pela execução
