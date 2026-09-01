@@ -916,9 +916,9 @@ nota lá) e no `DÉBITO-03`.
 
 ### BUG-003 — `[Dev] Simular Arquivo Novo` funciona em produção
 
-- Status: `NOT STARTED`
+- Status: `IN REVIEW` — código e testes prontos (sessão 2026-09-01); falta validação do master dev (Bruno)
 - Priority: `P1` (**promovido** de P2)
-- Owner: —
+- Owner: Bruno (validação PTMR)
 - Dependencies: none
 - Primary files: `electron/main.ts`, `electron/preload.ts`
 
