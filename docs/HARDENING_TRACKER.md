@@ -965,9 +965,11 @@ Ciclo limpo (ledger em `.scratch/bug-003/ledger.md`): três commits, um por fase
 
 ### BUG-004 — O fallback Playwright de download não está ligado
 
-- Status: `IN REVIEW` — código e testes prontos (sessão 2026-09-01); falta a validação do master dev e o smoke manual do fallback pelo Bruno
+- Status: `IN REVIEW` — ciclo PTMR 01 validado pelo master dev (sessão 2026-09-01);
+  falta o smoke manual do Bruno: um download real que caia no fallback deve abrir
+  um Chrome dedicado e o log deve mostrar "Falling back to Playwright"
 - Priority: `P1`
-- Owner: PTMR (PLAN 5.6 terra · TEST/READ mimo v2.5 · MAKE muse spark 1.2); master dev
+- Owner: PTMR (PLAN 5.6 terra · TEST/READ mimo v2.5 · MAKE muse spark 1.2); master dev Claude
 - Dependencies: `PIPE-002` (não mexer sem suíte executável)
 - Primary files:
   - `electron/services/download.service.ts` (492 linhas)
@@ -1081,6 +1083,35 @@ teste é o mesmo erro de apagar antes de ter dado, só mais devagar.
 - `ARCHITECTURE.md` descreve o comportamento real, não o pretendido.
 - Se opção A: as 771 linhas removidas e `npx tsc --noEmit` passa.
 - Se opção B: existe teste que exercita o caminho de fallback.
+
+#### Resolution (2026-09-01) — ciclo PTMR 01
+
+Opção B implementada (ledger em `.scratch/bug-004/ledger.md`, ciclo limpo):
+
+- `sigaa.service.ts#downloadViaPlaywright()` (privado, união discriminada,
+  `error` → `message`) chama `playwrightLogin.downloadFile` com **`basePath`**,
+  não `targetDir` — o `DownloadService` cria a pasta da turma sozinho.
+- `_downloadFileInternal`: o `return` de erro depois do segundo HTTP virou a
+  chamada ao fallback. Ordem preservada: HTTP → refresh + HTTP → Playwright.
+- `downloadAllFiles`: depois do passe de retry HTTP, cada `result` ainda `failed`
+  com script vai ao fallback, com a mesma contabilidade do passe de retry
+  (`downloaded++`, `failed--`, `results[i]` substituído, `onProgress('downloaded')`).
+  Deliberado: por arquivo, não `playwrightLogin.downloadAllFiles` — um seam só;
+  o custo (um browser por arquivo) está marcado com `// ponytail:` no código.
+- `ARCHITECTURE.md` descreve o fluxo real.
+- Testes em `sigaa-service.test.ts`: HTTP-first não toca Playwright; duas falhas
+  HTTP → Playwright chamado 1× com `basePath`; fallback falha → `message` do
+  Playwright; lote com script → `downloaded: 1` via fallback; lote sem script →
+  Playwright não chamado. Vermelho-verde provado por MAKE (3 vermelhos).
+- Nit do master dev (commit `Role: MASTER`): o teste antigo "fails after second
+  HTTP attempt fails" passava por acidente depois da mudança (mock sem retorno →
+  `TypeError` → `catch` → `success: false`). Removido; o cenário é coberto pelo
+  teste "returns Playwright error message when fallback also fails".
+- Pontos abertos, por decisão: o fallback abre browser **visível**
+  (`headless: false`, `playwright-login.service.ts:695`) — deixado como estava
+  para que uma falha no primeiro uso real seja atribuível; `sanitizeFolderName`
+  divergente entre `SigaaService` (remove) e `DownloadService` (`_`, corta em
+  100) — item 3 de "Enxugar ≠ deletar", só depois de medir.
 
 ### BUG-005 — Encanamento morto no payload de download
 
@@ -3085,6 +3116,12 @@ reavaliação não é decisão, é esquecimento.
 > **`QA-003` `DONE`, direto** (dois testes, prova por mutação). `BUG-003` também
 > `DONE` depois que o Bruno conferiu o build empacotado. Próximo pela ordem:
 > `BUG-004` (fallback Playwright de download), via PTMR.
+>
+> **`BUG-004` fechou o ciclo PTMR 02 do repositório** (branch
+> `traycer/snappy-lemur`, limpo, fast-forward em `master`, um nit `MASTER`).
+> Fallback Playwright ligado, `IN REVIEW` até o smoke manual do Bruno. Da Fase 2
+> resta `DL-001` (contenção do caminho de download). Próximo pela ordem:
+> `DL-001`, depois Fase 3 a partir do `ARCH-001`.
 
 **Registro histórico — rodar o gate no Windows e commitar o lote de 2026-08-05.** Havia um
 working tree acumulado sobre `38ff29b` que ainda não tinha passado pela execução
