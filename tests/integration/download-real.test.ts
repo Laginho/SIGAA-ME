@@ -39,6 +39,7 @@ vi.mock('axios', () => ({
 
 import axios from 'axios';
 import { HttpScraperService } from '../../electron/services/http-scraper.service';
+import { isInsideRoot } from '../../electron/services/download-path';
 
 const fixture = (name: string) =>
     readFileSync(path.join(process.cwd(), 'tests/fixtures', name), 'utf8');
@@ -200,10 +201,8 @@ describe('DL-001 — contenção no gravador HTTP', () => {
         const result = await scraper.downloadFile('99999', '555', '../../evil.pdf', destino, DOWNLOAD_SCRIPT);
 
         expect(result.success).toBe(true);
-        // filePath must be inside destino
-        const rel = path.relative(path.resolve(destino), path.resolve(result.filePath!));
-        expect(rel.startsWith('..')).toBe(false);
-        expect(path.isAbsolute(rel)).toBe(false);
+        // filePath must be inside destino — same proof the writer uses
+        expect(isInsideRoot(destino, result.filePath!)).toBe(true);
         // exactly one file in destino, name has no separators
         const files = arquivosNoDestino();
         expect(files).toHaveLength(1);
