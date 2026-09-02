@@ -125,3 +125,22 @@ describe('HttpScraperService.getCourseFiles com HTML de fixture', () => {
         expect(fs.promises.writeFile).not.toHaveBeenCalled();
     });
 });
+
+describe('HttpScraperService.getCourseFiles com página real do portal (BUG-011)', () => {
+    // `course-page-real-with-tasks.html` foi salva do SIGAA em 2026-09-01: página
+    // "Principal" de uma turma com 7 arquivos e 2 tarefas. Tarefa usa o mesmo
+    // `jsfcljs(...,id,...)` que arquivo; só o componente muda
+    // (`idEnviarMaterialTarefa` × `idInserirMaterialArquivo`).
+    it('não lista tarefa como arquivo', async () => {
+        const result = await scraper.getCourseFiles('536602', 'SINAIS E SISTEMAS', fixture('course-page-real-with-tasks.html'));
+
+        expect(result.success).toBe(true);
+        const names = result.files?.map((f: any) => f.name) ?? [];
+        expect(names).toEqual(expect.arrayContaining(['Plano de Ensino', 'Aula 3', 'Aula4 - Parte 1']));
+        expect(names).not.toEqual(expect.arrayContaining(['Atividade 1']));
+        expect(names).not.toEqual(expect.arrayContaining(['Atividade 2']));
+        expect(result.files?.map((f: any) => f.id)).toEqual(expect.arrayContaining(['3998953']));
+        expect(result.files).toHaveLength(7);
+        for (const f of result.files ?? []) expect(f.script ?? '').not.toContain('Tarefa');
+    });
+});

@@ -451,6 +451,13 @@ export class HttpScraperService {
                 const onclick = link.attr('onclick');
                 const href = link.attr('href');
 
+                // BUG-011: tarefa usa o mesmo `jsfcljs(...,id,...)` que arquivo; só o
+                // componente muda (`idEnviarMaterialTarefa` × `idInserirMaterialArquivo`).
+                // Baixá-la devolve a página "Responder tarefa", que a verificação
+                // rejeita e o fallback Playwright tenta de novo, em vão.
+                // ponytail: só tarefa é conhecida; questionário/fórum entram aqui quando aparecerem numa fixture.
+                if (onclick?.includes('idEnviarMaterialTarefa')) return;
+
                 // Strategy 1: Detect files by onclick pattern (jsfcljs with id parameter)
                 if (onclick && onclick.includes('jsfcljs') && onclick.includes(',id,')) {
                     const id = jsfParam(onclick, 'id');
