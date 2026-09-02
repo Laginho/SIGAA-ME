@@ -60,6 +60,13 @@ Windows passaram. Os workflows usam `npm ci`; não troque de volta para
 
 **A execução no Windows continua sendo a autoridade** para build, E2E e empacotamento.
 
+**npm 12 bloqueia scripts de instalação por padrão.** Num PC novo (2026-09-02), o
+`npm ci` terminou sem o binário do Electron nem do esbuild e o gate não rodava. A
+aprovação fica em `allowScripts` no `package.json`, pinada por versão. Ao subir
+`electron` ou `esbuild`, rode `npm install-scripts approve electron esbuild` e
+`npm rebuild electron esbuild`; se o `npm ci` avisar "install scripts blocked",
+é isso.
+
 ### Loop de verificação visual (num Linux)
 
 O gate prova que nada quebrou; ele não mostra como ficou. Para trabalho de UI,
