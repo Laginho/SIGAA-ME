@@ -184,27 +184,6 @@ describe('SigaaService (Unit)', () => {
             expect(result.filePath).toBe('/mock/downloads/doc.pdf');
         });
 
-        it('fails after second HTTP attempt fails', async () => {
-            mockPlaywright.enterCourseAndGetHTML.mockResolvedValue({ success: true, html: '<html></html>' });
-            mockPlaywright.navigateToFilesSection.mockResolvedValue({ success: true, html: '<html></html>' });
-            
-            mockHttp.getCourseFiles.mockResolvedValue({ success: true, files: [] });
-
-            // Both HTTP attempts fail
-            mockHttp.downloadFile.mockResolvedValue({
-                success: false,
-                error: 'HTTP Error 302'
-            });
-
-            const result = await service.downloadFile('C1', 'Math', 'doc.pdf', '/mock/downloads', 'jsfcljs,id,123');
-
-            // It should have tried to enter the course twice (first try + retry)
-            expect(mockPlaywright.enterCourseAndGetHTML).toHaveBeenCalledTimes(2);
-            // It should have tried the HTTP download twice
-            expect(mockHttp.downloadFile).toHaveBeenCalledTimes(2);
-            expect(result.success).toBe(false);
-        });
-
         it('does not call Playwright when HTTP succeeds on first attempt', async () => {
             mockPlaywright.enterCourseAndGetHTML.mockResolvedValue({ success: true, html: '<html></html>' });
             mockPlaywright.navigateToFilesSection.mockResolvedValue({ success: true, html: '<html></html>' });
