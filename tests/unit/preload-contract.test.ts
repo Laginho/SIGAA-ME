@@ -30,6 +30,8 @@ import { describe, expect, it } from 'vitest';
 const root = process.cwd();
 const preloadSource = readFileSync(path.join(root, 'electron/preload.ts'), 'utf8');
 const mainSource = readFileSync(path.join(root, 'electron/main.ts'), 'utf8');
+const sharedSource = readFileSync(path.join(root, 'shared/ipc.ts'), 'utf8');
+const courseDetailSource = readFileSync(path.join(root, 'src/pages/course-detail.ts'), 'utf8');
 
 /** Só o objeto `api` — a ponte genérica `ipcRenderer` é exposta antes e não interessa. */
 const apiBlock = preloadSource.slice(preloadSource.indexOf('const api: RendererApi'));
@@ -95,5 +97,15 @@ describe('contrato window.api', () => {
 
     it('não acessa membros privados do CacheService por bracket notation no main', () => {
         expect(mainSource).not.toMatch(/cacheService\['/);
+    });
+
+    // ── DL-001: renderer não define raiz de download ──────────────────
+    it('shared/ipc.ts não contém basePath nos payloads de download (DL-001)', () => {
+        expect(sharedSource).not.toMatch(/basePath/);
+    });
+
+    it('course-detail.ts não contém basePath nem updateSetting lastDownloadPath (DL-001)', () => {
+        expect(courseDetailSource).not.toMatch(/basePath/);
+        expect(courseDetailSource).not.toMatch(/updateSetting\('lastDownloadPath'/);
     });
 });

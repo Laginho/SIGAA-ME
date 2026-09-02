@@ -191,3 +191,34 @@ describe('HttpScraperService.downloadFile — falhas não deixam resíduo (BUG-0
         expect(arquivosNoDestino()).toEqual([]);
     });
 });
+
+describe('DL-001 — contenção no gravador HTTP', () => {
+    it('traversal no nome do arquivo é sanitizado e o resultado fica dentro de destino', async () => {
+        const parentBefore = readdirSync(path.dirname(destino));
+        vi.mocked(axios.post).mockResolvedValue(resposta(PDF_MINIMO, 'application/octet-stream'));
+
+        const result = await scraper.downloadFile('99999', '555', '../../evil.pdf', destino, DOWNLOAD_SCRIPT);
+
+        expect(result.success).toBe(true);
+        // filePath must be inside destino
+        const rel = path.relative(path.resolve(destino), path.resolve(result.filePath!));
+        expect(rel.startsWith('..')).toBe(false);
+        expect(path.isAbsolute(rel)).toBe(false);
+        // exactly one file in destino, name has no separators
+        const files = arquivosNoDestino();
+        expect(files).toHaveLength(1);
+        expect(files[0]).not.toMatch(/[/\\]/);
+        // nothing created outside destino
+        const parentAfter = readdirSync(path.dirname(destino));
+        expect(parentAfter).toEqual(parentBefore);
+    });
+
+    it('fileName ".." é rejeitado e destino fica vazio', async () => {
+        vi.mocked(axios.post).mockResolvedValue(resposta(PDF_MINIMO, 'application/octet-stream'));
+
+        const result = await scraper.downloadFile('99999', '555', '..', destino, DOWNLOAD_SCRIPT);
+
+        expect(result.success).toBe(false);
+        expect(arquivosNoDestino()).toEqual([]);
+    });
+});

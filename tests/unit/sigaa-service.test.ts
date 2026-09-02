@@ -16,6 +16,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('fs', () => ({
     existsSync: vi.fn(() => false),
     mkdirSync: vi.fn(),
+    realpathSync: vi.fn((p: string) => p),
 }));
 
 // 1. Mock the dependencies before importing the service
@@ -225,6 +226,15 @@ describe('SigaaService (Unit)', () => {
 
             expect(result).toEqual({ success: false, message: 'Playwright: timeout' });
             expect(result).not.toHaveProperty('error');
+        });
+
+        // ── DL-001: reserved name rejected before any network call ────────
+        it('rejects Windows reserved name (CON) as fileName without calling any network (DL-001)', async () => {
+            const result = await service.downloadFile('C1', 'CON', '..', '/mock/downloads', 'jsfcljs,id,123');
+
+            expect(result.success).toBe(false);
+            expect(mockHttp.downloadFile).not.toHaveBeenCalled();
+            expect(mockPlaywright.downloadFile).not.toHaveBeenCalled();
         });
     });
 
