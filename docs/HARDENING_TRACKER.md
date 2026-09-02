@@ -965,9 +965,9 @@ Ciclo limpo (ledger em `.scratch/bug-003/ledger.md`): três commits, um por fase
 
 ### BUG-004 — O fallback Playwright de download não está ligado
 
-- Status: `IN REVIEW` — ciclo PTMR 01 validado pelo master dev (sessão 2026-09-01);
-  falta o smoke manual do Bruno: um download real que caia no fallback deve abrir
-  um Chrome dedicado e o log deve mostrar "Falling back to Playwright"
+- Status: `DONE` — ciclo PTMR 01 validado pelo master dev; smoke do Bruno em
+  2026-09-01: o fallback disparou de verdade nos itens de tarefa (`BUG-011`),
+  abriu Chrome dedicado e o log mostrou "Falling back to Playwright"
 - Priority: `P1`
 - Owner: PTMR (PLAN 5.6 terra · TEST/READ mimo v2.5 · MAKE muse spark 1.2); master dev Claude
 - Dependencies: `PIPE-002` (não mexer sem suíte executável)
@@ -2027,9 +2027,8 @@ Decisão do Bruno: **normalizar na leitura**, sem versão de cache nem wipe.
 
 ### BUG-011 — Tarefa listada como arquivo dispara download e fallback Playwright
 
-- Status: `IN REVIEW` — código e teste prontos (sessão 2026-09-01); falta um
-  "baixar todos" real em SINAIS E SISTEMAS, depois de sincronizar, sem Chrome
-  abrir — que é do Bruno
+- Status: `DONE` — Bruno sincronizou e fez "baixar todos" em SINAIS E SISTEMAS no
+  build instalado (2026-09-01): nenhum Chrome abriu, toast verde
 - Priority: `P2`
 - Owner: Claude (sessão 2026-09-01)
 - Dependencies: none
@@ -2502,7 +2501,8 @@ npm run test:integration -- background-sync-serialization
 
 ### DL-001 — Enforce download root and path containment
 
-- Status: `IN REVIEW` — código e testes prontos (sessão 2026-09-01); falta um download real no app, que é do Bruno
+- Status: `DONE` — ciclo PTMR 03 validado pelo master dev; Bruno confirmou no build
+  instalado (2026-09-01): pasta persistida pelo main, download e "baixar todos" ok
 - Priority: `P1`
 - Owner: Bruno
 - Dependencies: `SEC-002`
@@ -3231,6 +3231,11 @@ reavaliação não é decisão, é esquecimento.
 > Playwright abrindo Chrome à toa), corrigido direto com a primeira fixture real
 > do portal; `IN REVIEW` até um "baixar todos" depois de sincronizar. Typo
 > "Sempre pergunta" corrigido em `28774e6`.
+>
+> **Segundo smoke do Bruno: sincronizar + "baixar todos", nenhum Chrome, toast
+> verde.** `DL-001`, `BUG-004` e `BUG-011` marcados `DONE`. Fase 2 fechada de
+> fato; `BUG-009` continua `IN REVIEW` (falta conferir zero "arquivo novo" na
+> sincronização com cache antigo). Próximo: Fase 3, `ARCH-001`.
 
 **Registro histórico — rodar o gate no Windows e commitar o lote de 2026-08-05.** Havia um
 working tree acumulado sobre `38ff29b` que ainda não tinha passado pela execução
