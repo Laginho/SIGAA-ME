@@ -45,7 +45,7 @@ Handles operations where speed matters and session can be borrowed from Playwrig
 | Method | Why HTTP? |
 |--------|-----------|
 | `getCourseFiles()` | Parsing only (uses HTML from Playwright) |
-| `downloadFile()` | Bulk downloads - HTTP is ~10x faster than Playwright downloads |
+| `downloadFile()` | Bulk downloads — HTTP is ~10x faster; after HTTP → session refresh + HTTP both fail, `SigaaService.downloadViaPlaywright` falls back to Playwright (dedicated visible browser via `download.service.ts`) |
 | `getNewsDetail()` | Has HTTP version but unused - sessions go stale between requests |
 
 ---
@@ -91,7 +91,7 @@ Handles operations where speed matters and session can be borrowed from Playwrig
 The current hybrid works because:
 1. Playwright establishes and maintains the session
 2. HTTP "borrows" cookies from Playwright for fast operations
-3. When HTTP fails, system falls back to Playwright (retry logic)
+3. When HTTP fails twice (HTTP → session refresh + HTTP → `SigaaService.downloadViaPlaywright`), system falls back to Playwright via `download.service.ts` (dedicated visible browser)
 
 ---
 
