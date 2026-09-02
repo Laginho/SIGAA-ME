@@ -124,6 +124,19 @@ export class SigaaService {
 
 
 
+    /**
+     * Plano B do download (BUG-004): só depois que o HTTP falhou duas vezes.
+     * `basePath`, não `targetDir`: o DownloadService cria a pasta da turma sozinho.
+     */
+    private async downloadViaPlaywright(
+        courseId: string, courseName: string, fileName: string, basePath: string, script: string
+    ): Promise<{ success: true; filePath: string } | { success: false; message: string }> {
+        logger.warn(`SIGAA: HTTP download failed twice for ${fileName}. Falling back to Playwright...`);
+        const result = await this.playwrightLogin.downloadFile(courseId, courseName, fileName, '', basePath, {}, script);
+        if (result.success && result.filePath) return { success: true, filePath: result.filePath };
+        return { success: false, message: result.error || 'Playwright download failed' };
+    }
+
     // Helper to sanitize folder names
     private sanitizeFolderName(name: string): string {
         return name.replace(/[<>:"/\\|?*]/g, '').trim();
@@ -266,7 +279,7 @@ export class SigaaService {
                 console.log('SIGAA: HTTP retry successful!');
                 return { success: true, filePath: retryHttpResult.filePath };
             } else {
-                return { success: false, message: retryHttpResult.error || 'Download failed after retry' };
+                return await this.downloadViaPlaywright(courseId, courseName, fileName, basePath, retryScript);
             }
 
         } catch (error: any) {
@@ -394,6 +407,8 @@ export class SigaaService {
                 });
             }
 
+            const retryFreshFilesMap = new Map<string, string>();
+
             logger.info(`SIGAA: Starting download loop for ${queue.length} files...`);
             for (const file of queue) {
                 logger.info(`SIGAA: Processing file: ${file.name}`);
@@ -455,7 +470,6 @@ export class SigaaService {
                     }
                     const retryParseResult = await this.httpScraper.getCourseFiles(courseId, courseName, retryEntryResult.html);
 
-                    const retryFreshFilesMap = new Map<string, string>();
                     if (retryParseResult.success && retryParseResult.files) {
                         retryParseResult.files.forEach(f => {
                             if (f.name && f.script) {
@@ -530,6 +544,29 @@ export class SigaaService {
                     }
                 } else {
                     console.error('SIGAA: Failed to refresh session for batch retry');
+                }
+            }
+
+            // ponytail: um browser por arquivo no fallback; trocar por playwrightLogin.downloadAllFiles se o lote de falhas for grande com frequência
+            for (let i = 0; i < results.length; i++) {
+                if (results[i].status !== 'failed') continue;
+                const fileName = results[i].fileName;
+                const originalFile = files.find(f => f.name === fileName);
+                let script: string | undefined;
+                if (retryFreshFilesMap.has(fileName)) {
+                    script = retryFreshFilesMap.get(fileName);
+                } else if (freshFilesMap.has(fileName)) {
+                    script = freshFilesMap.get(fileName);
+                } else {
+                    script = originalFile?.script;
+                }
+                if (!script) continue;
+                const pwResult = await this.downloadViaPlaywright(courseId, courseName, fileName, basePath, script);
+                if (pwResult.success) {
+                    downloaded++;
+                    failed--;
+                    results[i] = { fileName, status: 'downloaded', filePath: pwResult.filePath };
+                    if (onProgress) onProgress(fileName, 'downloaded');
                 }
             }
 
