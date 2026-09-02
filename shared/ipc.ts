@@ -47,7 +47,6 @@ export interface DownloadFilePayload {
   courseId: string
   courseName: string
   fileName: string
-  basePath: string
   script?: string
 }
 
@@ -55,7 +54,6 @@ export interface DownloadAllFilesPayload {
   courseId: string
   courseName: string
   files: CourseFileRef[]
-  basePath: string
 }
 
 export type DownloadStatus = 'downloaded' | 'skipped' | 'failed'
@@ -115,9 +113,8 @@ export interface AppSettings {
  * `lastBackgroundSync` é escrito só pelo main (background-sync.service.ts).
  * `autoSync` é campo morto. Nenhum dos dois deve ser mutável pelo renderer.
  *
- * O `SEC-002` quer excluir também a raiz de download; hoje não dá, porque
- * `lastDownloadPath` é gravado pelo renderer em course-detail.ts e settings.ts.
- * Fica para quando o main passar a resolver a pasta sozinho (DL-001).
+ * `lastDownloadPath` só pode ser limpo pelo renderer (null = "Sempre perguntar");
+ * a definição vem do main via `selectDownloadFolder` (DL-001).
  */
 export type RendererSettingKey = Exclude<
   keyof AppSettings,
@@ -128,10 +125,11 @@ export type RendererSettingKey = Exclude<
  * União discriminada exigida pelo `SEC-002`: amarra cada chave ao tipo do seu
  * valor. Impede `updateSetting('syncInterval', 'texto')`, que o
  * `(key: string, value: any)` anterior aceitava sem reclamar.
+ * `lastDownloadPath` é exceção: renderer só pode limpar (null), nunca definir.
  */
-export type SettingUpdate = {
-  [K in RendererSettingKey]: { key: K; value: Required<AppSettings>[K] }
-}[RendererSettingKey]
+export type SettingUpdate =
+  | { key: 'lastDownloadPath'; value: null }
+  | { [K in Exclude<RendererSettingKey, 'lastDownloadPath'>]: { key: K; value: Required<AppSettings>[K] } }[Exclude<RendererSettingKey, 'lastDownloadPath'>]
 
 // -------------------------------------------------------- contrato do preload
 

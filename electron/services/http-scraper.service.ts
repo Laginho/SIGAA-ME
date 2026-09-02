@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { app } from 'electron';
 import mime from 'mime-types';
+import { sanitizeSegment, isInsideRoot } from './download-path';
 
 interface Cookie {
     name: string;
@@ -999,9 +1000,9 @@ export class HttpScraperService {
                 this.log(`[HttpScraper] Appended extension. Final filename: ${finalFileName}`);
             }
 
-            // Sanitize the final filename to remove ANY illegal windows characters
-            // (in case the UI filename itself had bad characters)
-            finalFileName = finalFileName.replace(/[<>:"/\\|?*\x00-\x1F]/g, '_').trim();
+            // DL-001: política única de caminho
+            finalFileName = sanitizeSegment(finalFileName, 150);
+            if (!isInsideRoot(basePath, path.join(basePath, finalFileName))) throw new Error('Nome de arquivo/pasta inválido');
 
 
             // BUG-001: o download vai para `.part` e só ganha o nome definitivo

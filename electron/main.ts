@@ -8,6 +8,7 @@ import { execSync } from 'child_process'
 import { persistenceService } from './services/persistence.service'
 import { BackgroundSyncService } from './services/background-sync.service'
 import { cacheService } from './services/cache.service'
+import { isInsideRoot } from './services/download-path'
 import type {
   DownloadAllFilesPayload,
   DownloadFilePayload,
@@ -168,20 +169,26 @@ ipcMain.handle('select-download-folder', async () => {
     return { success: false };
   }
 
-  return { success: true, folderPath: result.filePaths[0] };
+  const folderPath = result.filePaths[0];
+  persistenceService.updateSetting('lastDownloadPath', folderPath);
+  return { success: true, folderPath };
 })
 
 ipcMain.handle('download-file', async (_, data: DownloadFilePayload) => {
+  const root = persistenceService.getSettings().lastDownloadPath;
+  if (!root) return { success: false, message: 'Nenhuma pasta de downloads definida' };
   return await sigaaService.downloadFile(
     data.courseId,
     data.courseName,
     data.fileName,
-    data.basePath,
+    root,
     data.script
   );
 })
 
 ipcMain.handle('download-all-files', async (_, data: DownloadAllFilesPayload) => {
+  const root = persistenceService.getSettings().lastDownloadPath;
+  if (!root) return { success: false, message: 'Nenhuma pasta de downloads definida' };
   const onProgress = (fileName: string, status: DownloadStatus) => {
     const progress: DownloadProgress = { fileName, status };
     win?.webContents.send('download-progress', progress);
@@ -191,15 +198,16 @@ ipcMain.handle('download-all-files', async (_, data: DownloadAllFilesPayload) =>
     data.courseId,
     data.courseName,
     data.files,
-    data.basePath,
+    root,
     onProgress
   );
 })
 
 ipcMain.handle('check-files-existence', async (_, filePaths: string[]) => {
+  const root = persistenceService.getSettings().lastDownloadPath;
   return filePaths.map(filePath => ({
     path: filePath,
-    exists: fs.existsSync(filePath)
+    exists: root !== null && isInsideRoot(root, filePath) && fs.existsSync(filePath)
   }));
 })
 
@@ -217,6 +225,7 @@ ipcMain.handle('get-app-settings', async () => {
 });
 
 ipcMain.handle('update-app-setting', async (_, update: SettingUpdate) => {
+  if (update.key === 'lastDownloadPath' && update.value !== null) return { success: false };
   persistenceService.applySetting(update);
   if (update.key === 'openAtLogin') {
     app.setLoginItemSettings({

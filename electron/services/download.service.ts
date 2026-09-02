@@ -2,6 +2,7 @@ import { Browser, Page } from 'playwright';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as mime from 'mime-types';
+import { resolveDownloadTarget, ensureDirInsideRoot } from './download-path';
 
 export class DownloadService {
     constructor(_browser: Browser | null) {
@@ -17,12 +18,8 @@ export class DownloadService {
         script?: string
     ): Promise<{ success: boolean; filePath?: string; error?: string }> {
         try {
-            const courseFolder = path.join(basePath, this.sanitizeFolderName(courseName));
-            if (!fs.existsSync(courseFolder)) {
-                fs.mkdirSync(courseFolder, { recursive: true });
-            }
-
-            const filePath = path.join(courseFolder, this.sanitizeFileName(fileName));
+            const { dir: courseFolder, fullPath: filePath } = resolveDownloadTarget(basePath, courseName, fileName);
+            ensureDirInsideRoot(basePath, courseFolder);
 
             let existingFileToUse = '';
 
@@ -162,19 +159,19 @@ export class DownloadService {
                 }
 
                 await page.unroute('**/*');
-                await download.saveAs(finalPath);
+                await download.saveAs(finalPath + '.part');
 
                 // --- JSF Error Page Detection ---
                 try {
                     const successRead = false;
                     for (let i = 0; i < 5; i++) {
                         try {
-                            const stats = fs.statSync(finalPath);
+                            const stats = fs.statSync(finalPath + '.part');
                             if (stats.size < 50000) {
-                                const content = fs.readFileSync(finalPath, 'utf8');
+                                const content = fs.readFileSync(finalPath + '.part', 'utf8');
                                 if (content.toLowerCase().includes('<!doctype html>') || content.toLowerCase().includes('<html') || content.toLowerCase().includes('<script') || content.toLowerCase().includes('sigaa')) {
                                     for (let j = 0; j < 5; j++) {
-                                        try { fs.unlinkSync(finalPath); break; } catch { await new Promise(r => setTimeout(r, 100)); }
+                                        try { fs.unlinkSync(finalPath + '.part'); break; } catch { await new Promise(r => setTimeout(r, 100)); }
                                     }
                                     if (content.includes('ViewExpiredException') || content.includes('Expira') || content.toLowerCase().includes('expira')) {
                                         throw new Error('JSF_SESSION_EXPIRED');
@@ -199,6 +196,7 @@ export class DownloadService {
                     }
                 }
 
+                fs.renameSync(finalPath + '.part', finalPath);
                 console.log(`Downloaded: ${finalPath}`);
                 return { success: true, filePath: finalPath };
 
@@ -220,17 +218,17 @@ export class DownloadService {
                         finalPath += ext;
                     }
 
-                    await popupDownload.saveAs(finalPath);
+                    await popupDownload.saveAs(finalPath + '.part');
 
                     const successReadPopup = false;
                     for (let i = 0; i < 5; i++) {
                         try {
-                            const stats = fs.statSync(finalPath);
+                            const stats = fs.statSync(finalPath + '.part');
                             if (stats.size < 50000) {
-                                const content = fs.readFileSync(finalPath, 'utf8');
+                                const content = fs.readFileSync(finalPath + '.part', 'utf8');
                                 if (content.toLowerCase().includes('<!doctype html>') || content.toLowerCase().includes('<html') || content.toLowerCase().includes('<script') || content.toLowerCase().includes('sigaa')) {
                                     for (let j = 0; j < 5; j++) {
-                                        try { fs.unlinkSync(finalPath); break; } catch { await new Promise(r => setTimeout(r, 100)); }
+                                        try { fs.unlinkSync(finalPath + '.part'); break; } catch { await new Promise(r => setTimeout(r, 100)); }
                                     }
                                     if (content.includes('ViewExpiredException') || content.includes('Expira') || content.toLowerCase().includes('expira')) {
                                         throw new Error('JSF_SESSION_EXPIRED');
@@ -253,6 +251,7 @@ export class DownloadService {
                         console.warn('Could not validate popup file due to lock errors.');
                     }
 
+                    fs.renameSync(finalPath + '.part', finalPath);
                     console.log(`Downloaded from popup: ${finalPath}`);
                     await popup.close();
                     return { success: true, filePath: finalPath };
@@ -304,17 +303,17 @@ export class DownloadService {
                         finalPath += ext;
                     }
 
-                    await download.saveAs(finalPath);
+                    await download.saveAs(finalPath + '.part');
 
                     const successReadReload = false;
                     for (let i = 0; i < 5; i++) {
                         try {
-                            const stats = fs.statSync(finalPath);
+                            const stats = fs.statSync(finalPath + '.part');
                             if (stats.size < 50000) {
-                                const content = fs.readFileSync(finalPath, 'utf8');
+                                const content = fs.readFileSync(finalPath + '.part', 'utf8');
                                 if (content.toLowerCase().includes('<!doctype html>') || content.toLowerCase().includes('<html') || content.toLowerCase().includes('<script') || content.toLowerCase().includes('sigaa')) {
                                     for (let j = 0; j < 5; j++) {
-                                        try { fs.unlinkSync(finalPath); break; } catch { await new Promise(r => setTimeout(r, 100)); }
+                                        try { fs.unlinkSync(finalPath + '.part'); break; } catch { await new Promise(r => setTimeout(r, 100)); }
                                     }
                                     if (content.includes('ViewExpiredException') || content.includes('Expira') || content.toLowerCase().includes('expira')) {
                                         throw new Error('JSF_SESSION_EXPIRED');
@@ -337,6 +336,7 @@ export class DownloadService {
                         console.warn('Could not validate popup reload file due to lock errors.');
                     }
 
+                    fs.renameSync(finalPath + '.part', finalPath);
                     console.log(`Downloaded after popup reload: ${finalPath}`);
                     await popup.close();
                     return { success: true, filePath: finalPath };
@@ -482,11 +482,5 @@ export class DownloadService {
         return { downloaded, skipped, failed, results };
     }
 
-    private sanitizeFileName(fileName: string): string {
-        return fileName.replace(/[<>:"/\\|?*]/g, '_');
-    }
 
-    private sanitizeFolderName(folderName: string): string {
-        return folderName.replace(/[<>:"/\\|?*]/g, '_').substring(0, 100);
-    }
 }
