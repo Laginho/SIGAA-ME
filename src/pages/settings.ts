@@ -99,7 +99,7 @@ export async function renderSettingsPage(container: HTMLDivElement) {
             <div class="setting-control">
               ${settings.lastDownloadPath
       ? '<button id="clearDownloadsBtn" class="btn-danger-outline">Limpar Padrão</button>'
-      : '<span class="about-info">Sempre pergunta</span>'}
+      : '<span class="about-info">Sempre perguntar</span>'}
             </div>
           </div>
         </section>
