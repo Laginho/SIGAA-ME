@@ -233,6 +233,7 @@ describe('SigaaService (Unit)', () => {
             const result = await service.downloadFile('C1', 'CON', '..', '/mock/downloads', 'jsfcljs,id,123');
 
             expect(result.success).toBe(false);
+            expect(mockPlaywright.enterCourseAndGetHTML).not.toHaveBeenCalled();
             expect(mockHttp.downloadFile).not.toHaveBeenCalled();
             expect(mockPlaywright.downloadFile).not.toHaveBeenCalled();
         });

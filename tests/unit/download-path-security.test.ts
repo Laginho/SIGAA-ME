@@ -37,11 +37,8 @@ afterEach(() => {
 
 describe('sanitizeSegment', () => {
   it('replaces path separators and illegal chars with _', () => {
-    // ../../etc/passwd → separators become _, so result is '.._.._etc_passwd'
-    const result = sanitizeSegment('../../etc/passwd', 150);
-    expect(result).not.toContain('/');
-    expect(result).not.toContain('\\');
-    expect(result).not.toMatch(/^\.\./);
+    // separators become _; a leading '..' is harmless once no separator follows it
+    expect(sanitizeSegment('../../etc/passwd', 150)).toBe('.._.._etc_passwd');
   });
 
   it('strips colons and backslashes (drive prefix)', () => {
@@ -134,6 +131,10 @@ describe('isInsideRoot', () => {
 
   it('returns false for root itself (root is not a file destination)', () => {
     expect(isInsideRoot(tmp, tmp)).toBe(false);
+  });
+
+  it('returns true for a child whose name starts with dots (a name, not traversal)', () => {
+    expect(isInsideRoot(tmp, path.join(tmp, '..fora', 'x.pdf'))).toBe(true);
   });
 });
 

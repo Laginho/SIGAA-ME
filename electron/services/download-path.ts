@@ -30,13 +30,6 @@ export function sanitizeSegment(raw: string, maxLength: number): string {
     sanitized = '_' + sanitized;
   }
 
-  // prefixa se começar com ponto para evitar `.._...` ser interpretado como travessia-like
-  // (necessário para passar `not.toMatch(/^\.\./)` em download-path-security.test.ts)
-  // Não afeta nomes normais; `.`/`..` já teriam lançado acima.
-  if (sanitized.startsWith('.')) {
-    sanitized = '_' + sanitized;
-  }
-
   // corta em maxLength preservando a extensão (no máximo 16 chars de extensão)
   if (sanitized.length > maxLength) {
     const finalExt = path.extname(sanitized);
@@ -49,29 +42,28 @@ export function sanitizeSegment(raw: string, maxLength: number): string {
   return sanitized;
 }
 
+/** `rel` (saída de `path.relative`) fica dentro? Vazio é a própria raiz: não. `..fora` é um nome, não travessia. */
+function relStaysInside(rel: string): boolean {
+  return rel !== '' && rel !== '..' && !rel.startsWith('..' + path.sep) && !path.isAbsolute(rel);
+}
+
 /** `true` se `candidate` (resolvido) está dentro de `root` (resolvido). Só `path`, sem fs. */
 export function isInsideRoot(root: string, candidate: string): boolean {
-  const rel = path.relative(path.resolve(root), path.resolve(candidate));
-  if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) return false;
-  return true;
+  return relStaysInside(path.relative(path.resolve(root), path.resolve(candidate)));
 }
 
 /** `root/<turma>/<arquivo>` sanitizado e provado dentro de `root`. Lança se escapar. */
 export function resolveDownloadTarget(root: string, courseName: string, fileName: string): { dir: string; fullPath: string } {
   const dir = path.join(root, sanitizeSegment(courseName, 100));
   const fullPath = path.join(dir, sanitizeSegment(fileName, 150));
-  const rel = path.relative(path.resolve(root), path.resolve(fullPath));
-  if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) {
-    throw new Error('Nome de arquivo/pasta inválido');
-  }
+  if (!isInsideRoot(root, fullPath)) throw new Error('Nome de arquivo/pasta inválido');
   return { dir, fullPath };
 }
 
 /** mkdir -p de `dir` e prova por `fs.realpathSync` que ele continua dentro de `root` (symlink/junction). Lança se não. */
 export function ensureDirInsideRoot(root: string, dir: string): void {
   fs.mkdirSync(dir, { recursive: true });
-  const rel = path.relative(fs.realpathSync(root), fs.realpathSync(dir));
-  if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) {
+  if (!relStaysInside(path.relative(fs.realpathSync(root), fs.realpathSync(dir)))) {
     throw new Error('Pasta fora da raiz de downloads');
   }
 }
