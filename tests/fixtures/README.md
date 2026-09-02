@@ -45,3 +45,18 @@ exatamente o sinal que o `PORTAL_COMPATIBILITY.md` acompanha.
 O HTML gravado vem de uma sessão autenticada. Antes de commitar, confira que não
 sobrou nome, matrícula, CPF ou `JSESSIONID`. O gravador tenta limpar os padrões
 óbvios, mas ele não sabe o que o seu portal mostra — a revisão é sua.
+
+## `course-page-real-with-tasks.html` — a primeira fixture gravada do portal
+
+Salva pelo Bruno em 2026-09-01 (navegador, Ctrl+S, "somente HTML") da página
+"Principal" da turma SINAIS E SISTEMAS, ISO-8859-1 convertida para UTF-8. Tem 7
+arquivos (`idInserirMaterialArquivo`, com `key`) e 2 tarefas
+(`idEnviarMaterialTarefa`, sem `key`), ambos com o mesmo
+`jsfcljs(...,id,...)`. É o que prova o `BUG-011`: o parser listava tarefa como
+arquivo, o download HTTP recebia a página "Responder tarefa" e o fallback
+Playwright abria um Chrome à toa.
+
+Limpeza feita antes de commitar: o nome do usuário virou `DISCENTE FIXTURE` e os
+caminhos de imagem do "salvar como" viraram `./img/`. O `ViewState` da página é
+`j_id10`, um índice do MyFaces, não um token de sessão. Não há matrícula, CPF nem
+`JSESSIONID` no HTML.
