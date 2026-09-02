@@ -1169,11 +1169,14 @@ do Bruno.
 
 ### DOC-003 — Anotar arquivos carregados por import dinâmico
 
-- Status: `NOT STARTED`
+- Status: `DONE` — sessão 2026-09-02
 - Priority: `P3`
-- Owner: —
+- Owner: Claude (sessão 2026-09-02)
 - Dependencies: `BUG-004`
-- Primary files: qualquer arquivo carregado via `await import()`
+- Primary files: `electron/services/download.service.ts` — o único arquivo do
+  repositório carregado via `await import()` (grep em `electron/`, `src/`,
+  `shared/` em 2026-09-02; o outro acerto, `electron-env.d.ts:26`, é tipo
+  `import('electron')`, não carga em runtime)
 
 #### Acceptance criteria
 
@@ -1181,6 +1184,17 @@ do Bruno.
   carrega e a partir de qual ponto de entrada, para que busca estática futura não
   chegue a conclusão errada.
 - Só se aplica ao que sobrar depois da decisão do `BUG-004`.
+
+#### Implementation notes
+
+- Comentário de cabeçalho em `download.service.ts` com a cadeia completa até o
+  ponto de entrada: IPC `download-file` → `SigaaService.downloadFile` →
+  `downloadViaPlaywright` (`BUG-004`) → `PlaywrightLoginService.downloadFile` →
+  `await import('./download.service')`.
+- Registrado no mesmo comentário que `PlaywrightLoginService.downloadAllFiles`
+  também importa o arquivo mas **continua sem chamador** — o fallback do lote
+  vai por um browser por arquivo (`ponytail:` em `SigaaService.downloadAllFiles`).
+- Sem teste: é comentário. A verificação é `npx tsc --noEmit`.
 
 ### CLEAN-001 — Nível 1 da auditoria de complexidade
 
@@ -3553,4 +3567,4 @@ Record status or scope changes that affect other agents.
 | 2026-08-09 | `PIPE-006` | Criada e concluída, `P1` — job Gitleaks bloqueia novas credenciais. A premissa de que `fetch-depth: 0` reauditaria o histórico foi refutada pelo log (`--log-opts=-1`) e registrada sem ampliar a configuração. | Codex |
 | 2026-08-09 | Lote agêntico | `QA-006`, `PIPE-005` e `PIPE-006` aprovadas pelo Claude; ordem de trabalho temporária encerrada. `DEP-002` permanece como próxima ação manual do Bruno. | Codex |
 | 2026-08-09 | `DEP-002` | `NOT STARTED` → `DONE`. Vite 5.4.21 → 6.4.3, lock regenerado, workflows em `npm ci`; instalação limpa, quality e build Windows verificados. Auditorias pendentes encaminhadas ao `DEP-001`. | Bruno + Codex |
-
+| 2026-09-02 | `DOC-003` | `NOT STARTED` → `DONE`. Cabeçalho em `download.service.ts` nomeando quem o carrega e a cadeia até o handler IPC; `downloadAllFiles` do Playwright anotado como ainda sem chamador. | Claude |
