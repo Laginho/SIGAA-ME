@@ -333,18 +333,14 @@ async function fetchCourseFiles(courseId: string) {
 async function downloadSingleFile(course: any, fileName: string, btnElement: HTMLElement, script?: string) {
   try {
     const settings = await window.api.getSettings();
-    let folderPath = settings.lastDownloadPath;
 
-    if (!folderPath) {
+    if (!settings.lastDownloadPath) {
       const folderResult = await window.api.selectDownloadFolder();
       if (!folderResult.success) {
         btnElement.innerHTML = '⬇️';
         btnElement.classList.remove('spinning');
         return;
       }
-      folderPath = folderResult.folderPath;
-      // Save for next time
-      await window.api.updateSetting('lastDownloadPath', folderPath);
     }
 
     const downloadedFiles = JSON.parse(localStorage.getItem('downloadedFiles') || '{}');
@@ -353,7 +349,6 @@ async function downloadSingleFile(course: any, fileName: string, btnElement: HTM
       courseId: course.id,
       courseName: course.name,
       fileName: fileName,
-      basePath: folderPath,
       script
     });
 
@@ -405,9 +400,8 @@ async function testDownloadAll(courseId: string) {
 
     const buttons = document.querySelectorAll('.btn-download-file');
     const settings = await window.api.getSettings();
-    let folderPath = settings.lastDownloadPath;
 
-    if (!folderPath) {
+    if (!settings.lastDownloadPath) {
       const folderResult = await window.api.selectDownloadFolder();
       if (!folderResult.success) {
         buttons.forEach(b => {
@@ -416,12 +410,7 @@ async function testDownloadAll(courseId: string) {
         });
         return;
       }
-      folderPath = folderResult.folderPath;
-      // Save for next time
-      await window.api.updateSetting('lastDownloadPath', folderPath);
     }
-
-    console.log('Download folder selected:', folderPath);
 
     buttons.forEach(b => {
       b.innerHTML = '🔄';
@@ -433,8 +422,7 @@ async function testDownloadAll(courseId: string) {
     const result = await window.api.downloadAllFiles({
       courseId: course.id,
       courseName: course.name,
-      files: course.files,
-      basePath: folderPath
+      files: course.files
     });
 
     // O main omite os contadores quando falha antes de entrar na disciplina,

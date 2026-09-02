@@ -3,6 +3,7 @@ import { PlaywrightLoginService } from './playwright-login.service';
 import { logger } from './logger.service';
 import * as fs from 'fs';
 import * as path from 'path';
+import { resolveDownloadTarget, ensureDirInsideRoot, sanitizeSegment } from './download-path';
 
 
 
@@ -137,11 +138,6 @@ export class SigaaService {
         return { success: false, message: result.error || 'Playwright download failed' };
     }
 
-    // Helper to sanitize folder names
-    private sanitizeFolderName(name: string): string {
-        return name.replace(/[<>:"/\\|?*]/g, '').trim();
-    }
-
     async downloadFile(
         courseId: string,
         courseName: string, // Changed from _courseName to use it
@@ -165,17 +161,13 @@ export class SigaaService {
         script?: string
     ): Promise<{ success: boolean; filePath?: string; message?: string }> {
         try {
+            // 0. Prepare Target Directory — resolve and prove containment BEFORE any network
+            const { dir: targetDir } = resolveDownloadTarget(basePath, courseName, fileName);
+            ensureDirInsideRoot(basePath, targetDir);
+
             console.log(`SIGAA: Downloading file ${fileName}...`);
             if (!script) {
                 return { success: false, message: 'Script not provided for download' };
-            }
-
-            // 0. Prepare Target Directory (Subdirectory per course)
-            const safeCourseName = this.sanitizeFolderName(courseName);
-            const targetDir = path.join(basePath, safeCourseName);
-
-            if (!fs.existsSync(targetDir)) {
-                fs.mkdirSync(targetDir, { recursive: true });
             }
 
             // 1. Enter course via Full Browser (Dashboard) - Headless API skips valid ViewState for files
@@ -303,24 +295,27 @@ export class SigaaService {
             logger.info(`SIGAA: First 3 files: ${JSON.stringify(files.slice(0, 3).map(f => ({ name: f.name, hasScript: !!f.script, scriptLen: f.script?.length || 0 })))}`);
             logger.info(`SIGAA: basePath: ${basePath}`);
 
-            // Create course subdirectory
-            const safeCourseName = this.sanitizeFolderName(courseName || 'Unknown Course');
-            const targetDir = path.join(basePath, safeCourseName);
-
-            if (!fs.existsSync(targetDir)) {
-                fs.mkdirSync(targetDir, { recursive: true });
-            }
+            // Create course subdirectory — single path policy (DL-001)
+            const courseSegment = sanitizeSegment(courseName || 'Unknown Course', 100);
+            const targetDir = path.join(basePath, courseSegment);
+            ensureDirInsideRoot(basePath, targetDir);
 
             const results: any[] = [];
             let downloaded = 0;
             let skipped = 0;
             let failed = 0;
 
-            // Filter out duplicates first
-            // Filter out duplicates first
+            // Filter out duplicates first — use sanitized final path for duplicate check (same as writer)
             const queue = files.filter(file => {
                 // Check if file exists in the TARGET directory
-                const targetFilePath = path.join(targetDir, file.name);
+                let targetFilePath: string;
+                try {
+                    const { fullPath } = resolveDownloadTarget(basePath, courseName || 'Unknown Course', file.name);
+                    targetFilePath = fullPath;
+                } catch {
+                    // invalid name will fail on download attempt; don't skip as duplicate
+                    return true;
+                }
                 if (fs.existsSync(targetFilePath)) {
                     console.log(`Skipping duplicate (exists on disk): ${file.name}`);
                     skipped++;
