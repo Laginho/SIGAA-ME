@@ -916,9 +916,8 @@ nota lá) e no `DÉBITO-03`.
 
 ### BUG-003 — `[Dev] Simular Arquivo Novo` funciona em produção
 
-- Status: `IN REVIEW` — código e testes prontos e validados pelo master dev
-  (sessão 2026-09-01, ciclo PTMR 01); falta o Bruno rodar um build empacotado
-  e conferir que o tray não tem `[Dev] Simular Arquivo Novo`
+- Status: `DONE` — ciclo PTMR 01 validado pelo master dev; Bruno confirmou no build
+  empacotado 1.2.0 (2026-09-01) que o tray não tem `[Dev] Simular Arquivo Novo`
 - Priority: `P1` (**promovido** de P2)
 - Owner: PTMR (PLAN 5.6 terra · TEST/READ mimo v2.5 · MAKE muse spark 1.2); master dev Claude
 - Dependencies: none
