@@ -1437,9 +1437,10 @@ autoridade. Rodar antes de commitar.
 
 ### QA-003 — O que a suíte verde **não** prova
 
-- Status: `NOT STARTED`
+- Status: `DONE` — os dois testes existem e cada um falha com a proteção
+  correspondente revertida (sessão 2026-09-01)
 - Priority: `P2`
-- Owner: —
+- Owner: Claude (sessão 2026-09-01, direto — tarefa só de teste, sem fase MAKE)
 - Dependencies: `PIPE-002`
 - Primary files: `tests/unit/course-detail.test.ts` (novo),
   `tests/unit/sync-selection.test.ts`
@@ -1489,6 +1490,26 @@ o valor certo chega na tela. Os dois são necessários porque nenhum cobre o
 outro.
 
 ---
+
+#### Resolution (2026-09-01)
+
+Feito direto, sem PTMR: são dois testes de caracterização sobre comportamento
+que já existe, então não há fase vermelha natural nem trabalho para MAKE. A prova
+de que cada teste morde foi feita por **mutação**, não por stash:
+
+- `tests/unit/sync-selection.test.ts`, describe `Sync: selector drift (QA-003)`:
+  `getCourses` devolve `[{ id: 42 }]`; o overlay mostra "1 disciplina(s) em
+  formato desconhecido", `getCourseFiles` não é chamado e nada vai para o
+  `localStorage`. Com a guarda trocada por `if (false)` o teste falha.
+- `tests/unit/course-detail.test.ts` (novo): renderiza a página com uma turma
+  em `coursesWithFiles`, clica em `.btn-download-file`, `downloadFile` devolve
+  `{ success: false, message: 'Sessão expirada no SIGAA' }` e o teste afirma
+  `toast.error('Erro no download: Sessão expirada no SIGAA')`. Com a leitura
+  revertida para `(result as any).error` o teste falha com "Erro desconhecido".
+- Duas armadilhas do render que o teste documenta: a lista de arquivos aparece
+  depois de `await`s em `fetchCourseFiles` (é preciso drenar a fila), e a página
+  assina `window.api.onDownloadProgress` no render — sem esse mock ela cai no
+  `error-message` e não há botão nenhum.
 
 ### BUG-007 — Parser de notícias devolvia zero item, em silêncio
 
@@ -3060,6 +3081,10 @@ reavaliação não é decisão, é esquecimento.
 > `traycer/noble-hawk` de uma tentativa abandonada sobre base divergente ficou
 > para trás — não contém nada a aproveitar. Próximo pela ordem: `QA-003`, depois
 > `BUG-004`.
+>
+> **`QA-003` `DONE`, direto** (dois testes, prova por mutação). `BUG-003` também
+> `DONE` depois que o Bruno conferiu o build empacotado. Próximo pela ordem:
+> `BUG-004` (fallback Playwright de download), via PTMR.
 
 **Registro histórico — rodar o gate no Windows e commitar o lote de 2026-08-05.** Havia um
 working tree acumulado sobre `38ff29b` que ainda não tinha passado pela execução
