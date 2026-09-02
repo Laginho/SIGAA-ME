@@ -201,3 +201,26 @@ describe('Sync: error state', () => {
         expect(attempt).toBe(2); // getCourses was called a second time
     });
 });
+
+describe('Sync: selector drift (QA-003)', () => {
+    it('fails loudly when getCourses returns courses without a usable id/name, instead of syncing nothing', async () => {
+        const app = buildApp();
+        renderSyncSelectionPage(app);
+        // `id` numérico e sem `name`: o SIGAA devolveu algo, mas não no formato
+        // que o app conhece. Antes desta guarda isso virava um sync vazio por
+        // cima do cache bom.
+        (window as any).api.getCourses = vi.fn().mockResolvedValue({
+            success: true,
+            courses: [{ id: 42 }],
+            photoUrl: null,
+        });
+
+        document.getElementById('btnFastSync')?.click();
+        for (let i = 0; i < 10; i++) await flushAll();
+
+        const overlay = app.querySelector('.sync-progress-overlay');
+        expect(overlay?.textContent).toContain('1 disciplina(s) em formato desconhecido');
+        expect((window as any).api.getCourseFiles).not.toHaveBeenCalled();
+        expect(localStorage.getItem('coursesWithFiles')).toBeNull();
+    });
+});
