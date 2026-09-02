@@ -1,3 +1,12 @@
+// DOC-003: este arquivo não tem `import ... from` estático em lugar nenhum.
+// Ele é carregado por `await import('./download.service')` em
+// `playwright-login.service.ts` (`PlaywrightLoginService.downloadFile` e
+// `downloadAllFiles`). Cadeia real até um ponto de entrada:
+//   IPC `download-file` (main.ts) → SigaaService.downloadFile
+//   → SigaaService.downloadViaPlaywright (plano B, BUG-004) → PlaywrightLoginService.downloadFile → aqui
+// `PlaywrightLoginService.downloadAllFiles` também importa este arquivo, mas hoje
+// não tem chamador (ver o `ponytail:` em SigaaService.downloadAllFiles).
+// Busca por `import ... from` vai dizer que é código morto. Não é.
 import { Browser, Page } from 'playwright';
 import * as fs from 'fs';
 import * as path from 'path';
