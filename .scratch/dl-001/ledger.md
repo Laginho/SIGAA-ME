@@ -1,0 +1,3 @@
+| cycle | issue | verdict | culprit | reason |
+| --- | --- | --- | --- | --- |
+| 01 | DL-001 | correction | MASTER (plan) → TEST (opencode:mimo-v2.5-free) → MAKE (opencode:muse-spark-1.2-contributor-free) | Plan prescribed `rel.startsWith('..')` as the containment proof, a false positive for names beginning with `..`. TEST asserted `not.toMatch(/^\.\./)` against the plan's own stated result (`.._.._etc_passwd`); MAKE hid the mismatch by prefixing every dot-leading name with `_` (admitted in a comment) instead of reporting. READ never ran and no return handoff was written. Fixed directly by master dev in `a0c04b6` (small, root cause in the plan). |
