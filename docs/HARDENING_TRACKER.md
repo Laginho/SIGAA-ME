@@ -965,9 +965,9 @@ Ciclo limpo (ledger em `.scratch/bug-003/ledger.md`): três commits, um por fase
 
 ### BUG-004 — O fallback Playwright de download não está ligado
 
-- Status: `NOT STARTED` — **decisão do autor necessária**
+- Status: `IN REVIEW` — código e testes prontos (sessão 2026-09-01); falta a validação do master dev e o smoke manual do fallback pelo Bruno
 - Priority: `P1`
-- Owner: —
+- Owner: PTMR (PLAN 5.6 terra · TEST/READ mimo v2.5 · MAKE muse spark 1.2); master dev
 - Dependencies: `PIPE-002` (não mexer sem suíte executável)
 - Primary files:
   - `electron/services/download.service.ts` (492 linhas)
