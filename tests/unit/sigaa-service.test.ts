@@ -28,7 +28,8 @@ vi.mock('../../electron/services/playwright-login.service', () => {
             enterCourseAndGetHTML = vi.fn();
             navigateToFilesSection = vi.fn();
             loadAllNews = vi.fn();
-            downloadFileWithPlaywright = vi.fn();
+            downloadFile = vi.fn();
+            getUserAgent = vi.fn().mockResolvedValue('mock-ua');
             getCookies = vi.fn().mockReturnValue([]);
         }
     };
@@ -203,5 +204,95 @@ describe('SigaaService (Unit)', () => {
             expect(mockHttp.downloadFile).toHaveBeenCalledTimes(2);
             expect(result.success).toBe(false);
         });
-});
+
+        it('does not call Playwright when HTTP succeeds on first attempt', async () => {
+            mockPlaywright.enterCourseAndGetHTML.mockResolvedValue({ success: true, html: '<html></html>' });
+            mockPlaywright.navigateToFilesSection.mockResolvedValue({ success: true, html: '<html></html>' });
+            mockHttp.getCourseFiles.mockResolvedValue({ success: true, files: [] });
+            mockHttp.downloadFile.mockResolvedValue({ success: true, filePath: '/mock/downloads/Math/doc.pdf' });
+
+            const result = await service.downloadFile('C1', 'Math', 'doc.pdf', '/mock/downloads', 'jsfcljs,id,123');
+
+            expect(mockHttp.downloadFile).toHaveBeenCalledTimes(1);
+            expect(mockPlaywright.downloadFile).not.toHaveBeenCalled();
+            expect(result.success).toBe(true);
+        });
+
+        it('calls Playwright fallback when both HTTP attempts fail (BUG-004)', async () => {
+            mockPlaywright.enterCourseAndGetHTML.mockResolvedValue({ success: true, html: '<html></html>' });
+            mockPlaywright.navigateToFilesSection.mockResolvedValue({ success: true, html: '<html></html>' });
+            mockHttp.getCourseFiles.mockResolvedValue({ success: true, files: [] });
+            mockHttp.downloadFile.mockResolvedValue({ success: false, error: 'HTTP Error 302' });
+            mockPlaywright.downloadFile.mockResolvedValue({ success: true, filePath: '/mock/downloads/Math/doc.pdf' });
+
+            const result = await service.downloadFile('C1', 'Math', 'doc.pdf', '/mock/downloads', 'jsfcljs,id,123');
+
+            expect(mockHttp.downloadFile).toHaveBeenCalledTimes(2);
+            expect(mockPlaywright.downloadFile).toHaveBeenCalledTimes(1);
+            expect(mockPlaywright.downloadFile).toHaveBeenCalledWith(
+                'C1', 'Math', 'doc.pdf', '', '/mock/downloads', {}, 'jsfcljs,id,123'
+            );
+            expect(result).toEqual({ success: true, filePath: '/mock/downloads/Math/doc.pdf' });
+        });
+
+        it('returns Playwright error message when fallback also fails (BUG-004)', async () => {
+            mockPlaywright.enterCourseAndGetHTML.mockResolvedValue({ success: true, html: '<html></html>' });
+            mockPlaywright.navigateToFilesSection.mockResolvedValue({ success: true, html: '<html></html>' });
+            mockHttp.getCourseFiles.mockResolvedValue({ success: true, files: [] });
+            mockHttp.downloadFile.mockResolvedValue({ success: false, error: 'HTTP Error 302' });
+            mockPlaywright.downloadFile.mockResolvedValue({ success: false, error: 'Playwright: timeout' });
+
+            const result = await service.downloadFile('C1', 'Math', 'doc.pdf', '/mock/downloads', 'jsfcljs,id,123');
+
+            expect(result).toEqual({ success: false, message: 'Playwright: timeout' });
+            expect(result).not.toHaveProperty('error');
+        });
+    });
+
+    // ── downloadAllFiles ─────────────────────────────────────
+    describe('downloadAllFiles()', () => {
+        it('downloads via Playwright fallback when HTTP fails for a file with script (BUG-004)', async () => {
+            mockPlaywright.enterCourseAndGetHTML.mockResolvedValue({ success: true, html: '<html></html>' });
+            mockPlaywright.navigateToFilesSection.mockResolvedValue({ success: true, html: '<html></html>' });
+            mockHttp.getCourseFiles.mockResolvedValue({
+                success: true,
+                files: [{ name: 'doc.pdf', script: 'jsfcljs,id,123' }]
+            });
+            mockHttp.downloadFile.mockResolvedValue({ success: false, error: 'HTTP Error 302' });
+            mockPlaywright.downloadFile.mockResolvedValue({ success: true, filePath: '/mock/downloads/Math/doc.pdf' });
+
+            const onProgress = vi.fn();
+            const result = await service.downloadAllFiles(
+                'C1', 'Math',
+                [{ name: 'doc.pdf', url: '', script: 'jsfcljs,id,123' }],
+                '/mock/downloads', onProgress
+            );
+
+            expect(result.downloaded).toBe(1);
+            expect(result.failed).toBe(0);
+            expect(result.results[0]).toEqual({
+                fileName: 'doc.pdf', status: 'downloaded', filePath: '/mock/downloads/Math/doc.pdf'
+            });
+            expect(mockPlaywright.downloadFile).toHaveBeenCalledTimes(1);
+            expect(mockPlaywright.downloadFile).toHaveBeenCalledWith(
+                'C1', 'Math', 'doc.pdf', '', '/mock/downloads', {}, 'jsfcljs,id,123'
+            );
+        });
+
+        it('does not call Playwright fallback for file without script (BUG-004)', async () => {
+            mockPlaywright.enterCourseAndGetHTML.mockResolvedValue({ success: true, html: '<html></html>' });
+            mockPlaywright.navigateToFilesSection.mockResolvedValue({ success: true, html: '<html></html>' });
+            mockHttp.getCourseFiles.mockResolvedValue({ success: true, files: [] });
+            mockHttp.downloadFile.mockResolvedValue({ success: false, error: 'HTTP Error 302' });
+
+            const result = await service.downloadAllFiles(
+                'C1', 'Math',
+                [{ name: 'doc.pdf', url: '' }],
+                '/mock/downloads'
+            );
+
+            expect(result.failed).toBe(1);
+            expect(mockPlaywright.downloadFile).not.toHaveBeenCalled();
+        });
+    });
 });
