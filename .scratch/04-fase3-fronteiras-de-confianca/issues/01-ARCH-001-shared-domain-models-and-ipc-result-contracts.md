@@ -1,5 +1,5 @@
 # ARCH-001 — Shared domain models and IPC result contracts
-Status: open
+Status: claimed
 Priority: P0
 Tracker status at migration: `NOT STARTED`
 
@@ -36,7 +36,7 @@ ViewState values, cookies, or internal SIGAA URLs.
 - Main, preload, and renderer import the same contract definitions. ✅
 - No IPC method returns an untyped `Promise<any>`. ✅ (nem `unknown[]`; guardado por teste)
 - Existing flows compile against `AppResult<T>`. ✅
-- Error consumers distinguish retryable portal failures from invalid requests. ❌ — `isRetryable` existe e ninguém consome; o background sync reloga em qualquer erro que não seja `SELECTOR_DRIFT` (revisão READ de `485bf75`, `handoffs/ARCH-001-READ-review.md`; correção via PTMR, `handoffs/01-to-plan.md`)
+- Error consumers distinguish retryable portal failures from invalid requests. ✅ — correction cycle 01 consumes `isRetryable`; only `SESSION_EXPIRED` relogs.
 - `tsconfig.json` includes the shared contract directory. ✅ (já incluía)
 
 #### Verification
@@ -101,3 +101,27 @@ retornos dos parsers); `vitest run` 179 passed, 4 skipped, 183 coletados (eram 1
   - `course-detail.ts` e `dashboard.ts` ainda leem `coursesWithFiles` como
     `any` em vários pontos; o tipo `CourseSnapshot` existe, é trocar quando
     cada arquivo for tocado (catraca do ESLint).
+
+#### Correction cycle 01 (2026-09-03) — READ review
+
+The PTMR correction closes the four findings from the independent READ review
+of `485bf75`:
+
+- manual sync preserves prior course snapshots when a course-file request fails;
+- main-process download falls back to Playwright's live DOM lookup without
+  returning scripts to the renderer;
+- background sync consumes `isRetryable` and relogs only on `SESSION_EXPIRED`;
+- download scripts match only the supplied file id, never the filename.
+
+Commits: `445ede5` (red tests; amended after TEST retry #2 to isolate hash
+state), `2b9d459` (production implementation), and the READ closure commit.
+Red-green proof reported 10 focused failures with production sources stashed;
+the complete READ gate passed: typecheck clean, lint 0 errors / 77 legacy
+warnings, and Vitest 190 passed | 4 skipped (194 collected). READ found no
+behavioural concern, plan deviation, suspicious test, or refactor to keep.
+
+## Ciclos PTMR
+
+| cycle | issue | verdict | culprit | reason |
+| --- | --- | --- | --- | --- |
+| 01 | ARCH-001 | clean | - | Four READ-review corrections implemented; gate green. |
