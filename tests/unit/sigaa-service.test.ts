@@ -242,6 +242,18 @@ describe('SigaaService (Unit)', () => {
             expect(mockHttp.downloadFile.mock.calls[0][4]).toBe(SCRIPT);
         });
 
+        it('does not select a file by name when the id does not match (ARCH-001 READ §4)', async () => {
+            const onlyId999 = { ...PARSED_DOC, id: '999', script: SCRIPT.replace('id,123', 'id,999') };
+            mockHttp.getCourseFiles.mockResolvedValue({ success: true, files: [onlyId999] });
+            mockPlaywright.downloadFile.mockResolvedValue({ success: false, error: 'Playwright: link not found' });
+
+            const forgedRef = { id: 'forjado', name: 'doc.pdf' };
+            const result = await service.downloadFile('C1', 'Math', forgedRef, '/mock/downloads');
+
+            expect(mockHttp.downloadFile).not.toHaveBeenCalled();
+            expect(result).toEqual({ success: false, error: { code: 'DOWNLOAD_FAILED', message: 'Playwright: link not found' } });
+        });
+
         it('falls back to the Dashboard HTML when the files section does not list the file', async () => {
             mockHttp.getCourseFiles
                 .mockResolvedValueOnce({ success: true, files: [] })          // seção de arquivos
@@ -255,15 +267,27 @@ describe('SigaaService (Unit)', () => {
             expect(result.success).toBe(true);
         });
 
-        it('returns NOT_FOUND without any download attempt when the file is on neither page (ARCH-001)', async () => {
+        it('falls back to Playwright without a script when neither static parse lists the file (ARCH-001 READ §2)', async () => {
             mockHttp.getCourseFiles.mockResolvedValue({ success: true, files: [] });
+            mockPlaywright.downloadFile.mockResolvedValue({ success: true, filePath: '/mock/downloads/Math/doc.pdf' });
 
             const result = await service.downloadFile('C1', 'Math', DOC_REF, '/mock/downloads');
 
-            expect(result.success).toBe(false);
-            if (!result.success) expect(result.error.code).toBe('NOT_FOUND');
             expect(mockHttp.downloadFile).not.toHaveBeenCalled();
-            expect(mockPlaywright.downloadFile).not.toHaveBeenCalled();
+            expect(mockPlaywright.downloadFile).toHaveBeenCalledWith(
+                'C1', 'Math', 'doc.pdf', '', '/mock/downloads', {}, undefined
+            );
+            expect(result).toEqual({ success: true, data: { filePath: '/mock/downloads/Math/doc.pdf' } });
+        });
+
+        it('returns DOWNLOAD_FAILED when Playwright fallback fails after neither static parse lists the file (ARCH-001 READ §2)', async () => {
+            mockHttp.getCourseFiles.mockResolvedValue({ success: true, files: [] });
+            mockPlaywright.downloadFile.mockResolvedValue({ success: false, error: 'Playwright: link not found' });
+
+            const result = await service.downloadFile('C1', 'Math', DOC_REF, '/mock/downloads');
+
+            expect(mockHttp.downloadFile).not.toHaveBeenCalled();
+            expect(result).toEqual({ success: false, error: { code: 'DOWNLOAD_FAILED', message: 'Playwright: link not found' } });
         });
 
         it('does not call Playwright when HTTP succeeds on first attempt', async () => {
@@ -338,17 +362,48 @@ describe('SigaaService (Unit)', () => {
             );
         });
 
-        it('marks a file the fresh page does not list as failed, without Playwright (BUG-004, ARCH-001)', async () => {
+        it('batch: file absent from Dashboard and files section goes to Playwright without a script (ARCH-001 READ §2)', async () => {
             mockPlaywright.enterCourseAndGetHTML.mockResolvedValue({ success: true, html: '<html></html>' });
             mockHttp.getCourseFiles.mockResolvedValue({ success: true, files: [] });
-            mockHttp.downloadFile.mockResolvedValue({ success: false, error: 'HTTP Error 302' });
+            mockPlaywright.navigateToFilesSection.mockResolvedValue({ success: true, html: '<files></files>' });
+            mockPlaywright.downloadFile.mockResolvedValue({ success: true, filePath: '/mock/downloads/Math/doc.pdf' });
 
             const result = await service.downloadAllFiles('C1', 'Math', [DOC_REF], '/mock/downloads');
 
+            expect(mockPlaywright.navigateToFilesSection).toHaveBeenCalledTimes(1);
             expect(result.success).toBe(true);
-            if (result.success) expect(result.data.failed).toBe(1);
+            if (result.success) {
+                expect(result.data.downloaded).toBe(1);
+                expect(result.data.failed).toBe(0);
+            }
             expect(mockHttp.downloadFile).not.toHaveBeenCalled();
+        });
+
+        it('batch: uses the files-section script when the Dashboard lacks the file', async () => {
+            mockPlaywright.enterCourseAndGetHTML.mockResolvedValue({ success: true, html: '<html></html>' });
+            // Dashboard parse returns no files
+            mockHttp.getCourseFiles
+                .mockResolvedValueOnce({ success: true, files: [] })          // files section parse (called in _downloadFileInternal per-file? No — in batch it's different)
+                .mockResolvedValueOnce({ success: true, files: [PARSED_DOC] }); // Dashboard parse in batch
+            mockPlaywright.navigateToFilesSection.mockResolvedValue({ success: true, html: '<files></files>' });
+            mockHttp.downloadFile.mockResolvedValue({ success: true, filePath: '/mock/downloads/doc.pdf' });
+
+            const result = await service.downloadAllFiles('C1', 'Math', [DOC_REF], '/mock/downloads');
+
+            expect(mockHttp.downloadFile).toHaveBeenCalledTimes(1);
+            expect(mockHttp.downloadFile.mock.calls[0][4]).toBe(SCRIPT);
             expect(mockPlaywright.downloadFile).not.toHaveBeenCalled();
+        });
+
+        it('batch: does not navigate to the files section when the Dashboard already lists every file', async () => {
+            mockPlaywright.enterCourseAndGetHTML.mockResolvedValue({ success: true, html: '<html></html>' });
+            mockHttp.getCourseFiles.mockResolvedValue({ success: true, files: [PARSED_DOC] });
+            mockHttp.downloadFile.mockResolvedValue({ success: true, filePath: '/mock/downloads/doc.pdf' });
+
+            const result = await service.downloadAllFiles('C1', 'Math', [DOC_REF], '/mock/downloads');
+
+            expect(mockPlaywright.navigateToFilesSection).not.toHaveBeenCalled();
+            expect(mockHttp.downloadFile).toHaveBeenCalledTimes(1);
         });
     });
 });

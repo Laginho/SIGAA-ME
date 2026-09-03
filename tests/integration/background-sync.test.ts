@@ -225,6 +225,56 @@ describe('BackgroundSyncService.syncNow', () => {
         expect(cacheState.callLog).not.toContain('updateCourseState');
     });
 
+    it('does not re-login on PORTAL_UNAVAILABLE; waits for next cycle', async () => {
+        const sigaaService = makeSigaaService({
+            getCourses: vi.fn(async () => fail('PORTAL_UNAVAILABLE', 'timeout of 10000ms exceeded')),
+        });
+        const window = makeWindow();
+        const service = new BackgroundSyncService(sigaaService, () => window);
+
+        const p = service.syncNow();
+        await vi.runAllTimersAsync();
+        await expect(p).resolves.toBeUndefined();
+
+        expect(sigaaService.getCourses).toHaveBeenCalledTimes(1);
+        expect(sigaaService.login).not.toHaveBeenCalled();
+        expect(window.webContents.send).not.toHaveBeenCalled();
+        expect(cacheState.callLog).not.toContain('updateCourseState');
+    });
+
+    it('does not re-login on INVALID_REQUEST; aborts with error log', async () => {
+        const sigaaService = makeSigaaService({
+            getCourses: vi.fn(async () => fail('INVALID_REQUEST', 'x')),
+        });
+        const window = makeWindow();
+        const service = new BackgroundSyncService(sigaaService, () => window);
+
+        const p = service.syncNow();
+        await vi.runAllTimersAsync();
+        await expect(p).resolves.toBeUndefined();
+
+        expect(sigaaService.getCourses).toHaveBeenCalledTimes(1);
+        expect(sigaaService.login).not.toHaveBeenCalled();
+        expect(window.webContents.send).not.toHaveBeenCalled();
+        expect(cacheState.callLog).not.toContain('updateCourseState');
+    });
+
+    it('re-logins on SESSION_EXPIRED and retries getCourses', async () => {
+        const sigaaService = makeSigaaService({
+            getCourses: vi.fn(async () => fail('SESSION_EXPIRED', 'Session expired')),
+            login: vi.fn(async () => ok({ id: 'u', name: 'U' }))
+        });
+        const window = makeWindow();
+        const service = new BackgroundSyncService(sigaaService, () => window);
+
+        const p = service.syncNow();
+        await vi.runAllTimersAsync();
+        await expect(p).resolves.toBeUndefined();
+
+        expect(sigaaService.login).toHaveBeenCalledTimes(1);
+        expect(sigaaService.getCourses).toHaveBeenCalledTimes(2);
+    });
+
     it('guards against reentrancy: a sync already in flight makes a second call return immediately without a second getCourses call', async () => {
         let resolveGetCourses!: (value: AppResult<{ courses: any[] }>) => void;
         const hang = new Promise<AppResult<{ courses: any[] }>>(resolve => {
