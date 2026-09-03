@@ -70,5 +70,5 @@ test-results/
 playwright-report/
 
 # PTMR: handoffs são entregues por caminho absoluto, nunca commitados. O ledger
-# (.scratch/<feature>/ledger.md) fica fora deste padrão e É commitado.
+# do PTMR fica na tabela "Ciclos PTMR" do arquivo da issue e É commitado.
 .scratch/**/handoffs/
