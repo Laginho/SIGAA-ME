@@ -3,6 +3,8 @@ import { SigaaService } from './sigaa.service';
 import { persistenceService } from './persistence.service';
 import { cacheService } from './cache.service';
 import * as path from 'path';
+import type { CourseSnapshot, CourseSummary, NotificationItem } from '../../shared/domain';
+import type { BackgroundSyncUpdate } from '../../shared/ipc';
 
 export class BackgroundSyncService {
     private sigaaService: SigaaService;
@@ -19,7 +21,7 @@ export class BackgroundSyncService {
         this.stop();
         const settings = persistenceService.getSettings();
         if (!settings.runInBackground) return;
-        
+
         const intervalMs = settings.syncInterval * 60 * 1000;
         console.log(`[BackgroundSync] Starting sync scheduler every ${settings.syncInterval} minutes`);
         this.intervalId = setInterval(() => this.syncNow(), intervalMs);
@@ -58,27 +60,34 @@ export class BackgroundSyncService {
             }
 
             // A quiet background login (or session verification)
-            // sigaaService.login handles reuse if Playwright is already authenticated, 
+            // sigaaService.login handles reuse if Playwright is already authenticated,
             // but we might just try to fetch courses and if it fails, relogin.
             const coursesResult = await this.sigaaService.getCourses();
-            let courses = coursesResult.courses;
+            let courses: CourseSummary[];
 
-            if (!coursesResult.success) {
+            if (coursesResult.success) {
+                courses = coursesResult.data.courses;
+            } else if (coursesResult.error.code === 'SELECTOR_DRIFT') {
+                // Relogar não muda o HTML do portal. Um login automatizado a cada
+                // ciclo, sem chance de sucesso, é só risco de bloqueio de conta.
+                console.error('[BackgroundSync] Portal layout changed; re-login would not help:', coursesResult.error.message);
+                return;
+            } else {
                 console.log('[BackgroundSync] Session expired or invalid. Attempting re-login...');
                 const loginResult = await this.sigaaService.login(creds.username, creds.password);
                 if (!loginResult.success) {
-                    console.error('[BackgroundSync] Re-login failed:', loginResult.message);
+                    console.error('[BackgroundSync] Re-login failed:', loginResult.error.message);
                     return;
                 }
                 const retryCourses = await this.sigaaService.getCourses();
                 if (!retryCourses.success) {
-                    console.error('[BackgroundSync] Retry after re-login failed:', retryCourses.message ?? 'unknown');
+                    console.error('[BackgroundSync] Retry after re-login failed:', retryCourses.error.message);
                     return;
                 }
-                courses = retryCourses.courses;
+                courses = retryCourses.data.courses;
             }
 
-            if (!courses || courses.length === 0) {
+            if (courses.length === 0) {
                 console.log('[BackgroundSync] No courses found to sync.');
                 return;
             }
@@ -87,21 +96,21 @@ export class BackgroundSyncService {
             let totalNewNews = 0;
             let coursesWithUpdates = 0;
             let singleCourseUpdateName = '';
-            const allCoursesData: any[] = [];
-            const newNotifications: any[] = []; // Structured notifications for the bell
+            const allCoursesData: CourseSnapshot[] = [];
+            const newNotifications: NotificationItem[] = []; // Structured notifications for the bell
             const pendingCommits: { courseId: string; fileIds: string[]; newsIds: string[] }[] = [];
 
             for (const course of courses) {
                 console.log(`[BackgroundSync] Checking course: ${course.name}`);
-                
+
                 // Wait briefly to avoid hammering the SIGAA server
                 await new Promise(resolve => setTimeout(resolve, 2000));
 
                 const contentResult = await this.sigaaService.getCourseFiles(course.id, course.name);
-                
+
                 if (contentResult.success) {
-                    const currentFiles = contentResult.files || [];
-                    const currentNews = contentResult.news || [];
+                    const currentFiles = contentResult.data.files;
+                    const currentNews = contentResult.data.news;
 
                     // Check if this is a cold-start (first sync for this course, no prior cache).
                     // On cold-start, all items appear "new" in the diff, but they're not truly new —
@@ -122,7 +131,7 @@ export class BackgroundSyncService {
                         console.log(`[BackgroundSync] Cold start for ${course.name} — populating baseline (${currentFiles.length} files, ${currentNews.length} news). No notifications.`);
                     } else if (diff.newFiles.length > 0 || diff.newNews.length > 0) {
                         console.log(`[BackgroundSync] Found ${diff.newFiles.length} new files and ${diff.newNews.length} new news in ${course.name}`);
-                        
+
                         totalNewFiles += diff.newFiles.length;
                         totalNewNews += diff.newNews.length;
                         coursesWithUpdates++;
@@ -157,11 +166,10 @@ export class BackgroundSyncService {
                         // Auto-download new files
                         if (settings.autoDownloadUpdates && diff.newFiles.length > 0 && settings.lastDownloadPath) {
                             console.log('[BackgroundSync] Auto-downloading new files...');
-                            const filesToDownload = diff.newFiles.map(f => ({ name: f.name, url: f.url, script: f.script }));
                             await this.sigaaService.downloadAllFiles(
                                 course.id,
                                 course.name,
-                                filesToDownload,
+                                diff.newFiles,
                                 settings.lastDownloadPath
                             );
                         }
@@ -173,11 +181,11 @@ export class BackgroundSyncService {
                                 try {
                                     await new Promise(resolve => setTimeout(resolve, 1500));
                                     const detail = await this.sigaaService.getNewsDetail(course.id, course.name, newsItem.id);
-                                    if (detail.success && detail.news) {
+                                    if (detail.success) {
                                         // Inject content into the news array so it's cached
-                                        const target = currentNews.find((n: any) => n.id === newsItem.id);
+                                        const target = currentNews.find(n => n.id === newsItem.id);
                                         if (target) {
-                                            target.content = detail.news.content;
+                                            target.content = detail.data.content;
                                             console.log(`[BackgroundSync] Cached content for news "${newsItem.title}"`);
                                         }
                                     }
@@ -196,7 +204,7 @@ export class BackgroundSyncService {
                         fileCount: currentFiles.length
                     });
                 } else {
-                    console.warn(`[BackgroundSync] Failed to fetch content for ${course.name}: ${contentResult.message}`);
+                    console.warn(`[BackgroundSync] Failed to fetch content for ${course.name}: ${contentResult.error.message}`);
                 }
             }
 
@@ -207,11 +215,12 @@ export class BackgroundSyncService {
             if (allCoursesData.length > 0) {
                 const window = this.getWindow();
                 if (window && !window.isDestroyed()) {
-                    window.webContents.send('background-sync-update', {
+                    const update: BackgroundSyncUpdate = {
                         courses: allCoursesData,
                         notifications: newNotifications,
                         timestamp: Date.now()
-                    });
+                    };
+                    window.webContents.send('background-sync-update', update);
                     console.log(`[BackgroundSync] Pushed ${allCoursesData.length} courses and ${newNotifications.length} notifications to renderer.`);
                 }
             }

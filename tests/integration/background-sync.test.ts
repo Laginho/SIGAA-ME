@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SigaaService } from '../../electron/services/sigaa.service';
 import type { BrowserWindow } from 'electron';
 import type { AppSettings } from '../../shared/ipc';
+import { type AppResult, fail, ok } from '../../shared/errors';
 
 vi.mock('electron', () => ({
     app: {
@@ -88,11 +89,11 @@ function makeWindow() {
 
 function makeSigaaService(overrides: Partial<Record<'getCourses' | 'getCourseFiles' | 'login' | 'downloadAllFiles' | 'getNewsDetail', any>> = {}) {
     return {
-        getCourses: vi.fn(async () => ({ success: true, courses: [] })),
-        getCourseFiles: vi.fn(async () => ({ success: true, files: [], news: [] })),
-        login: vi.fn(async () => ({ success: true })),
-        downloadAllFiles: vi.fn(async () => ({ success: true })),
-        getNewsDetail: vi.fn(async () => ({ success: false })),
+        getCourses: vi.fn(async () => ok({ courses: [] })),
+        getCourseFiles: vi.fn(async () => ok({ files: [], news: [] })),
+        login: vi.fn(async () => ok({ id: 'u', name: 'U' })),
+        downloadAllFiles: vi.fn(async () => ok({ downloaded: 0, skipped: 0, failed: 0, results: [] })),
+        getNewsDetail: vi.fn(async () => fail('UNKNOWN', 'x')),
         ...overrides
     } as unknown as SigaaService;
 }
@@ -111,9 +112,8 @@ describe('BackgroundSyncService.syncNow', () => {
 
     it('produces no notifications on a cold start but still populates courses and commits the baseline', async () => {
         const sigaaService = makeSigaaService({
-            getCourses: vi.fn(async () => ({ success: true, courses: [{ id: 'c1', name: 'Course 1' }] })),
-            getCourseFiles: vi.fn(async () => ({
-                success: true,
+            getCourses: vi.fn(async () => ok({ courses: [{ id: 'c1', name: 'Course 1' }] })),
+            getCourseFiles: vi.fn(async () => ok({
                 files: [{ id: '1', name: 'f1.pdf' }, { id: '2', name: 'f2.pdf' }],
                 news: [{ id: 'n1', title: 'News 1' }]
             }))
@@ -136,9 +136,8 @@ describe('BackgroundSyncService.syncNow', () => {
     it('notifies on a warm diff with the expected payload shape', async () => {
         cacheState.baselines.set('c1', { files: ['1'], news: [] });
         const sigaaService = makeSigaaService({
-            getCourses: vi.fn(async () => ({ success: true, courses: [{ id: 'c1', name: 'Course 1' }] })),
-            getCourseFiles: vi.fn(async () => ({
-                success: true,
+            getCourses: vi.fn(async () => ok({ courses: [{ id: 'c1', name: 'Course 1' }] })),
+            getCourseFiles: vi.fn(async () => ok({
                 files: [{ id: '1', name: 'f1.pdf' }, { id: '2', name: 'f2.pdf' }],
                 news: []
             }))
@@ -158,8 +157,8 @@ describe('BackgroundSyncService.syncNow', () => {
 
     it('commits the cache baseline only after delivering to the renderer, so a crash in between re-notifies next sync instead of losing the item', async () => {
         const sigaaService = makeSigaaService({
-            getCourses: vi.fn(async () => ({ success: true, courses: [{ id: 'c1', name: 'Course 1' }] })),
-            getCourseFiles: vi.fn(async () => ({ success: true, files: [{ id: '1', name: 'f1.pdf' }], news: [] }))
+            getCourses: vi.fn(async () => ok({ courses: [{ id: 'c1', name: 'Course 1' }] })),
+            getCourseFiles: vi.fn(async () => ok({ files: [{ id: '1', name: 'f1.pdf' }], news: [] }))
         });
         const window = makeWindow();
         const service = new BackgroundSyncService(sigaaService, () => window);
@@ -183,10 +182,9 @@ describe('BackgroundSyncService.syncNow', () => {
         cacheState.baselines.set('c1', { files: ['0'], news: [] });
         try {
             const sigaaService = makeSigaaService({
-                getCourses: vi.fn(async () => ({ success: true, courses: [{ id: 'c1', name: 'Course 1' }] })),
-                getCourseFiles: vi.fn(async () => ({
-                    success: true,
-                    files: [{ id: '1', name: 'f1.pdf', url: 'http://x/f1.pdf' }],
+                getCourses: vi.fn(async () => ok({ courses: [{ id: 'c1', name: 'Course 1' }] })),
+                getCourseFiles: vi.fn(async () => ok({
+                    files: [{ id: '1', name: 'f1.pdf', type: 'file' }],
                     news: []
                 })),
                 downloadAllFiles: vi.fn(async () => {
@@ -210,8 +208,8 @@ describe('BackgroundSyncService.syncNow', () => {
 
     it('aborts explicitly when the post-re-login retry also fails, without touching a single course', async () => {
         const sigaaService = makeSigaaService({
-            getCourses: vi.fn(async () => ({ success: false })),
-            login: vi.fn(async () => ({ success: true }))
+            getCourses: vi.fn(async () => fail('SESSION_EXPIRED', 'expired')),
+            login: vi.fn(async () => ok({ id: 'u', name: 'U' }))
         });
         const window = makeWindow();
         const service = new BackgroundSyncService(sigaaService, () => window);
@@ -228,8 +226,8 @@ describe('BackgroundSyncService.syncNow', () => {
     });
 
     it('guards against reentrancy: a sync already in flight makes a second call return immediately without a second getCourses call', async () => {
-        let resolveGetCourses!: (value: { success: true; courses: any[] }) => void;
-        const hang = new Promise<{ success: true; courses: any[] }>(resolve => {
+        let resolveGetCourses!: (value: AppResult<{ courses: any[] }>) => void;
+        const hang = new Promise<AppResult<{ courses: any[] }>>(resolve => {
             resolveGetCourses = resolve;
         });
         const sigaaService = makeSigaaService({
@@ -244,19 +242,18 @@ describe('BackgroundSyncService.syncNow', () => {
 
         expect(sigaaService.getCourses).toHaveBeenCalledTimes(1);
 
-        resolveGetCourses({ success: true, courses: [] });
+        resolveGetCourses(ok({ courses: [] }));
         await first;
     });
 
     it('skips a course whose getCourseFiles call failed but still delivers the courses that succeeded', async () => {
         const sigaaService = makeSigaaService({
-            getCourses: vi.fn(async () => ({
-                success: true,
+            getCourses: vi.fn(async () => ok({
                 courses: [{ id: 'a', name: 'Course A' }, { id: 'b', name: 'Course B' }]
             })),
             getCourseFiles: vi.fn(async (courseId: string) => {
-                if (courseId === 'a') return { success: false, message: 'x' };
-                return { success: true, files: [{ id: '1', name: 'f1.pdf' }], news: [] };
+                if (courseId === 'a') return fail('PORTAL_UNAVAILABLE', 'x');
+                return ok({ files: [{ id: '1', name: 'f1.pdf' }], news: [] });
             })
         });
         const window = makeWindow();

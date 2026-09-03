@@ -3,6 +3,21 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { app } from 'electron';
 import { logger } from './logger.service';
+import type { NewsDetail } from '../../shared/domain';
+
+/**
+ * Linha da lista de turmas como o portal a entrega. `href`/`onclick` são
+ * internos do JSF e **não** atravessam o IPC: `SigaaService` reduz isto a
+ * `CourseSummary` (shared/domain.ts).
+ */
+export interface ParsedCourse {
+    id: string;
+    code: string;
+    name: string;
+    period: string;
+    href: string | null;
+    onclick: string | null;
+}
 
 /**
  * Decides whether the loaded turma virtual page belongs to the expected course,
@@ -209,7 +224,7 @@ export class PlaywrightLoginService {
         }
     }
 
-    async getCourses(): Promise<{ success: boolean; courses?: any[]; photoUrl?: string; error?: string }> {
+    async getCourses(): Promise<{ success: boolean; courses?: ParsedCourse[]; photoUrl?: string; error?: string }> {
         try {
             logger.info('Playwright: Launching browser to fetch courses...');
 
@@ -284,7 +299,7 @@ export class PlaywrightLoginService {
             // Extract courses with robust selector-based logic
             console.log('Playwright: Extracting courses from page...');
             const courseExtraction = await page.evaluate(() => {
-                const results: any[] = [];
+                const results: ParsedCourse[] = [];
                 // Find all rows that might contain courses
                 const rows = document.querySelectorAll('tr');
 
@@ -908,7 +923,7 @@ export class PlaywrightLoginService {
         return { downloaded: 0, skipped: 0, failed: files.length, results: [] };
     }
 
-    async getNewsDetail(courseId: string, courseName: string, newsId: string): Promise<{ success: boolean; news?: any; error?: string }> {
+    async getNewsDetail(courseId: string, courseName: string, newsId: string): Promise<{ success: boolean; news?: NewsDetail; error?: string }> {
         try {
             console.log(`Playwright: Fetching news ${newsId} for course ${courseName}...`);
 

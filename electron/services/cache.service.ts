@@ -60,7 +60,7 @@ export class CacheService {
      * Compares new arrays against the cached ones, returning only the NEW items.
      * Elements should be objects with an `id` property.
      */
-    public diffCourseState(courseId: string, currentFiles: any[], currentNews: any[]): { newFiles: any[], newNews: any[] } {
+    public diffCourseState<F extends { id: string }, N extends { id: string }>(courseId: string, currentFiles: F[], currentNews: N[]): { newFiles: F[], newNews: N[] } {
         const cachedState = this.getCourseState(courseId);
         
         const newFiles = currentFiles.filter(item => item.id && !cachedState.files.includes(String(item.id)));

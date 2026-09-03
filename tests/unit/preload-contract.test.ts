@@ -31,6 +31,7 @@ const root = process.cwd();
 const preloadSource = readFileSync(path.join(root, 'electron/preload.ts'), 'utf8');
 const mainSource = readFileSync(path.join(root, 'electron/main.ts'), 'utf8');
 const sharedSource = readFileSync(path.join(root, 'shared/ipc.ts'), 'utf8');
+const domainSource = readFileSync(path.join(root, 'shared/domain.ts'), 'utf8');
 const courseDetailSource = readFileSync(path.join(root, 'src/pages/course-detail.ts'), 'utf8');
 
 /** Só o objeto `api` — a ponte genérica `ipcRenderer` é exposta antes e não interessa. */
@@ -97,6 +98,21 @@ describe('contrato window.api', () => {
 
     it('não acessa membros privados do CacheService por bracket notation no main', () => {
         expect(mainSource).not.toMatch(/cacheService\['/);
+    });
+
+    // ── ARCH-001: o que o renderer vê não carrega internos do SIGAA ──────
+    it('shared/domain.ts e shared/ipc.ts não declaram script, onclick, href, key, ViewState ou cookie (ARCH-001)', () => {
+        // Campo declarado (`nome:` ou `nome?:` no início da linha), não menção em
+        // comentário — o comentário explicando a regra pode citar os nomes.
+        expect(domainSource).not.toMatch(/^\s+(script|onclick|href|key|viewState|cookies?)\??:/m);
+        // `key` fica de fora no ipc.ts: `updateSetting(key, value)` é a chave do
+        // setting, não a `key` do JSF.
+        expect(sharedSource).not.toMatch(/^\s+(script|onclick|href|viewState|cookies?)\??:/m);
+    });
+
+    it('nenhum retorno do RendererApi é Promise<any> ou Promise<unknown> (ARCH-001)', () => {
+        const apiInterface = sharedSource.slice(sharedSource.indexOf('export interface RendererApi'));
+        expect(apiInterface).not.toMatch(/Promise<any>|Promise<unknown>|unknown\[\]/);
     });
 
     // ── DL-001: renderer não define raiz de download ──────────────────

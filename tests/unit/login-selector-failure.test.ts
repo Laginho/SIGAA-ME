@@ -27,7 +27,7 @@ describe('Login selector-drift recovery (renderer E2E boundary)', () => {
         (window as any).api = {
             login: vi.fn().mockResolvedValue({
                 success: false,
-                message: 'SIGAA login selector drift: the username field (input[name="user.login"]) was not found.'
+                error: { code: 'SELECTOR_DRIFT', message: 'SIGAA login selector drift: the username field (input[name="user.login"]) was not found.' }
             })
         };
     });

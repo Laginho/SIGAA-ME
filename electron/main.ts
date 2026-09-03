@@ -10,13 +10,16 @@ import { BackgroundSyncService } from './services/background-sync.service'
 import { cacheService } from './services/cache.service'
 import { isInsideRoot } from './services/download-path'
 import type {
+  CourseRequest,
   DownloadAllFilesPayload,
   DownloadFilePayload,
   DownloadProgress,
-  DownloadStatus,
   LoginCredentials,
+  NewsDetailRequest,
   SettingUpdate,
 } from '../shared/ipc'
+import type { DownloadStatus } from '../shared/domain'
+import { errorMessage, fail, failFromMessage, ok } from '../shared/errors'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -128,15 +131,16 @@ function createWindow() {
 // IPC Handlers
 ipcMain.handle('login-request', async (_event, { username, password, rememberMe }: LoginCredentials) => {
   const result = await sigaaService.login(username, password)
-  if (result.success && rememberMe) {
+  if (!result.success) return result;
+  if (rememberMe) {
     try {
       persistenceService.saveCredentials(username, password);
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = errorMessage(error);
       console.error('Failed to save remembered credentials:', message);
-      return { success: false, message: `Login succeeded, but the session could not be remembered: ${message}` };
+      return fail('STORAGE', `Login succeeded, but the session could not be remembered: ${message}`);
     }
-  } else if (result.success && !rememberMe) {
+  } else {
     persistenceService.clearCredentials();
   }
   return result;
@@ -148,14 +152,14 @@ ipcMain.handle('try-auto-login', async () => {
     console.log('Auto-login: stored credentials found');
     return await sigaaService.login(creds.username, creds.password);
   }
-  return { success: false };
+  return fail('SESSION_EXPIRED', 'Nenhuma credencial salva.');
 })
 
 ipcMain.handle('get-courses', async () => {
   return await sigaaService.getCourses()
 })
 
-ipcMain.handle('get-course-files', async (_, { courseId, courseName }) => {
+ipcMain.handle('get-course-files', async (_, { courseId, courseName }: CourseRequest) => {
   return await sigaaService.getCourseFiles(courseId, courseName);
 })
 
@@ -166,29 +170,28 @@ ipcMain.handle('select-download-folder', async () => {
   });
 
   if (result.canceled) {
-    return { success: false };
+    return fail('CANCELLED', 'Seleção de pasta cancelada.');
   }
 
   const folderPath = result.filePaths[0];
   persistenceService.updateSetting('lastDownloadPath', folderPath);
-  return { success: true, folderPath };
+  return ok({ folderPath });
 })
 
 ipcMain.handle('download-file', async (_, data: DownloadFilePayload) => {
   const root = persistenceService.getSettings().lastDownloadPath;
-  if (!root) return { success: false, message: 'Nenhuma pasta de downloads definida' };
+  if (!root) return fail('INVALID_REQUEST', 'Nenhuma pasta de downloads definida');
   return await sigaaService.downloadFile(
     data.courseId,
     data.courseName,
-    data.fileName,
-    root,
-    data.script
+    { id: data.fileId, name: data.fileName },
+    root
   );
 })
 
 ipcMain.handle('download-all-files', async (_, data: DownloadAllFilesPayload) => {
   const root = persistenceService.getSettings().lastDownloadPath;
-  if (!root) return { success: false, message: 'Nenhuma pasta de downloads definida' };
+  if (!root) return fail('INVALID_REQUEST', 'Nenhuma pasta de downloads definida');
   const onProgress = (fileName: string, status: DownloadStatus) => {
     const progress: DownloadProgress = { fileName, status };
     win?.webContents.send('download-progress', progress);
@@ -211,7 +214,7 @@ ipcMain.handle('check-files-existence', async (_, filePaths: string[]) => {
   }));
 })
 
-ipcMain.handle('get-news-detail', async (_, { courseId, courseName, newsId }) => {
+ipcMain.handle('get-news-detail', async (_, { courseId, courseName, newsId }: NewsDetailRequest) => {
   return await sigaaService.getNewsDetail(courseId, courseName, newsId);
 })
 
@@ -225,7 +228,7 @@ ipcMain.handle('get-app-settings', async () => {
 });
 
 ipcMain.handle('update-app-setting', async (_, update: SettingUpdate) => {
-  if (update.key === 'lastDownloadPath' && update.value !== null) return { success: false };
+  if (update.key === 'lastDownloadPath' && update.value !== null) return fail('INVALID_REQUEST', 'A pasta de downloads só pode ser definida pelo main (DL-001).');
   persistenceService.applySetting(update);
   if (update.key === 'openAtLogin') {
     app.setLoginItemSettings({
@@ -237,7 +240,7 @@ ipcMain.handle('update-app-setting', async (_, update: SettingUpdate) => {
   if (update.key === 'runInBackground' || update.key === 'syncInterval') {
     backgroundSyncService.restart();
   }
-  return { success: true };
+  return ok();
 });
 
 if (!app.isPackaged) {
@@ -249,11 +252,11 @@ ipcMain.handle('logout', async () => {
   try {
     persistenceService.clearCredentials();
     await sigaaService.logout();
-    return { success: true };
+    return ok();
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = errorMessage(error);
     console.error('Logout error:', message);
-    return { success: false, message };
+    return failFromMessage(message);
   }
 });
 
@@ -262,11 +265,11 @@ ipcMain.handle('clear-all-data', async () => {
   try {
     persistenceService.clearCredentials();
     await sigaaService.logout();
-    return { success: true };
+    return ok();
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = errorMessage(error);
     console.error('Clear all data error:', message);
-    return { success: false, message };
+    return failFromMessage(message);
   }
 });
 

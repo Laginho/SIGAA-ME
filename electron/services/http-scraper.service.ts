@@ -6,6 +6,32 @@ import { app } from 'electron';
 import mime from 'mime-types';
 import { sanitizeSegment, isInsideRoot } from './download-path';
 
+/**
+ * Arquivo como o parser o vê, com o que o main precisa para baixar. `script` e
+ * `key` são internos do JSF e **não** atravessam o IPC: `SigaaService` reduz
+ * isto a `CourseFile` (shared/domain.ts) antes de devolver.
+ */
+export interface ParsedFile {
+    id: string;
+    name: string;
+    type: 'file' | 'link';
+    /** `onclick` do JSF; só em `type: 'file'`. */
+    script?: string;
+    key?: string;
+    /** Só em `type: 'link'`. */
+    url?: string;
+    date?: string;
+}
+
+export interface ParsedNews {
+    id: string;
+    title: string;
+    date: string;
+    notification: string;
+    /** `onclick` do JSF. Não atravessa o IPC. */
+    script: string;
+}
+
 interface Cookie {
     name: string;
     value: string;
@@ -249,7 +275,7 @@ export class HttpScraperService {
 
 
 
-    async getCourseFiles(courseId: string, courseName?: string, preFetchedHtml?: string): Promise<{ success: boolean; files?: any[]; news?: any[]; error?: string }> {
+    async getCourseFiles(courseId: string, courseName?: string, preFetchedHtml?: string): Promise<{ success: boolean; files?: ParsedFile[]; news?: ParsedNews[]; error?: string }> {
         try {
             if (this.cookies.length === 0) {
                 return { success: false, error: 'No session cookies. Please login first.' };
@@ -441,8 +467,8 @@ export class HttpScraperService {
                 this.log(`[HttpScraper] WARNING: Could not extract ViewState for course ${courseId}`);
             }
 
-            const files: any[] = [];
-            const news: any[] = [];
+            const files: ParsedFile[] = [];
+            const news: ParsedNews[] = [];
 
             this.log('[HttpScraper] Scanning for files...');
             $files('a').each((_, el) => {

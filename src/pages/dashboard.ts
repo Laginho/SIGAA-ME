@@ -1,4 +1,5 @@
 import '../styles/dashboard.css';
+import type { BackgroundSyncUpdate } from '../../shared/ipc';
 import { toast } from '../components/toast';
 import { formatSyncLabel, mergeCoursesIntoCache } from '../utils/ui-helpers';
 import {
@@ -13,9 +14,9 @@ import {
 } from '../utils/notification-store';
 
 /** Handle a background sync update — exported for unit testing. */
-export function handleBackgroundSyncUpdate(data: any): void {
-  console.log('[Dashboard] Received background sync update:', data.courses?.length, 'courses');
-  if (data.courses && data.courses.length > 0) {
+export function handleBackgroundSyncUpdate(data: BackgroundSyncUpdate): void {
+  console.log('[Dashboard] Received background sync update:', data.courses.length, 'courses');
+  if (data.courses.length > 0) {
     try {
       mergeCoursesIntoCache(data.courses, { replaceSet: true }, data.timestamp);
     } catch (error) {
@@ -28,7 +29,7 @@ export function handleBackgroundSyncUpdate(data: any): void {
   }
 
   // Push notification items from the sync
-  if (data.notifications && data.notifications.length > 0) {
+  if (data.notifications.length > 0) {
     pushNotifications(data.notifications);
     updateBellBadge();
     toast.info(`${data.notifications.length} nova(s) atualização(ões) encontrada(s).`);
