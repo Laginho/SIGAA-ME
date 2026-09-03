@@ -3,9 +3,6 @@ Status: resolved
 Priority: P0
 Tracker status at migration: `DONE` — `npm run quality` verde no Windows em 2026-08-04 (68 passed, 4 skipped). Ver o `QA-003` para o que isso **não** prova.
 
-- Status: `DONE` — `npm run quality` verde no Windows em 2026-08-04
-  (68 passed, 4 skipped). Ver o `QA-003` para o que isso **não** prova.
-- Priority: `P0`
 - Owner: Claude (sessão 2026-08-02) / revisão de Bruno
 - Dependencies: none
 - Primary files: `package.json`, `eslint.config.js`, `shared/ipc.ts`,

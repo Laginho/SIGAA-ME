@@ -3,8 +3,6 @@ Status: resolved
 Priority: P1
 Tracker status at migration: `DONE` — `CLAUDE.md` existe na raiz (sessão 2026-08-02)
 
-- Status: `DONE` — `CLAUDE.md` existe na raiz (sessão 2026-08-02)
-- Priority: `P1`
 - Owner: —
 - Dependencies: `DOC-001`
 - Primary files: New: `CLAUDE.md` (raiz)

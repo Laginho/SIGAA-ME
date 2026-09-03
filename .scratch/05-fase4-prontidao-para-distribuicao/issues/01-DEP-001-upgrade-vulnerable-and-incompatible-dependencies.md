@@ -4,8 +4,6 @@ Priority: P1
 Blocked by: A11Y-001
 Tracker status at migration: `NOT STARTED`
 
-- Status: `NOT STARTED`
-- Priority: `P1`
 - Owner: —
 - Dependencies: security tests should be in place before broad upgrades
 - Primary files:

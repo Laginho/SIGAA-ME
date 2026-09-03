@@ -3,8 +3,6 @@ Status: resolved
 Priority: P1
 Tracker status at migration: `DONE`
 
-- Status: `DONE`
-- Priority: `P1`
 - Owner: Claude (sessão 2026-08-02)
 - Dependencies: none
 - Primary files: `CODE_REVIEW.md`, `docs/HARDENING_TRACKER.md`, `docs/PLANO.md`

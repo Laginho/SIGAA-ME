@@ -4,8 +4,6 @@ Priority: P1
 Blocked by: DATA-001
 Tracker status at migration: `NOT STARTED`
 
-- Status: `NOT STARTED`
-- Priority: `P1`
 - Owner: —
 - Dependencies: `DATA-001`, `CONC-001`
 - Primary files:

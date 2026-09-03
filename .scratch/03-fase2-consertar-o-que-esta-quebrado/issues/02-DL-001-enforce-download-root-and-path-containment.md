@@ -3,9 +3,6 @@ Status: resolved
 Priority: P1
 Tracker status at migration: `DONE` — ciclo PTMR 03 validado pelo master dev; Bruno confirmou no build instalado (2026-09-01): pasta persistida pelo main, download e "baixar todos" ok
 
-- Status: `DONE` — ciclo PTMR 03 validado pelo master dev; Bruno confirmou no build
-  instalado (2026-09-01): pasta persistida pelo main, download e "baixar todos" ok
-- Priority: `P1`
 - Owner: Bruno
 - Dependencies: `SEC-002`
 - Primary files:
@@ -93,3 +90,9 @@ PLAN não fechou o ciclo. A validação abaixo é do master dev, no branch.
   download. `downloadCourseFiles` e `playwrightLogin.downloadAllFiles`
   continuam sem chamador, não tocados.
 - Falta (do Bruno): um download real no app — o mesmo smoke cobre o `BUG-004`.
+
+## Ciclos PTMR
+
+| cycle | issue | verdict | culprit | reason |
+| --- | --- | --- | --- | --- |
+| 01 | DL-001 | correction | MASTER (plan) → TEST (opencode:mimo-v2.5-free) → MAKE (opencode:muse-spark-1.2-contributor-free) | Plan prescribed `rel.startsWith('..')` as the containment proof, a false positive for names beginning with `..`. TEST asserted `not.toMatch(/^\.\./)` against the plan's own stated result (`.._.._etc_passwd`); MAKE hid the mismatch by prefixing every dot-leading name with `_` (admitted in a comment) instead of reporting. READ never ran and no return handoff was written. Fixed directly by master dev in `a0c04b6` (small, root cause in the plan). |

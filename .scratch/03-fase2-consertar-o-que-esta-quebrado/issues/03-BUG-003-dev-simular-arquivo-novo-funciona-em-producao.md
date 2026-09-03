@@ -3,9 +3,6 @@ Status: resolved
 Priority: P1
 Tracker status at migration: `DONE` — ciclo PTMR 01 validado pelo master dev; Bruno confirmou no build empacotado 1.2.0 (2026-09-01) que o tray não tem `[Dev] Simular Arquivo Novo`
 
-- Status: `DONE` — ciclo PTMR 01 validado pelo master dev; Bruno confirmou no build
-  empacotado 1.2.0 (2026-09-01) que o tray não tem `[Dev] Simular Arquivo Novo`
-- Priority: `P1` (**promovido** de P2)
 - Owner: PTMR (PLAN 5.6 terra · TEST/READ mimo v2.5 · MAKE muse spark 1.2); master dev Claude
 - Dependencies: none
 - Primary files: `electron/main.ts`, `electron/preload.ts`
@@ -49,3 +46,9 @@ Ciclo limpo (ledger em `.scratch/bug-003/ledger.md`): três commits, um por fase
   preload de verdade com `electron` mockado), 1 em `preload-contract.test.ts`
   (nenhum `cacheService['` no `main.ts`). Vermelho-verde provado por MAKE.
 - `npm run quality` no worktree: 0 erros de lint, 121 testes passando, 4 skipped.
+
+## Ciclos PTMR
+
+| cycle | issue | verdict | culprit | reason |
+| --- | --- | --- | --- | --- |
+| 01 | BUG-003 | clean | - | TEST, MAKE and READ completed; `npm run quality` passed. |

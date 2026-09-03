@@ -3,8 +3,6 @@ Status: resolved
 Priority: P1
 Tracker status at migration: `DONE` — implementado e verificado em 2026-08-09
 
-- Status: `DONE` — implementado e verificado em 2026-08-09
-- Priority: `P1`
 - Owner: Codex
 - Dependencies: none
 - Primary files: `tests/unit/sigaa-service.test.ts`

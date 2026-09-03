@@ -3,8 +3,6 @@ Status: resolved
 Priority: P1
 Tracker status at migration: `DONE` — implementado na sessão 2026-08-05
 
-- Status: `DONE` — implementado na sessão 2026-08-05
-- Priority: `P1`
 - Owner: Claude
 - Dependencies: `QA-004`
 - Primary files: `tests/unit/parser.test.ts` (**apagado**),

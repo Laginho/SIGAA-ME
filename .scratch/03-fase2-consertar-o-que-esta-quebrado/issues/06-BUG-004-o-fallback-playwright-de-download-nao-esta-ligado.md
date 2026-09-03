@@ -3,10 +3,6 @@ Status: resolved
 Priority: P1
 Tracker status at migration: `DONE` — ciclo PTMR 01 validado pelo master dev; smoke do Bruno em 2026-09-01: o fallback disparou de verdade nos itens de tarefa (`BUG-011`), abriu Chrome dedicado e o log mostrou "Falling back to Playwright"
 
-- Status: `DONE` — ciclo PTMR 01 validado pelo master dev; smoke do Bruno em
-  2026-09-01: o fallback disparou de verdade nos itens de tarefa (`BUG-011`),
-  abriu Chrome dedicado e o log mostrou "Falling back to Playwright"
-- Priority: `P1`
 - Owner: PTMR (PLAN 5.6 terra · TEST/READ mimo v2.5 · MAKE muse spark 1.2); master dev Claude
 - Dependencies: `PIPE-002` (não mexer sem suíte executável)
 - Primary files:
@@ -150,3 +146,9 @@ Opção B implementada (ledger em `.scratch/bug-004/ledger.md`, ciclo limpo):
   para que uma falha no primeiro uso real seja atribuível; `sanitizeFolderName`
   divergente entre `SigaaService` (remove) e `DownloadService` (`_`, corta em
   100) — item 3 de "Enxugar ≠ deletar", só depois de medir.
+
+## Ciclos PTMR
+
+| cycle | issue | verdict | culprit | reason |
+| --- | --- | --- | --- | --- |
+| 01 | BUG-004 | clean | - | TEST red, MAKE green, and READ gate passed; awaiting master validation and Bruno's manual fallback smoke. |

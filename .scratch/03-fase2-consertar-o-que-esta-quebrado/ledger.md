@@ -12,3 +12,6 @@
 | 2026-08-05 | BUG-007 | — |
 | 2026-08-05 | BUG-008 | — |
 | 2026-09-01 | BUG-011 | `7723e89`, `eb9df2a` (git log; tracker não registrou) |
+| 2026-09-03 | BUG-005 | — (fechado na limpeza pós-migração; já estava concluído) |
+| 2026-09-03 | BUG-009 | — (fechado na limpeza pós-migração; já estava concluído) |
+| 2026-09-03 | BUG-010 | — (fechado na limpeza pós-migração; já estava concluído) |

@@ -3,9 +3,6 @@ Status: resolved
 Priority: P2
 Tracker status at migration: `DONE` — os dois testes existem e cada um falha com a proteção correspondente revertida (sessão 2026-09-01)
 
-- Status: `DONE` — os dois testes existem e cada um falha com a proteção
-  correspondente revertida (sessão 2026-09-01)
-- Priority: `P2`
 - Owner: Claude (sessão 2026-09-01, direto — tarefa só de teste, sem fase MAKE)
 - Dependencies: `PIPE-002`
 - Primary files: `tests/unit/course-detail.test.ts` (novo),

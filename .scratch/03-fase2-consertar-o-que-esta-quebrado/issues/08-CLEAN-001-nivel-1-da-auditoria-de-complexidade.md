@@ -3,8 +3,6 @@ Status: resolved
 Priority: P3
 Tracker status at migration: `DONE` — 2026-08-09, commit `700de9a`
 
-- Status: `DONE` — 2026-08-09, commit `700de9a`
-- Priority: `P3`
 - Owner: Claude (sessão 2026-08-09)
 - Dependencies: `PIPE-002`
 - Primary files: `electron/services/sigaa-login-ufc.ts` (removido),

@@ -1,12 +1,8 @@
 # BUG-009 — Id de arquivo capturado com o apóstrofo do JSF
-Status: claimed
+Status: resolved
 Priority: P2
 Tracker status at migration: `IN REVIEW` — código e testes prontos (sessão 2026-09-01); falta uma sincronização real com o `cache.json` antigo confirmando zero "arquivo novo", que é do Bruno
 
-- Status: `IN REVIEW` — código e testes prontos (sessão 2026-09-01); falta uma
-  sincronização real com o `cache.json` antigo confirmando zero "arquivo novo",
-  que é do Bruno
-- Priority: `P2`
 - Owner: Claude (sessão 2026-09-01)
 - Dependencies: none
 - Primary files: `electron/services/http-scraper.service.ts` (linhas ~428 e

@@ -3,9 +3,6 @@ Status: resolved
 Priority: P1
 Tracker status at migration: `DONE` — corrigido na sessão 2026-08-05
 
-- Status: `DONE` — corrigido na sessão 2026-08-05
-- Priority: `P1` — não bloqueia mais o `PIPE-003`; `DEP-002` também fechou em
-  2026-08-09
 - Owner: Claude
 - Dependencies: `PIPE-002`
 - Primary files: `src/utils/ui-helpers.ts`,

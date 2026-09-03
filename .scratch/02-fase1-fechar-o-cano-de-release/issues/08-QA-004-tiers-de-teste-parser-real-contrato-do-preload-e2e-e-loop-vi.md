@@ -3,8 +3,6 @@ Status: resolved
 Priority: P1
 Tracker status at migration: `DONE` — implementado na sessão 2026-08-05
 
-- Status: `DONE` — implementado na sessão 2026-08-05
-- Priority: `P1`
 - Owner: Claude
 - Dependencies: `PIPE-002`, `QA-002`
 - Primary files: `playwright.config.ts`,
