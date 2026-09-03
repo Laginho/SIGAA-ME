@@ -41,15 +41,16 @@ beforeEach(() => {
     (window as any).api = {
         getCourses: vi.fn().mockResolvedValue({
             success: true,
-            courses: [makeCourse('c1', 'Cálculo I'), makeCourse('c2', 'Física II')],
-            photoUrl: null,
+            data: { courses: [makeCourse('c1', 'Cálculo I'), makeCourse('c2', 'Física II')] },
         }),
         getCourseFiles: vi.fn().mockResolvedValue({
             success: true,
-            files: [{ name: 'Lista.pdf', script: 'jsfcljs...' }],
-            news: [{ id: 'n1', title: 'Aviso', date: '01/01/2026' }],
+            data: {
+                files: [{ id: '1', name: 'Lista.pdf', type: 'file' }],
+                news: [{ id: 'n1', title: 'Aviso', date: '01/01/2026', notification: '' }],
+            },
         }),
-        loadAllNews: vi.fn().mockResolvedValue({ success: true, news: [] }),
+        loadAllNews: vi.fn().mockResolvedValue({ success: true, data: [] }),
     };
 });
 
@@ -91,7 +92,7 @@ describe('Sync: progressive save', () => {
             await flushAll();
             const saved = JSON.parse(localStorage.getItem('coursesWithFiles') || '[]');
             savedAfterEachCourse.push(saved.length);
-            return { success: true, files: [], news: [] };
+            return { success: true, data: { files: [], news: [] } };
         });
 
         document.getElementById('btnFastSync')?.click();
@@ -152,7 +153,7 @@ describe('Sync: error state', () => {
         (window as any).api.getCourseFiles = vi.fn().mockImplementation(async () => {
             callCount++;
             if (callCount === 2) throw new Error('Network error on second course');
-            return { success: true, files: [], news: [] };
+            return { success: true, data: { files: [], news: [] } };
         });
 
         document.getElementById('btnFastSync')?.click();
@@ -186,7 +187,7 @@ describe('Sync: error state', () => {
         (window as any).api.getCourses = vi.fn().mockImplementation(async () => {
             attempt++;
             if (attempt === 1) throw new Error('First attempt fails');
-            return { success: true, courses: [], photoUrl: null };
+            return { success: true, data: { courses: [] } };
         });
 
         document.getElementById('btnFastSync')?.click();
@@ -211,8 +212,7 @@ describe('Sync: selector drift (QA-003)', () => {
         // cima do cache bom.
         (window as any).api.getCourses = vi.fn().mockResolvedValue({
             success: true,
-            courses: [{ id: 42 }],
-            photoUrl: null,
+            data: { courses: [{ id: 42 }] },
         });
 
         document.getElementById('btnFastSync')?.click();

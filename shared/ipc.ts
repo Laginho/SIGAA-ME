@@ -4,16 +4,28 @@
  * Este arquivo é importado pelos TRÊS lados (main, preload, renderer), então
  * não pode importar `electron`, `fs`, nem nada de Node — só tipos.
  *
- * Escopo deliberadamente pequeno: contém apenas o que atravessa o IPC hoje.
- * O `ARCH-001` do HARDENING_TRACKER prevê modelar também `CourseSummary`,
- * `CourseFile`, `NewsDetail`, `AppResult<T>` e `AppErrorCode`. Isso ainda não
- * está aqui porque os retornos do IPC não são anotados explicitamente — logo,
- * modelá-los agora seria especulação, e mudar todos os consumidores de uma vez
- * sem teste de fronteira é justamente o risco que a Fase 1 existe para evitar.
+ * Os modelos (disciplina, arquivo, notícia) vivem em `shared/domain.ts`; o
+ * resultado discriminado e os códigos de erro, em `shared/errors.ts`. Aqui fica
+ * só o que é específico do IPC: payloads, eventos e o `RendererApi`.
  *
  * Regra ao editar: nada de `any`. Se o formato é desconhecido, use `unknown` e
  * valide no consumidor.
  */
+
+import type {
+  AccountProfile,
+  CourseFile,
+  CourseId,
+  CourseSnapshot,
+  CourseSummary,
+  DownloadStatus,
+  DownloadResult,
+  DownloadToken,
+  NewsDetail,
+  NewsSummary,
+  NotificationItem,
+} from './domain'
+import type { AppResult } from './errors'
 
 // ---------------------------------------------------------------- credenciais
 
@@ -23,73 +35,32 @@ export interface LoginCredentials {
   rememberMe?: boolean
 }
 
-// ----------------------------------------------------------------------- conta
+// ---------------------------------------------------------------------- payloads
 
-/**
- * Identidade da conta exibida no header, devolvida por `login` e
- * `tryAutoLogin`. Fonte: `sigaa.service.ts:38`.
- */
-export interface AccountSummary {
-  name: string
-  photoUrl?: string
-}
-
-// ------------------------------------------------------------------ downloads
-
-/** Referência a um arquivo de disciplina, como o renderer a conhece. */
-export interface CourseFileRef {
-  name: string
-  url: string
-  script?: string
-}
-
-export interface DownloadFilePayload {
-  courseId: string
+export interface CourseRequest {
+  courseId: CourseId
   courseName: string
-  fileName: string
-  script?: string
 }
 
-export interface DownloadAllFilesPayload {
-  courseId: string
-  courseName: string
-  files: CourseFileRef[]
+export interface DownloadFilePayload extends CourseRequest {
+  fileId: DownloadToken
+  fileName: string
 }
 
-export type DownloadStatus = 'downloaded' | 'skipped' | 'failed'
+/** Só id e nome atravessam — nunca o objeto inteiro do cache, que pode carregar campos antigos. */
+export type DownloadFileRef = Pick<CourseFile, 'id' | 'name'>
 
-/**
- * Item de `downloadAllFiles().results`.
- * Fonte: `sigaa.service.ts:319,416,437,442` — `filePath` só existe quando
- * `status === 'downloaded'`.
- */
-export interface DownloadResultItem {
-  fileName: string
-  status: DownloadStatus
-  filePath?: string
+export interface DownloadAllFilesPayload extends CourseRequest {
+  files: DownloadFileRef[]
+}
+
+export interface NewsDetailRequest extends CourseRequest {
+  newsId: string
 }
 
 export interface DownloadProgress {
   fileName: string
   status: DownloadStatus
-}
-
-// ---------------------------------------------------------------------- news
-
-/**
- * Detalhe de uma notícia, como o Playwright a extrai
- * (`playwright-login.service.ts:1183-1188`). Todos os campos são `string`
- * porque o extrator devolve string vazia quando o rótulo não existe na página —
- * nenhum deles é opcional.
- *
- * ⚠️ `content` é **HTML bruto do SIGAA**. Não renderizar com `innerHTML` sem
- * sanitização — ver `SEC-001` e a regra 1 do `CLAUDE.md`.
- */
-export interface NewsDetail {
-  title: string
-  date: string
-  content: string
-  notification: string
 }
 
 // ------------------------------------------------------------------ settings
@@ -151,48 +122,37 @@ export type SettingUpdate =
  * apagaria todos os retornos e reabriria a porta do `BUG-006` (campo lido que o
  * main nunca devolveu). O retorno anotado é o que o typecheck tem para conferir.
  *
- * Os retornos ainda usam `unknown` em vários pontos: o `ARCH-001` vai modelar
- * `CourseSummary`, `CourseFile` e um `AppResult<T>` discriminado. Até então
- * `unknown` é honesto — obriga o consumidor a validar — enquanto `any` mentia
- * dizendo que o formato era conhecido. Os PAYLOADS (renderer -> main) já estão
- * estritos, porque é a direção por onde dado não confiável entra no processo
- * privilegiado.
+ * Todo retorno falível é `AppResult<T>` (ARCH-001). O que o main devolve é o
+ * que `SigaaService` devolve — ao mudar um, abra o outro.
  */
 export interface RendererApi {
-  login: (credentials: LoginCredentials) => Promise<{ success: boolean; message?: string; account?: AccountSummary }>
-  tryAutoLogin: () => Promise<{ success: boolean; message?: string; account?: AccountSummary }>
-  getCourses: () => Promise<{ success: boolean; courses?: unknown[]; photoUrl?: string; message?: string }>
-  getCourseFiles: (courseId: string, courseName?: string) => Promise<{ success: boolean; files?: unknown[]; news?: unknown[]; message?: string }>
-  selectDownloadFolder: () => Promise<{ success: true; folderPath: string } | { success: false }>
-  downloadFile: (data: DownloadFilePayload) => Promise<{ success: boolean; filePath?: string; message?: string }>
-  downloadAllFiles: (data: DownloadAllFilesPayload) => Promise<{ success: boolean; message?: string; downloaded?: number; skipped?: number; failed?: number; results?: DownloadResultItem[] }>
+  login: (credentials: LoginCredentials) => Promise<AppResult<AccountProfile>>
+  tryAutoLogin: () => Promise<AppResult<AccountProfile>>
+  getCourses: () => Promise<AppResult<{ courses: CourseSummary[]; photoUrl?: string }>>
+  getCourseFiles: (courseId: CourseId, courseName: string) => Promise<AppResult<{ files: CourseFile[]; news: NewsSummary[] }>>
+  selectDownloadFolder: () => Promise<AppResult<{ folderPath: string }>>
+  downloadFile: (data: DownloadFilePayload) => Promise<AppResult<{ filePath: string }>>
+  downloadAllFiles: (data: DownloadAllFilesPayload) => Promise<AppResult<DownloadResult>>
   checkFilesExistence: (filePaths: string[]) => Promise<{ path: string; exists: boolean }[]>
   onDownloadProgress: (callback: (data: DownloadProgress) => void) => () => void
-  getNewsDetail: (courseId: string, courseName: string, newsId: string) => Promise<{ success: boolean; news?: NewsDetail; message?: string }>
-  loadAllNews: (courseId: string, courseName: string) => Promise<{ success: boolean; news?: unknown[]; message?: string }>
-  logout: () => Promise<{ success: boolean; message?: string }>
-  clearAllData: () => Promise<{ success: boolean; message?: string }>
+  getNewsDetail: (courseId: CourseId, courseName: string, newsId: string) => Promise<AppResult<NewsDetail>>
+  loadAllNews: (courseId: CourseId, courseName: string) => Promise<AppResult<NewsSummary[]>>
+  logout: () => Promise<AppResult>
+  clearAllData: () => Promise<AppResult>
   getSettings: () => Promise<AppSettings>
   updateSetting: <K extends SettingUpdate['key']>(
     key: K,
     value: Extract<SettingUpdate, { key: K }>['value'],
-  ) => Promise<{ success: boolean }>
+  ) => Promise<AppResult>
   simulateNewFile?: () => Promise<boolean>
   onBackgroundSyncUpdate: (callback: (data: BackgroundSyncUpdate) => void) => () => void
 }
 
 // ------------------------------------------------------------------- eventos
 
-/**
- * Payload de `background-sync-update`.
- *
- * `courses` e `notifications` continuam `unknown[]` de propósito: o renderer
- * hoje faz merge estrutural com o que está no localStorage, e modelar isso é
- * tarefa do `ARCH-001`. `unknown` obriga o consumidor a validar antes de usar,
- * que é exatamente o que se quer numa fronteira.
- */
+/** Payload de `background-sync-update`. */
 export interface BackgroundSyncUpdate {
-  courses: unknown[]
-  notifications: unknown[]
+  courses: CourseSnapshot[]
+  notifications: NotificationItem[]
   timestamp: number
 }

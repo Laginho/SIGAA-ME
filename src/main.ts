@@ -45,7 +45,7 @@ function route() {
 window.addEventListener('hashchange', route)
 
 // Initial theme application
-window.api.getSettings().then((settings: any) => {
+window.api.getSettings().then((settings) => {
   document.documentElement.setAttribute('data-theme', settings.theme);
 });
 
@@ -56,9 +56,9 @@ if (!window.location.hash || window.location.hash === '#/login') {
   window.api.tryAutoLogin().then((result) => {
     if ((window as any).stopLoadingInterval) (window as any).stopLoadingInterval();
 
-    if (result.success && result.account) {
+    if (result.success) {
       console.log('Auto-login success!');
-      sessionStorage.setItem('account', JSON.stringify(result.account));
+      sessionStorage.setItem('account', JSON.stringify(result.data));
       window.location.hash = '#/dashboard';
     } else {
       route();

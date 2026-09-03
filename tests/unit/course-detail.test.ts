@@ -1,12 +1,16 @@
 // @vitest-environment jsdom
 /**
- * `QA-003`: a falha de download tem que mostrar a `message` que veio do main.
+ * `QA-003`: a falha de download tem que mostrar a mensagem que veio do main.
  *
  * O `BUG-006` foi corrigido lendo `result.message` em vez de `result.error`
  * (campo que nunca existiu), e na época nenhum teste tocava esse caminho —
- * quem pegou foi o `tsc`, quando o retorno deixou de ser `any`. Tipo prova que
- * o campo existe; este teste prova que o valor chega ao usuário. Reverter o
- * `BUG-006` faz este teste falhar com "Erro desconhecido".
+ * quem pegou foi o `tsc`, quando o retorno deixou de ser `any`. Desde o
+ * `ARCH-001` a falha é `{ success: false, error: { code, message } }`
+ * (`AppResult`, shared/errors.ts); o tipo prova que o campo existe e este teste
+ * prova que o valor chega ao usuário.
+ *
+ * Também cobre a fronteira do `ARCH-001`: o cache antigo carrega `script`, e o
+ * botão de download deve mandar só `fileId`/`fileName` — nunca o script.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { toast } from '../../src/components/toast';
@@ -32,7 +36,7 @@ describe('course-detail: falha de download', () => {
 
         (window as any).api = {
             getSettings: vi.fn().mockResolvedValue({ lastDownloadPath: 'C:/Users/aluno/SIGAA' }),
-            downloadFile: vi.fn().mockResolvedValue({ success: false, message: 'Sessão expirada no SIGAA' }),
+            downloadFile: vi.fn().mockResolvedValue({ success: false, error: { code: 'SESSION_EXPIRED', message: 'Sessão expirada no SIGAA' } }),
             selectDownloadFolder: vi.fn(),
             updateSetting: vi.fn(),
             // Assinado no render; sem ele a página cai no error-message e não há botão.
@@ -55,8 +59,9 @@ describe('course-detail: falha de download', () => {
         for (let i = 0; i < 10; i++) await flushAll();
 
         expect((window as any).api.downloadFile).toHaveBeenCalledWith(
-            expect.objectContaining({ courseId: 'c1', fileName: 'Lista 3.pdf' })
+            { courseId: 'c1', courseName: 'Cálculo I', fileId: '555', fileName: 'Lista 3.pdf' }
         );
+        expect(JSON.stringify((window as any).api.downloadFile.mock.calls[0][0])).not.toContain('jsfcljs');
         expect(toastError).toHaveBeenCalledWith('Erro no download: Sessão expirada no SIGAA');
         expect(toastError).not.toHaveBeenCalledWith(expect.stringContaining('Erro desconhecido'));
     });

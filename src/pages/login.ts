@@ -61,14 +61,14 @@ export function renderLoginPage(app: HTMLDivElement) {
     try {
       const result = await window.api.login({ username, password, rememberMe });
 
-      if (result.success && result.account) {
+      if (result.success) {
         console.log('Login success!');
         // Store account data in sessionStorage
-        sessionStorage.setItem('account', JSON.stringify(result.account));
+        sessionStorage.setItem('account', JSON.stringify(result.data));
         // Navigate to dashboard using hash
         window.location.hash = '#/dashboard';
       } else {
-        toast.error(`Erro ao entrar: ${result.message}`);
+        toast.error(`Erro ao entrar: ${result.error.message}`);
       }
     } catch (error) {
       console.error(error);

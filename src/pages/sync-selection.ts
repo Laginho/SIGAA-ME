@@ -1,16 +1,14 @@
 import '../styles/sync-selection.css';
 import { mergeCoursesIntoCache } from '../utils/ui-helpers';
+import type { CourseSnapshot, CourseSummary } from '../../shared/domain';
 
 /**
- * Forma mínima que esta página precisa de uma disciplina.
- *
- * `getCourses` devolve `unknown[]` de propósito: modelar `CourseSummary`
- * inteiro é o `ARCH-001`. Até lá, validar na fronteira é o que o `unknown`
- * existe para forçar — e tem um efeito colateral útil: se o SIGAA mudar e o
- * parser passar a devolver outra forma, isso aparece aqui como falha
- * explícita, em vez de `undefined` vazando para dentro do localStorage.
+ * Guarda de runtime por cima do tipo. O contrato diz `CourseSummary[]`, mas o
+ * dado nasce do HTML do portal: se o SIGAA mudar e o parser passar a devolver
+ * outra forma, isso aparece aqui como falha explícita (QA-003), em vez de
+ * `undefined` vazando para dentro do localStorage.
  */
-function isCourseLike(value: unknown): value is { id: string; name: string } {
+function isCourseLike(value: unknown): value is CourseSummary {
   if (typeof value !== 'object' || value === null) return false;
   const candidate = value as { id?: unknown; name?: unknown };
   return typeof candidate.id === 'string' && typeof candidate.name === 'string';
@@ -142,35 +140,36 @@ async function startSync(app: HTMLDivElement, mode: 'fast' | 'full') {
     updateProgress(10, 'Buscando Disciplinas', 'Verificando turmas ativas...');
     const result = await window.api.getCourses();
 
-    if (!result.success || !result.courses) {
-      throw new Error(result.message || 'Falha ao buscar disciplinas');
+    if (!result.success) {
+      throw new Error(result.error.message);
     }
 
-    const courses = result.courses.filter(isCourseLike);
-    const coursesWithContent: any[] = [];
+    const received = result.data.courses;
+    const courses = received.filter(isCourseLike);
+    const coursesWithContent: CourseSnapshot[] = [];
 
     // Zero disciplinas utilizáveis num retorno não vazio significa que o
     // formato mudou — deriva de seletor, não "aluno sem matrícula". Falhar
     // alto aqui é melhor que sincronizar dados vazios em cima do cache bom.
-    if (courses.length === 0 && result.courses.length > 0) {
+    if (courses.length === 0 && received.length > 0) {
       throw new Error(
-        `O SIGAA devolveu ${result.courses.length} disciplina(s) em formato desconhecido. ` +
+        `O SIGAA devolveu ${received.length} disciplina(s) em formato desconhecido. ` +
         'O app provavelmente precisa ser atualizado.'
       );
     }
 
-    if (courses.length < result.courses.length) {
+    if (courses.length < received.length) {
       console.warn(
-        `${result.courses.length - courses.length} de ${result.courses.length} disciplinas ignoradas por não terem id/name utilizáveis.`
+        `${received.length - courses.length} de ${received.length} disciplinas ignoradas por não terem id/name utilizáveis.`
       );
     }
 
     // Persist photo URL if returned
-    if (result.photoUrl) {
+    if (result.data.photoUrl) {
       const account = JSON.parse(sessionStorage.getItem('account') || '{}');
-      account.photoUrl = result.photoUrl;
+      account.photoUrl = result.data.photoUrl;
       sessionStorage.setItem('account', JSON.stringify(account));
-      localStorage.setItem('userPhotoUrl', result.photoUrl);
+      localStorage.setItem('userPhotoUrl', result.data.photoUrl);
     }
 
     updateProgress(20, 'Disciplinas Encontradas', `${courses.length} disciplinas identificadas.`);
@@ -187,22 +186,18 @@ async function startSync(app: HTMLDivElement, mode: 'fast' | 'full') {
       );
 
       const filesResult = await window.api.getCourseFiles(course.id, course.name);
-      let news = filesResult.success ? (filesResult.news || []) : [];
+      const files = filesResult.success ? filesResult.data.files : [];
+      let news = filesResult.success ? filesResult.data.news : [];
 
       if (mode === 'full' && news.length > 0) {
         updateProgress(stepPct + 5, `Baixando Conteúdo: ${course.name}`, `Lendo ${news.length} notícias...`);
         const contentResult = await window.api.loadAllNews(course.id, course.name);
-        if (contentResult.success && contentResult.news) {
-          news = contentResult.news;
+        if (contentResult.success) {
+          news = contentResult.data;
         }
       }
 
-      const synced = {
-        ...course,
-        files: filesResult.success ? filesResult.files : [],
-        news,
-        fileCount: filesResult.success ? filesResult.files?.length || 0 : 0
-      };
+      const synced: CourseSnapshot = { ...course, files, news, fileCount: files.length };
       coursesWithContent.push(synced);
 
       // Merge: preserves courses not yet processed this run and previously

@@ -2,6 +2,7 @@ import '../styles/course-detail.css'
 import { toast } from '../components/toast'
 import { isNewsCached } from '../utils/ui-helpers'
 import { isItemRead, markAsRead } from '../utils/notification-store'
+import type { CourseSnapshot } from '../../shared/domain'
 
 export function renderCourseDetailPage(container: HTMLDivElement, courseId: string) {
   container.innerHTML = `
@@ -79,7 +80,7 @@ export function renderCourseDetailPage(container: HTMLDivElement, courseId: stri
 
       const result = await window.api.loadAllNews(courseId, course?.name || 'Unknown Course');
 
-      if (result.success && result.news) {
+      if (result.success) {
         // Find current cached course
         const cachedData = localStorage.getItem('coursesWithFiles');
         if (cachedData) {
@@ -87,7 +88,7 @@ export function renderCourseDetailPage(container: HTMLDivElement, courseId: stri
           const course = courses.find((c: any) => c.id === courseId);
           if (course) {
             // Merge content
-            course.news = result.news;
+            course.news = result.data;
             localStorage.setItem('coursesWithFiles', JSON.stringify(courses));
             // Refresh UI
             fetchCourseFiles(courseId);
@@ -99,7 +100,7 @@ export function renderCourseDetailPage(container: HTMLDivElement, courseId: stri
           btn.disabled = false;
         }, 3000);
       } else {
-        toast.error('Erro ao carregar notícias: ' + (result.message || 'Erro desconhecido'));
+        toast.error('Erro ao carregar notícias: ' + result.error.message);
         btn.innerHTML = '❌ Erro';
         btn.disabled = false;
       }
@@ -264,7 +265,9 @@ async function fetchCourseFiles(courseId: string) {
           <div class="file-action">
             ${isDownloaded
             ? '<span class="status-done" title="Baixado">✅</span>'
-            : `<button class="btn-download-file" title="Baixar arquivo" data-file-name="${file.name}" data-file-url="${file.url}" data-file-script="${file.script || ''}">⬇️</button>`
+            : file.type === 'link'
+              ? '<span class="status-done" title="Link externo">🔗</span>'
+              : `<button class="btn-download-file" title="Baixar arquivo" data-file-name="${file.name}" data-file-id="${file.id}">⬇️</button>`
           }
           </div>
         </div>
@@ -283,10 +286,9 @@ async function fetchCourseFiles(courseId: string) {
           e.stopPropagation();
           const target = e.currentTarget as HTMLElement;
           const fileName = target.getAttribute('data-file-name');
-          const fileUrl = target.getAttribute('data-file-url');
-          const script = target.getAttribute('data-file-script');
+          const fileId = target.getAttribute('data-file-id');
 
-          if (fileName && (fileUrl || script)) {
+          if (fileName && fileId) {
             const fileItem = target.closest('.file-item');
             if (fileItem) clearUnread(fileItem, 'file', courseId, fileName);
 
@@ -294,7 +296,7 @@ async function fetchCourseFiles(courseId: string) {
             target.innerHTML = '🔄';
             target.classList.add('spinning');
 
-            await downloadSingleFile(course, fileName, target, script || undefined);
+            await downloadSingleFile(course, fileId, fileName, target);
           }
         });
       });
@@ -330,7 +332,7 @@ async function fetchCourseFiles(courseId: string) {
   }
 }
 
-async function downloadSingleFile(course: any, fileName: string, btnElement: HTMLElement, script?: string) {
+async function downloadSingleFile(course: CourseSnapshot, fileId: string, fileName: string, btnElement: HTMLElement) {
   try {
     const settings = await window.api.getSettings();
 
@@ -348,15 +350,15 @@ async function downloadSingleFile(course: any, fileName: string, btnElement: HTM
     const result = await window.api.downloadFile({
       courseId: course.id,
       courseName: course.name,
-      fileName: fileName,
-      script
+      fileId,
+      fileName
     });
 
     if (result.success) {
       if (!downloadedFiles[course.id]) downloadedFiles[course.id] = {};
       downloadedFiles[course.id][fileName] = {
         downloadedAt: Date.now(),
-        path: result.filePath
+        path: result.data.filePath
       };
       localStorage.setItem('downloadedFiles', JSON.stringify(downloadedFiles));
 
@@ -368,7 +370,7 @@ async function downloadSingleFile(course: any, fileName: string, btnElement: HTM
 
       toast.success(`Download concluído: ${fileName}`);
     } else {
-      toast.error(`Erro no download: ${result.message || 'Erro desconhecido'}`);
+      toast.error(`Erro no download: ${result.error.message}`);
       btnElement.innerHTML = '❌';
       btnElement.classList.remove('spinning');
     }
@@ -390,8 +392,8 @@ async function testDownloadAll(courseId: string) {
       return;
     }
 
-    const coursesWithFiles = JSON.parse(cachedData);
-    const course = coursesWithFiles.find((c: any) => c.id === courseId);
+    const coursesWithFiles: CourseSnapshot[] = JSON.parse(cachedData);
+    const course = coursesWithFiles.find((c) => c.id === courseId);
 
     if (!course || !course.files || course.files.length === 0) {
       toast.info('Nenhum arquivo para baixar nesta disciplina.');
@@ -422,42 +424,32 @@ async function testDownloadAll(courseId: string) {
     const result = await window.api.downloadAllFiles({
       courseId: course.id,
       courseName: course.name,
-      files: course.files
+      // Só id e nome: o cache antigo pode carregar `script`, e script não atravessa o IPC.
+      files: course.files.filter(f => f.type !== 'link').map(f => ({ id: f.id, name: f.name }))
     });
 
-    // O main omite os contadores quando falha antes de entrar na disciplina,
-    // então o contrato os declara opcionais. Normalizar aqui evita quatro
-    // `?? 0` espalhados pelas interpolações.
-    const downloaded = result.downloaded ?? 0;
-    const skipped = result.skipped ?? 0;
-    const failed = result.failed ?? 0;
-
-    if (result.success || downloaded > 0 || skipped > 0) {
+    if (result.success) {
+      const { downloaded, skipped, failed, results } = result.data;
       if (failed === 0) {
         toast.success(`Download concluído! ${downloaded} baixados, ${skipped} já existiam.`);
       } else {
         toast.error(`${downloaded} baixados, ${failed} falharam. Tente novamente mais tarde.`);
       }
 
-      if (result.results) {
-        result.results.forEach((r) => {
-          if (r.status === 'downloaded' && r.filePath) {
-            if (!downloadedFiles[courseId]) downloadedFiles[courseId] = {};
-            downloadedFiles[courseId][r.fileName] = {
-              downloadedAt: Date.now(),
-              path: r.filePath
-            };
-          }
-        });
-        localStorage.setItem('downloadedFiles', JSON.stringify(downloadedFiles));
-      }
-
-      fetchCourseFiles(courseId);
-
+      results.forEach((r) => {
+        if (r.status === 'downloaded') {
+          if (!downloadedFiles[courseId]) downloadedFiles[courseId] = {};
+          downloadedFiles[courseId][r.fileName] = {
+            downloadedAt: Date.now(),
+            path: r.filePath
+          };
+        }
+      });
+      localStorage.setItem('downloadedFiles', JSON.stringify(downloadedFiles));
     } else {
-      toast.error('Falha no download: ' + (result.message || 'Erro desconhecido'));
-      fetchCourseFiles(courseId);
+      toast.error('Falha no download: ' + result.error.message);
     }
+    fetchCourseFiles(courseId);
   } catch (error: any) {
     console.error('Download error:', error);
     toast.error('Erro no processo de download: ' + error.message);
@@ -534,7 +526,8 @@ async function openNewsModal(courseId: string, courseName: string, newsId: strin
     console.log('Fetching news via Playwright for course:', courseName);
     const result = await window.api.getNewsDetail(courseId, courseName, newsId)
 
-    if (result.success && result.news) {
+    if (result.success) {
+      const news = result.data;
       // Cache the fetched content in localStorage
       try {
         const cachedData = localStorage.getItem('coursesWithFiles');
@@ -544,10 +537,10 @@ async function openNewsModal(courseId: string, courseName: string, newsId: strin
           if (course && course.news) {
             const newsItem = course.news.find((n: any) => n.id === newsId);
             if (newsItem) {
-              newsItem.content = result.news.content;
-              newsItem.title = result.news.title;
-              newsItem.date = result.news.date;
-              newsItem.notification = result.news.notification;
+              newsItem.content = news.content;
+              newsItem.title = news.title;
+              newsItem.date = news.date;
+              newsItem.notification = news.notification;
               localStorage.setItem('coursesWithFiles', JSON.stringify(courses));
               console.log('Cached news content for', newsId);
             }
@@ -559,20 +552,20 @@ async function openNewsModal(courseId: string, courseName: string, newsId: strin
 
       modalBody.innerHTML = `
         <div class="modal-header">
-          <h3 class="modal-title">${result.news.title}</h3>
+          <h3 class="modal-title">${news.title}</h3>
           <div class="modal-meta">
-            <span>📅 ${result.news.date}</span>
-            ${result.news.notification === 'Sim' ? '<span>🔔 Notificação enviada</span>' : ''}
+            <span>📅 ${news.date}</span>
+            ${news.notification === 'Sim' ? '<span>🔔 Notificação enviada</span>' : ''}
           </div>
         </div>
         <div class="modal-body">
-          ${result.news.content}
+          ${news.content}
         </div>
       `
     } else {
       modalBody.innerHTML = `
         <div class="error-message">
-          Erro ao carregar notícia: ${result.message || 'Erro desconhecido'}
+          Erro ao carregar notícia: ${result.error.message}
         </div>
       `
     }

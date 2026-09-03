@@ -1,11 +1,48 @@
-import { HttpScraperService } from './http-scraper.service';
-import { PlaywrightLoginService } from './playwright-login.service';
+import { HttpScraperService, type ParsedFile, type ParsedNews } from './http-scraper.service';
+import { PlaywrightLoginService, type ParsedCourse } from './playwright-login.service';
 import { logger } from './logger.service';
 import * as fs from 'fs';
 import * as path from 'path';
 import { resolveDownloadTarget, ensureDirInsideRoot, sanitizeSegment } from './download-path';
+import type {
+    AccountProfile,
+    CourseFile,
+    CourseSummary,
+    DownloadRecord,
+    DownloadResult,
+    DownloadStatus,
+    NewsDetail,
+    NewsSummary,
+} from '../../shared/domain';
+import type { DownloadFileRef } from '../../shared/ipc';
+import { type AppResult, errorMessage, fail, failFromMessage, ok } from '../../shared/errors';
 
+// ---------------------------------------------------------------------------
+// Redução parser -> domínio (ARCH-001).
+//
+// É aqui, e só aqui, que `script`, `key`, `href` e `onclick` ficam para trás.
+// Tudo que sai desta classe é o que o renderer pode ver; o que o main precisa
+// para baixar (o script JSF) é reconstruído da página fresca a cada pedido.
+// ---------------------------------------------------------------------------
 
+function toCourseSummary(c: ParsedCourse): CourseSummary {
+    return { id: c.id, code: c.code, name: c.name, period: c.period };
+}
+
+function toCourseFile(f: ParsedFile): CourseFile {
+    return { id: f.id, name: f.name, type: f.type, date: f.date };
+}
+
+function toNewsSummary(n: ParsedNews): NewsSummary {
+    return { id: n.id, title: n.title, date: n.date, notification: n.notification };
+}
+
+/** Script JSF do arquivo na página fresca: pelo id (estável), senão pelo nome. */
+function findScript(files: ParsedFile[] | undefined, file: DownloadFileRef): string | undefined {
+    if (!files) return undefined;
+    const byId = file.id ? files.find(f => f.id === file.id) : undefined;
+    return (byId ?? files.find(f => f.name === file.name))?.script;
+}
 
 export class SigaaService {
     private playwrightLogin: PlaywrightLoginService;
@@ -34,31 +71,24 @@ export class SigaaService {
         }
     }
 
-
-
-    async login(username: string, password: string): Promise<{ success: boolean; message?: string; account?: { name: string; photoUrl?: string } }> {
+    async login(username: string, password: string): Promise<AppResult<AccountProfile>> {
         try {
             logger.info('SIGAA: Attempting login...');
             const result = await this.playwrightLogin.login(username, password);
 
-            if (result.success && result.cookies) {
+            if (!result.success) {
+                logger.error('SIGAA: Login failed', result.error);
+                return failFromMessage(result.error, 'Falha no login');
+            }
+            if (result.cookies) {
                 logger.info('SIGAA: Login successful, setting cookies for HTTP scraper');
                 this.httpScraper.setCookies(result.cookies);
-            } else {
-                logger.error('SIGAA: Login failed', result.error);
             }
-
-            return {
-                success: result.success,
-                message: result.error,
-                account: result.success ? {
-                    name: result.userName || 'User',
-                    photoUrl: undefined
-                } : undefined
-            };
-        } catch (error: any) {
+            // A foto só existe na página do portal; `getCourses` a devolve.
+            return ok({ id: username, name: result.userName || 'User' });
+        } catch (error) {
             logger.error('SIGAA: Login error', error);
-            return { success: false, message: error.message };
+            return failFromMessage(errorMessage(error));
         }
     }
 
@@ -67,29 +97,27 @@ export class SigaaService {
         await this.playwrightLogin.close();
     }
 
-
-    async getCourses(): Promise<{ success: boolean; courses?: any[]; photoUrl?: string; message?: string }> {
+    async getCourses(): Promise<AppResult<{ courses: CourseSummary[]; photoUrl?: string }>> {
+        this.startBusy();
         try {
             logger.info('SIGAA: Fetching courses using Playwright...');
-            // Mark busy
-            this.startBusy();
             const result = await this.playwrightLogin.getCourses();
-            this.stopBusy();
 
-            if (result.success && result.courses) {
-                logger.info(`SIGAA: Found ${result.courses.length || 0} courses`);
-            } else {
+            if (!result.success || !result.courses) {
                 logger.error('SIGAA: Failed to fetch courses', result.error);
+                return failFromMessage(result.error, 'Failed to fetch courses');
             }
-            return { success: result.success, courses: result.courses, photoUrl: result.photoUrl, message: result.error };
-        } catch (error: any) {
-            this.stopBusy();
+            logger.info(`SIGAA: Found ${result.courses.length} courses`);
+            return ok({ courses: result.courses.map(toCourseSummary), photoUrl: result.photoUrl });
+        } catch (error) {
             logger.error('SIGAA: Error fetching courses', error);
-            return { success: false, message: error.message || 'Failed to fetch courses' };
+            return failFromMessage(errorMessage(error), 'Failed to fetch courses');
+        } finally {
+            this.stopBusy();
         }
     }
 
-    async getCourseFiles(courseId: string, courseName: string): Promise<{ success: boolean; files?: any[]; news?: any[]; message?: string }> {
+    async getCourseFiles(courseId: string, courseName: string): Promise<AppResult<{ files: CourseFile[]; news: NewsSummary[] }>> {
         this.startBusy();
         try {
             // 1. Enter course (Lands on Dashboard/Portal)
@@ -97,7 +125,7 @@ export class SigaaService {
             const entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
 
             if (!entryResult.success || !entryResult.html) {
-                return { success: false, message: entryResult.error || 'Failed to enter course' };
+                return failFromMessage(entryResult.error, 'Failed to enter course');
             }
 
             if (entryResult.cookies) {
@@ -110,20 +138,23 @@ export class SigaaService {
             // Files with download links (jsfcljs...id...) are on the Dashboard, not the Conteúdo page
             logger.info('SIGAA: Parsing Dashboard for files and news...');
             const dashboardParse = await this.httpScraper.getCourseFiles(courseId, courseName, entryResult.html);
-            const newsItems = dashboardParse.news || [];
-            const filesList = dashboardParse.files || [];
-            logger.info(`SIGAA: Found ${filesList.length} files and ${newsItems.length} news items on Dashboard.`);
+            // Antes, falha de parse (sessão expirada, deriva de seletor) virava
+            // `success: true` com listas vazias — e uma disciplina vazia no cache.
+            if (!dashboardParse.success) {
+                return failFromMessage(dashboardParse.error, 'Failed to parse course page');
+            }
+            const files = (dashboardParse.files ?? []).map(toCourseFile);
+            const news = (dashboardParse.news ?? []).map(toNewsSummary);
+            logger.info(`SIGAA: Found ${files.length} files and ${news.length} news items on Dashboard.`);
 
-            return { success: true, files: filesList, news: newsItems };
-        } catch (error: any) {
+            return ok({ files, news });
+        } catch (error) {
             logger.error('SIGAA: Error fetching files:', error);
-            return { success: false, message: error.message || 'Failed to fetch files' };
+            return failFromMessage(errorMessage(error), 'Failed to fetch files');
         } finally {
             this.stopBusy();
         }
     }
-
-
 
     /**
      * Plano B do download (BUG-004): só depois que o HTTP falhou duas vezes.
@@ -131,23 +162,22 @@ export class SigaaService {
      */
     private async downloadViaPlaywright(
         courseId: string, courseName: string, fileName: string, basePath: string, script: string
-    ): Promise<{ success: true; filePath: string } | { success: false; message: string }> {
+    ): Promise<AppResult<{ filePath: string }>> {
         logger.warn(`SIGAA: HTTP download failed twice for ${fileName}. Falling back to Playwright...`);
         const result = await this.playwrightLogin.downloadFile(courseId, courseName, fileName, '', basePath, {}, script);
-        if (result.success && result.filePath) return { success: true, filePath: result.filePath };
-        return { success: false, message: result.error || 'Playwright download failed' };
+        if (result.success && result.filePath) return ok({ filePath: result.filePath });
+        return fail('DOWNLOAD_FAILED', result.error || 'Playwright download failed');
     }
 
     async downloadFile(
         courseId: string,
-        courseName: string, // Changed from _courseName to use it
-        fileName: string,
-        basePath: string,
-        script?: string
-    ): Promise<{ success: boolean; filePath?: string; message?: string }> {
+        courseName: string,
+        file: DownloadFileRef,
+        basePath: string
+    ): Promise<AppResult<{ filePath: string }>> {
         this.startBusy();
         try {
-            return await this._downloadFileInternal(courseId, courseName, fileName, basePath, script);
+            return await this._downloadFileInternal(courseId, courseName, file, basePath);
         } finally {
             this.stopBusy();
         }
@@ -156,80 +186,68 @@ export class SigaaService {
     private async _downloadFileInternal(
         courseId: string,
         courseName: string,
-        fileName: string,
-        basePath: string,
-        script?: string
-    ): Promise<{ success: boolean; filePath?: string; message?: string }> {
+        file: DownloadFileRef,
+        basePath: string
+    ): Promise<AppResult<{ filePath: string }>> {
+        // 0. Prepare Target Directory — resolve and prove containment BEFORE any network
+        let targetDir: string;
         try {
-            // 0. Prepare Target Directory — resolve and prove containment BEFORE any network
-            const { dir: targetDir } = resolveDownloadTarget(basePath, courseName, fileName);
+            targetDir = resolveDownloadTarget(basePath, courseName, file.name).dir;
             ensureDirInsideRoot(basePath, targetDir);
+        } catch (error) {
+            return fail('INVALID_REQUEST', errorMessage(error));
+        }
 
-            console.log(`SIGAA: Downloading file ${fileName}...`);
-            if (!script) {
-                return { success: false, message: 'Script not provided for download' };
-            }
+        try {
+            console.log(`SIGAA: Downloading file ${file.name}...`);
 
             // 1. Enter course via Full Browser (Dashboard) - Headless API skips valid ViewState for files
             logger.info('SIGAA: Entering course via Full Browser for download (State reliability)...');
             const entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
-
-            let parseResult: { success: boolean; files?: any[]; error?: string } = { success: false };
-
-            if (entryResult.success && entryResult.html) {
-                if (entryResult.cookies) {
-                    this.httpScraper.setCookies(entryResult.cookies);
-                }
-
-                // 2. Navigate to Files Section (Essential for ViewState)
-                logger.info('SIGAA: Navigating to Files Section for download state...');
-                const filesNavResult = await this.playwrightLogin.navigateToFilesSection();
-
-                logger.info(`SIGAA: filesNavResult.success=${filesNavResult.success}, hasHtml=${!!filesNavResult.html}, htmlLength=${filesNavResult.html?.length || 0}, error=${filesNavResult.error || 'none'}`);
-                if (filesNavResult.html) {
-                    const titleMatch = filesNavResult.html.match(/<title>(.*?)<\/title>/i);
-                    logger.info(`SIGAA: filesNavResult page title: "${titleMatch?.[1] || 'unknown'}"`);
-                }
-
-                if (filesNavResult.success && filesNavResult.html) {
-                    logger.info('SIGAA: Files Section loaded. Parsing fresh scripts...');
-                    parseResult = await this.httpScraper.getCourseFiles(courseId, courseName, filesNavResult.html);
-                } else {
-                    logger.warn('SIGAA: Failed to navigate to files section. Proceeding with Dashboard HTML (likely to fail)...');
-                    parseResult = await this.httpScraper.getCourseFiles(courseId, courseName, entryResult.html);
-                }
-            } else {
-                return { success: false, message: entryResult.error || 'Failed to enter course' };
+            if (!entryResult.success || !entryResult.html) {
+                return failFromMessage(entryResult.error, 'Failed to enter course');
+            }
+            if (entryResult.cookies) {
+                this.httpScraper.setCookies(entryResult.cookies);
             }
 
-            let targetScript = script;
-            if (parseResult.success && parseResult.files) {
-                const freshFile = parseResult.files.find(f => f.name === fileName);
-                if (freshFile && freshFile.script) {
-                    console.log(`SIGAA: Found fresh script for file ${fileName}`);
-                    targetScript = freshFile.script;
-                } else {
-                    console.warn(`SIGAA: Could not find file ${fileName} in fresh page scan. Using original script.`);
-                }
+            // 2. Navigate to Files Section (Essential for ViewState)
+            logger.info('SIGAA: Navigating to Files Section for download state...');
+            const filesNavResult = await this.playwrightLogin.navigateToFilesSection();
+
+            logger.info(`SIGAA: filesNavResult.success=${filesNavResult.success}, hasHtml=${!!filesNavResult.html}, htmlLength=${filesNavResult.html?.length || 0}, error=${filesNavResult.error || 'none'}`);
+            if (filesNavResult.html) {
+                const titleMatch = filesNavResult.html.match(/<title>(.*?)<\/title>/i);
+                logger.info(`SIGAA: filesNavResult page title: "${titleMatch?.[1] || 'unknown'}"`);
+            }
+
+            const filesSectionHtml = filesNavResult.success && filesNavResult.html ? filesNavResult.html : null;
+            if (!filesSectionHtml) {
+                logger.warn('SIGAA: Failed to navigate to files section. Proceeding with Dashboard HTML (likely to fail)...');
+            }
+            let parseResult = await this.httpScraper.getCourseFiles(courseId, courseName, filesSectionHtml ?? entryResult.html);
+            let targetScript = findScript(parseResult.files, file);
+
+            // A lista que o renderer tem veio do Dashboard; a seção de arquivos
+            // pode não listar tudo. Antes, o script antigo do renderer cobria
+            // esse caso — agora ele não atravessa o IPC, então olhamos a mesma
+            // página de onde a lista saiu.
+            if (!targetScript && filesSectionHtml) {
+                logger.info(`SIGAA: ${file.name} not in files section; scanning Dashboard HTML...`);
+                parseResult = await this.httpScraper.getCourseFiles(courseId, courseName, entryResult.html);
+                targetScript = findScript(parseResult.files, file);
+            }
+            if (!targetScript) {
+                return fail('NOT_FOUND', `O arquivo "${file.name}" não está mais na página da disciplina.`);
             }
 
             // 3. Use HTTP Scraper for fast download
-            // Extract ID from script for logging if possible
-            const idMatch = targetScript.match(/,id,([^,]+)/);
-            const fileId = idMatch ? idMatch[1] : 'unknown';
+            console.log(`SIGAA: Attempting fast HTTP download for file ${file.id}...`);
+            const httpResult = await this.httpScraper.downloadFile(courseId, file.id, file.name, targetDir, targetScript);
 
-            console.log(`SIGAA: Attempting fast HTTP download for file ${fileId}...`);
-            const httpResult = await this.httpScraper.downloadFile(
-                courseId,
-                fileId,
-                fileName,
-                targetDir, // Use the new subdirectory
-                targetScript
-            );
-
-            if (httpResult.success) {
+            if (httpResult.success && httpResult.filePath) {
                 console.log('SIGAA: HTTP download successful!');
-                return { success: true, filePath: httpResult.filePath };
+                return ok({ filePath: httpResult.filePath });
             }
 
             console.warn('SIGAA: HTTP download failed. Refreshing session and retrying HTTP download...', httpResult.error);
@@ -239,7 +257,7 @@ export class SigaaService {
             const retryEntryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
 
             if (!retryEntryResult.success || !retryEntryResult.html) {
-                return { success: false, message: retryEntryResult.error || 'Failed to refresh session for retry' };
+                return failFromMessage(retryEntryResult.error, 'Failed to refresh session for retry');
             }
 
             // Update HttpScraper with fresh state
@@ -248,51 +266,36 @@ export class SigaaService {
             }
             // Parse again to get fresh script
             const retryParseResult = await this.httpScraper.getCourseFiles(courseId, courseName, retryEntryResult.html);
-
-            let retryScript = script;
-            if (retryParseResult.success && retryParseResult.files) {
-                const freshFile = retryParseResult.files.find(f => f.name === fileName);
-                if (freshFile && freshFile.script) {
-                    retryScript = freshFile.script;
-                }
-            }
+            const retryScript = findScript(retryParseResult.files, file) ?? targetScript;
 
             // Retry HTTP Download
-            console.log(`SIGAA: Retrying HTTP download for file ${fileName}...`);
-            const retryHttpResult = await this.httpScraper.downloadFile(
-                courseId,
-                fileId,
-                fileName,
-                targetDir,
-                retryScript
-            );
+            console.log(`SIGAA: Retrying HTTP download for file ${file.name}...`);
+            const retryHttpResult = await this.httpScraper.downloadFile(courseId, file.id, file.name, targetDir, retryScript);
 
-            if (retryHttpResult.success) {
+            if (retryHttpResult.success && retryHttpResult.filePath) {
                 console.log('SIGAA: HTTP retry successful!');
-                return { success: true, filePath: retryHttpResult.filePath };
-            } else {
-                return await this.downloadViaPlaywright(courseId, courseName, fileName, basePath, retryScript);
+                return ok({ filePath: retryHttpResult.filePath });
             }
+            return await this.downloadViaPlaywright(courseId, courseName, file.name, basePath, retryScript);
 
-        } catch (error: any) {
+        } catch (error) {
             console.error('SIGAA: Error downloading file:', error);
-            return { success: false, message: error.message || 'Download failed' };
+            return failFromMessage(errorMessage(error), 'Download failed');
         }
     }
 
     async downloadAllFiles(
         courseId: string,
         courseName: string,
-        files: Array<{ name: string; url: string; script?: string }>,
+        files: DownloadFileRef[],
         basePath: string,
-        onProgress?: (fileName: string, status: 'downloaded' | 'skipped' | 'failed') => void
-    ): Promise<{ success: boolean; downloaded?: number; skipped?: number; failed?: number; results?: any[]; message?: string }> {
+        onProgress?: (fileName: string, status: DownloadStatus) => void
+    ): Promise<AppResult<DownloadResult>> {
+        this.startBusy();
         try {
-            this.startBusy();
             logger.info(`SIGAA: =====================================`);
             logger.info(`SIGAA: downloadAllFiles called for course ${courseName}`);
             logger.info(`SIGAA: Files received: ${files.length}`);
-            logger.info(`SIGAA: First 3 files: ${JSON.stringify(files.slice(0, 3).map(f => ({ name: f.name, hasScript: !!f.script, scriptLen: f.script?.length || 0 })))}`);
             logger.info(`SIGAA: basePath: ${basePath}`);
 
             // Create course subdirectory — single path policy (DL-001)
@@ -300,7 +303,7 @@ export class SigaaService {
             const targetDir = path.join(basePath, courseSegment);
             ensureDirInsideRoot(basePath, targetDir);
 
-            const results: any[] = [];
+            const results: DownloadRecord[] = [];
             let downloaded = 0;
             let skipped = 0;
             let failed = 0;
@@ -358,14 +361,7 @@ export class SigaaService {
 
             if (!entryResult.success || !entryResult.html) {
                 logger.error(`SIGAA: Failed to enter course for batch download: ${entryResult.error}`);
-                return {
-                    success: false,
-                    message: entryResult.error || 'Failed to enter course for download',
-                    downloaded: 0,
-                    skipped,
-                    failed: queue.length,
-                    results
-                };
+                return failFromMessage(entryResult.error, 'Failed to enter course for download');
             }
 
             // Set cookies from Playwright session
@@ -380,63 +376,31 @@ export class SigaaService {
 
             if (!parseResult.success) {
                 logger.error(`SIGAA: Failed to parse course files: ${parseResult.error}`);
-                return {
-                    success: false,
-                    message: parseResult.error || 'Failed to parse course for download',
-                    downloaded: 0,
-                    skipped,
-                    failed: queue.length,
-                    results
-                };
+                return failFromMessage(parseResult.error, 'Failed to parse course for download');
             }
 
-            logger.info(`SIGAA: Course session ready. Found ${parseResult.files?.length || 0} files on page.`);
-
-            // Update queue with fresh scripts from the parsed page if available
-            const freshFilesMap = new Map<string, string>();
-            if (parseResult.files) {
-                parseResult.files.forEach(f => {
-                    if (f.name && f.script) {
-                        freshFilesMap.set(f.name, f.script);
-                    }
-                });
-            }
-
-            const retryFreshFilesMap = new Map<string, string>();
+            // O script de cada arquivo vem da página fresca, nunca do renderer.
+            const parsedFiles = parseResult.files ?? [];
+            let retryParsedFiles: ParsedFile[] | undefined;
+            logger.info(`SIGAA: Course session ready. Found ${parsedFiles.length} files on page.`);
 
             logger.info(`SIGAA: Starting download loop for ${queue.length} files...`);
             for (const file of queue) {
                 logger.info(`SIGAA: Processing file: ${file.name}`);
 
-                // Use fresh script from parsed page if available, otherwise use original
-                let targetScript = file.script;
-                if (freshFilesMap.has(file.name)) {
-                    targetScript = freshFilesMap.get(file.name)!;
-                    logger.info(`SIGAA: Using fresh script for ${file.name}`);
-                }
-
+                const targetScript = findScript(parsedFiles, file);
                 if (!targetScript) {
-                    logger.warn(`SIGAA: Skipping ${file.name} - no script available`);
+                    logger.warn(`SIGAA: Skipping ${file.name} - not found on course page`);
                     failed++;
                     results.push({ fileName: file.name, status: 'failed' });
                     if (onProgress) onProgress(file.name, 'failed');
                     continue;
                 }
 
-                // Extract ID from script
-                const idMatch = targetScript.match(/,id,([^,]+)/);
-                const fileId = idMatch ? idMatch[1] : 'unknown';
-                logger.info(`SIGAA: Downloading ${file.name} (ID: ${fileId})...`);
+                logger.info(`SIGAA: Downloading ${file.name} (ID: ${file.id})...`);
+                const result = await this.httpScraper.downloadFile(courseId, file.id, file.name, targetDir, targetScript);
 
-                const result = await this.httpScraper.downloadFile(
-                    courseId,
-                    fileId,
-                    file.name,
-                    targetDir, // Use the new subdirectory
-                    targetScript
-                );
-
-                if (result.success) {
+                if (result.success && result.filePath) {
                     logger.info(`SIGAA: Downloaded ${file.name} successfully`);
                     downloaded++;
                     results.push({ fileName: file.name, status: 'downloaded', filePath: result.filePath });
@@ -464,47 +428,27 @@ export class SigaaService {
                         this.httpScraper.setCookies(retryEntryResult.cookies);
                     }
                     const retryParseResult = await this.httpScraper.getCourseFiles(courseId, courseName, retryEntryResult.html);
-
-                    if (retryParseResult.success && retryParseResult.files) {
-                        retryParseResult.files.forEach(f => {
-                            if (f.name && f.script) {
-                                retryFreshFilesMap.set(f.name, f.script);
-                            }
-                        });
-                    }
+                    retryParsedFiles = retryParseResult.files;
 
                     const failedFiles = results
                         .filter(r => r.status === 'failed')
                         .map(r => files.find(f => f.name === r.fileName))
-                        .filter(f => f !== undefined) as Array<{ name: string; url: string; script?: string }>;
+                        .filter((f): f is DownloadFileRef => f !== undefined);
 
                     for (const file of failedFiles) {
                         console.log(`SIGAA: Retrying HTTP download for ${file.name} (Attempt 1/3)...`);
 
-                        let retryScript = file.script;
-                        if (retryFreshFilesMap.has(file.name)) {
-                            retryScript = retryFreshFilesMap.get(file.name)!;
-                        }
-
+                        let retryScript = findScript(retryParsedFiles, file) ?? findScript(parsedFiles, file);
                         if (!retryScript) continue;
-
-                        const idMatch = retryScript.match(/,id,([^,]+)/);
-                        const fileId = idMatch ? idMatch[1] : 'unknown';
 
                         // Retry Loop
                         let retrySuccess = false;
                         for (let attempt = 1; attempt <= 3; attempt++) {
                             if (attempt > 1) console.log(`SIGAA: Retry attempt ${attempt}/3 for ${file.name}...`);
 
-                            const retryResult = await this.httpScraper.downloadFile(
-                                courseId,
-                                fileId,
-                                file.name,
-                                targetDir,
-                                retryScript || ''
-                            );
+                            const retryResult = await this.httpScraper.downloadFile(courseId, file.id, file.name, targetDir, retryScript);
 
-                            if (retryResult.success) {
+                            if (retryResult.success && retryResult.filePath) {
                                 downloaded++;
                                 failed--;
                                 // Update result in array
@@ -525,8 +469,7 @@ export class SigaaService {
                                         // Update script if possible
                                         if (refreshResult.html) {
                                             const newParse = await this.httpScraper.getCourseFiles(courseId, courseName, refreshResult.html);
-                                            const newFile = newParse.files?.find(f => f.name === file.name);
-                                            if (newFile?.script) retryScript = newFile.script;
+                                            retryScript = findScript(newParse.files, file) ?? retryScript;
                                         }
                                     }
                                 }
@@ -547,60 +490,47 @@ export class SigaaService {
                 if (results[i].status !== 'failed') continue;
                 const fileName = results[i].fileName;
                 const originalFile = files.find(f => f.name === fileName);
-                let script: string | undefined;
-                if (retryFreshFilesMap.has(fileName)) {
-                    script = retryFreshFilesMap.get(fileName);
-                } else if (freshFilesMap.has(fileName)) {
-                    script = freshFilesMap.get(fileName);
-                } else {
-                    script = originalFile?.script;
-                }
+                if (!originalFile) continue;
+                const script = findScript(retryParsedFiles, originalFile) ?? findScript(parsedFiles, originalFile);
                 if (!script) continue;
                 const pwResult = await this.downloadViaPlaywright(courseId, courseName, fileName, basePath, script);
                 if (pwResult.success) {
                     downloaded++;
                     failed--;
-                    results[i] = { fileName, status: 'downloaded', filePath: pwResult.filePath };
+                    results[i] = { fileName, status: 'downloaded', filePath: pwResult.data.filePath };
                     if (onProgress) onProgress(fileName, 'downloaded');
                 }
             }
 
-            return {
-                success: true,
-                downloaded,
-                skipped,
-                failed,
-                results
-            };
-        } catch (error: any) {
+            return ok({ downloaded, skipped, failed, results });
+        } catch (error) {
             console.error('SIGAA: Error downloading files:', error);
-            return { success: false, message: error.message || 'Download failed' };
+            return failFromMessage(errorMessage(error), 'Download failed');
         } finally {
             this.stopBusy();
         }
     }
 
-    async getNewsDetail(courseId: string, courseName: string, newsId: string): Promise<{ success: boolean; news?: any; message?: string }> {
+    async getNewsDetail(courseId: string, courseName: string, newsId: string): Promise<AppResult<NewsDetail>> {
         this.startBusy();
         try {
             console.log(`SIGAA: Fetching news detail ${newsId} using Playwright...`);
             // Use Playwright for reliable JSF session handling
             const result = await this.playwrightLogin.getNewsDetail(courseId, courseName, newsId);
 
-            if (!result.success) {
-                return { success: false, message: result.error || 'Failed to fetch news detail' };
+            if (!result.success || !result.news) {
+                return failFromMessage(result.error, 'Failed to fetch news detail');
             }
-
-            return { success: true, news: result.news };
-        } catch (error: any) {
+            return ok(result.news);
+        } catch (error) {
             console.error('SIGAA: Error fetching news detail:', error);
-            return { success: false, message: error.message || 'Failed to fetch news detail' };
+            return failFromMessage(errorMessage(error), 'Failed to fetch news detail');
         } finally {
             this.stopBusy();
         }
     }
 
-    async loadAllNews(courseId: string, courseName: string): Promise<{ success: boolean; news?: any[]; message?: string }> {
+    async loadAllNews(courseId: string, courseName: string): Promise<AppResult<NewsSummary[]>> {
         this.startBusy();
         try {
             logger.info(`SIGAA: Loading all news for course ${courseName} (${courseId})...`);
@@ -608,7 +538,7 @@ export class SigaaService {
             // 1. Enter Course to get fresh News List (and ViewState)
             const entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName);
             if (!entryResult.success || !entryResult.html) {
-                return { success: false, message: entryResult.error || 'Failed to enter course' };
+                return failFromMessage(entryResult.error, 'Failed to enter course');
             }
 
             if (entryResult.cookies) {
@@ -617,32 +547,36 @@ export class SigaaService {
 
             // 2. Parse News Headers
             const parseResult = await this.httpScraper.getCourseFiles(courseId, 'Unknown', entryResult.html);
-            const newsItems = parseResult.news || [];
+            if (!parseResult.success) {
+                return failFromMessage(parseResult.error, 'Failed to parse course page');
+            }
+            const newsItems = parseResult.news ?? [];
 
             logger.info(`SIGAA: Found ${newsItems.length} news items. Fetching content for all...`);
 
             // 3. Fetch detail for each news item using Playwright (HTTP scraper fails due to session issues)
-            const enrichedNews: any[] = [];
+            const enrichedNews: NewsSummary[] = [];
             for (const item of newsItems) {
                 logger.info(`SIGAA: Fetching content for news "${item.title}"...`);
 
                 // Use Playwright for reliable JSF session handling instead of HTTP scraper
                 // The HTTP approach fails because sessions become stale between requests
                 const detail = await this.playwrightLogin.getNewsDetail(courseId, courseName, item.id);
+                const summary = toNewsSummary(item);
 
                 if (detail.success && detail.news) {
-                    enrichedNews.push({ ...item, content: detail.news.content });
+                    enrichedNews.push({ ...summary, content: detail.news.content });
                 } else {
                     logger.warn(`SIGAA: Failed to fetch news "${item.title}": ${detail.error}`);
-                    enrichedNews.push(item); // Keep header at least
+                    enrichedNews.push(summary); // Keep header at least
                 }
             }
 
-            return { success: true, news: enrichedNews };
+            return ok(enrichedNews);
 
-        } catch (error: any) {
+        } catch (error) {
             logger.error('SIGAA: Error loading all news:', error);
-            return { success: false, message: error.message };
+            return failFromMessage(errorMessage(error));
         } finally {
             this.stopBusy();
         }

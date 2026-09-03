@@ -13,16 +13,10 @@ const READ_ITEMS_KEY = 'readItems';
 const NOTIFICATIONS_KEY = 'notificationsHistory';
 const MAX_NOTIFICATIONS = 15;
 
-export interface NotificationItem {
-  id: string;          // unique: `${type}-${courseId}-${itemId}`
-  type: 'file' | 'news';
-  courseId: string;
-  courseName: string;
-  itemId: string;      // file name or news id
-  itemTitle: string;   // display name
-  timestamp: number;
-  read: boolean;
-}
+// O main constrói estes itens no background sync e os manda pelo IPC, então o
+// tipo vive em shared/domain.ts (ARCH-001). Reexportado para os imports locais.
+export type { NotificationItem } from '../../shared/domain';
+import type { NotificationItem } from '../../shared/domain';
 
 // ─── Read State ──────────────────────────────────────────
 
