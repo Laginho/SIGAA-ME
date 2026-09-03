@@ -34,6 +34,10 @@ READ: <model>
 
 The Cast block is the **sole model authority**. Cast names are the user's informal names; PLAN resolves each one by **searching** the full `traycer_list_harness_models` listing across every harness (opencode included) — case-insensitive, punctuation- and order-tolerant, with version fragments and a parenthesised effort ("(medium)") as qualifiers. A unique match is used and the informal-name → harness-id mapping is reported in the return handoff. Zero or multiple matches → PLAN stops and hands back **listing the closest candidates it found** — giving up without searching, or a bare "not found", is a contract violation. **Never substitute a model silently**: a silent substitution corrupts the ledger.
 
+If the Cast is absent, incomplete, or contains a placeholder such as `<declarar>`, PLAN asks the user for the four role assignments and records the reply in the active handoff's `## Cast` block before proceeding. Do not create a return handoff merely because the Cast is missing. The user may instead say **"use the last cast"**: PLAN reads the handoffs in the current feature's `handoffs/` directory, newest numbered handoff first, and uses the most recent complete, non-placeholder `## Cast` block. PLAN copies that block into the active handoff and records the source handoff path in its return report. If no such Cast exists, ask the user for assignments; never infer or substitute one.
+
+The zero-or-multiple-match stop rule applies only after a complete Cast was obtained from the user or the documented last-Cast lookup.
+
 ## Commits
 
 - One commit per phase, authored by PLAN, in the Traycer-managed worktree on the `traycer/*` branch Traycer names (the plan names only the base branch).

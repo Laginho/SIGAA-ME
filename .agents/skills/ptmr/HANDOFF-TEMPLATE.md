@@ -11,6 +11,12 @@ TEST: <model>
 MAKE: <model>
 READ: <model>
 
+Every role must be declared. If a handoff is delivered without a complete Cast,
+PLAN asks the user and writes the chosen values into that handoff before running
+the cycle. The user may say `use the last cast`; PLAN copies the most recent
+complete, non-placeholder Cast from this feature's numbered handoffs and cites
+its path in the return report.
+
 ## Scope
 Issue(s): .scratch/<feature>/issues/NN-<slug>.md   ← one issue; 2–3 only if inseparable, say why
 Base branch: <branch>
