@@ -174,7 +174,10 @@ async function startSync(app: HTMLDivElement, mode: 'fast' | 'full') {
 
     updateProgress(20, 'Disciplinas Encontradas', `${courses.length} disciplinas identificadas.`);
 
-    // 3. Loop — save progressively so a crash never loses already-completed data
+    // 3. Loop — save progressively so a crash never loses already-completed data.
+    // A failed course keeps its previous snapshot: it is recorded in
+    // `failures` and skipped, never merged as an empty course over good cache.
+    const failures: { name: string; message: string }[] = [];
     for (let i = 0; i < courses.length; i++) {
       const course = courses[i];
       const stepPct = 20 + ((i / courses.length) * (mode === 'fast' ? 70 : 40));
@@ -186,8 +189,12 @@ async function startSync(app: HTMLDivElement, mode: 'fast' | 'full') {
       );
 
       const filesResult = await window.api.getCourseFiles(course.id, course.name);
-      const files = filesResult.success ? filesResult.data.files : [];
-      let news = filesResult.success ? filesResult.data.news : [];
+      if (filesResult.success === false) {
+        failures.push({ name: course.name, message: filesResult.error.message });
+        continue;
+      }
+      const files = filesResult.data.files;
+      let news = filesResult.data.news;
 
       if (mode === 'full' && news.length > 0) {
         updateProgress(stepPct + 5, `Baixando Conteúdo: ${course.name}`, `Lendo ${news.length} notícias...`);
@@ -203,6 +210,17 @@ async function startSync(app: HTMLDivElement, mode: 'fast' | 'full') {
       // Merge: preserves courses not yet processed this run and previously
       // downloaded news content (a fast sync must not wipe the offline corpus).
       mergeCoursesIntoCache([synced]);
+    }
+
+    // A failure blocks the replaceSet: a course that left the enrollment is
+    // only dropped from the cache on a fully clean sync.
+    if (failures.length > 0) {
+      const savedSoFar = (() => {
+        try { return JSON.parse(localStorage.getItem('coursesWithFiles') || '[]').length; } catch { return 0; }
+      })();
+      const detail = failures.map(f => `${f.name} — ${f.message}`).join('; ');
+      showError(`${failures.length} disciplina(s) falharam: ${detail}`, savedSoFar);
+      return;
     }
 
     // Full pass succeeded: the synced set IS the enrollment; drop stale courses.

@@ -37,11 +37,15 @@ function toNewsSummary(n: ParsedNews): NewsSummary {
     return { id: n.id, title: n.title, date: n.date, notification: n.notification };
 }
 
-/** Script JSF do arquivo na página fresca: pelo id (estável), senão pelo nome. */
+/**
+ * Script JSF do arquivo na página fresca: só pelo id. O nome que acompanha o
+ * pedido nunca seleciona qual script executar — só dá nome ao arquivo em
+ * disco e guia o Playwright até o link no DOM vivo. Id forjado ou vazio não
+ * casa com nada (o chamador decide o fallback sem script).
+ */
 function findScript(files: ParsedFile[] | undefined, file: DownloadFileRef): string | undefined {
-    if (!files) return undefined;
-    const byId = file.id ? files.find(f => f.id === file.id) : undefined;
-    return (byId ?? files.find(f => f.name === file.name))?.script;
+    if (!files || !file.id) return undefined;
+    return files.find(f => f.id === file.id)?.script;
 }
 
 export class SigaaService {
@@ -157,13 +161,15 @@ export class SigaaService {
     }
 
     /**
-     * Plano B do download (BUG-004): só depois que o HTTP falhou duas vezes.
+     * Último recurso do download, no DOM vivo (o Playwright procura o link
+     * pelo nome e só usa o script como plano C). Chamado com script depois
+     * que o HTTP falhou duas vezes (BUG-004), e sem script quando nenhum
+     * parse estático listou o arquivo.
      * `basePath`, não `targetDir`: o DownloadService cria a pasta da turma sozinho.
      */
     private async downloadViaPlaywright(
-        courseId: string, courseName: string, fileName: string, basePath: string, script: string
+        courseId: string, courseName: string, fileName: string, basePath: string, script?: string
     ): Promise<AppResult<{ filePath: string }>> {
-        logger.warn(`SIGAA: HTTP download failed twice for ${fileName}. Falling back to Playwright...`);
         const result = await this.playwrightLogin.downloadFile(courseId, courseName, fileName, '', basePath, {}, script);
         if (result.success && result.filePath) return ok({ filePath: result.filePath });
         return fail('DOWNLOAD_FAILED', result.error || 'Playwright download failed');
@@ -238,7 +244,8 @@ export class SigaaService {
                 targetScript = findScript(parseResult.files, file);
             }
             if (!targetScript) {
-                return fail('NOT_FOUND', `O arquivo "${file.name}" não está mais na página da disciplina.`);
+                logger.warn(`SIGAA: ${file.name} not in static parses; trying Playwright live-DOM lookup...`);
+                return await this.downloadViaPlaywright(courseId, courseName, file.name, basePath, undefined);
             }
 
             // 3. Use HTTP Scraper for fast download
@@ -276,6 +283,7 @@ export class SigaaService {
                 console.log('SIGAA: HTTP retry successful!');
                 return ok({ filePath: retryHttpResult.filePath });
             }
+            logger.warn(`SIGAA: HTTP download failed twice for ${file.name}. Falling back to Playwright...`);
             return await this.downloadViaPlaywright(courseId, courseName, file.name, basePath, retryScript);
 
         } catch (error) {
@@ -380,7 +388,24 @@ export class SigaaService {
             }
 
             // O script de cada arquivo vem da página fresca, nunca do renderer.
+            // A lista do renderer saiu do Dashboard, mas a seção de arquivos
+            // pode listar o que o Dashboard não lista: se algum arquivo da
+            // fila ficou sem script, esse segundo parse é consultado depois.
             const parsedFiles = parseResult.files ?? [];
+            let filesSectionFiles: ParsedFile[] | undefined;
+            if (queue.some((file) => !findScript(parsedFiles, file))) {
+                const filesSectionResult = await this.playwrightLogin.navigateToFilesSection();
+                if (filesSectionResult.success && filesSectionResult.html) {
+                    const sectionParse = await this.httpScraper.getCourseFiles(courseId, courseName, filesSectionResult.html);
+                    if (sectionParse.success) {
+                        filesSectionFiles = sectionParse.files ?? [];
+                    } else {
+                        logger.warn('SIGAA: Failed to parse files section; proceeding with Dashboard files only.');
+                    }
+                } else {
+                    logger.warn('SIGAA: Failed to navigate to files section; proceeding with Dashboard files only.');
+                }
+            }
             let retryParsedFiles: ParsedFile[] | undefined;
             logger.info(`SIGAA: Course session ready. Found ${parsedFiles.length} files on page.`);
 
@@ -388,7 +413,7 @@ export class SigaaService {
             for (const file of queue) {
                 logger.info(`SIGAA: Processing file: ${file.name}`);
 
-                const targetScript = findScript(parsedFiles, file);
+                const targetScript = findScript(parsedFiles, file) ?? findScript(filesSectionFiles, file);
                 if (!targetScript) {
                     logger.warn(`SIGAA: Skipping ${file.name} - not found on course page`);
                     failed++;
@@ -438,7 +463,10 @@ export class SigaaService {
                     for (const file of failedFiles) {
                         console.log(`SIGAA: Retrying HTTP download for ${file.name} (Attempt 1/3)...`);
 
-                        let retryScript = findScript(retryParsedFiles, file) ?? findScript(parsedFiles, file);
+                        // HTTP sem script não tem como funcionar: segue pulando.
+                        let retryScript = findScript(retryParsedFiles, file)
+                            ?? findScript(parsedFiles, file)
+                            ?? findScript(filesSectionFiles, file);
                         if (!retryScript) continue;
 
                         // Retry Loop
@@ -491,8 +519,10 @@ export class SigaaService {
                 const fileName = results[i].fileName;
                 const originalFile = files.find(f => f.name === fileName);
                 if (!originalFile) continue;
-                const script = findScript(retryParsedFiles, originalFile) ?? findScript(parsedFiles, originalFile);
-                if (!script) continue;
+                // Sem script, o Playwright procura o link pelo nome no DOM vivo.
+                const script = findScript(retryParsedFiles, originalFile)
+                    ?? findScript(parsedFiles, originalFile)
+                    ?? findScript(filesSectionFiles, originalFile);
                 const pwResult = await this.downloadViaPlaywright(courseId, courseName, fileName, basePath, script);
                 if (pwResult.success) {
                     downloaded++;
