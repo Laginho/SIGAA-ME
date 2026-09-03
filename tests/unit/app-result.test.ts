@@ -40,6 +40,8 @@ describe('classifyMessage — mensagens reais dos serviços', () => {
         ['timeout of 10000ms exceeded', 'PORTAL_UNAVAILABLE'],
         ['read ECONNRESET', 'PORTAL_UNAVAILABLE'],
         ['Course ID input not found in portal (Title: Portal)', 'NOT_FOUND'],
+        ['Target page, context or browser has been closed', 'SESSION_EXPIRED'],
+        ['Browser not active', 'SESSION_EXPIRED'],
         ['Could not parse news content from page', 'UNKNOWN'],
         ['Invalid download script format', 'UNKNOWN'],
     ];

@@ -36,6 +36,7 @@ function flushAll() {
 beforeEach(() => {
     document.body.innerHTML = '';
     localStorage.clear();
+    window.location.hash = '';
 
     // Default: well-behaved API (two courses, both succeed)
     (window as any).api = {
@@ -222,5 +223,83 @@ describe('Sync: selector drift (QA-003)', () => {
         expect(overlay?.textContent).toContain('1 disciplina(s) em formato desconhecido');
         expect((window as any).api.getCourseFiles).not.toHaveBeenCalled();
         expect(localStorage.getItem('coursesWithFiles')).toBeNull();
+    });
+});
+
+describe('Sync: falha de disciplina preserva cache (ARCH-001 READ §1)', () => {
+    it('does not overwrite cached files when getCourseFiles fails for a course', async () => {
+        localStorage.setItem('coursesWithFiles', JSON.stringify([
+            { id: 'c1', name: 'Cálculo I', code: 'CB0001', files: [{ id: '555', name: 'Lista 3.pdf', type: 'file' }], news: [], fileCount: 1 }
+        ]));
+
+        (window as any).api.getCourses = vi.fn().mockResolvedValue({
+            success: true,
+            data: { courses: [{ id: 'c1', name: 'Cálculo I', code: 'CB0001', period: '2026.1' }] },
+        });
+        (window as any).api.getCourseFiles = vi.fn().mockResolvedValue({
+            success: false,
+            error: { code: 'SELECTOR_DRIFT', message: 'SIGAA course selector drift: form missing' },
+        });
+
+        const app = buildApp();
+        renderSyncSelectionPage(app);
+        document.getElementById('btnFastSync')?.click();
+        for (let i = 0; i < 10; i++) await flushAll();
+
+        const overlay = app.querySelector('.sync-progress-overlay');
+        expect(overlay?.textContent).toContain('Cálculo I');
+        expect(overlay?.textContent).toContain('selector drift');
+        expect(document.getElementById('retryBtn')).not.toBeNull();
+        expect(window.location.hash).not.toBe('#/dashboard');
+        const cached = JSON.parse(localStorage.getItem('coursesWithFiles') || '[]');
+        expect(cached[0].files).toEqual([{ id: '555', name: 'Lista 3.pdf', type: 'file' }]);
+    });
+
+    it('preserves first course snapshot and saves second course when first fails and second succeeds', async () => {
+        localStorage.setItem('coursesWithFiles', JSON.stringify([
+            { id: 'c1', name: 'Cálculo I', code: 'CB0001', files: [{ id: '555', name: 'Lista 3.pdf', type: 'file' }], news: [], fileCount: 1 }
+        ]));
+
+        (window as any).api.getCourses = vi.fn().mockResolvedValue({
+            success: true,
+            data: {
+                courses: [
+                    { id: 'c1', name: 'Cálculo I', code: 'CB0001', period: '2026.1' },
+                    { id: 'c2', name: 'Física II', code: 'CB0002', period: '2026.1' },
+                ],
+            },
+        });
+
+        let callCount = 0;
+        (window as any).api.getCourseFiles = vi.fn().mockImplementation(async (courseId: string) => {
+            callCount++;
+            if (courseId === 'c1') {
+                return { success: false, error: { code: 'SELECTOR_DRIFT', message: 'SIGAA course selector drift: form missing' } };
+            }
+            return {
+                success: true,
+                data: {
+                    files: [{ id: '200', name: 'Prova 1.pdf', type: 'file' }],
+                    news: [],
+                },
+            };
+        });
+
+        const app = buildApp();
+        renderSyncSelectionPage(app);
+        document.getElementById('btnFastSync')?.click();
+        for (let i = 0; i < 10; i++) await flushAll();
+
+        expect(document.getElementById('dashboardBtn')).not.toBeNull();
+        expect(window.location.hash).not.toBe('#/dashboard');
+
+        const cached = JSON.parse(localStorage.getItem('coursesWithFiles') || '[]');
+        expect(cached).toHaveLength(2);
+
+        const c1 = cached.find((c: any) => c.id === 'c1');
+        expect(c1.files).toEqual([{ id: '555', name: 'Lista 3.pdf', type: 'file' }]);
+
+        const c2 = cached.find((c: any) => c.id === 'c2');
+        expect(c2.files).toEqual([{ id: '200', name: 'Prova 1.pdf', type: 'file' }]);
     });
 });
