@@ -4,7 +4,10 @@ App desktop Electron que faz scraping do SIGAA da UFC (`si3.ufc.br`) para dar ao
 aluno leitura offline de disciplinas, arquivos e notícias.
 
 **Leia antes de trabalhar aqui:** `docs/PLANO.md` (plano ativo e decisões
-tomadas) e `docs/HARDENING_TRACKER.md` (status de cada tarefa). O
+tomadas) e `.scratch/` (status de cada tarefa, desde 2026-09-03). Em `.scratch/`
+há um diretório por fase (`NN-faseN-slug/`), cada um com `spec.md` (a seção da
+fase no PLANO), `ledger.md` (tarefas fechadas) e `issues/NN-ID-slug.md`, uma por
+tarefa, com a linha `Status:` (open/claimed/resolved/blocked) no topo. O
 `CODE_REVIEW.md` é registro histórico com correções marcadas inline.
 
 ## Comandos
