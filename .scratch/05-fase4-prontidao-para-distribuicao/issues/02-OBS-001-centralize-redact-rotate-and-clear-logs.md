@@ -4,8 +4,6 @@ Priority: P2
 Blocked by: DL-002
 Tracker status at migration: `NOT STARTED`
 
-- Status: `NOT STARTED`
-- Priority: `P2`
 - Owner: —
 - Dependencies: `ARCH-001`, `DATA-002`
 - Primary files:

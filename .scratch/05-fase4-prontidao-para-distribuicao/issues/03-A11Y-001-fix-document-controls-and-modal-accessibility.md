@@ -4,8 +4,6 @@ Priority: P2
 Blocked by: OBS-001
 Tracker status at migration: `NOT STARTED`
 
-- Status: `NOT STARTED`
-- Priority: `P2`
 - Owner: —
 - Dependencies: `SEC-001`
 - Primary files:

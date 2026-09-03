@@ -4,8 +4,6 @@ Priority: P0
 Blocked by: SEC-002
 Tracker status at migration: `NOT STARTED`
 
-- Status: `NOT STARTED`
-- Priority: `P0`
 - Owner: —
 - Dependencies: `SEC-002`
 - Primary files:

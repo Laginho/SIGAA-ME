@@ -3,9 +3,6 @@ Status: resolved
 Priority: P2
 Tracker status at migration: `DONE` — Bruno sincronizou e fez "baixar todos" em SINAIS E SISTEMAS no build instalado (2026-09-01): nenhum Chrome abriu, toast verde
 
-- Status: `DONE` — Bruno sincronizou e fez "baixar todos" em SINAIS E SISTEMAS no
-  build instalado (2026-09-01): nenhum Chrome abriu, toast verde
-- Priority: `P2`
 - Owner: Claude (sessão 2026-09-01)
 - Dependencies: none
 - Primary files: `electron/services/http-scraper.service.ts` (`getCourseFiles`,

@@ -4,8 +4,6 @@ Priority: P1
 Blocked by: QA-001
 Tracker status at migration: `NOT STARTED` — **ESCOPO ALTERADO 2026-08-02**
 
-- Status: `NOT STARTED` — **ESCOPO ALTERADO 2026-08-02**
-- Priority: `P1`
 - Owner: —
 - Dependencies: `DEP-001`, `QA-001`
 

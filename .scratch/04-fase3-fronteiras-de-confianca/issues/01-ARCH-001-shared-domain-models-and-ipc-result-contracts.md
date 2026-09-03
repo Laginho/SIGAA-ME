@@ -3,8 +3,6 @@ Status: open
 Priority: P0
 Tracker status at migration: `NOT STARTED`
 
-- Status: `NOT STARTED`
-- Priority: `P0`
 - Owner: —
 - Dependencies: none
 - Primary files:

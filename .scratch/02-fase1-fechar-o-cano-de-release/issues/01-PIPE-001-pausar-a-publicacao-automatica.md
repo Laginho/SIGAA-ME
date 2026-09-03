@@ -3,8 +3,6 @@ Status: resolved
 Priority: P0
 Tracker status at migration: `DONE` — implementado na sessão 2026-08-05
 
-- Status: `DONE` — implementado na sessão 2026-08-05
-- Priority: `P0`
 - Owner: Claude
 - Dependencies: none
 - Primary files: `.github/workflows/release.yml`, `package.json`

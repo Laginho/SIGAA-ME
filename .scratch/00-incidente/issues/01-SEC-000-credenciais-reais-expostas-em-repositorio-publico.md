@@ -1,10 +1,8 @@
 # SEC-000 — Credenciais reais expostas em repositório público
-Status: claimed
+Status: resolved
 Priority: P0
 Tracker status at migration: `IN PROGRESS` — risco neutralizado; limpeza de histórico pendente
 
-- Status: `IN PROGRESS` — risco neutralizado; limpeza de histórico pendente
-- Priority: `P0`
 - Owner: Bruno
 - Dependencies: none
 - Descoberto: 2026-08-02, durante a auditoria de complexidade

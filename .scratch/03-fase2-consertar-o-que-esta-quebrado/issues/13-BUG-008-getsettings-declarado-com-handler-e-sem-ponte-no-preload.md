@@ -3,8 +3,6 @@ Status: resolved
 Priority: P1
 Tracker status at migration: `DONE` — corrigido na sessão 2026-08-05
 
-- Status: `DONE` — corrigido na sessão 2026-08-05
-- Priority: `P1`
 - Owner: Claude
 - Dependencies: none
 - Primary files: `electron/preload.ts`, `tests/unit/preload-contract.test.ts`

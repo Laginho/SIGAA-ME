@@ -3,8 +3,6 @@ Status: open
 Priority: P2
 Tracker status at migration: `PARTIAL`
 
-- Status: `PARTIAL`
-- Priority: `P2`
 - Owner: —
 - Dependencies: none
 - Primary files:

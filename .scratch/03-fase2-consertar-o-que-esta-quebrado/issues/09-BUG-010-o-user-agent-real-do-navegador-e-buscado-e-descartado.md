@@ -1,11 +1,8 @@
 # BUG-010 — O User-Agent real do navegador é buscado e descartado
-Status: claimed
+Status: resolved
 Priority: P2
 Tracker status at migration: `IN REVIEW` — código e testes prontos (sessão 2026-09-01); falta só a medição de taxa de falha em uso real, que é do Bruno
 
-- Status: `IN REVIEW` — código e testes prontos (sessão 2026-09-01); falta só a
-  medição de taxa de falha em uso real, que é do Bruno
-- Priority: `P2`
 - Owner: Claude (sessão 2026-09-01)
 - Dependencies: `BUG-001` (não mexer no caminho de download antes)
 - Primary files: `electron/services/http-scraper.service.ts:118-123,198,254,351,685,870`,

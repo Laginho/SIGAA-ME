@@ -4,8 +4,6 @@ Priority: P1
 Blocked by: DEP-001
 Tracker status at migration: `PARTIAL`
 
-- Status: `PARTIAL`
-- Priority: `P1`
 - Owner: —
 - Dependencies: `ARCH-001`, critical security tests
 - Primary files:

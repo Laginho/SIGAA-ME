@@ -3,8 +3,6 @@ Status: resolved
 Priority: P2
 Tracker status at migration: `DONE` — corrigido na sessão 2026-08-04
 
-- Status: `DONE` — corrigido na sessão 2026-08-04
-- Priority: `P2`
 - Owner: Claude
 - Dependencies: none
 - Primary files: `src/pages/course-detail.ts`

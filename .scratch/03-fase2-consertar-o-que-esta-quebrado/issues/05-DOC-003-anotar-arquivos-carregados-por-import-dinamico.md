@@ -3,8 +3,6 @@ Status: resolved
 Priority: P3
 Tracker status at migration: `DONE` — sessão 2026-09-02
 
-- Status: `DONE` — sessão 2026-09-02
-- Priority: `P3`
 - Owner: Claude (sessão 2026-09-02)
 - Dependencies: `BUG-004`
 - Primary files: `electron/services/download.service.ts` — o único arquivo do

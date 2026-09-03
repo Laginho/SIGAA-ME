@@ -4,8 +4,6 @@ Priority: P1
 Blocked by: ARCH-001
 Tracker status at migration: `NOT STARTED`
 
-- Status: `NOT STARTED`
-- Priority: `P1`
 - Owner: —
 - Dependencies: `PORTAL-001`, `CONC-001`
 - Primary files:

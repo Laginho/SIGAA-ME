@@ -3,8 +3,6 @@ Status: resolved
 Priority: P1
 Tracker status at migration: `DONE` — fechado na sessão 2026-09-01
 
-- Status: `DONE` — fechado na sessão 2026-09-01
-- Priority: `P1`
 - Owner: Claude (sessão 2026-09-01)
 - Dependencies: none
 - Primary files: `src/pages/course-detail.ts`

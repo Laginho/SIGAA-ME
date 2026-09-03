@@ -3,9 +3,6 @@ Status: resolved
 Priority: P1
 Tracker status at migration: `DONE` — implementado e verificado no Windows em 2026-08-09
 
-- Status: `DONE` — implementado e verificado no Windows em 2026-08-09
-- Priority: `P1` — degradação de reprodutibilidade resolvida; ver nota histórica
-  de 2026-08-05 no fim desta tarefa
 - Owner: Bruno + Codex (execução no Windows)
 - Dependencies: none
 - Primary files: `package-lock.json`, `package.json`,

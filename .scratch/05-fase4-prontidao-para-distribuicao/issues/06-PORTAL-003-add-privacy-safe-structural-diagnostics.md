@@ -4,8 +4,6 @@ Priority: P1
 Blocked by: ARCH-001
 Tracker status at migration: `PARTIAL`
 
-- Status: `PARTIAL`
-- Priority: `P1`
 - Owner: —
 - Dependencies: `PORTAL-001`, `OBS-001`
 - Primary files:
