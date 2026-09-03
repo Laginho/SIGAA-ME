@@ -5,6 +5,7 @@ import { cacheService } from './cache.service';
 import * as path from 'path';
 import type { CourseSnapshot, CourseSummary, NotificationItem } from '../../shared/domain';
 import type { BackgroundSyncUpdate } from '../../shared/ipc';
+import { isRetryable } from '../../shared/errors';
 
 export class BackgroundSyncService {
     private sigaaService: SigaaService;
@@ -67,12 +68,7 @@ export class BackgroundSyncService {
 
             if (coursesResult.success) {
                 courses = coursesResult.data.courses;
-            } else if (coursesResult.error.code === 'SELECTOR_DRIFT') {
-                // Relogar não muda o HTML do portal. Um login automatizado a cada
-                // ciclo, sem chance de sucesso, é só risco de bloqueio de conta.
-                console.error('[BackgroundSync] Portal layout changed; re-login would not help:', coursesResult.error.message);
-                return;
-            } else {
+            } else if (coursesResult.error.code === 'SESSION_EXPIRED') {
                 console.log('[BackgroundSync] Session expired or invalid. Attempting re-login...');
                 const loginResult = await this.sigaaService.login(creds.username, creds.password);
                 if (!loginResult.success) {
@@ -85,6 +81,15 @@ export class BackgroundSyncService {
                     return;
                 }
                 courses = retryCourses.data.courses;
+            } else if (isRetryable(coursesResult.error)) {
+                // Portal fora do ar: relogar não ajuda; o próximo ciclo tenta de novo.
+                console.warn('[BackgroundSync] Portal unavailable; will retry next cycle:', coursesResult.error.message);
+                return;
+            } else {
+                // Deriva de seletor, pedido inválido ou erro desconhecido: um
+                // login automatizado não tem chance de resolver. Aborta sem relogar.
+                console.error(`[BackgroundSync] getCourses failed (${coursesResult.error.code}); aborting without re-login:`, coursesResult.error.message);
+                return;
             }
 
             if (courses.length === 0) {

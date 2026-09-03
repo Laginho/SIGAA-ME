@@ -72,6 +72,9 @@ export function isRetryable(error: AppError): boolean {
 export function classifyMessage(message: string): AppErrorCode {
   if (/selector drift/i.test(message)) return 'SELECTOR_DRIFT'
   if (/session|login page|please login|credentials|re-authenticate/i.test(message)) return 'SESSION_EXPIRED'
+  // Playwright com browser/context/page fechado é sessão perdida, não rede:
+  // "Target page, context or browser has been closed", "Browser not active".
+  if (/\b(browser|context|page)\b.*\b(closed|not active)\b/i.test(message)) return 'SESSION_EXPIRED'
   if (/timed? ?out|ECONN|ENOTFOUND|ETIMEDOUT|net::|navigation|socket hang up/i.test(message)) return 'PORTAL_UNAVAILABLE'
   if (/not found|could not find/i.test(message)) return 'NOT_FOUND'
   return 'UNKNOWN'

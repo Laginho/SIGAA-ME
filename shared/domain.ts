@@ -53,10 +53,12 @@ export interface CourseSnapshot extends CourseSummary {
 // -------------------------------------------------------------------- arquivos
 
 /**
- * Identificador opaco que o renderer devolve ao main para baixar um arquivo.
- * Hoje é o `id` do arquivo no JSF (`jsfcljs(...,id,555,...)`). O script que
- * executa o download **não** sai do main: ele é reconstruído da página fresca
- * a cada pedido, casando por este id.
+ * `id` do arquivo no JSF (`jsfcljs(...,id,555,...)`) que o renderer devolve
+ * ao main para baixar um arquivo. O `name` que acompanha o pedido **não**
+ * seleciona qual script executar: só dá nome ao arquivo em disco e guia o
+ * Playwright até o link no DOM vivo quando os parses estáticos não acham o
+ * id. O script que executa o download **não** sai do main: ele é
+ * reconstruído da página fresca a cada pedido, casando só por este id.
  */
 export type DownloadToken = string
 
