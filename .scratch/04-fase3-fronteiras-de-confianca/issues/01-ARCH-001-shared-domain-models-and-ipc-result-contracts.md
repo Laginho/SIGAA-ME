@@ -1,5 +1,5 @@
 # ARCH-001 — Shared domain models and IPC result contracts
-Status: resolved
+Status: open
 Priority: P0
 Tracker status at migration: `NOT STARTED`
 
@@ -36,7 +36,7 @@ ViewState values, cookies, or internal SIGAA URLs.
 - Main, preload, and renderer import the same contract definitions. ✅
 - No IPC method returns an untyped `Promise<any>`. ✅ (nem `unknown[]`; guardado por teste)
 - Existing flows compile against `AppResult<T>`. ✅
-- Error consumers distinguish retryable portal failures from invalid requests. ✅
+- Error consumers distinguish retryable portal failures from invalid requests. ❌ — `isRetryable` existe e ninguém consome; o background sync reloga em qualquer erro que não seja `SELECTOR_DRIFT` (revisão READ de `485bf75`, `handoffs/ARCH-001-READ-review.md`; correção via PTMR, `handoffs/01-to-plan.md`)
 - `tsconfig.json` includes the shared contract directory. ✅ (já incluía)
 
 #### Verification
@@ -48,7 +48,7 @@ npm test
 
 2026-09-03: `tsc` limpo; `eslint .` 0 erros (77 avisos, eram mais — o
 `any` saiu de `sigaa.service`, `background-sync`, `cache.service` e dos
-retornos dos parsers); `vitest run` 183 passed, 4 skipped (eram 154).
+retornos dos parsers); `vitest run` 179 passed, 4 skipped, 183 coletados (eram 154 + 4).
 
 #### Implementation notes (2026-09-03)
 
