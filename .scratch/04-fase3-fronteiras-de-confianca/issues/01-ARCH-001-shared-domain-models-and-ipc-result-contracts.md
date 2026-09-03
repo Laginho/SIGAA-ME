@@ -1,5 +1,5 @@
 # ARCH-001 — Shared domain models and IPC result contracts
-Status: claimed
+Status: resolved
 Priority: P0
 Tracker status at migration: `NOT STARTED`
 
