@@ -46,3 +46,12 @@ npm run test:e2e -- security-boundaries
 - Commit: —
 - Approved domains: —
 - Sandbox exceptions: —
+
+#### Note from SEC-001 (2026-09-04)
+
+`sanitizeNewsHtml` (`src/security/html-sanitizer.ts`) keeps `<a href>` for
+`https:`/`mailto:` only and adds `rel="noopener noreferrer"`, never `target`.
+Clicking such a link inside a news modal still navigates the `BrowserWindow`
+itself to the external site: pre-existing behaviour, left for this issue.
+The `will-navigate` handler here must route those clicks through
+`shell.openExternal` (host allowlist above) and deny the in-window navigation.
