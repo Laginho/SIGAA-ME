@@ -1,4 +1,5 @@
 import { ipcRenderer, contextBridge, type IpcRendererEvent } from 'electron'
+import type { CourseId } from '../shared/domain'
 import type {
   BackgroundSyncUpdate,
   DownloadAllFilesPayload,
@@ -7,29 +8,6 @@ import type {
   LoginCredentials,
   RendererApi,
 } from '../shared/ipc'
-
-// --------- Expose some API to the Renderer process ---------
-// ATENÇÃO: esta ponte genérica permite ao renderer invocar QUALQUER canal IPC.
-// É o achado P0 `SEC-002` do HARDENING_TRACKER, e está aberto.
-// NÃO amplie esta superfície. Todo canal novo vai em `api`, nomeado e tipado.
-contextBridge.exposeInMainWorld('ipcRenderer', {
-  on(...args: Parameters<typeof ipcRenderer.on>) {
-    const [channel, listener] = args
-    return ipcRenderer.on(channel, (event, ...args) => listener(event, ...args))
-  },
-  off(...args: Parameters<typeof ipcRenderer.off>) {
-    const [channel, ...omit] = args
-    return ipcRenderer.off(channel, ...omit)
-  },
-  send(...args: Parameters<typeof ipcRenderer.send>) {
-    const [channel, ...omit] = args
-    return ipcRenderer.send(channel, ...omit)
-  },
-  invoke(...args: Parameters<typeof ipcRenderer.invoke>) {
-    const [channel, ...omit] = args
-    return ipcRenderer.invoke(channel, ...omit)
-  },
-})
 
 /**
  * A anotação `: RendererApi` é a verificação que faltava nesta fronteira.
@@ -42,13 +20,13 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
  *
  * O que isto **não** cobre: se o canal invocado abaixo não tiver
  * `ipcMain.handle` do outro lado, o `tsc` não vê. Essa metade é verificada por
- * `tests/unit/preload-contract.test.ts`, que lê o `main.ts`.
+ * `tests/unit/preload-contract.test.ts`, que lê o `register-handlers.ts`.
  */
 const api: RendererApi = {
   login: (credentials: LoginCredentials) => ipcRenderer.invoke('login-request', credentials),
   tryAutoLogin: () => ipcRenderer.invoke('try-auto-login'),
   getCourses: () => ipcRenderer.invoke('get-courses'),
-  getCourseFiles: (courseId: string, courseName?: string) => ipcRenderer.invoke('get-course-files', { courseId, courseName }),
+  getCourseFiles: (courseId: CourseId, courseName: string) => ipcRenderer.invoke('get-course-files', { courseId, courseName }),
   checkFilesExistence: (filePaths: string[]) => ipcRenderer.invoke('check-files-existence', filePaths),
   selectDownloadFolder: () => ipcRenderer.invoke('select-download-folder'),
   downloadFile: (data: DownloadFilePayload) => ipcRenderer.invoke('download-file', data),
@@ -61,7 +39,7 @@ const api: RendererApi = {
   getNewsDetail: (courseId: string, courseName: string, newsId: string) => ipcRenderer.invoke('get-news-detail', { courseId, courseName, newsId }),
 
   // News Content
-  loadAllNews: (courseId: string, courseName: string) => ipcRenderer.invoke('load-all-news', courseId, courseName),
+  loadAllNews: (courseId: string, courseName: string) => ipcRenderer.invoke('load-all-news', { courseId, courseName }),
 
   // Session Management
   logout: () => ipcRenderer.invoke('logout'),
@@ -75,10 +53,6 @@ const api: RendererApi = {
   // se provam equivalentes.
   updateSetting: (key, value) => ipcRenderer.invoke('update-app-setting', { key, value }),
 
-  ...(process.argv.includes('--sigaa-dev')
-    ? { simulateNewFile: () => ipcRenderer.invoke('test-simulate-new-file') }
-    : {}),
-
   // Background Sync Updates
   onBackgroundSyncUpdate: (callback: (data: BackgroundSyncUpdate) => void) => {
     const subscription = (_event: IpcRendererEvent, data: BackgroundSyncUpdate) => callback(data)
@@ -88,3 +62,9 @@ const api: RendererApi = {
 }
 
 contextBridge.exposeInMainWorld('api', api)
+
+if (process.argv.includes('--sigaa-dev')) {
+  contextBridge.exposeInMainWorld('testApi', {
+    simulateNewFile: () => ipcRenderer.invoke('test-simulate-new-file'),
+  })
+}

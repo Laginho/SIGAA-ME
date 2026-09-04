@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, Tray, Menu } from 'electron'
+import { app, BrowserWindow, dialog, Tray, Menu } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import fs from 'node:fs'
@@ -8,18 +8,7 @@ import { execSync } from 'child_process'
 import { persistenceService } from './services/persistence.service'
 import { BackgroundSyncService } from './services/background-sync.service'
 import { cacheService } from './services/cache.service'
-import { isInsideRoot } from './services/download-path'
-import type {
-  CourseRequest,
-  DownloadAllFilesPayload,
-  DownloadFilePayload,
-  DownloadProgress,
-  LoginCredentials,
-  NewsDetailRequest,
-  SettingUpdate,
-} from '../shared/ipc'
-import type { DownloadStatus } from '../shared/domain'
-import { errorMessage, fail, failFromMessage, ok } from '../shared/errors'
+import { registerIpcHandlers } from './ipc/register-handlers'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -97,6 +86,16 @@ async function simulateNewFile(): Promise<boolean> {
   return true;
 }
 
+registerIpcHandlers({
+  sigaaService,
+  persistence: persistenceService,
+  backgroundSync: backgroundSyncService,
+  getWindow: () => win,
+  allowedOrigin: VITE_DEV_SERVER_URL ? new URL(VITE_DEV_SERVER_URL).origin : 'file:',
+  isPackaged: app.isPackaged,
+  simulateNewFile,
+});
+
 function createWindow() {
   const isHiddenStartup = process.argv.includes('--hidden');
   
@@ -107,10 +106,6 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.mjs'),
       additionalArguments: app.isPackaged ? [] : ['--sigaa-dev'],
     },
-  })
-
-  win.webContents.on('did-finish-load', () => {
-    win?.webContents.send('main-process-message', (new Date).toLocaleString())
   })
 
   if (VITE_DEV_SERVER_URL) {
@@ -127,151 +122,6 @@ function createWindow() {
     }
   });
 }
-
-// IPC Handlers
-ipcMain.handle('login-request', async (_event, { username, password, rememberMe }: LoginCredentials) => {
-  const result = await sigaaService.login(username, password)
-  if (!result.success) return result;
-  if (rememberMe) {
-    try {
-      persistenceService.saveCredentials(username, password);
-    } catch (error) {
-      const message = errorMessage(error);
-      console.error('Failed to save remembered credentials:', message);
-      return fail('STORAGE', `Login succeeded, but the session could not be remembered: ${message}`);
-    }
-  } else {
-    persistenceService.clearCredentials();
-  }
-  return result;
-})
-
-ipcMain.handle('try-auto-login', async () => {
-  const creds = persistenceService.loadCredentials();
-  if (creds) {
-    console.log('Auto-login: stored credentials found');
-    return await sigaaService.login(creds.username, creds.password);
-  }
-  return fail('SESSION_EXPIRED', 'Nenhuma credencial salva.');
-})
-
-ipcMain.handle('get-courses', async () => {
-  return await sigaaService.getCourses()
-})
-
-ipcMain.handle('get-course-files', async (_, { courseId, courseName }: CourseRequest) => {
-  return await sigaaService.getCourseFiles(courseId, courseName);
-})
-
-ipcMain.handle('select-download-folder', async () => {
-  const result = await dialog.showOpenDialog(win!, {
-    properties: ['openDirectory', 'createDirectory'],
-    title: 'Selecione a pasta para downloads'
-  });
-
-  if (result.canceled) {
-    return fail('CANCELLED', 'Seleção de pasta cancelada.');
-  }
-
-  const folderPath = result.filePaths[0];
-  persistenceService.updateSetting('lastDownloadPath', folderPath);
-  return ok({ folderPath });
-})
-
-ipcMain.handle('download-file', async (_, data: DownloadFilePayload) => {
-  const root = persistenceService.getSettings().lastDownloadPath;
-  if (!root) return fail('INVALID_REQUEST', 'Nenhuma pasta de downloads definida');
-  return await sigaaService.downloadFile(
-    data.courseId,
-    data.courseName,
-    { id: data.fileId, name: data.fileName },
-    root
-  );
-})
-
-ipcMain.handle('download-all-files', async (_, data: DownloadAllFilesPayload) => {
-  const root = persistenceService.getSettings().lastDownloadPath;
-  if (!root) return fail('INVALID_REQUEST', 'Nenhuma pasta de downloads definida');
-  const onProgress = (fileName: string, status: DownloadStatus) => {
-    const progress: DownloadProgress = { fileName, status };
-    win?.webContents.send('download-progress', progress);
-  };
-
-  return await sigaaService.downloadAllFiles(
-    data.courseId,
-    data.courseName,
-    data.files,
-    root,
-    onProgress
-  );
-})
-
-ipcMain.handle('check-files-existence', async (_, filePaths: string[]) => {
-  const root = persistenceService.getSettings().lastDownloadPath;
-  return filePaths.map(filePath => ({
-    path: filePath,
-    exists: root !== null && isInsideRoot(root, filePath) && fs.existsSync(filePath)
-  }));
-})
-
-ipcMain.handle('get-news-detail', async (_, { courseId, courseName, newsId }: NewsDetailRequest) => {
-  return await sigaaService.getNewsDetail(courseId, courseName, newsId);
-})
-
-ipcMain.handle('load-all-news', async (_, courseId: string, courseName: string) => {
-  return await sigaaService.loadAllNews(courseId, courseName);
-});
-
-// App Settings Handlers
-ipcMain.handle('get-app-settings', async () => {
-  return persistenceService.getSettings();
-});
-
-ipcMain.handle('update-app-setting', async (_, update: SettingUpdate) => {
-  if (update.key === 'lastDownloadPath' && update.value !== null) return fail('INVALID_REQUEST', 'A pasta de downloads só pode ser definida pelo main (DL-001).');
-  persistenceService.applySetting(update);
-  if (update.key === 'openAtLogin') {
-    app.setLoginItemSettings({
-      openAtLogin: update.value,
-      path: process.execPath,
-      args: app.isPackaged ? ['--hidden'] : [app.getAppPath(), '--hidden']
-    });
-  }
-  if (update.key === 'runInBackground' || update.key === 'syncInterval') {
-    backgroundSyncService.restart();
-  }
-  return ok();
-});
-
-if (!app.isPackaged) {
-  ipcMain.handle('test-simulate-new-file', simulateNewFile);
-}
-
-ipcMain.handle('logout', async () => {
-  console.log('Logout: Clearing credentials and closing session...');
-  try {
-    persistenceService.clearCredentials();
-    await sigaaService.logout();
-    return ok();
-  } catch (error) {
-    const message = errorMessage(error);
-    console.error('Logout error:', message);
-    return failFromMessage(message);
-  }
-});
-
-ipcMain.handle('clear-all-data', async () => {
-  console.log('Clear all data: Clearing credentials and closing session...');
-  try {
-    persistenceService.clearCredentials();
-    await sigaaService.logout();
-    return ok();
-  } catch (error) {
-    const message = errorMessage(error);
-    console.error('Clear all data error:', message);
-    return failFromMessage(message);
-  }
-});
 
 let isQuitting = false;
 

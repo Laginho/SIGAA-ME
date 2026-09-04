@@ -20,10 +20,11 @@ declare global {
          */
         api: RendererApi;
         /**
-         * Ponte IPC genérica. Achado P0 `SEC-002` — permite ao renderer invocar
-         * qualquer canal. Tipada como `unknown` de propósito: dificulta o uso
-         * acidental e não desaparece silenciosamente até o SEC-002 removê-la.
+         * Ponte de teste, exposta só com `--sigaa-dev` (SEC-002).
+         * Produção não tem `testApi`.
          */
-        ipcRenderer: unknown;
+        testApi?: {
+            simulateNewFile: () => Promise<boolean>;
+        };
     }
 }
