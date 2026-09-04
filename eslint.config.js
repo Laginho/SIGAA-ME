@@ -86,6 +86,7 @@ export default tseslint.config(
       'coverage/**',
       'playwright-report/**',
       'test-results/**',
+      '_agent_tmp/**', // scratch de agentes (screenshots do visual spec, checkouts alheios); nunca é código deste repo
       '*.config.js',
       '*.config.ts',
     ],
