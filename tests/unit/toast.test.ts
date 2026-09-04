@@ -103,6 +103,15 @@ describe('Toast Component', () => {
         expect(toasts.length).toBe(3);
     });
 
+    // ── Content security (SEC-001) ──────────────────────────
+
+    it('renders message as literal text, never as HTML', () => {
+        toast.error('<img src=x onerror=alert(1)>');
+        const msg = document.querySelector('.toast__message');
+        expect(msg?.textContent).toBe('<img src=x onerror=alert(1)>');
+        expect(document.querySelector('img')).toBeNull();
+    });
+
     // ── Auto-dismiss ────────────────────────────────────────
 
     it('removes .toast--visible after dismiss duration', () => {
