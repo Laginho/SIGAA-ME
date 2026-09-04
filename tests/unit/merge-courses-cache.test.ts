@@ -90,4 +90,18 @@ describe('mergeCoursesIntoCache', () => {
         mergeCoursesIntoCache([{ id: 'A', name: 'Course A', news: [] }], {}, 12345);
         expect(localStorage.getItem('cacheTimestamp')).toBe('12345');
     });
+
+    it('sanitizes news content before writing to cache (SEC-001)', () => {
+        mergeCoursesIntoCache([{
+            id: 'A',
+            name: 'Course A',
+            news: [{ id: '1', content: '<p>ok</p><script>x</script><img src=x onerror=alert(1)>' }],
+        }]);
+
+        const result = JSON.parse(localStorage.getItem('coursesWithFiles') || '[]');
+        const content = result[0].news[0].content as string;
+        expect(content).toContain('<p>ok</p>');
+        expect(content).not.toContain('<script');
+        expect(content).not.toContain('onerror');
+    });
 });
