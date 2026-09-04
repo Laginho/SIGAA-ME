@@ -336,6 +336,8 @@ describe('course-detail: conteúdo do SIGAA não cria nó executável, sanitiza 
     it('sanitiza na escrita no cache e na leitura no modal quando content vem via getNewsDetail', async () => {
         setupCache({ news: [{ id: 'n1', title: 'T', date: 'D', notification: '', /* no content */ }] });
         setupApi();
+        // Ver notícia não é sync: o rótulo "Sync manual" do dashboard lê cacheTimestamp.
+        localStorage.setItem('cacheTimestamp', '111');
         const container = document.createElement('div');
         document.body.appendChild(container);
 
@@ -354,5 +356,6 @@ describe('course-detail: conteúdo do SIGAA não cria nó executável, sanitiza 
         const storedContent = stored[0].news[0].content as string;
         expect(storedContent).not.toContain('<script');
         expect(storedContent).not.toContain('onerror');
+        expect(localStorage.getItem('cacheTimestamp')).toBe('111');
     });
 });

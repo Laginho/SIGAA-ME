@@ -94,7 +94,7 @@ export function renderCourseDetailPage(container: HTMLDivElement, courseId: stri
             // Único escritor de `coursesWithFiles`: sanitiza antes de
             // cachear (SEC-001). `replaceSet: false` substitui a turma
             // pelo `id` — a semântica que este ponto já tinha.
-            mergeCoursesIntoCache([course]);
+            mergeCoursesIntoCache([course], { keepTimestamp: true });
             // Refresh UI
             fetchCourseFiles(courseId);
           }
@@ -547,7 +547,7 @@ async function openNewsModal(courseId: string, courseName: string, newsId: strin
               newsItem.notification = news.notification;
               // Único escritor de `coursesWithFiles`: sanitiza antes de
               // cachear (SEC-001).
-              mergeCoursesIntoCache([course]);
+              mergeCoursesIntoCache([course], { keepTimestamp: true });
               console.log('Cached news content for', newsId);
             }
           }
