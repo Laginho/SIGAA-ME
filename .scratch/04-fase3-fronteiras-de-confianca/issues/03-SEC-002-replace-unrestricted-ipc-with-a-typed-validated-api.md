@@ -1,5 +1,5 @@
 # SEC-002 — Replace unrestricted IPC with a typed, validated API
-Status: open
+Status: claimed
 Priority: P0
 Blocked by: SEC-001
 Tracker status at migration: `NOT STARTED`

@@ -15,6 +15,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { toast } from '../../src/components/toast';
 import { renderCourseDetailPage } from '../../src/pages/course-detail';
+import { ok } from '../../shared/errors';
 
 function flushAll() {
     return new Promise(resolve => setTimeout(resolve, 0));
@@ -39,6 +40,7 @@ describe('course-detail: falha de download', () => {
             downloadFile: vi.fn().mockResolvedValue({ success: false, error: { code: 'SESSION_EXPIRED', message: 'Sessão expirada no SIGAA' } }),
             selectDownloadFolder: vi.fn(),
             updateSetting: vi.fn(),
+            checkFilesExistence: vi.fn().mockResolvedValue(ok([])),
             // Assinado no render; sem ele a página cai no error-message e não há botão.
             onDownloadProgress: vi.fn(() => () => undefined),
         };
