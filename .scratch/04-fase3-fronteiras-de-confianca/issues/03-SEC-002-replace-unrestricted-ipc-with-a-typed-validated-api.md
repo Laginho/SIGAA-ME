@@ -102,9 +102,11 @@ Cycle 02 (initial). Master dev validated on `traycer/crisp-swan`.
   list. The rejection now goes to the existing catch and the list renders;
   one new test fails without it. Also removed an `as unknown as` cast on
   `senderFrame` (Electron 30 types `parent`). Gate after: 280 passed | 4 skipped.
-- Pending (Bruno): `npm run dev` smoke, because no automated tier exercises the
-  `http://localhost:5173` origin of the sender policy (the visual spec runs the
-  built app on `file:`); `test:e2e` with `.env`, which now calls
+- Dev origin smoke (Bruno, 2026-09-04): `npm run dev` opened normally, so the
+  sender policy accepts the `http://localhost:5173` origin too. No automated
+  tier covers that path (the visual spec runs the built app on `file:`); the
+  boot `tryAutoLogin` invoke is what would have failed.
+- Pending (Bruno): `test:e2e` with `.env`, which now calls
   `window.testApi.simulateNewFile()`.
 
 ## Ciclos PTMR
