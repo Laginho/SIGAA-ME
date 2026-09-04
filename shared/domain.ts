@@ -95,7 +95,9 @@ export interface NewsSummary {
   notification: string
   /**
    * HTML bruto do SIGAA, presente só depois de `loadAllNews`/`getNewsDetail`.
-   * ⚠️ Não renderizar com `innerHTML` sem sanitização (`SEC-001`).
+   * ⚠️ Não renderizar com `innerHTML` sem sanitização (`SEC-001`): o renderer
+   * sanitiza em `mergeCoursesIntoCache` (antes de cachear) e no modal (antes
+   * de renderizar).
    */
   content?: string
 }
@@ -104,7 +106,8 @@ export interface NewsSummary {
  * Detalhe de uma notícia, como o Playwright a extrai. Todos os campos são
  * `string` porque o extrator devolve string vazia quando o rótulo não existe.
  *
- * ⚠️ `content` é **HTML bruto do SIGAA**. Ver `NewsSummary.content`.
+ * ⚠️ `content` é **HTML bruto do SIGAA**. Ver `NewsSummary.content`
+ * (sanitizado em `mergeCoursesIntoCache` e no modal — `SEC-001`).
  */
 export interface NewsDetail {
   title: string

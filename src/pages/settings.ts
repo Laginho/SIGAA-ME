@@ -1,5 +1,6 @@
 import '../styles/settings.css';
 import { toast } from '../components/toast';
+import { h } from '../utils/dom';
 
 export async function renderSettingsPage(container: HTMLDivElement) {
   const settings = await window.api.getSettings();
@@ -22,7 +23,7 @@ export async function renderSettingsPage(container: HTMLDivElement) {
             </div>
             <div class="setting-control">
               <label class="switch">
-                <input type="checkbox" id="themeToggle" ${settings.theme === 'dark' ? 'checked' : ''}>
+                <input type="checkbox" id="themeToggle">
                 <span class="slider"></span>
               </label>
             </div>
@@ -40,48 +41,48 @@ export async function renderSettingsPage(container: HTMLDivElement) {
             </div>
             <div class="setting-control">
               <label class="switch">
-                <input type="checkbox" id="runInBackgroundToggle" ${settings.runInBackground ? 'checked' : ''}>
+                <input type="checkbox" id="runInBackgroundToggle">
                 <span class="slider"></span>
               </label>
             </div>
           </div>
 
-          <div class="setting-item ${!settings.runInBackground ? 'disabled-item' : ''}" id="openAtLoginContainer">
+          <div class="setting-item" id="openAtLoginContainer">
             <div class="setting-info">
               <span class="setting-label">Iniciar com o Windows</span>
               <span class="setting-description">Executar o app silenciosamente na bandeja ao ligar o PC.</span>
             </div>
             <div class="setting-control">
               <label class="switch">
-                <input type="checkbox" id="openAtLoginToggle" ${settings.openAtLogin ? 'checked' : ''} ${!settings.runInBackground ? 'disabled' : ''}>
+                <input type="checkbox" id="openAtLoginToggle">
                 <span class="slider"></span>
               </label>
             </div>
           </div>
 
-          <div class="setting-item ${!settings.runInBackground ? 'disabled-item' : ''}" id="syncIntervalContainer">
+          <div class="setting-item" id="syncIntervalContainer">
             <div class="setting-info">
               <span class="setting-label">Intervalo de Busca</span>
               <span class="setting-description">De quanto em quanto tempo verificar o SIGAA por novidades.</span>
             </div>
             <div class="setting-control">
-              <select id="syncIntervalSelect" class="form-select" ${!settings.runInBackground ? 'disabled' : ''}>
-                <option value="15" ${settings.syncInterval === 15 ? 'selected' : ''}>15 minutos</option>
-                <option value="30" ${settings.syncInterval === 30 ? 'selected' : ''}>30 minutos</option>
-                <option value="60" ${settings.syncInterval === 60 ? 'selected' : ''}>1 hora</option>
-                <option value="120" ${settings.syncInterval === 120 ? 'selected' : ''}>2 horas</option>
+              <select id="syncIntervalSelect" class="form-select">
+                <option value="15">15 minutos</option>
+                <option value="30">30 minutos</option>
+                <option value="60">1 hora</option>
+                <option value="120">2 horas</option>
               </select>
             </div>
           </div>
 
-          <div class="setting-item ${!settings.runInBackground ? 'disabled-item' : ''}" id="autoDownloadContainer">
+          <div class="setting-item" id="autoDownloadContainer">
             <div class="setting-info">
               <span class="setting-label">Download Automático</span>
               <span class="setting-description">Baixar novos arquivos automaticamente se uma pasta padrão estiver definida.</span>
             </div>
             <div class="setting-control">
               <label class="switch">
-                <input type="checkbox" id="autoDownloadToggle" ${settings.autoDownloadUpdates ? 'checked' : ''} ${!settings.runInBackground ? 'disabled' : ''}>
+                <input type="checkbox" id="autoDownloadToggle">
                 <span class="slider"></span>
               </label>
             </div>
@@ -94,12 +95,9 @@ export async function renderSettingsPage(container: HTMLDivElement) {
           <div class="setting-item">
             <div class="setting-info">
               <span class="setting-label">Pasta de Download</span>
-              <span class="setting-description">Caminho padrão: ${settings.lastDownloadPath || 'Sempre perguntar'}</span>
+              <span class="setting-description" id="downloadPathDescription"></span>
             </div>
-            <div class="setting-control">
-              ${settings.lastDownloadPath
-      ? '<button id="clearDownloadsBtn" class="btn-danger-outline">Limpar Padrão</button>'
-      : '<span class="about-info">Sempre perguntar</span>'}
+            <div class="setting-control" id="downloadPathControl">
             </div>
           </div>
         </section>
@@ -110,12 +108,35 @@ export async function renderSettingsPage(container: HTMLDivElement) {
           <div class="about-info">
             <p><strong>SIGAA-ME</strong></p>
             <p>Para não depender de um app feito em Java.</p>
-            <p>Versão: ${__APP_VERSION__}</p>
+            <p id="appVersionLine"></p>
           </div>
         </section>
       </div>
     </div>
   `;
+
+  // Estado vindo de config vira propriedade/texto, nunca interpolação (SEC-001).
+  (document.getElementById('themeToggle') as HTMLInputElement).checked = settings.theme === 'dark';
+  (document.getElementById('runInBackgroundToggle') as HTMLInputElement).checked = settings.runInBackground;
+  (document.getElementById('openAtLoginToggle') as HTMLInputElement).checked = settings.openAtLogin;
+  (document.getElementById('openAtLoginToggle') as HTMLInputElement).disabled = !settings.runInBackground;
+  (document.getElementById('syncIntervalSelect') as HTMLSelectElement).value = String(settings.syncInterval);
+  (document.getElementById('syncIntervalSelect') as HTMLSelectElement).disabled = !settings.runInBackground;
+  (document.getElementById('autoDownloadToggle') as HTMLInputElement).checked = settings.autoDownloadUpdates;
+  (document.getElementById('autoDownloadToggle') as HTMLInputElement).disabled = !settings.runInBackground;
+  for (const id of ['openAtLoginContainer', 'syncIntervalContainer', 'autoDownloadContainer']) {
+    document.getElementById(id)?.classList.toggle('disabled-item', !settings.runInBackground);
+  }
+  document.getElementById('downloadPathDescription')!.textContent =
+    'Caminho padrão: ' + (settings.lastDownloadPath || 'Sempre perguntar');
+  const downloadPathControl = document.getElementById('downloadPathControl')!;
+  if (settings.lastDownloadPath) {
+    const clearBtn = h('button', { className: 'btn-danger-outline', id: 'clearDownloadsBtn' }, 'Limpar Padrão');
+    downloadPathControl.replaceChildren(clearBtn);
+  } else {
+    downloadPathControl.replaceChildren(h('span', { className: 'about-info' }, 'Sempre perguntar'));
+  }
+  document.getElementById('appVersionLine')!.textContent = 'Versão: ' + __APP_VERSION__;
 
   // Theme Toggle Logic
   const themeToggle = document.getElementById('themeToggle') as HTMLInputElement;

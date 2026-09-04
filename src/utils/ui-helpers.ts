@@ -1,3 +1,5 @@
+import { sanitizeNewsHtml } from '../security/html-sanitizer';
+
 /**
  * Utility: Sync Badge Label Formatter
  *
@@ -86,7 +88,8 @@ function isIncomingNews(value: unknown): value is IncomingNews {
  *     (a partial sync must not drop the courses it hasn't reached yet).
  *
  * Shared by the manual sync loop (`sync-selection.ts`) and the background
- * sync push (`dashboard.ts`) — the two writers of this cache.
+ * sync push (`dashboard.ts`) — and the only writer of this cache: news
+ * modals merge through here too (SEC-001).
  */
 export function mergeCoursesIntoCache(incoming: IncomingCourse[], opts: MergeOptions = {}, timestamp: number = Date.now()): void {
     const existingRaw = localStorage.getItem('coursesWithFiles');
@@ -116,6 +119,18 @@ export function mergeCoursesIntoCache(incoming: IncomingCourse[], opts: MergeOpt
                 if (isIncomingNews(n) && !n.content) {
                     const cached = contentMap.get(`${course.id}-${n.id}`);
                     if (cached) n.content = cached;
+                }
+            }
+        }
+    }
+    // Sanitizar antes de cachear (SEC-001): o `content` é HTML bruto do
+    // SIGAA e este é o único escritor de `coursesWithFiles` — cobre os
+    // quatro caminhos de escrita num lugar só.
+    for (const course of incoming) {
+        if (course.news) {
+            for (const n of course.news) {
+                if (isIncomingNews(n) && typeof n.content === 'string') {
+                    n.content = sanitizeNewsHtml(n.content);
                 }
             }
         }

@@ -1,6 +1,8 @@
 import '../styles/course-detail.css'
 import { toast } from '../components/toast'
-import { isNewsCached } from '../utils/ui-helpers'
+import { sanitizeNewsHtml } from '../security/html-sanitizer'
+import { h } from '../utils/dom'
+import { isNewsCached, mergeCoursesIntoCache } from '../utils/ui-helpers'
 import { isItemRead, markAsRead } from '../utils/notification-store'
 import type { CourseSnapshot } from '../../shared/domain'
 
@@ -73,9 +75,9 @@ export function renderCourseDetailPage(container: HTMLDivElement, courseId: stri
     const course = courses.find((c: any) => c.id === courseId);
 
     const btn = loadAllNewsBtn as HTMLButtonElement;
-    const originalText = btn.innerHTML;
+    const originalText = btn.textContent;
     try {
-      btn.innerHTML = '🔄 Carregando...';
+      btn.textContent = '🔄 Carregando...';
       btn.disabled = true;
 
       const result = await window.api.loadAllNews(courseId, course?.name || 'Unknown Course');
@@ -89,25 +91,28 @@ export function renderCourseDetailPage(container: HTMLDivElement, courseId: stri
           if (course) {
             // Merge content
             course.news = result.data;
-            localStorage.setItem('coursesWithFiles', JSON.stringify(courses));
+            // Único escritor de `coursesWithFiles`: sanitiza antes de
+            // cachear (SEC-001). `replaceSet: false` substitui a turma
+            // pelo `id` — a semântica que este ponto já tinha.
+            mergeCoursesIntoCache([course]);
             // Refresh UI
             fetchCourseFiles(courseId);
           }
         }
-        btn.innerHTML = '✅ Concluído';
+        btn.textContent = '✅ Concluído';
         setTimeout(() => {
-          btn.innerHTML = originalText;
+          btn.textContent = originalText;
           btn.disabled = false;
         }, 3000);
       } else {
         toast.error('Erro ao carregar notícias: ' + result.error.message);
-        btn.innerHTML = '❌ Erro';
+        btn.textContent = '❌ Erro';
         btn.disabled = false;
       }
     } catch (e: any) {
       console.error(e);
       toast.error('Erro: ' + (e.message || 'Erro desconhecido'));
-      btn.innerHTML = '❌ Erro';
+      btn.textContent = '❌ Erro';
       btn.disabled = false;
     }
   })
@@ -155,12 +160,10 @@ async function fetchCourseFiles(courseId: string) {
     const cachedData = localStorage.getItem('coursesWithFiles')
 
     if (!cachedData) {
-      filesListElement.innerHTML = `
-        <div class="error-message">
-          Dados não encontrados. Por favor, volte ao dashboard.
-        </div>
-      `
-      newsListElement.innerHTML = ''
+      filesListElement.replaceChildren(
+        h('div', { className: 'error-message' }, 'Dados não encontrados. Por favor, volte ao dashboard.'),
+      )
+      newsListElement.replaceChildren()
       return
     }
 
@@ -168,12 +171,10 @@ async function fetchCourseFiles(courseId: string) {
     const course = coursesWithFiles.find((c: any) => c.id === courseId)
 
     if (!course) {
-      filesListElement.innerHTML = `
-        <div class="error-message">
-          Disciplina não encontrada.
-        </div>
-      `
-      newsListElement.innerHTML = ''
+      filesListElement.replaceChildren(
+        h('div', { className: 'error-message' }, 'Disciplina não encontrada.'),
+      )
+      newsListElement.replaceChildren()
       return
     }
 
@@ -183,20 +184,28 @@ async function fetchCourseFiles(courseId: string) {
 
     // Render News
     if (!course.news || course.news.length === 0) {
-      newsListElement.innerHTML = `
-        <div class="no-news">Nenhuma notícia recente</div>
-      `
+      newsListElement.replaceChildren(
+        h('div', { className: 'no-news' }, 'Nenhuma notícia recente'),
+      )
     } else {
-      newsListElement.innerHTML = course.news.map((item: any) => {
+      newsListElement.replaceChildren()
+      for (const item of course.news) {
         const unread = !isItemRead('news', courseId, item.id);
-        return `
-        <div class="news-item ${unread ? 'news-item--unread' : ''}" data-id="${item.id}">
-          ${unread ? '<span class="item-unread-dot"></span>' : ''}
-          <div class="news-title">${item.title}</div>
-          <div class="news-date">${item.date}</div>
-          ${item.notification === 'Sim' ? '<div class="news-notification" title="O professor enviou um email sobre esta notícia">📧 Email Enviado</div>' : ''}
-        </div>
-      `}).join('')
+        const row = h('div', {
+          className: `news-item${unread ? ' news-item--unread' : ''}`,
+          dataset: { id: String(item.id) },
+        });
+        if (unread) row.append(h('span', { className: 'item-unread-dot' }));
+        row.append(h('div', { className: 'news-title' }, item.title ?? ''));
+        row.append(h('div', { className: 'news-date' }, item.date ?? ''));
+        if (item.notification === 'Sim') {
+          row.append(h('div', {
+            className: 'news-notification',
+            title: 'O professor enviou um email sobre esta notícia',
+          }, '📧 Email Enviado'));
+        }
+        newsListElement.append(row);
+      }
 
       // Add click + hover listeners
       const newsItems = newsListElement.querySelectorAll('.news-item')
@@ -214,9 +223,9 @@ async function fetchCourseFiles(courseId: string) {
     }
 
     if (!course.files || course.files.length === 0) {
-      filesListElement.innerHTML = `
-        <div class="no-files">Nenhum material disponível nesta disciplina</div>
-      `
+      filesListElement.replaceChildren(
+        h('div', { className: 'no-files' }, 'Nenhum material disponível nesta disciplina'),
+      )
 
     } else {
       // Get downloaded status
@@ -250,28 +259,36 @@ async function fetchCourseFiles(courseId: string) {
         }
       }
 
-      filesListElement.innerHTML = course.files.map((file: any) => {
+      filesListElement.replaceChildren()
+      for (const file of course.files) {
         const isDownloaded = !!courseDownloads[file.name];
         const unread = !isItemRead('file', courseId, file.name);
 
-        return `
-        <div class="file-item ${unread ? 'file-item--unread' : ''}" data-file-id="${file.name}">
-          ${unread ? '<span class="item-unread-dot"></span>' : ''}
-          <div class="file-icon">📄</div>
-          <div class="file-info">
-            <div class="file-name">${file.name}</div>
-            <div class="file-meta">Arquivo da disciplina</div>
-          </div>
-          <div class="file-action">
-            ${isDownloaded
-            ? '<span class="status-done" title="Baixado">✅</span>'
-            : file.type === 'link'
-              ? '<span class="status-done" title="Link externo">🔗</span>'
-              : `<button class="btn-download-file" title="Baixar arquivo" data-file-name="${file.name}" data-file-id="${file.id}">⬇️</button>`
-          }
-          </div>
-        </div>
-      `}).join('')
+        const row = h('div', {
+          className: `file-item${unread ? ' file-item--unread' : ''}`,
+          dataset: { fileId: String(file.name ?? '') },
+        });
+        if (unread) row.append(h('span', { className: 'item-unread-dot' }));
+        row.append(h('div', { className: 'file-icon' }, '📄'));
+        const info = h('div', { className: 'file-info' });
+        info.append(h('div', { className: 'file-name' }, file.name ?? ''));
+        info.append(h('div', { className: 'file-meta' }, 'Arquivo da disciplina'));
+        row.append(info);
+        const action = h('div', { className: 'file-action' });
+        if (isDownloaded) {
+          action.append(h('span', { className: 'status-done', title: 'Baixado' }, '✅'));
+        } else if (file.type === 'link') {
+          action.append(h('span', { className: 'status-done', title: 'Link externo' }, '🔗'));
+        } else {
+          action.append(h('button', {
+            className: 'btn-download-file',
+            title: 'Baixar arquivo',
+            dataset: { fileName: String(file.name ?? ''), fileId: String(file.id ?? '') },
+          }, '⬇️'));
+        }
+        row.append(action);
+        filesListElement.append(row);
+      }
 
       // Hover on an unread item clears its dot
       filesListElement.querySelectorAll('.file-item--unread').forEach(item => {
@@ -293,7 +310,7 @@ async function fetchCourseFiles(courseId: string) {
             if (fileItem) clearUnread(fileItem, 'file', courseId, fileName);
 
             // Show spinner immediately
-            target.innerHTML = '🔄';
+            target.textContent = '🔄';
             target.classList.add('spinning');
 
             await downloadSingleFile(course, fileId, fileName, target);
@@ -316,19 +333,17 @@ async function fetchCourseFiles(courseId: string) {
             span.title = 'Baixado';
             targetBtn.replaceWith(span);
           } else if (data.status === 'failed') {
-            targetBtn.innerHTML = '❌';
+            targetBtn.textContent = '❌';
             targetBtn.classList.remove('spinning');
-            setTimeout(() => { targetBtn.innerHTML = '⬇️'; }, 3000);
+            setTimeout(() => { targetBtn.textContent = '⬇️'; }, 3000);
           }
         }
       });
     }
   } catch (error: any) {
-    filesListElement.innerHTML = `
-      <div class="error-message">
-        Erro ao carregar arquivos: ${error.message || 'Erro desconhecido'}
-      </div>
-    `
+    filesListElement.replaceChildren(
+      h('div', { className: 'error-message' }, 'Erro ao carregar arquivos: ' + (error.message || 'Erro desconhecido')),
+    )
   }
 }
 
@@ -339,7 +354,7 @@ async function downloadSingleFile(course: CourseSnapshot, fileId: string, fileNa
     if (!settings.lastDownloadPath) {
       const folderResult = await window.api.selectDownloadFolder();
       if (!folderResult.success) {
-        btnElement.innerHTML = '⬇️';
+        btnElement.textContent = '⬇️';
         btnElement.classList.remove('spinning');
         return;
       }
@@ -371,13 +386,13 @@ async function downloadSingleFile(course: CourseSnapshot, fileId: string, fileNa
       toast.success(`Download concluído: ${fileName}`);
     } else {
       toast.error(`Erro no download: ${result.error.message}`);
-      btnElement.innerHTML = '❌';
+      btnElement.textContent = '❌';
       btnElement.classList.remove('spinning');
     }
   } catch (error: any) {
     console.error('Download error:', error);
     toast.error('Erro ao baixar arquivo: ' + error.message);
-    btnElement.innerHTML = '❌';
+    btnElement.textContent = '❌';
     btnElement.classList.remove('spinning');
   }
 }
@@ -407,7 +422,7 @@ async function testDownloadAll(courseId: string) {
       const folderResult = await window.api.selectDownloadFolder();
       if (!folderResult.success) {
         buttons.forEach(b => {
-          b.innerHTML = '⬇️';
+          b.textContent = '⬇️';
           b.classList.remove('spinning');
         });
         return;
@@ -415,7 +430,7 @@ async function testDownloadAll(courseId: string) {
     }
 
     buttons.forEach(b => {
-      b.innerHTML = '🔄';
+      b.textContent = '🔄';
       b.classList.add('spinning');
     });
 
@@ -507,18 +522,7 @@ async function openNewsModal(courseId: string, courseName: string, newsId: strin
 
     if (cachedContent) {
       console.log('Using cached news content');
-      modalBody.innerHTML = `
-        <div class="modal-header">
-          <h3 class="modal-title">${cachedTitle}</h3>
-          <div class="modal-meta">
-            <span>📅 ${cachedDate}</span>
-            ${cachedNotification === 'Sim' ? '<span>🔔 Notificação enviada</span>' : ''}
-          </div>
-        </div>
-        <div class="modal-body">
-          ${cachedContent}
-        </div>
-      `
+      renderNewsIntoModal(modalBody, cachedTitle, cachedDate, cachedNotification, cachedContent)
       return;
     }
 
@@ -541,7 +545,9 @@ async function openNewsModal(courseId: string, courseName: string, newsId: strin
               newsItem.title = news.title;
               newsItem.date = news.date;
               newsItem.notification = news.notification;
-              localStorage.setItem('coursesWithFiles', JSON.stringify(courses));
+              // Único escritor de `coursesWithFiles`: sanitiza antes de
+              // cachear (SEC-001).
+              mergeCoursesIntoCache([course]);
               console.log('Cached news content for', newsId);
             }
           }
@@ -550,30 +556,36 @@ async function openNewsModal(courseId: string, courseName: string, newsId: strin
         console.warn('Failed to cache news content:', e);
       }
 
-      modalBody.innerHTML = `
-        <div class="modal-header">
-          <h3 class="modal-title">${news.title}</h3>
-          <div class="modal-meta">
-            <span>📅 ${news.date}</span>
-            ${news.notification === 'Sim' ? '<span>🔔 Notificação enviada</span>' : ''}
-          </div>
-        </div>
-        <div class="modal-body">
-          ${news.content}
-        </div>
-      `
+      renderNewsIntoModal(modalBody, news.title, news.date, news.notification, news.content)
     } else {
-      modalBody.innerHTML = `
-        <div class="error-message">
-          Erro ao carregar notícia: ${result.error.message}
-        </div>
-      `
+      modalBody.replaceChildren(
+        h('div', { className: 'error-message' }, 'Erro ao carregar notícia: ' + result.error.message),
+      )
     }
   } catch (error: any) {
-    modalBody.innerHTML = `
-      <div class="error-message">
-        Erro ao carregar notícia: ${error.message}
-      </div>
-    `
+    modalBody.replaceChildren(
+      h('div', { className: 'error-message' }, 'Erro ao carregar notícia: ' + error.message),
+    )
   }
+}
+
+/**
+ * Cabeçalho via `textContent`, corpo via sanitizador (SEC-001).
+ *
+ * O `body.innerHTML = sanitizeNewsHtml(...)` abaixo é o único `innerHTML`
+ * com dado externo do app, e só é permitido porque o RHS é a chamada ao
+ * sanitizador allowlist — todo outro dado desta tela vira nó/texto.
+ */
+function renderNewsIntoModal(modalBody: HTMLElement, title: string, date: string, notification: string, content: string) {
+  const header = h('div', { className: 'modal-header' });
+  header.append(h('h3', { className: 'modal-title' }, title ?? ''));
+  const meta = h('div', { className: 'modal-meta' });
+  meta.append(h('span', undefined, `📅 ${date ?? ''}`));
+  if (notification === 'Sim') {
+    meta.append(h('span', undefined, '🔔 Notificação enviada'));
+  }
+  header.append(meta);
+  const body = h('div', { className: 'modal-body' });
+  body.innerHTML = sanitizeNewsHtml(content);
+  modalBody.replaceChildren(header, body);
 }
