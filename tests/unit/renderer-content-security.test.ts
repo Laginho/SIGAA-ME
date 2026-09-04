@@ -20,6 +20,7 @@ import { readFileSync, readdirSync, statSync } from 'fs';
 import path from 'path';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ESLint } from 'eslint';
+import { ok } from '../../shared/errors';
 
 const root = process.cwd();
 
@@ -292,7 +293,7 @@ describe('course-detail: conteúdo do SIGAA não cria nó executável, sanitiza 
         (window as any).api = {
             getSettings: vi.fn().mockResolvedValue({ ...baseSettings }),
             onDownloadProgress: vi.fn(() => () => undefined),
-            checkFilesExistence: vi.fn().mockResolvedValue([]),
+            checkFilesExistence: vi.fn().mockResolvedValue(ok([])),
             downloadFile: vi.fn().mockResolvedValue({ success: false, error: { code: 'SESSION_EXPIRED', message: 'x' } }),
             selectDownloadFolder: vi.fn(),
             getNewsDetail: vi.fn().mockResolvedValue({ success: true, data: { title: 'T', date: 'D', notification: '', content: MALICIOUS } }),
