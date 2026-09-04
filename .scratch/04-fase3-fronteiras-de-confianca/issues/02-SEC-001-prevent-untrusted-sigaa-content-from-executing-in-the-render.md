@@ -1,5 +1,5 @@
 # SEC-001 — Prevent untrusted SIGAA content from executing in the renderer
-Status: claimed
+Status: resolved
 Priority: P0
 Blocked by: ARCH-001
 Tracker status at migration: `NOT STARTED`
