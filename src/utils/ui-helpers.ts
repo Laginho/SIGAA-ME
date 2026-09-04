@@ -60,6 +60,9 @@ export interface MergeOptions {
     /** When true, courses absent from `incoming` are removed (use only after a
      *  complete successful sync over the full enrollment). Default false. */
     replaceSet?: boolean;
+    /** When true, `cacheTimestamp` is left untouched: caching a news body is
+     *  not a sync, and the dashboard shows that stamp as "Sync manual". */
+    keepTimestamp?: boolean;
 }
 
 interface IncomingNews {
@@ -149,5 +152,5 @@ export function mergeCoursesIntoCache(incoming: IncomingCourse[], opts: MergeOpt
     } catch (err: any) {
         throw new Error('Cache local cheio (localStorage) — ' + err.message);
     }
-    localStorage.setItem('cacheTimestamp', timestamp.toString());
+    if (!opts.keepTimestamp) localStorage.setItem('cacheTimestamp', timestamp.toString());
 }

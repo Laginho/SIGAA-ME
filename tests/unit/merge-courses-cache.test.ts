@@ -91,6 +91,12 @@ describe('mergeCoursesIntoCache', () => {
         expect(localStorage.getItem('cacheTimestamp')).toBe('12345');
     });
 
+    it('keeps cacheTimestamp untouched with keepTimestamp (a news-body cache write is not a sync)', () => {
+        localStorage.setItem('cacheTimestamp', '111');
+        mergeCoursesIntoCache([{ id: 'A', name: 'Course A', news: [{ id: '1', content: '<p>ok</p>' }] }], { keepTimestamp: true });
+        expect(localStorage.getItem('cacheTimestamp')).toBe('111');
+    });
+
     it('sanitizes news content before writing to cache (SEC-001)', () => {
         mergeCoursesIntoCache([{
             id: 'A',
