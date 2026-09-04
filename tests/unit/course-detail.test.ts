@@ -15,7 +15,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { toast } from '../../src/components/toast';
 import { renderCourseDetailPage } from '../../src/pages/course-detail';
-import { ok } from '../../shared/errors';
+import { fail, ok } from '../../shared/errors';
 
 function flushAll() {
     return new Promise(resolve => setTimeout(resolve, 0));
@@ -66,5 +66,21 @@ describe('course-detail: falha de download', () => {
         expect(JSON.stringify((window as any).api.downloadFile.mock.calls[0][0])).not.toContain('jsfcljs');
         expect(toastError).toHaveBeenCalledWith('Erro no download: Sessão expirada no SIGAA');
         expect(toastError).not.toHaveBeenCalledWith(expect.stringContaining('Erro desconhecido'));
+    });
+    it('renderiza a lista mesmo quando checkFilesExistence devolve INVALID_REQUEST (SEC-002)', async () => {
+        // Há um download registrado, então a checagem de existência é chamada. Se o
+        // main rejeitar o pedido, a poda do cache é pulada — a lista não pode sumir.
+        localStorage.setItem('downloadedFiles', JSON.stringify({ c1: { 'Lista 3.pdf': { path: 'C:/Users/aluno/SIGAA/Lista 3.pdf' } } }));
+        (window as any).api.checkFilesExistence = vi.fn().mockResolvedValue(fail('INVALID_REQUEST', 'lista de caminhos inválida'));
+        vi.spyOn(console, 'error').mockImplementation(() => undefined);
+        const container = document.createElement('div');
+        document.body.appendChild(container);
+
+        renderCourseDetailPage(container, 'c1');
+        for (let i = 0; i < 10; i++) await flushAll();
+
+        expect((window as any).api.checkFilesExistence).toHaveBeenCalledWith(['C:/Users/aluno/SIGAA/Lista 3.pdf']);
+        expect(container.querySelectorAll('.file-item')).toHaveLength(1);
+        expect(container.querySelector('.status-done')).not.toBeNull();
     });
 });

@@ -68,13 +68,8 @@ export function registerIpcHandlers(deps: IpcDeps): void {
   ): void {
     ipcMain.handle(channel, async (event, raw: unknown) => {
       const win = deps.getWindow();
-      const frame =
-        event.senderFrame === null || event.senderFrame === undefined
-          ? null
-          : {
-              url: event.senderFrame.url,
-              parent: (event.senderFrame as unknown as { parent: unknown | null }).parent ?? null,
-            };
+      const senderFrame = event.senderFrame;
+      const frame = senderFrame ? { url: senderFrame.url, parent: senderFrame.parent } : null;
       if (
         !isTrustedSender(frame, event.sender.id, {
           windowWebContentsId: win?.webContents.id ?? null,

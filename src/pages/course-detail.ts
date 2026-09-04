@@ -237,7 +237,8 @@ async function fetchCourseFiles(courseId: string) {
       if (filePaths.length > 0) {
         try {
           const existenceResults = await window.api.checkFilesExistence(filePaths);
-          if (!existenceResults.success) return;
+          // Poda do cache é best-effort: rejeição vai para o catch abaixo e a lista renderiza mesmo assim.
+          if (!existenceResults.success) throw new Error(existenceResults.error.message);
           let changed = false;
 
           existenceResults.data.forEach((res) => {
