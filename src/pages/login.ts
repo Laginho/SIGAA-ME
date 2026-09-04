@@ -5,7 +5,7 @@ export function renderLoginPage(app: HTMLDivElement) {
   app.innerHTML = `
     <div class="login-container">
       <div class="login-card">
-        <img src="${import.meta.env.BASE_URL}ufc-logo.png" alt="UFC Logo" class="login-logo" style="background: transparent;">
+        <img id="loginLogo" alt="UFC Logo" class="login-logo" style="background: transparent;">
         <h1 class="login-title">SIGAA-ME</h1>
         <p class="login-subtitle">Para não depender de um app feito em Java.</p>
         
@@ -32,6 +32,9 @@ export function renderLoginPage(app: HTMLDivElement) {
   `;
 
   // Add event listener for the form
+  const logo = document.getElementById('loginLogo') as HTMLImageElement;
+  if (logo) logo.src = import.meta.env.BASE_URL + 'ufc-logo.png';
+
   const form = document.getElementById('loginForm') as HTMLFormElement;
   if (!form) return;
 

@@ -1,6 +1,7 @@
 import '../styles/dashboard.css';
 import type { BackgroundSyncUpdate } from '../../shared/ipc';
 import { toast } from '../components/toast';
+import { h } from '../utils/dom';
 import { formatSyncLabel, mergeCoursesIntoCache } from '../utils/ui-helpers';
 import {
   seedExistingItemsAsRead,
@@ -9,8 +10,7 @@ import {
   getUnreadCount,
   markAllAsRead,
   markAsRead,
-  courseHasUnread,
-  NotificationItem
+  courseHasUnread
 } from '../utils/notification-store';
 
 /** Handle a background sync update — exported for unit testing. */
@@ -63,20 +63,11 @@ export function renderDashboardPage(app: HTMLDivElement, account: UserAccount) {
   }
 
   const name: string = toTitleCase(account.name);
-  const unreadCount = getUnreadCount();
 
   app.innerHTML = `
     <div class="dashboard-container">
       <header class="dashboard-header"> 
         <div class="user-info">
-          ${account.photoUrl
-      ? `<img src="${account.photoUrl}" alt="Foto de Perfil" class="user-photo" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';"><div class="user-photo-placeholder" style="display:none">${name.charAt(0)}</div>`
-      : `<div class="user-photo-placeholder">${name.charAt(0)}</div>`
-    }
-          <div class="user-details">
-            <h1 class="user-name">Olá, ${name}</h1>
-            <p class="user-status">Bem-vindo ao SIGAA-ME</p>
-          </div>
         </div>
         <div class="header-actions">
           <div class="sync-status-container" style="display: flex; flex-direction: column; align-items: flex-end; justify-content: center; margin-right: 1rem; gap: 4px;">
@@ -86,7 +77,6 @@ export function renderDashboardPage(app: HTMLDivElement, account: UserAccount) {
           <div class="notification-bell-wrapper">
             <button id="notificationBellBtn" class="btn-notification-bell" title="Notificações">
               🔔
-              ${unreadCount > 0 ? `<span class="notification-badge">${unreadCount > 9 ? '9+' : unreadCount}</span>` : ''}
             </button>
             <div id="notificationDropdown" class="notification-dropdown">
               <div class="notification-dropdown-header">
@@ -115,6 +105,34 @@ export function renderDashboardPage(app: HTMLDivElement, account: UserAccount) {
       </main>
     </div>
   `;
+
+  // Dados do SIGAA viram nós, nunca HTML (SEC-001). A foto só entra no
+  // atributo `src` com allowlist de origem do portal.
+  const userInfo = app.querySelector('.user-info');
+  if (userInfo) {
+    const placeholder = h('div', { className: 'user-photo-placeholder' }, name.charAt(0));
+    if (typeof account.photoUrl === 'string' && account.photoUrl.startsWith('https://si3.ufc.br/')) {
+      const photo = document.createElement('img');
+      photo.src = account.photoUrl;
+      photo.alt = 'Foto de Perfil';
+      photo.className = 'user-photo';
+      placeholder.style.display = 'none';
+      photo.addEventListener('error', () => {
+        photo.style.display = 'none';
+        placeholder.style.display = 'flex';
+      });
+      userInfo.append(photo, placeholder);
+    } else {
+      userInfo.append(placeholder);
+    }
+    const details = h('div', { className: 'user-details' });
+    const nameEl = h('h1', { className: 'user-name' });
+    nameEl.textContent = 'Olá, ' + name;
+    details.append(nameEl);
+    details.append(h('p', { className: 'user-status' }, 'Bem-vindo ao SIGAA-ME'));
+    userInfo.append(details);
+  }
+  updateBellBadge();
 
   // ─── Notification Bell Logic ───────────────────────────
   const bellBtn = document.getElementById('notificationBellBtn');
@@ -236,17 +254,20 @@ function renderNotificationList() {
     return;
   }
 
-  listEl.innerHTML = notifications.map((n: NotificationItem) => `
-    <div class="notification-item ${n.read ? '' : 'notification-item--unread'}" 
-         data-type="${n.type}" data-course-id="${n.courseId}" data-item-id="${n.itemId}">
-      <span class="notification-item-icon">${n.type === 'file' ? '📄' : '📰'}</span>
-      <div class="notification-item-content">
-        <span class="notification-item-title">${n.itemTitle}</span>
-        <span class="notification-item-course">${n.courseName}</span>
-      </div>
-      ${!n.read ? '<span class="notification-unread-dot"></span>' : ''}
-    </div>
-  `).join('');
+  listEl.replaceChildren();
+  for (const n of notifications) {
+    const row = h('div', {
+      className: `notification-item${n.read ? '' : ' notification-item--unread'}`,
+      dataset: { type: n.type, courseId: n.courseId, itemId: n.itemId },
+    });
+    row.append(h('span', { className: 'notification-item-icon' }, n.type === 'file' ? '📄' : '📰'));
+    const content = h('div', { className: 'notification-item-content' });
+    content.append(h('span', { className: 'notification-item-title' }, n.itemTitle ?? ''));
+    content.append(h('span', { className: 'notification-item-course' }, n.courseName ?? ''));
+    row.append(content);
+    if (!n.read) row.append(h('span', { className: 'notification-unread-dot' }));
+    listEl.append(row);
+  }
 
   // Add click listeners for shortcuts
   listEl.querySelectorAll('.notification-item').forEach(item => {
@@ -303,11 +324,9 @@ function loadCoursesFromCache() {
     }
   } catch (error: any) {
     console.error('Error loading courses:', error);
-    coursesListElement.innerHTML = `
-        <div class="error-message">
-          Erro ao carregar cache: ${error.message}
-        </div>
-      `;
+    coursesListElement.replaceChildren(
+      h('div', { className: 'error-message' }, 'Erro ao carregar cache: ' + error.message),
+    );
   }
 }
 
@@ -317,19 +336,24 @@ function displayCourses(coursesWithFiles: any[], coursesListElement: HTMLElement
       <div class="no-courses">Nenhuma disciplina ativa encontrada</div>
     `;
   } else {
-    coursesListElement.innerHTML = coursesWithFiles.map((course: any) => {
+    coursesListElement.replaceChildren();
+    for (const course of coursesWithFiles) {
       const hasUnread = courseHasUnread(course.id);
-      return `
-      <div class="course-card" onclick="window.location.hash='#/course/${course.id}'">
-        <div class="course-card-header">
-          <h3>${course.name}</h3>
-          ${hasUnread ? '<span class="course-unread-dot" title="Novidades"></span>' : ''}
-        </div>
-        <p class="course-code">${course.code || 'Sem código'}</p>
-        <p class="course-period">${course.period || 'Período não especificado'}</p>
-        <p class="course-files-count">${course.fileCount || course.files?.length || 0} arquivos</p>
-      </div>
-    `}).join('');
+      // O `id` entra numa string JS do listener, nunca em HTML (SEC-001):
+      // fim da rota dentro de handler inline.
+      const card = h('div', {
+        className: 'course-card',
+        onClick: () => { window.location.hash = '#/course/' + course.id; },
+      });
+      const header = h('div', { className: 'course-card-header' });
+      header.append(h('h3', undefined, course.name ?? ''));
+      if (hasUnread) header.append(h('span', { className: 'course-unread-dot', title: 'Novidades' }));
+      card.append(header);
+      card.append(h('p', { className: 'course-code' }, course.code || 'Sem código'));
+      card.append(h('p', { className: 'course-period' }, course.period || 'Período não especificado'));
+      card.append(h('p', { className: 'course-files-count' }, `${course.fileCount || course.files?.length || 0} arquivos`));
+      coursesListElement.append(card);
+    }
   }
 }
 

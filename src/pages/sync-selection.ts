@@ -1,4 +1,5 @@
 import '../styles/sync-selection.css';
+import { h } from '../utils/dom';
 import { mergeCoursesIntoCache } from '../utils/ui-helpers';
 import type { CourseSnapshot, CourseSummary } from '../../shared/domain';
 
@@ -64,9 +65,16 @@ export function renderSyncSelectionPage(app: HTMLDivElement) {
         </div>
       </div>
 
-      ${hasCache ? '<a href="#/dashboard" class="back-link">← Voltar ao Dashboard</a>' : ''}
     </div>
   `;
+
+  if (hasCache) {
+    const backLink = document.createElement('a');
+    backLink.href = '#/dashboard';
+    backLink.className = 'back-link';
+    backLink.textContent = '← Voltar ao Dashboard';
+    app.querySelector('.sync-selection-container')?.append(backLink);
+  }
 
   // Event Listeners
   document.getElementById('btnFastSync')?.addEventListener('click', () => startSync(app, 'fast'));
@@ -113,16 +121,18 @@ async function startSync(app: HTMLDivElement, mode: 'fast' | 'full') {
     if (bar) bar.style.background = '#ff5555';
     if (detailEl) { detailEl.textContent = message; detailEl.style.color = '#ff5555'; }
 
-    const actions = document.createElement('div');
-    actions.className = 'sync-error-actions';
-    actions.innerHTML = `
-      <button id="retryBtn" class="btn-section-action btn-section-action--primary">🔄 Tentar novamente</button>
-      ${savedCount > 0
-        ? `<button id="dashboardBtn" class="btn-section-action btn-section-action--success">
-             📊 Dashboard (${savedCount} disciplina${savedCount !== 1 ? 's' : ''} salva${savedCount !== 1 ? 's' : ''})
-           </button>`
-        : ''}
-    `;
+    const actions = h('div', { className: 'sync-error-actions' });
+    actions.append(h('button', {
+      className: 'btn-section-action btn-section-action--primary',
+      id: 'retryBtn',
+    }, '🔄 Tentar novamente'));
+    if (savedCount > 0) {
+      const plural = savedCount !== 1 ? 's' : '';
+      actions.append(h('button', {
+        className: 'btn-section-action btn-section-action--success',
+        id: 'dashboardBtn',
+      }, `📊 Dashboard (${savedCount} disciplina${plural} salva${plural})`));
+    }
 
     overlay.querySelector('.progress-list')?.after(actions);
 

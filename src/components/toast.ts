@@ -9,6 +9,8 @@
  *   toast.info('Sincronizando...');
  */
 
+import { h } from '../utils/dom';
+
 type ToastType = 'success' | 'error' | 'info';
 
 const DISMISS_DURATION = 4000; // ms
@@ -30,7 +32,10 @@ function show(message: string, type: ToastType): void {
   el.className = `toast toast--${type}`;
 
   const icon = type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️';
-  el.innerHTML = `<span class="toast__icon">${icon}</span><span class="toast__message">${message}</span>`;
+  el.replaceChildren(
+    h('span', { className: 'toast__icon' }, icon),
+    h('span', { className: 'toast__message' }, message),
+  );
 
   container.appendChild(el);
 

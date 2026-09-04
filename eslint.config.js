@@ -50,6 +50,32 @@ const noAsAny = {
     'que você quer, o problema é o contrato do preload, não o TypeScript.',
 }
 
+/**
+ * `innerHTML` só com literal, ou com o retorno do sanitizador. Regra 1 do CLAUDE.md, SEC-001.
+ *
+ * O esqueleto estático de cada página continua `innerHTML` (literal sem `${}`).
+ * Qualquer coisa que dependa de dado vira nó: `h()`/`textContent` (`src/utils/dom.ts`).
+ * O corpo de notícia é o único `innerHTML` com dado externo, e só passa porque
+ * o RHS é a chamada a `sanitizeNewsHtml(...)`.
+ */
+const noUnsafeInnerHtml = {
+  selector:
+    'AssignmentExpression[left.property.name="innerHTML"]' +
+    ':not([right.type="Literal"])' +
+    ':not([right.type="TemplateLiteral"][right.expressions.length=0])' +
+    ':not([right.type="CallExpression"][right.callee.name="sanitizeNewsHtml"])',
+  message:
+    'innerHTML só aceita literal sem interpolação ou sanitizeNewsHtml(...). ' +
+    'Dado vira nó: h()/textContent (src/utils/dom.ts). Ver SEC-001.',
+}
+
+const noOtherHtmlSinks = {
+  selector:
+    'AssignmentExpression[left.property.name="outerHTML"], ' +
+    'CallExpression[callee.property.name=/^(insertAdjacentHTML|write|writeln)$/]',
+  message: 'Sink de HTML fora do padrão do projeto. Ver SEC-001.',
+}
+
 export default tseslint.config(
   {
     ignores: [
@@ -85,6 +111,20 @@ export default tseslint.config(
       // try/catch que só engole erro. Regra 3 do CLAUDE.md — a segunda defesa
       // que falhou no pauseSync. Aviso porque há vários casos herdados.
       'no-empty': 'warn',
+    },
+  },
+
+  // ------------------------------------------------------- ZONA DO RENDERER
+  // `innerHTML` com dado é o defeito do SEC-001: erro aqui, sem exceção.
+  {
+    files: ['src/**/*.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        noCredentialFallback,
+        noUnsafeInnerHtml,
+        noOtherHtmlSinks,
+      ],
     },
   },
 
