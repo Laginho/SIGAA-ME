@@ -97,6 +97,7 @@ export type RendererSettingKey = Exclude<
  * valor. Impede `updateSetting('syncInterval', 'texto')`, que o
  * `(key: string, value: any)` anterior aceitava sem reclamar.
  * `lastDownloadPath` é exceção: renderer só pode limpar (null), nunca definir.
+ * A validação em runtime é `parseSettingUpdate` (`electron/ipc/validation.ts`).
  */
 export type SettingUpdate =
   | { key: 'lastDownloadPath'; value: null }
@@ -133,7 +134,7 @@ export interface RendererApi {
   selectDownloadFolder: () => Promise<AppResult<{ folderPath: string }>>
   downloadFile: (data: DownloadFilePayload) => Promise<AppResult<{ filePath: string }>>
   downloadAllFiles: (data: DownloadAllFilesPayload) => Promise<AppResult<DownloadResult>>
-  checkFilesExistence: (filePaths: string[]) => Promise<{ path: string; exists: boolean }[]>
+  checkFilesExistence: (filePaths: string[]) => Promise<AppResult<{ path: string; exists: boolean }[]>>
   onDownloadProgress: (callback: (data: DownloadProgress) => void) => () => void
   getNewsDetail: (courseId: CourseId, courseName: string, newsId: string) => Promise<AppResult<NewsDetail>>
   loadAllNews: (courseId: CourseId, courseName: string) => Promise<AppResult<NewsSummary[]>>
@@ -144,7 +145,6 @@ export interface RendererApi {
     key: K,
     value: Extract<SettingUpdate, { key: K }>['value'],
   ) => Promise<AppResult>
-  simulateNewFile?: () => Promise<boolean>
   onBackgroundSyncUpdate: (callback: (data: BackgroundSyncUpdate) => void) => () => void
 }
 

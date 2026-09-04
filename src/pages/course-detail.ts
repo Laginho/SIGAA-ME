@@ -237,9 +237,10 @@ async function fetchCourseFiles(courseId: string) {
       if (filePaths.length > 0) {
         try {
           const existenceResults = await window.api.checkFilesExistence(filePaths);
+          if (!existenceResults.success) return;
           let changed = false;
 
-          existenceResults.forEach((res: any) => {
+          existenceResults.data.forEach((res) => {
             if (!res.exists) {
               // Find key by path
               const key = Object.keys(courseDownloads).find(k => courseDownloads[k].path === res.path);

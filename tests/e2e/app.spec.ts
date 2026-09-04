@@ -201,7 +201,7 @@ describeOrSkip('App E2E (With Credentials)', () => {
 
         // Trigger simulation via the hidden dev IPC
         console.log('E2E: Triggering simulated background sync new file...');
-        const isSimulated = await window.evaluate(() => (window as any).api.simulateNewFile());
+        const isSimulated = await window.evaluate(() => (window as any).testApi.simulateNewFile());
 
         if (isSimulated) {
             // Wait for the toast notification to appear, meaning the IPC arrived and dashboard updated

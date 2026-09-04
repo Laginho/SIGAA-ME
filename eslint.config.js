@@ -135,6 +135,7 @@ export default tseslint.config(
     files: [
       'electron/preload.ts',
       'electron/main.ts',
+      'electron/ipc/**/*.ts',
       'shared/**/*.ts', // ainda não existe; nasce estrito (ARCH-001)
     ],
     rules: {
