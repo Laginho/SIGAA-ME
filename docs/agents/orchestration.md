@@ -1,9 +1,9 @@
-# Orquestração PTMR — amarrações deste repositório
+# Loop de trabalho — amarrações deste repositório
 
-O loop genérico (PLAN → TEST → MAKE → READ, commits por fase, ledger, Cast) está
-em `.agents/skills/ptmr/SKILL.md`; os contratos por papel em
-`.agents/skills/ptmr/roles/`. Este arquivo só diz o que o loop deixa em aberto e
-é específico daqui.
+Três papéis, três sessões separadas. O loop existe por uma razão só: **quem
+escreve os testes não é quem os faz passar.** Foi assim que 14 testes verdes
+ficaram em cima de um parser quebrado (`tests/unit/parser.test.ts` testava uma
+cópia). Ver `CLAUDE.md`, "Loop de trabalho".
 
 ## Regras que valem para todo papel
 
@@ -23,34 +23,28 @@ diretório por fase, `.scratch/NN-faseN-slug/`, com:
 - `spec.md` — a seção da fase em `docs/PLANO.md`;
 - `issues/NN-ID-slug.md` — uma por tarefa (`ARCH-001`, `SEC-002`, ...). O
   `Problem`/`Required ...` + `Acceptance criteria` dela são a especificação;
-- `ledger.md` — tabela `| Data | ID | Commit |` das tarefas **fechadas** da
-  fase. Não confundir com o ledger do PTMR (abaixo);
-- `handoffs/` — gitignorado, ver abaixo.
+- `ledger.md` — tabela `| Data | ID | Commit |` das tarefas **fechadas** da fase.
 
-O handoff aponta para o arquivo da issue por caminho absoluto.
-
-- Vocabulário da linha `Status:` no topo da issue: `open`, `claimed`,
-  `resolved`, `blocked`. PLAN põe `claimed` ao começar o ciclo e `resolved` ao
-  fechar com gate verde; uma revisão que derruba uma issue fechada a devolve a
-  `open` e marca na lista de critérios qual caiu (❌ com o motivo e o
-  apontador para a revisão). Quem fecha a issue também acrescenta a linha em
-  `ledger.md` da fase; quem reabre, remove.
+- Linha `Status:` no topo da issue: `open`, `claimed`, `resolved`, `blocked`.
+  Quem especifica põe `claimed` ao começar; quem revisa põe `resolved` ao fechar
+  com gate verde e acrescenta a linha no `ledger.md` da fase. Uma revisão que
+  derruba uma issue fechada a devolve a `open`, marca qual critério caiu (❌ com
+  o motivo) e remove a linha do ledger.
 - A ordem das tarefas é a do `docs/PLANO.md` (a Fase 3 respeita integralmente a
-  ordem de dependência). PTMR só recebe tarefas médias em diante; tarefas
-  triviais vão direto, sem PTMR (decisão de 2026-09-01).
+  ordem de dependência). Tarefa trivial vai direto, sem loop.
 - Toda correção de bug precisa de um teste que falharia sem ela (`CLAUDE.md`,
   "Antes de commitar", item 5). Teste chama código de produção, não uma cópia
   (ver `tests/fixtures/README.md` e `QA-005`).
 
 ## Branch base
 
-`master`. Traycer cria o worktree e nomeia o branch `traycer/*`.
+`master`. Cada tarefa num branch próprio, criado a partir de `master`.
 
 ## Gate
 
 | O que | Comando | Observação |
 |---|---|---|
-| Gate completo | `npm run quality` | typecheck + lint + testes, nessa ordem. É o que READ roda |
+| Gate completo | `npm run quality` | typecheck + lint + testes, nessa ordem. É o que a revisão roda |
 | Só tipos | `npm run typecheck` (`tsc --noEmit`) | |
 | Só lint | `npm run lint` (`eslint .`) | 0 erros obrigatório; os warnings `no-explicit-any` são legado e só podem cair (77 em 2026-09-03); em `shared/`, `electron/main.ts` e `electron/preload.ts` `any` é erro |
 | Só suíte | `npm test` (`vitest run`) | termina sozinho |
@@ -67,11 +61,10 @@ dentro da pasta montada. Detalhes e armadilhas em `CLAUDE.md`. No Windows, a
 suíte rodada dentro de um sandbox pode falhar com `EPERM` ao criar
 `D:\tmp\logs\app_*.log`; repetir fora do sandbox — não é falha do projeto.
 
-**Prova de vermelho-verde:** antes de reportar, MAKE/READ mostram que os testes
-novos falham sem a correção (`git stash push -- <fontes>` → `vitest run` → `git
-stash pop`) e passam com ela. É o que a issue registra como "vermelho-verde
-provado". Reportar a contagem real da suíte (`N passed | M skipped (N+M)`), não
-a arredondada.
+**Prova de vermelho-verde:** antes de reportar, implementação e revisão mostram
+que os testes novos falham sem a correção (`git stash push -- <fontes>` →
+`vitest run` → `git stash pop`) e passam com ela. Reportar a contagem real da
+suíte (`N passed | M skipped (N+M)`), não a arredondada.
 
 ## Convenções de teste
 
@@ -90,34 +83,13 @@ a arredondada.
 ## Commits
 
 Conventional Commits em inglês, corpo explicando o porquê e citando a tarefa
-(`fix: ... (BUG-003)`), mais o trailer de papel exigido pelo loop:
-
-```
-Role: MAKE (<modelo resolvido>)
-```
-
-Uma fase, um commit; nunca squash. Nits do master dev vão em commit `Role: MASTER`.
-Autor humano dos commits é o Bruno; ninguém faz push nem merge — o PR é aberto
-pelo master dev e o Bruno mescla.
-
-## Handoffs e ledger do PTMR
-
-- Handoffs: `.scratch/<fase>/handoffs/NN-<direction>.md` (gitignorado por
-  `.scratch/**/handoffs/`, entregue por caminho absoluto). Numeração por fase,
-  a partir de `01`; uma revisão independente pode entrar ali com nome livre
-  (ex.: `ARCH-001-READ-review.md`) e ser citada pelo handoff seguinte.
-- Ledger do PTMR (placar dos modelos, formato do `SKILL.md`): tabela
-  `## Ciclos PTMR` **no fim do arquivo da issue**, uma linha por ciclo, inclusive
-  os limpos. Padrão em
-  `.scratch/03-fase2-consertar-o-que-esta-quebrado/issues/02-DL-001-*.md`.
-  Não existe `ledger.md` separado para o PTMR — o `ledger.md` da fase é o de
-  tarefas fechadas.
-- Nada é semeado antes do primeiro ciclo de cada tarefa.
+(`fix: ... (BUG-003)`). Testes e implementação podem ser commits separados;
+nunca squash. Autor humano dos commits é o Bruno; ninguém faz push nem merge —
+a revisão abre o PR e o Bruno mescla.
 
 ## Registro na issue
 
-Ao fim de cada ciclo, o master dev acrescenta ao arquivo da issue um bloco
-`#### Resolution (AAAA-MM-DD)` (ou `#### Correction cycle NN (AAAA-MM-DD)`) com
-decisão, arquivos, prova de vermelho-verde e saída do gate, e a linha no
-`## Ciclos PTMR`. A issue é a memória entre sessões; a tabela de ciclos é o
-placar dos modelos.
+Ao fechar, a revisão acrescenta ao arquivo da issue um bloco
+`#### Resolution (AAAA-MM-DD)` com decisão, arquivos, prova de vermelho-verde e
+saída do gate. A issue é a memória entre sessões. As tabelas `## Ciclos PTMR`
+em issues antigas são registro histórico do loop anterior; não acrescente linhas.
