@@ -1,5 +1,5 @@
-import { app, BrowserWindow, dialog, Tray, Menu } from 'electron'
-import { fileURLToPath } from 'node:url'
+import { app, BrowserWindow, dialog, shell, Tray, Menu } from 'electron'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import path from 'node:path'
 import fs from 'node:fs'
 import { SigaaService } from './services/sigaa.service'
@@ -9,6 +9,7 @@ import { persistenceService } from './services/persistence.service'
 import { BackgroundSyncService } from './services/background-sync.service'
 import { cacheService } from './services/cache.service'
 import { registerIpcHandlers } from './ipc/register-handlers'
+import { installNavigationGuard } from './security/navigation-policy'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -99,12 +100,37 @@ registerIpcHandlers({
 function createWindow() {
   const isHiddenStartup = process.argv.includes('--hidden');
   
-  win = new BrowserWindow({
+  const window = new BrowserWindow({
     show: !isHiddenStartup,
     icon: path.join(process.env.VITE_PUBLIC, 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
       additionalArguments: app.isPackaged ? [] : ['--sigaa-dev'],
+      // Explícitos por documentação (SEC-003): já são o efetivo no Electron 30,
+      // mas ninguém deveria precisar saber disso para auditar a janela.
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      webSecurity: true,
+    },
+  })
+  win = window
+
+  installNavigationGuard(window.webContents, {
+    appUrl: VITE_DEV_SERVER_URL ?? pathToFileURL(path.join(RENDERER_DIST, 'index.html')).href,
+    // Ligação tardia de propósito: o E2E troca `shell.openExternal` por um stub.
+    openExternal: (url) => shell.openExternal(url),
+    confirmExternal: async (url) => {
+      const { response } = await dialog.showMessageBox(window, {
+        type: 'question',
+        buttons: ['Abrir no navegador', 'Cancelar'],
+        defaultId: 1,
+        cancelId: 1,
+        title: 'Abrir link externo',
+        message: 'Abrir este link fora do SIGAA-ME?',
+        detail: url,
+      })
+      return response === 0
     },
   })
 
