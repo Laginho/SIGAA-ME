@@ -86,8 +86,8 @@ export default tseslint.config(
       'coverage/**',
       'playwright-report/**',
       'test-results/**',
-      '_agent_tmp/**',
-      '.claude/worktrees/**', // worktree de agente: checkout do repo dentro do repo, local da máquina // scratch de agentes (screenshots do visual spec, checkouts alheios); nunca é código deste repo
+      '_agent_tmp/**', // scratch de agentes (screenshots do visual spec, checkouts alheios); nunca é código deste repo
+      '.claude/worktrees/**', // worktree de agente: checkout do repo dentro do repo, local da máquina
       '*.config.js',
       '*.config.ts',
     ],

@@ -1,5 +1,5 @@
 # SEC-003 — Enforce BrowserWindow navigation and external-link policy
-Status: claimed
+Status: resolved
 Priority: P0
 Blocked by: SEC-002
 Tracker status at migration: `NOT STARTED`
@@ -167,7 +167,7 @@ called.
 
 #### Implementation notes
 
-- Commit: —
+- Commit: acbb95a (tests + contract), 3c7a17b (implementation)
 - Approved domains: `ufc.br`, `*.ufc.br`, `github.com/Laginho/SIGAA-ME[/...]`
 - Sandbox exceptions: none
 
@@ -179,3 +179,43 @@ Clicking such a link inside a news modal still navigates the `BrowserWindow`
 itself to the external site: pre-existing behaviour, left for this issue.
 The `will-navigate` handler here must route those clicks through
 `shell.openExternal` (host allowlist above) and deny the in-window navigation.
+
+#### Resolution (2026-09-05)
+
+Review session (clean; did not see the spec or implementation sessions).
+Reviewed the full diff `master...sec-003-navigation-policy` against the
+contract and traced callers: `createWindow()` is the only `BrowserWindow`
+constructor (called from `whenReady` and `activate`), no other `loadURL`,
+`openExternal` or `setWindowOpenHandler` exists under `electron/`, and the
+renderer has no `location.href`/`assign`/`window.open`/`target=` of its own,
+so the only navigation vector really is a sanitized `<a href>` in a news body.
+
+- Files: `electron/security/navigation-policy.ts` (new, pure
+  `classifyNavigation` + `installNavigationGuard`), `electron/main.ts`
+  (explicit `webPreferences`, guard wired with late-bound `shell.openExternal`
+  and a `dialog.showMessageBox` naming the URL), `eslint.config.js`
+  (`electron/security/**` in the boundary zone; `.claude/worktrees/**`
+  ignored), `tests/unit/navigation-policy.test.ts`,
+  `tests/e2e/security-boundaries.spec.ts`.
+- Every acceptance criterion has a test that calls production code: the
+  `main.ts` describe imports the real `main.ts` with `electron` mocked and
+  reads the `webPreferences` passed to the constructor; the E2E clicks real
+  anchors in the real app with `shell`/`dialog` stubbed from main.
+- Red-green, reproduced by the reviewer on Windows: without
+  `electron/security/` the unit file fails at import; with the module but
+  `master`'s `main.ts`, `9 failed | 64 passed (73)`; on the branch 73 passed.
+- Gate on the branch: `tsc` clean, lint 0 errors / 71 legacy warnings,
+  `353 passed | 4 skipped (357)` in 27 files. `npx vite build` +
+  `security-boundaries.spec.ts`: 6 passed under real Electron.
+- Findings: none with a concrete failure scenario. Fixed inline: the
+  `_agent_tmp/**` comment in `eslint.config.js` had been glued onto the new
+  `.claude/worktrees/**` line.
+- Observation, not a defect (matches decision 6): the sanitizer keeps
+  `http:` hrefs (`ALLOWED_URI_REGEXP` is `https?:|mailto:`) and the guard
+  drops them silently, so a plain-`http` link in a news body clicks to
+  nothing with no feedback. If that shows up in real news, the product call is
+  either to upgrade `http:` on an allowlisted host to `https:` or to strip
+  `http:` in the sanitizer so the link is visibly inert.
+- Pending (Bruno, manual): one real `mailto:` click, and the dev-origin
+  smoke (`npm run dev`, click a news link) — no automated tier runs the guard
+  against `http://localhost:5173`.
