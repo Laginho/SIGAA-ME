@@ -87,6 +87,7 @@ export default tseslint.config(
       'playwright-report/**',
       'test-results/**',
       '_agent_tmp/**', // scratch de agentes (screenshots do visual spec, checkouts alheios); nunca é código deste repo
+      '.claude/worktrees/**', // worktree de agente: checkout do repo dentro do repo, local da máquina
       '*.config.js',
       '*.config.ts',
     ],
@@ -136,6 +137,7 @@ export default tseslint.config(
       'electron/preload.ts',
       'electron/main.ts',
       'electron/ipc/**/*.ts',
+      'electron/security/**/*.ts',
       'shared/**/*.ts', // ainda não existe; nasce estrito (ARCH-001)
     ],
     rules: {
