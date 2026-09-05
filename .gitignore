@@ -69,6 +69,5 @@ debug_playwright_*.html
 test-results/
 playwright-report/
 
-# PTMR: handoffs são entregues por caminho absoluto, nunca commitados. O ledger
-# do PTMR fica na tabela "Ciclos PTMR" do arquivo da issue e É commitado.
+# Handoffs entre sessões são entregues por caminho absoluto, nunca commitados.
 .scratch/**/handoffs/

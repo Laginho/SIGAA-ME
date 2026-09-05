@@ -10,6 +10,27 @@ fase no PLANO), `ledger.md` (tarefas fechadas) e `issues/NN-ID-slug.md`, uma por
 tarefa, com a linha `Status:` (open/claimed/resolved/blocked) no topo. O
 `CODE_REVIEW.md` é registro histórico com correções marcadas inline.
 
+## Loop de trabalho
+
+Três papéis, **três sessões separadas**, e a regra que sustenta tudo: **quem
+escreve os testes não é quem os faz passar.**
+
+1. **Especificar** (modelo forte): grilling da tarefa, issue em `.scratch/` com
+   critérios de aceite, e os **testes falhando**, contra código de produção.
+   Antes de declarar um contrato, abrir o handler **e** o serviço por trás dele.
+2. **Implementar** (modelo mais barato, sessão limpa, só a issue e os testes):
+   fazer os testes passarem e refatorar. Nada além disso. Tarefa de fronteira de
+   confiança ou concorrência (ex.: `CONC-001`) vai para o modelo forte também.
+3. **Revisar** (modelo forte, sessão limpa, sem ver a sessão que especificou):
+   conferir o diff contra a issue **e** o que a issue não disse — subir a cadeia
+   de chamadores de tudo que o diff toca. Só reporta achado com cenário de falha
+   concreto (input, sequência ou teste que falha); **zero achados é resposta
+   válida**. Uma passada; discordância vira teste, não debate. Fecha a issue,
+   commita e abre o PR.
+
+Tarefa trivial vai direto, sem loop. Amarrações (gate, convenções de teste,
+commits, registro na issue): `docs/agents/orchestration.md`.
+
 ## Comandos
 
 ```bash
@@ -144,16 +165,6 @@ README dizer o contrário.
 ## Regras invioláveis
 
 Cada uma existe por causa de um bug real deste repositório.
-
-### Mensageria Traycer em subagentes OpenCode
-
-Quando um subagente OpenCode não receber as ferramentas nativas `traycer_*`, o
-coordenador deve recuperar o shim global em
-`C:\Users\bruno\.traycer\.opencode\traycer-a2a-recovery.md` e resetar somente a
-sessão/provedor OpenCode afetado. O subagente não deve tentar substituir a
-ferramenta por comandos de shell: a conclusão é ter, em uma sessão nova,
-`traycer_get_self`, `traycer_create_agent` e `traycer_send_message` disponíveis
-nativamente.
 
 ### 1. Nunca `innerHTML` com dado que veio do SIGAA
 
