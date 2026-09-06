@@ -1,291 +1,139 @@
-# CLAUDE.md — regras deste projeto
+# CLAUDE.md — contexto deste projeto
 
 App desktop Electron que faz scraping do SIGAA da UFC (`si3.ufc.br`) para dar ao
 aluno leitura offline de disciplinas, arquivos e notícias.
 
-**Leia antes de trabalhar aqui:** `docs/PLANO.md` (plano ativo e decisões
-tomadas) e `.scratch/` (status de cada tarefa, desde 2026-09-03). Em `.scratch/`
-há um diretório por fase (`NN-faseN-slug/`), cada um com `spec.md` (a seção da
-fase no PLANO), `ledger.md` (tarefas fechadas) e `issues/NN-ID-slug.md`, uma por
-tarefa, com a linha `Status:` (open/claimed/resolved/blocked) no topo. O
-`CODE_REVIEW.md` é registro histórico com correções marcadas inline.
+**Leia antes de trabalhar aqui:** `docs/PLANO.md` (plano ativo e decisões) e
+`.scratch/` (uma pasta por fase, `NN-faseN-slug/`, com `spec.md`, `ledger.md` e
+`issues/NN-ID-slug.md`; a linha `Status:` no topo da issue é a verdade sobre a
+tarefa). Antes de mexer em scraping, `ARCHITECTURE.md`.
+
+## Arquitetura em uma frase
+
+Playwright estabelece e mantém a sessão JSF do SIGAA; HTTP pega emprestado os
+cookies para parsing e download (~10x mais rápido) e cai de volta no Playwright
+quando falha.
+
+Persistência: **JSON no `userData`** (main) + **`localStorage`** (renderer).
+Não existe SQLite, apesar de `sqlite@5` no `package.json` e do README dizerem o
+contrário.
+
+Dois fatos que uma busca não revela:
+
+- `download.service.ts` é carregado por `await import()` (invisível para grep de
+  `import ... from`) e **não é alcançável**: os dois métodos que o importam não
+  têm chamador. O download real é `httpScraper.downloadFile`. O fallback
+  Playwright que `ARCHITECTURE.md` descreve existe como código e não está ligado.
+- Código que parece proteger algo pode não fazer nada (`pauseSync()` tinha
+  chamada, `try/catch` e cast, e o método não existia no preload). Ao encontrar
+  proteção importante, confirme que o outro lado existe.
 
 ## Loop de trabalho
 
-Três papéis, **três sessões separadas**, e a regra que sustenta tudo: **quem
-escreve os testes não é quem os faz passar.**
+Três papéis em **três sessões separadas**, porque quem escreve os testes não é
+quem os faz passar (14 testes verdes já ficaram em cima de um parser quebrado).
 
-1. **Especificar** (modelo forte): grilling da tarefa, issue em `.scratch/` com
-   critérios de aceite, e os **testes falhando**, contra código de produção.
-   Antes de declarar um contrato, abrir o handler **e** o serviço por trás dele.
-2. **Implementar** (modelo mais barato, sessão limpa, só a issue e os testes):
-   fazer os testes passarem e refatorar. Nada além disso. Tarefa de fronteira de
-   confiança ou concorrência (ex.: `CONC-001`) vai para o modelo forte também.
-3. **Revisar** (modelo forte, sessão limpa, sem ver a sessão que especificou):
-   conferir o diff contra a issue **e** o que a issue não disse — subir a cadeia
-   de chamadores de tudo que o diff toca. Só reporta achado com cenário de falha
-   concreto (input, sequência ou teste que falha); **zero achados é resposta
-   válida**. Uma passada; discordância vira teste, não debate. Fecha a issue,
-   commita e abre o PR.
+1. **Especificar**: grilling da tarefa, issue em `.scratch/` com critérios de
+   aceite e os testes **falhando**, contra código de produção. Antes de declarar
+   um contrato de IPC, abrir o handler **e** o serviço por trás dele.
+2. **Implementar** (sessão limpa, só a issue e os testes): fazer os testes
+   passarem e refatorar. Nada além disso.
+3. **Revisar** (sessão limpa, sem ver a sessão que especificou): conferir o diff
+   contra a issue e subir a cadeia de chamadores de tudo que o diff toca. Só
+   reporta achado com cenário de falha concreto; zero achados é resposta válida.
+   Discordância vira teste, não debate. Fecha a issue, commita e abre o PR.
 
-Tarefa trivial vai direto, sem loop. Amarrações (gate, convenções de teste,
-commits, registro na issue): `docs/agents/orchestration.md`.
+Tarefa trivial vai direto, sem loop. Gate, convenções de teste, commits e
+registro na issue: `docs/agents/orchestration.md`.
 
 ## Comandos
 
 ```bash
 npm run dev          # desenvolvimento
-npm run build        # build de produção
+npm run build        # build de produção (só Windows)
 npm run quality      # typecheck + lint + testes, nessa ordem — é o gate
-npm test             # só a suíte (vitest run, termina sozinho)
-npm run typecheck    # só os tipos
-npm run lint         # só o ESLint
+npm test             # só a suíte (vitest run)
+npm run typecheck
+npm run lint
 ```
 
-**`npm install` roda no Windows, pelo autor.** O projeto depende de binários
-nativos por plataforma (Electron, Playwright). Instalar de um ambiente Linux
-para dentro desta pasta baixa binários errados e quebra o setup local.
+**Instalação só no Windows, pelo autor, com `npm ci`** (o lock foi regenerado no
+Windows; `npm install` resolveria fora do lock). Electron e Playwright têm
+binários por plataforma: instalar de um Linux para dentro desta pasta quebra o
+setup local. Um agente num Linux **copia o repo sem `node_modules`** e instala
+lá; o gate inteiro roda em ~12s. Do Linux não saem `npm run build` nem
+`test:e2e`.
 
-O que um agente com esta pasta montada de um Linux consegue rodar, medido em
-2026-08-04:
+O npm 12 bloqueia scripts de instalação; a aprovação está em `allowScripts` no
+`package.json`, pinada por versão. Ao subir `electron` ou `esbuild`:
+`npm install-scripts approve electron esbuild` e `npm rebuild electron esbuild`.
 
-| Comando | Funciona? | Detalhe |
-|---|---|---|
-| `tsc --noEmit` | **Sim** | JS puro, ~20s. É o loop de feedback útil |
-| `eslint .` | Inviável | ~40s **por arquivo** — ligado por I/O na montagem, não por CPU |
-| `vitest run` | **Não** | o `node_modules` montado é do Windows: `.bin/vitest` chama `node.exe` |
-
-O `vitest` não falha por incompatibilidade do `rolldown` — ele publica binding
-por plataforma, e o lock lista todas as 15, `linux-x64-gnu` inclusive. O que
-existe na montagem é só a `win32` porque foi lá que o `npm install` rodou.
-Instalado no Linux, o `vitest` roda.
-
-**Copiar o repositório (sem `node_modules`) para o ambiente do agente e instalar
-as dev-deps lá é o caminho bom, e é bem mais rápido que a montagem.** Medido em
-2026-08-05, num container Linux:
-
-| Comando | Tempo | Resultado |
-|---|---|---|
-| `tsc --noEmit` | 3,1s | limpo |
-| `eslint .` | 2,8s no repo **inteiro** | 0 erros, 125 warnings (`no-explicit-any`) |
-| `vitest run` | 5,8s | 68 passed, 4 skipped |
-
-O gate inteiro em ~12s. O que **não** sai de um Linux: `npm run build`
-(`electron-builder --win` precisaria de wine) e `test:e2e`. O binário do Electron
-para Linux baixa normalmente, e o app abre com
-`xvfb-run electron --no-sandbox` — dá para inspecionar a UI, não para gerar
-instalador.
-
-**`npm ci` voltou a ser o caminho autoritativo em 2026-08-09 (`DEP-002`).** O
-Vite subiu de 5.4.21 para 6.4.3, major aceita pelo Vitest 4.1.4, e o lock foi
-regenerado no Windows. Uma instalação limpa, `npm run quality` e o empacotamento
-Windows passaram. Os workflows usam `npm ci`; não troque de volta para
-`npm install`, que resolveria versões fora do lock.
-
-**A execução no Windows continua sendo a autoridade** para build, E2E e empacotamento.
-
-**npm 12 bloqueia scripts de instalação por padrão.** Num PC novo (2026-09-02), o
-`npm ci` terminou sem o binário do Electron nem do esbuild e o gate não rodava. A
-aprovação fica em `allowScripts` no `package.json`, pinada por versão. Ao subir
-`electron` ou `esbuild`, rode `npm install-scripts approve electron esbuild` e
-`npm rebuild electron esbuild`; se o `npm ci` avisar "install scripts blocked",
-é isso.
-
-### Loop de verificação visual (num Linux)
-
-O gate prova que nada quebrou; ele não mostra como ficou. Para trabalho de UI,
-depois de copiar o repo e instalar as dev-deps:
+### Verificação visual (Linux)
 
 ```bash
-npx tsc --noEmit && npx eslint . && npx vitest run       # ~12s
-npx vite build                                           # ~7s, não precisa do Electron
-node node_modules/electron/install.js                    # baixa o binário Linux
-xvfb-run -a npx playwright test visual.spec.ts           # ~16s, screenshots por rota
+npx vite build
+node node_modules/electron/install.js
+xvfb-run -a npx playwright test visual.spec.ts     # PNGs em _agent_tmp/shots/
 ```
 
-`tests/e2e/visual.spec.ts` abre o app de verdade, navega por hash em todas as
-rotas em tema claro e escuro, falha se alguma renderizar vazia, e no final falha
-se qualquer navegação deixou erro no console. Os PNGs ficam em
-`_agent_tmp/shots/` para alguém olhar — não são snapshots comparados
-automaticamente.
+Duas armadilhas, meia hora cada se você não souber:
 
-Duas armadilhas medidas em 2026-08-05, ambas custam meia hora se você não souber:
+1. Precisa de um `google-chrome` no PATH. Sem ele, `main.ts` abre um
+   `dialog.showErrorBox` **antes** de `createWindow()` e o Playwright dá timeout
+   sem dizer por quê. Solução: `ln -s <chromium do playwright> ~/bin/google-chrome`.
+2. O boot chama `tryAutoLogin()` de verdade. Para inspecionar UI, plante fixture
+   em `sessionStorage["sigaa-me:v2:session:account"]` (um `AccountProfile` com
+   `id`) e `localStorage["sigaa-me:v2:<id>:courses"]` e navegue por hash, como
+   `tests/e2e/visual.spec.ts` faz.
 
-1. **Precisa de um `google-chrome` no PATH.** O `whenReady` do `main.ts` procura o
-   Chrome e, se não achar, chama `dialog.showErrorBox` — um modal que **bloqueia
-   antes de `createWindow()`**. Sem window, o Playwright dá timeout e não diz por
-   quê. Num container com Playwright: `ln -s <chromium do playwright> ~/bin/google-chrome`.
-2. **Não espere o boot real.** O boot chama `window.api.tryAutoLogin()`, que faz
-   login de verdade no SIGAA. Para inspecionar UI isso é ruído: plante fixture em
-   `sessionStorage["sigaa-me:v2:session:account"]` (um `AccountProfile` com `id`) e
-   `localStorage["sigaa-me:v2:<id>:courses"]` e navegue por hash,
-   como o spec faz.
+### Tiers de teste
 
-### Os tiers de teste
+| Tier | Onde | Precisa de |
+|---|---|---|
+| Unit + integração mockada | `tests/unit/`, `tests/integration/` (vitest) | nada |
+| Parser contra fixture | `tests/integration/parser-real.test.ts` | nada |
+| Visual | `tests/e2e/visual.spec.ts` (playwright) | nada |
+| E2E sem credencial | `tests/e2e/app.spec.ts`, 2 testes | nada |
+| Live smoke do scraper | `tests/integration/scraper.test.ts` | `.env` + `RUN_LIVE_SIGAA_TESTS=true` |
+| E2E fluxo completo | `app.spec.ts`, 3 testes | `.env` |
 
-| Tier | Onde | Precisa de | Runner |
-|---|---|---|---|
-| Unit + integração mockada | `tests/unit/`, `tests/integration/` | nada | vitest |
-| Parser contra fixture | `tests/integration/parser-real.test.ts` | nada | vitest |
-| Visual | `tests/e2e/visual.spec.ts` | nada | playwright |
-| E2E sem credencial | `tests/e2e/app.spec.ts` (2 testes) | nada | playwright |
-| Live smoke do scraper | `tests/integration/scraper.test.ts` | `.env` **+** `RUN_LIVE_SIGAA_TESTS=true` | vitest |
-| E2E fluxo completo | `app.spec.ts` (3 testes) | `.env` | playwright |
+- `tests/e2e/` é só `*.spec.ts`. Um `.test.ts` ali zera a coleta do Playwright
+  sem erro óbvio.
+- Os tiers com credencial são login real na conta do usuário. Rodam à mão,
+  antes de release, só o Bruno.
+- Teste chama código de produção, não uma cópia da lógica (`tests/fixtures/README.md`).
 
-Regras que sustentam isso:
-
-- **`tests/e2e/` é só `*.spec.ts`.** O `playwright.config.ts` fixa
-  `testMatch: '**/*.spec.ts'` porque o vitest inclui `tests/**/*.test.ts` e o
-  Playwright, pelo padrão dele, pegava os dois. Um teste de vitest em
-  `tests/e2e/` fazia o Playwright morrer na transformação e **zerar a coleta
-  inteira** — 0 testes, sem erro óbvio.
-- **Os tiers com credencial não entram em loop.** São login real na conta do
-  usuário no portal da universidade: rodar em ciclo é dezenas de logins
-  automatizados e risco de bloqueio. Manual, antes de release.
-- **Teste não espelha implementação.** `tests/unit/parser.test.ts` declara que
-  suas funções "mirror the parsing logic in the service" — ele testa uma cópia,
-  e a cópia não tem a detecção de selector drift que o serviço real tem. Foi
-  assim que um `/['"](\\d+)['"]/` (barra invertida literal, não dígito) ficou
-  quebrado no parser real com 14 testes verdes em cima. Teste novo chama o
-  código de produção; ver `tests/fixtures/README.md`.
-
-O que este loop **não** cobre: empacotamento, assinatura, e qualquer coisa que
-dependa de sync real contra o `si3.ufc.br`.
-
-## Arquitetura em uma frase
-
-Playwright estabelece e mantém a sessão JSF do SIGAA; HTTP "pega emprestado" os
-cookies para o que é possível (parsing e download, ~10x mais rápido) e cai de
-volta no Playwright quando falha. Detalhes em `ARCHITECTURE.md` — leia antes de
-mexer em scraping.
-
-Persistência hoje: **JSON no `userData`** (main) + **`localStorage`** (renderer).
-Não existe SQLite, apesar de `sqlite@5` estar no `package.json` sem uso e do
-README dizer o contrário.
-
-## Regras invioláveis
+## Regras do código
 
 Cada uma existe por causa de um bug real deste repositório.
 
-### 1. Nunca `innerHTML` com dado que veio do SIGAA
-
-Nome de disciplina, nome de arquivo, título de notícia, corpo de notícia, foto de
-perfil — tudo isso é **entrada não confiável**. Use `textContent`.
-
-O corpo da notícia é a única exceção que pode precisar de HTML, e só depois de
-sanitização com allowlist estrita (tarefa `SEC-001`, ainda não feita).
-
-Não existe sanitizador no projeto hoje. Se precisar de um, essa é a tarefa
-`SEC-001` — não improvise um inline.
-
-### 2. Nunca `as any` para atravessar o IPC
-
-Foi exatamente isso que escondeu o bug do `pauseSync()`:
-
-```ts
-// ERRADO — foi assim que um método inexistente passou meses sem ser notado
-(window as any).api.pauseSync()
-```
-
-O cast desliga o verificador de tipos. Se `window.api` não tem o método que você
-quer, o problema é o contrato do preload, não o TypeScript.
-
-### 3. `try/catch` que só faz `console.error` é quase sempre um bug
-
-Ou o erro importa — e precisa ser tratado ou propagado — ou não importa, e o
-`try` não deveria existir. Engolir erro silenciosamente foi a segunda defesa que
-falhou no caso do `pauseSync`.
-
-### 4. Canal IPC novo precisa de tipo e validação
-
-O preload hoje expõe `ipcRenderer` genérico (`send`/`on`/`invoke`), o que permite
-ao renderer invocar qualquer canal. Isso é a tarefa `SEC-002` e está aberto.
-
-**Não amplie essa superfície.** Todo canal novo: nomeado explicitamente, com
-tipo, e com validação de payload no main. Nunca passe script JSF, ViewState,
-cookie ou URL interna do SIGAA para o renderer.
-
-### 5. Credencial nunca em código-fonte, e nunca com fallback
-
-```ts
-// ERRADO — aconteceu de verdade aqui, e foi para um repositório público
-const password = process.env.SIGAA_PASS || '<senha real estava aqui>'
-```
-
-Credencial vem de `process.env` **sem valor padrão**. Se a variável não existir,
-o programa falha — falhar é o comportamento correto. O `||` transforma um erro
-de configuração numa credencial hardcoded permanente.
-
-O `.gitignore` protege `.env`. Ele não protege senha escrita num arquivo `.ts`.
-
-### 6. Retorno de IPC é união discriminada, não objeto com campos opcionais
-
-```ts
-// ERRADO — `if (!r.success) return` não estreita nada; `folderPath` continua
-// `string | undefined` depois do early return, e o erro reaparece em todo
-// consumidor
-Promise<{ success: boolean; folderPath?: string }>
-
-// CERTO — o early return estreita, e `folderPath` vira `string`
-Promise<{ success: true; folderPath: string } | { success: false }>
-```
-
-Padrão a reconhecer: **erro de `null`/`undefined` repetido em vários call sites
-quase sempre é uma união discriminada faltando na origem.** No `PIPE-002`,
-corrigir a origem apagou 4 erros de uma vez sem tocar em nenhum consumidor.
-
-E o contrato precisa casar com o que o main **devolve**, não com o que parece
-razoável. O `vite-env.d.ts` foi escrito por leitura parcial do main e omitia
-`account`, `photoUrl`, `skipped` e `results`. Ao declarar um retorno, abra o
-handler **e** o serviço por trás dele.
-
-### 7. Não crie abstração para um caso
-
-Sem interface com uma implementação, sem factory para um produto, sem config para
-valor que nunca muda. Este repositório já tem 6.282 linhas de TypeScript para um
-app que lista arquivos — o problema não é falta de estrutura.
+1. **Nunca `innerHTML` com dado do SIGAA** (nome de disciplina, arquivo,
+   notícia, foto). Use `textContent`. O corpo da notícia é a única exceção
+   possível, e só depois de um sanitizador com allowlist (`SEC-001`, não feita).
+   Não existe sanitizador no projeto; não improvise um inline.
+2. **Nunca `as any` para atravessar o IPC.** Foi assim que `pauseSync()`
+   inexistente passou meses. Se `window.api` não tem o método, o problema é o
+   contrato do preload.
+3. **`try/catch` que só faz `console.error` é bug.** Ou o erro importa e é
+   tratado ou propagado, ou o `try` não deveria existir.
+4. **Canal IPC novo: nomeado, tipado, com validação de payload no main.** O
+   preload ainda expõe `ipcRenderer` genérico (`SEC-002`, aberta); não amplie
+   essa superfície. Nunca passe script JSF, ViewState, cookie ou URL interna do
+   SIGAA para o renderer.
+5. **Credencial só de `process.env`, sem valor padrão.** Um
+   `process.env.SIGAA_PASS || '<senha>'` já foi para um repositório público.
+   Sem a variável, o programa falha, e falhar é o correto.
+6. **Retorno de IPC é união discriminada**, `{ success: true; x: T } | { success: false }`,
+   não `{ success: boolean; x?: T }`. Erro de `undefined` repetido em vários
+   consumidores quase sempre é união faltando na origem. E o contrato declara o
+   que o handler **devolve**: abra o handler e o serviço, não deduza.
+7. **Sem abstração para um caso.** São 6.282 linhas de TypeScript para um app
+   que lista arquivos; o problema não é falta de estrutura.
 
 ## Antes de commitar
 
-1. `npx tsc --noEmit` passa.
-2. `npx vitest run` passa.
-3. Você não adicionou `any` em código de fronteira (`preload.ts`, handlers IPC).
-4. Você não adicionou `innerHTML` com dado externo.
-5. Se corrigiu um bug, existe um teste que falharia sem a correção.
-6. Cada implementação concluída vira um commit Conventional Commit próprio,
-   depois que o gate estiver verde.
-
-`npm run quality` verde prova que **as coisas cobertas pela suíte** continuam
-funcionando. Não prova que a sua mudança funciona, se nada exercita a sua
-mudança. Antes de escrever "verificado", pergunte qual teste falharia se a
-correção fosse revertida — se a resposta for "nenhum", o item 5 não foi
-cumprido. Ver `QA-003` no tracker para o exemplo real disso neste repositório.
-
-## Contexto histórico útil
-
-Este projeto foi construído com foco em resultado, e o processo ficou para
-depois. A dívida resultante está catalogada e sendo paga em ordem — não é
-descuido, é plano.
-
-Dois padrões de falha que já aconteceram aqui e vale reconhecer:
-
-**Código que finge implementar algo.** O `pauseSync()` tinha chamada, `try/catch`
-e cast — parecia proteção contra concorrência. Não fazia nada. Ao encontrar
-código que parece cuidar de algo importante, confirme que o outro lado existe.
-
-**Relatório de ferramenta tratado como fato.** O caso do `download.service.ts`
-teve três conclusões erradas em sequência, e vale como aula:
-
-1. Uma busca automática disse "código morto, não há `import ... from` dele".
-   Errado — ele é carregado por `await import('./download.service')`.
-2. A correção disse "está vivo, é o fallback do download". Também errado — os
-   dois métodos que fazem esse import dinâmico
-   (`playwrightLogin.downloadFile`/`downloadAllFiles`) **não têm chamador
-   nenhum**. O download real vai por `httpScraper.downloadFile`, e o retry
-   também é HTTP.
-3. O `ARCHITECTURE.md` descreve um fallback Playwright para download. Ele existe
-   como código e **não está ligado**.
-
-Duas lições: busca por `import ... from` não encontra `await import()`, e provar
-que um arquivo é importado **não** prova que ele é alcançável — é preciso subir a
-cadeia de chamadores até um ponto de entrada real (handler IPC, `main.ts`, teste).
+`npm run quality` verde, sem `any` novo em `preload.ts`/handlers, sem
+`innerHTML` novo com dado externo. Bug corrigido tem um teste que falharia sem
+a correção; se nenhum teste falharia ao reverter a mudança, ela não está
+verificada. Cada implementação concluída é um commit Conventional Commit
+próprio, com o gate verde.

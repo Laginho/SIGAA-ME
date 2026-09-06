@@ -7,12 +7,9 @@ cópia). Ver `CLAUDE.md`, "Loop de trabalho".
 
 ## Regras que valem para todo papel
 
-`CLAUDE.md` é lei: sem `innerHTML` com dado do SIGAA, sem `as any` atravessando
-o IPC, sem `try/catch` que só faz `console.error`, canal IPC novo com tipo e
-validação, credencial nunca em código, retorno de IPC como união discriminada,
-nenhuma abstração para um caso. Antes de mexer em scraping, `ARCHITECTURE.md`.
-Não existe `CONTEXT.md`; o vocabulário do domínio está no `CLAUDE.md`, no
-`ARCHITECTURE.md`, em `shared/domain.ts` e nas próprias tarefas.
+As "Regras do código" do `CLAUDE.md` valem em todo papel. Antes de mexer em
+scraping, `ARCHITECTURE.md`. Não existe `CONTEXT.md`; o vocabulário do domínio
+está no `CLAUDE.md`, no `ARCHITECTURE.md`, em `shared/domain.ts` e nas issues.
 
 ## Rastreador de issues
 
