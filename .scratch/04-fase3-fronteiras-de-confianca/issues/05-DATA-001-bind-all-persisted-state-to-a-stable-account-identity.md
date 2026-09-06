@@ -1,5 +1,5 @@
 # DATA-001 — Bind all persisted state to a stable account identity
-Status: claimed
+Status: resolved
 Priority: P1
 Blocked by: SEC-003
 Tracker status at migration: `NOT STARTED`
@@ -313,3 +313,58 @@ tipado), exatamente o vermelho que a spec previu. Com as fontes de volta:
 `npx vite build && npx playwright test visual.spec.ts`: `11 passed`, com o
 dashboard renderizando as duas disciplinas a partir de
 `sigaa-me:v2:e2e-account:courses` (`_agent_tmp/shots/dashboard-light.png`).
+
+#### Resolution (2026-09-05)
+
+Review session (clean; did not see the spec or implementation sessions).
+Reviewed the full diff `origin/master...data-001-account-identity` against the
+contract and traced callers beyond it:
+
+- `SigaaService.login` is reached from `login-request`, `try-auto-login` and
+  the background re-login, and `PlaywrightLoginService.login` always
+  `close()`s and relaunches the browser first, so there is no Playwright
+  session reuse across accounts either — the `resetSession()` on the HTTP
+  scraper closes the only remaining cross-account channel.
+- `logout` and `clear-all-data` both go through `SigaaService.logout`, which
+  resets the scraper and nulls the active account; `clearCredentials()` runs
+  first in both, so a background sync cannot re-login as the account that just
+  left.
+- No file under `src/` or `index.html` other than `src/data/account-storage.ts`
+  touches Web Storage (grep, and the text test in `account-storage.test.ts`).
+  `app.spec.ts` plants no legacy key, as the implementation note says.
+- The three implementation choices the contract left open (no reset on the
+  first login, whole-bucket drop, quota-only rewrap in `mergeCoursesIntoCache`)
+  are all the conservative reading and each is pinned by a test.
+- Fixture migrations in the eleven existing test files change only the keys,
+  signatures and the profile `id`; the assertions are the same, except the
+  BUG-009 case, which became "v1 file is discarded" exactly as decision 4 says.
+
+Red-green, reproduced by the reviewer on Windows: with the dashboard guard in
+`handleBackgroundSyncUpdate` disabled (`if (false)`), `account-isolation.test.ts`
+fails `2 failed | 8 passed (10)` (foreign account, missing id); on the branch
+all 10 pass.
+
+Gate on the branch: `tsc` clean, lint 0 errors / 71 legacy warnings,
+`399 passed | 4 skipped (403)` in 32 files. `npx vite build` +
+`playwright test visual.spec.ts`: 11 passed under real Electron, dashboard
+rendering both fixture courses from `sigaa-me:v2:e2e-account:courses`
+(`_agent_tmp/shots/dashboard-light.png`).
+
+Findings: none with a concrete failure scenario. Fixed inline: `CLAUDE.md`
+("Não espere o boot real") still told agents to plant the legacy
+`sessionStorage.account`/`localStorage.coursesWithFiles` fixtures; now names
+the v2 keys.
+
+Observations, not defects:
+
+- A `cache.json` account bucket is validated on load, but the bucket keys
+  themselves are not (`accounts[accountId] = bucket` for whatever key is on
+  disk). Only someone who can already write `userData` can plant one, which is
+  outside this task's threat model.
+- A sync that starts as A and finishes after B logs in commits its baseline
+  to A's bucket and sends an update tagged A, which B's dashboard rejects.
+  That is the intended outcome; the wasted sync is `CONC-001`'s problem.
+
+Pending (Bruno, manual): the credentialed tiers — one real login as one
+account, logout, login as another, confirm the dashboard starts empty and the
+first account's data is back after logging in again.
