@@ -260,8 +260,56 @@ invented them). `test:e2e` in full needs `.env` and stays manual (Bruno).
 
 #### Implementation notes
 
-- Commit: — (tests + contract: spec session commit; implementation: —)
+- Commit: — (tests + contract: `125c031`; implementation: este commit)
 - Migration decision: **reset** — v1 `cache.json` discarded on load; the six
   legacy renderer keys deleted by `setActiveAccount`. No quarantine copy.
 - Schema version: `cache.json` → 2 (`CacheFileV2`); `settings.json` → 1
   (flat shape unchanged, `schemaVersion` field added on write).
+
+#### Implementação (2026-09-05, sessão de implementação)
+
+Contrato seguido como escrito; nenhuma decisão nova. Três pontos onde o
+contrato não dizia e a implementação escolheu:
+
+1. **`resetSession` na troca de conta só dispara com conta anterior
+   não-nula.** Contrato diz "compara o novo id com o anterior; quando
+   diferente, reseta". No primeiro login o anterior é `null` e o teste exige
+   `resetSession` **não** chamado — a comparação é `previous !== null &&
+   previous !== accountId`.
+2. **Balde de conta malformado é descartado inteiro** (não curso a curso). O
+   contrato diz "an invalid entry is dropped"; um predicado só, e o teste
+   `drops malformed account entries` passa das duas formas.
+3. **`mergeCoursesIntoCache` só reembrulha erro de cota.** Com
+   `writeAccountItem` lançando quando não há conta ativa, o `catch` genérico
+   rotularia "sem conta ativa" de "Cache local cheio" e mandaria o usuário
+   apagar dados por causa de um bug de fluxo. Agora só `QuotaExceededError`
+   vira aquela mensagem; o resto sobe como está. A mensagem mudou de
+   `Cache local cheio (localStorage) — …` para
+   `Cache local cheio (armazenamento do navegador) — …` porque o teste de
+   texto de `account-storage.test.ts` proíbe a palavra em `src/`.
+
+**Fixtures migradas** (assertivas preservadas, exceto onde a mudança de
+contrato as invalidava): `cache-service.test.ts` (o caso do BUG-009 virou
+"arquivo v1 é descartado", conforme o contrato), `background-sync.test.ts`
+(mocks com `accountId`, `setActiveAccount` no `beforeEach`, `accountId` na
+lista de chaves do payload), `sigaa-service.test.ts` (o `id` devolvido é
+`deriveAccountId('user')`, não `'user'`), `dashboard-listener.test.ts`
+(evento carimbado + chave namespaced no spy de cota),
+`login-selector-failure.test.ts` (`getActiveAccount()` no lugar de
+`sessionStorage.account`), `merge-courses-cache.test.ts`, `ui-helpers.test.ts`,
+`notification-store.test.ts`, `course-detail.test.ts`, `sync-selection.test.ts`,
+`renderer-content-security.test.ts`, `visual.spec.ts`. `app.spec.ts` não
+precisou de mudança: só usa `clear()`, nunca planta chave legada.
+
+**Vermelho→verde.** `git stash push -u -- electron/ shared/ src/` e os cinco
+arquivos novos: `5 failed | 8 failed | 2 passed (10)` — os dois que passam são
+as guardas que já valiam (`cache.json` corrompido, settings legado bem
+tipado), exatamente o vermelho que a spec previu. Com as fontes de volta:
+`32 passed (32) | 399 passed | 4 skipped (403)`.
+
+**Gate.** `npm run quality` verde: `tsc --noEmit` limpo, `eslint .` 0 erros /
+71 warnings (`no-explicit-any` legado, abaixo dos 77 de 2026-09-03), suíte
+`399 passed | 4 skipped (403)` — baseline era `353 passed | 4 skipped (357)`.
+`npx vite build && npx playwright test visual.spec.ts`: `11 passed`, com o
+dashboard renderizando as duas disciplinas a partir de
+`sigaa-me:v2:e2e-account:courses` (`_agent_tmp/shots/dashboard-light.png`).

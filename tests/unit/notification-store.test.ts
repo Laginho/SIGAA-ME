@@ -16,6 +16,10 @@ import {
     pushNotifications,
     seedExistingItemsAsRead
 } from '../../src/utils/notification-store';
+import { setActiveAccount, writeAccountItem } from '../../src/data/account-storage';
+
+// DATA-001: notificações e lidos são por conta.
+const ACCOUNT = { id: 'acc-test', name: 'ALUNO' };
 
 function makeItem(overrides: Partial<NotificationItem> = {}): NotificationItem {
     return {
@@ -34,6 +38,8 @@ function makeItem(overrides: Partial<NotificationItem> = {}): NotificationItem {
 describe('notification-store', () => {
     beforeEach(() => {
         localStorage.clear();
+        sessionStorage.clear();
+        setActiveAccount(ACCOUNT);
     });
 
     it('stores pushed items and returns them most-recent-first', () => {
@@ -84,7 +90,7 @@ describe('notification-store', () => {
     });
 
     it('seedExistingItemsAsRead is idempotent: a second call with different data changes nothing', () => {
-        localStorage.setItem('coursesWithFiles', JSON.stringify([
+        writeAccountItem('courses', JSON.stringify([
             { id: 'c1', files: [{ name: 'old.pdf' }], news: [{ id: 'n1' }] }
         ]));
 
@@ -92,7 +98,7 @@ describe('notification-store', () => {
         expect(isItemRead('file', 'c1', 'old.pdf')).toBe(true);
         expect(isItemRead('file', 'c1', 'new.pdf')).toBe(false);
 
-        localStorage.setItem('coursesWithFiles', JSON.stringify([
+        writeAccountItem('courses', JSON.stringify([
             { id: 'c1', files: [{ name: 'new.pdf' }], news: [] }
         ]));
         seedExistingItemsAsRead();
@@ -101,9 +107,9 @@ describe('notification-store', () => {
         expect(isItemRead('file', 'c1', 'new.pdf')).toBe(false);
     });
 
-    it('returns empty defaults instead of throwing when either key holds corrupt JSON', () => {
-        localStorage.setItem('readItems', '{not-json');
-        localStorage.setItem('notificationsHistory', '{not-json');
+    it('returns empty defaults instead of throwing when either scoped key holds corrupt JSON', () => {
+        writeAccountItem('read-items', '{not-json');
+        writeAccountItem('notifications', '{not-json');
 
         expect(() => getAllNotifications()).not.toThrow();
         expect(getAllNotifications()).toEqual([]);

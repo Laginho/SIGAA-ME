@@ -1,6 +1,8 @@
 import '../styles/dashboard.css';
+import type { AccountProfile } from '../../shared/domain';
 import type { BackgroundSyncUpdate } from '../../shared/ipc';
 import { toast } from '../components/toast';
+import { clearActiveAccount, clearAllLocalData, getActiveAccount, readAccountItem } from '../data/account-storage';
 import { h } from '../utils/dom';
 import { formatSyncLabel, mergeCoursesIntoCache } from '../utils/ui-helpers';
 import {
@@ -13,8 +15,21 @@ import {
   courseHasUnread
 } from '../utils/notification-store';
 
-/** Handle a background sync update — exported for unit testing. */
+/**
+ * Handle a background sync update — exported for unit testing.
+ *
+ * O evento só é aceito se vier carimbado com a conta que está logada nesta
+ * janela (DATA-001). Um sync disparado antes de uma troca de conta chega
+ * depois dela: sem esta guarda, ele escreveria as disciplinas de quem saiu no
+ * cache de quem entrou.
+ */
 export function handleBackgroundSyncUpdate(data: BackgroundSyncUpdate): void {
+  const active = getActiveAccount();
+  if (!active || data.accountId !== active.id) {
+    console.warn('[Dashboard] Ignoring a background sync update that does not belong to the account signed in here.');
+    return;
+  }
+
   console.log('[Dashboard] Received background sync update:', data.courses.length, 'courses');
   if (data.courses.length > 0) {
     try {
@@ -36,12 +51,7 @@ export function handleBackgroundSyncUpdate(data: BackgroundSyncUpdate): void {
   }
 }
 
-interface UserAccount {
-  name: string;
-  photoUrl?: string;
-}
-
-export function renderDashboardPage(app: HTMLDivElement, account: UserAccount) {
+export function renderDashboardPage(app: HTMLDivElement, account: AccountProfile) {
   // Seed read state for items that existed before this feature was added
   seedExistingItemsAsRead();
 
@@ -54,9 +64,9 @@ export function renderDashboardPage(app: HTMLDivElement, account: UserAccount) {
     }).join(' ');
   };
 
-  // Fallback: Load photoUrl from localStorage if not in account
+  // Fallback: a foto guardada é da conta ativa, nunca de quem usou antes.
   if (!account.photoUrl) {
-    const savedPhotoUrl = localStorage.getItem('userPhotoUrl');
+    const savedPhotoUrl = readAccountItem('photo');
     if (savedPhotoUrl) {
       account.photoUrl = savedPhotoUrl;
     }
@@ -176,8 +186,9 @@ export function renderDashboardPage(app: HTMLDivElement, account: UserAccount) {
     } catch (e) {
       console.error('Logout error:', e);
     }
-    // Only clear session, keep localStorage cache for faster next login
-    sessionStorage.clear();
+    // Só a sessão: o cache com escopo desta conta fica, para o próximo login
+    // dela ser rápido. Ele é invisível para qualquer outra conta.
+    clearActiveAccount();
     window.location.hash = '#/login';
   });
 
@@ -194,8 +205,7 @@ export function renderDashboardPage(app: HTMLDivElement, account: UserAccount) {
       } catch (e) {
         console.error('Clear data error:', e);
       }
-      localStorage.clear();
-      sessionStorage.clear();
+      clearAllLocalData();
       toast.success('Dados locais removidos.');
       setTimeout(() => { window.location.hash = '#/login'; }, 1200);
     } else {
@@ -299,8 +309,8 @@ function loadCoursesFromCache() {
   if (!coursesListElement) return;
 
   try {
-    const cachedData = localStorage.getItem('coursesWithFiles');
-    const cacheTimestamp = localStorage.getItem('cacheTimestamp');
+    const cachedData = readAccountItem('courses');
+    const cacheTimestamp = readAccountItem('sync-timestamp');
 
     if (cachedData) {
       console.log('Loading from cache...');

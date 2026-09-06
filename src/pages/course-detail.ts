@@ -4,6 +4,7 @@ import { sanitizeNewsHtml } from '../security/html-sanitizer'
 import { h } from '../utils/dom'
 import { isNewsCached, mergeCoursesIntoCache } from '../utils/ui-helpers'
 import { isItemRead, markAsRead } from '../utils/notification-store'
+import { readAccountItem, writeAccountItem } from '../data/account-storage'
 import type { CourseSnapshot } from '../../shared/domain'
 
 export function renderCourseDetailPage(container: HTMLDivElement, courseId: string) {
@@ -70,7 +71,7 @@ export function renderCourseDetailPage(container: HTMLDivElement, courseId: stri
   const loadAllNewsBtn = document.getElementById('loadAllNewsBtn')
   loadAllNewsBtn?.addEventListener('click', async () => {
     // Get fresh course data for name
-    const cachedData = localStorage.getItem('coursesWithFiles');
+    const cachedData = readAccountItem('courses');
     const courses = cachedData ? JSON.parse(cachedData) : [];
     const course = courses.find((c: any) => c.id === courseId);
 
@@ -84,7 +85,7 @@ export function renderCourseDetailPage(container: HTMLDivElement, courseId: stri
 
       if (result.success) {
         // Find current cached course
-        const cachedData = localStorage.getItem('coursesWithFiles');
+        const cachedData = readAccountItem('courses');
         if (cachedData) {
           const courses = JSON.parse(cachedData);
           const course = courses.find((c: any) => c.id === courseId);
@@ -156,8 +157,8 @@ async function fetchCourseFiles(courseId: string) {
   if (!filesListElement || !newsListElement || !courseTitleElement || !courseCodeElement) return
 
   try {
-    // Read from localStorage (persistent cache)
-    const cachedData = localStorage.getItem('coursesWithFiles')
+    // Lê o cache persistente desta conta
+    const cachedData = readAccountItem('courses')
 
     if (!cachedData) {
       filesListElement.replaceChildren(
@@ -229,7 +230,7 @@ async function fetchCourseFiles(courseId: string) {
 
     } else {
       // Get downloaded status
-      const downloadedFiles = JSON.parse(localStorage.getItem('downloadedFiles') || '{}');
+      const downloadedFiles = JSON.parse(readAccountItem('downloads') || '{}');
       const courseDownloads = downloadedFiles[courseId] || {};
 
       // Verify existence
@@ -254,7 +255,7 @@ async function fetchCourseFiles(courseId: string) {
 
           if (changed) {
             downloadedFiles[courseId] = courseDownloads;
-            localStorage.setItem('downloadedFiles', JSON.stringify(downloadedFiles));
+            writeAccountItem('downloads', JSON.stringify(downloadedFiles));
           }
         } catch (e) {
           console.error('Failed to verify files:', e);
@@ -362,7 +363,7 @@ async function downloadSingleFile(course: CourseSnapshot, fileId: string, fileNa
       }
     }
 
-    const downloadedFiles = JSON.parse(localStorage.getItem('downloadedFiles') || '{}');
+    const downloadedFiles = JSON.parse(readAccountItem('downloads') || '{}');
 
     const result = await window.api.downloadFile({
       courseId: course.id,
@@ -377,7 +378,7 @@ async function downloadSingleFile(course: CourseSnapshot, fileId: string, fileNa
         downloadedAt: Date.now(),
         path: result.data.filePath
       };
-      localStorage.setItem('downloadedFiles', JSON.stringify(downloadedFiles));
+      writeAccountItem('downloads', JSON.stringify(downloadedFiles));
 
       const span = document.createElement('span');
       span.className = 'status-done';
@@ -403,7 +404,7 @@ async function testDownloadAll(courseId: string) {
   console.log('Testing download all for course:', courseId);
 
   try {
-    const cachedData = localStorage.getItem('coursesWithFiles');
+    const cachedData = readAccountItem('courses');
     if (!cachedData) {
       toast.error('Dados não encontrados. Faça uma sincronização primeiro.');
       return;
@@ -436,7 +437,7 @@ async function testDownloadAll(courseId: string) {
       b.classList.add('spinning');
     });
 
-    const downloadedFiles = JSON.parse(localStorage.getItem('downloadedFiles') || '{}');
+    const downloadedFiles = JSON.parse(readAccountItem('downloads') || '{}');
 
     const result = await window.api.downloadAllFiles({
       courseId: course.id,
@@ -462,7 +463,7 @@ async function testDownloadAll(courseId: string) {
           };
         }
       });
-      localStorage.setItem('downloadedFiles', JSON.stringify(downloadedFiles));
+      writeAccountItem('downloads', JSON.stringify(downloadedFiles));
     } else {
       toast.error('Falha no download: ' + result.error.message);
     }
@@ -500,7 +501,7 @@ async function openNewsModal(courseId: string, courseName: string, newsId: strin
 
   try {
     // Check cache first
-    const cachedData = localStorage.getItem('coursesWithFiles')
+    const cachedData = readAccountItem('courses')
     let cachedContent = null;
     let cachedTitle = '';
     let cachedDate = '';
@@ -534,9 +535,9 @@ async function openNewsModal(courseId: string, courseName: string, newsId: strin
 
     if (result.success) {
       const news = result.data;
-      // Cache the fetched content in localStorage
+      // Guarda o conteúdo baixado no cache desta conta
       try {
-        const cachedData = localStorage.getItem('coursesWithFiles');
+        const cachedData = readAccountItem('courses');
         if (cachedData) {
           const courses = JSON.parse(cachedData);
           const course = courses.find((c: any) => c.id === courseId);

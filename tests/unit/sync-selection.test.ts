@@ -3,7 +3,7 @@
  * Unit Tests: Sync Progressive Save & Error Recovery
  *
  * Tests that the sync flow:
- *   1. Saves course data to localStorage progressively (after each course)
+ *   1. Saves course data to the account cache progressively (after each course)
  *   2. Shows an inline error overlay (not alert()) when sync fails
  *   3. Offers a "Tentar novamente" retry button on failureñ
  *   4. Offers a "Dashboard" button when partial data was already saved
@@ -12,7 +12,11 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { readAccountItem, setActiveAccount, writeAccountItem } from '../../src/data/account-storage';
 import { renderSyncSelectionPage } from '../../src/pages/sync-selection';
+
+// DATA-001: sincronizar exige conta ativa; o cache é gravado no escopo dela.
+const ACCOUNT = { id: 'acc-test', name: 'ALUNO' };
 
 // ── Helpers ───────────────────────────────────────────────
 
@@ -36,6 +40,8 @@ function flushAll() {
 beforeEach(() => {
     document.body.innerHTML = '';
     localStorage.clear();
+    sessionStorage.clear();
+    setActiveAccount(ACCOUNT);
     window.location.hash = '';
 
     // Default: well-behaved API (two courses, both succeed)
@@ -65,8 +71,8 @@ describe('Sync: card rendering', () => {
         expect(document.getElementById('btnFullSync')).not.toBeNull();
     });
 
-    it('shows a back-link when coursesWithFiles is cached', () => {
-        localStorage.setItem('coursesWithFiles', '[]');
+    it('shows a back-link when the account has a course cache', () => {
+        writeAccountItem('courses', '[]');
         const app = buildApp();
         renderSyncSelectionPage(app);
         const link = app.querySelector('.back-link');
@@ -82,16 +88,16 @@ describe('Sync: card rendering', () => {
 });
 
 describe('Sync: progressive save', () => {
-    it('saves data to localStorage after each course (not only at the end)', async () => {
+    it('saves data to the account cache after each course (not only at the end)', async () => {
         const app = buildApp();
         renderSyncSelectionPage(app);
 
-        // Intercept getCourseFiles to assert localStorage state mid-loop
+        // Intercept getCourseFiles to assert cache state mid-loop
         const savedAfterEachCourse: number[] = [];
         (window as any).api.getCourseFiles = vi.fn().mockImplementation(async () => {
-            // Give the loop a tick to write to localStorage before we read it
+            // Give the loop a tick to write to the cache before we read it
             await flushAll();
-            const saved = JSON.parse(localStorage.getItem('coursesWithFiles') || '[]');
+            const saved = JSON.parse(readAccountItem('courses') || '[]');
             savedAfterEachCourse.push(saved.length);
             return { success: true, data: { files: [], news: [] } };
         });
@@ -105,7 +111,7 @@ describe('Sync: progressive save', () => {
         expect(savedAfterEachCourse.length).toBe(2);
         // The saves should grow incrementally: [1, 2] not [0, 0]
         expect(savedAfterEachCourse[0]).toBeGreaterThanOrEqual(0); // at least attempting
-        const final = JSON.parse(localStorage.getItem('coursesWithFiles') || '[]');
+        const final = JSON.parse(readAccountItem('courses') || '[]');
         expect(final.length).toBe(2);
     });
 });
@@ -161,7 +167,7 @@ describe('Sync: error state', () => {
         for (let i = 0; i < 20; i++) await flushAll();
 
         // 1 course was saved before the failure
-        const saved = JSON.parse(localStorage.getItem('coursesWithFiles') || '[]');
+        const saved = JSON.parse(readAccountItem('courses') || '[]');
         expect(saved.length).toBe(1);
 
         // Dashboard button should be present because partial data exists
@@ -222,13 +228,13 @@ describe('Sync: selector drift (QA-003)', () => {
         const overlay = app.querySelector('.sync-progress-overlay');
         expect(overlay?.textContent).toContain('1 disciplina(s) em formato desconhecido');
         expect((window as any).api.getCourseFiles).not.toHaveBeenCalled();
-        expect(localStorage.getItem('coursesWithFiles')).toBeNull();
+        expect(readAccountItem('courses')).toBeNull();
     });
 });
 
 describe('Sync: falha de disciplina preserva cache (ARCH-001 READ §1)', () => {
     it('does not overwrite cached files when getCourseFiles fails for a course', async () => {
-        localStorage.setItem('coursesWithFiles', JSON.stringify([
+        writeAccountItem('courses', JSON.stringify([
             { id: 'c1', name: 'Cálculo I', code: 'CB0001', files: [{ id: '555', name: 'Lista 3.pdf', type: 'file' }], news: [], fileCount: 1 }
         ]));
 
@@ -251,12 +257,12 @@ describe('Sync: falha de disciplina preserva cache (ARCH-001 READ §1)', () => {
         expect(overlay?.textContent).toContain('selector drift');
         expect(document.getElementById('retryBtn')).not.toBeNull();
         expect(window.location.hash).not.toBe('#/dashboard');
-        const cached = JSON.parse(localStorage.getItem('coursesWithFiles') || '[]');
+        const cached = JSON.parse(readAccountItem('courses') || '[]');
         expect(cached[0].files).toEqual([{ id: '555', name: 'Lista 3.pdf', type: 'file' }]);
     });
 
     it('preserves first course snapshot and saves second course when first fails and second succeeds', async () => {
-        localStorage.setItem('coursesWithFiles', JSON.stringify([
+        writeAccountItem('courses', JSON.stringify([
             { id: 'c1', name: 'Cálculo I', code: 'CB0001', files: [{ id: '555', name: 'Lista 3.pdf', type: 'file' }], news: [], fileCount: 1 }
         ]));
 
@@ -293,7 +299,7 @@ describe('Sync: falha de disciplina preserva cache (ARCH-001 READ §1)', () => {
         expect(document.getElementById('dashboardBtn')).not.toBeNull();
         expect(window.location.hash).not.toBe('#/dashboard');
 
-        const cached = JSON.parse(localStorage.getItem('coursesWithFiles') || '[]');
+        const cached = JSON.parse(readAccountItem('courses') || '[]');
         expect(cached).toHaveLength(2);
 
         const c1 = cached.find((c: any) => c.id === 'c1');

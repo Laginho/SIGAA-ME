@@ -5,6 +5,7 @@ import { renderCourseDetailPage } from './pages/course-detail'
 import { renderLoadingPage } from './pages/loading'
 import { renderSyncSelectionPage } from './pages/sync-selection'
 import { renderSettingsPage } from './pages/settings'
+import { getActiveAccount, readAccountItem, setActiveAccount } from './data/account-storage'
 
 const app = document.querySelector<HTMLDivElement>('#app')!
 
@@ -16,17 +17,15 @@ function route() {
     const courseId = hash.replace('#/course/', '')
     renderCourseDetailPage(app, courseId)
   } else if (hash === '#/dashboard') {
-    // Get account from sessionStorage
-    const accountData = sessionStorage.getItem('account')
-    if (accountData) {
+    const account = getActiveAccount()
+    if (account) {
       // Logic: If no cache, likely "New Game" -> Redirect to Sync Selection
-      const hasCache = localStorage.getItem('coursesWithFiles');
+      const hasCache = readAccountItem('courses');
       if (!hasCache) {
         window.location.hash = '#/sync-selection';
         return;
       }
 
-      const account = JSON.parse(accountData)
       renderDashboardPage(app, account)
     } else {
       // No account data, redirect to login
@@ -58,7 +57,7 @@ if (!window.location.hash || window.location.hash === '#/login') {
 
     if (result.success) {
       console.log('Auto-login success!');
-      sessionStorage.setItem('account', JSON.stringify(result.data));
+      setActiveAccount(result.data);
       window.location.hash = '#/dashboard';
     } else {
       route();
