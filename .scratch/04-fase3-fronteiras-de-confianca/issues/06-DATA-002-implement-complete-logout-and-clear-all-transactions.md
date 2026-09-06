@@ -1,22 +1,40 @@
 # DATA-002 — Implement complete logout and clear-all transactions
-Status: open
+Status: claimed
 Priority: P1
 Blocked by: DATA-001
 Tracker status at migration: `NOT STARTED`
 
 - Owner: —
-- Dependencies: `DATA-001`, `CONC-001`
-- Primary files:
-  - `electron/main.ts`
-  - `electron/services/persistence.service.ts`
-  - `electron/services/cache.service.ts`
-  - `electron/services/logger.service.ts`
-  - `electron/services/background-sync.service.ts`
-  - `electron/services/playwright-login.service.ts`
-  - `src/pages/dashboard.ts`
-  - `src/data/account-storage.ts`
-  - `src/data/session-store.ts`
-  - New: `tests/integration/clear-all-data.test.ts`
+- Dependencies: `DATA-001`. (`CONC-001` was listed here and lists this task as
+  its blocker — a cycle. Broken on 2026-09-06 by the spec session: this task
+  ships the **minimal** cancellation it needs, `CONC-001` replaces it later.
+  See "Decisions", 1.)
+- Primary files (corrected 2026-09-06 by the spec session; see Contract):
+  - `electron/ipc/register-handlers.ts` — the `logout` and `clear-all-data`
+    handlers become the two transactions; `IpcDeps` grows
+  - `electron/main.ts` — wires the new deps (`cache`, `logger`,
+    `userDataPath`, `resetAppLog`, `clearBrowserStorage`); the file logger
+    becomes resettable
+  - `electron/services/background-sync.service.ts` — `cancel()`
+  - `electron/services/sigaa.service.ts` — `logout()` forgets the Playwright
+    session; new `clearDiagnostics()`
+  - `electron/services/playwright-login.service.ts` — new `logout()`
+    (`close()` is unchanged on purpose)
+  - `electron/services/http-scraper.service.ts` — new `resetLog()`
+  - `electron/services/persistence.service.ts` — `reset()`;
+    `clearCredentials()` propagates failures
+  - `electron/services/cache.service.ts` — `clear()`
+  - `electron/services/logger.service.ts` — `clear()` already exists
+  - `src/pages/dashboard.ts` — single sync listener, result-driven logout and
+    clear-all, no double-click confirmation
+  - `src/data/account-storage.ts` — unchanged (`clearAllLocalData` stays)
+  - ~~`src/data/session-store.ts`~~ — does not exist; DATA-001 made
+    `account-storage.ts` the only storage module
+  - New: `tests/integration/clear-all-data.test.ts`,
+    `tests/integration/background-sync-cancel.test.ts`,
+    `tests/unit/dashboard-session-actions.test.ts`,
+    `tests/e2e/clear-all.spec.ts`; extended: `tests/unit/persisted-schemas.test.ts`,
+    `tests/unit/playwright-lifecycle.test.ts`, `tests/unit/sigaa-service.test.ts`
 
 #### Logout transaction
 
@@ -56,9 +74,253 @@ The confirmation UI must state that explicitly.
 #### Verification
 
 ```text
-npm run test:integration -- clear-all-data account-isolation
-npm run test:e2e
+npx vitest run tests/integration/clear-all-data.test.ts tests/integration/background-sync-cancel.test.ts tests/unit/dashboard-session-actions.test.ts tests/unit/persisted-schemas.test.ts tests/unit/playwright-lifecycle.test.ts tests/unit/sigaa-service.test.ts
+npm run quality
+npx vite build && npx playwright test clear-all.spec.ts      # Windows; no credential needed
 ```
+
+---
+
+## What is actually there today (spec session, 2026-09-06)
+
+Read before the contract; each line is a gap the tests below close.
+
+- **`logout` handler** = `persistence.clearCredentials()` +
+  `sigaaService.logout()`. The latter resets the HTTP scraper, nulls the active
+  account and calls `playwrightLogin.close()`. `close()` releases the browser
+  but **keeps `storedCookies`, `storedUsername` and `storedPassword`**, and
+  `reloginWithStoredCredentials()` logs back in with them without passing
+  through `SigaaService.login`. After "Sair", an in-flight sync (or the next
+  `getCourses`) relaunches Chrome with the cookies and the password of the
+  person who just left.
+- **`clear-all-data` handler** is byte-for-byte the logout handler. Nothing
+  under `userData` is removed: `cache.json`, `settings.json`, `sigaa-me.log`,
+  `scraper.log`, `logs/app_*.log`, `debug_*.html|json`. `CacheService` and
+  `PersistenceService` keep their in-memory state, so the next `saveCache()`
+  or `saveSettings()` recreates the files. Electron's session storage is not
+  touched. The renderer wipes `localStorage`/`sessionStorage` itself and
+  **ignores the handler's result** (`try { await clearAllData() } catch {
+  console.error }` — CLAUDE.md rule 3).
+- **Confirmation** is a double-click on 🗑️ with a 4s toast that says nothing
+  about downloaded files.
+- **Background sync** has no cancellation at all; `isSyncing` only prevents
+  two runs at once. The `BackgroundSyncService` is not even in the logout
+  handler's deps.
+- **`renderDashboardPage`** subscribes `onBackgroundSyncUpdate` on every mount
+  and never unsubscribes: each visit to the dashboard adds one more listener,
+  so one sync event is merged and toasted N times.
+- **`clearCredentials()`** swallows `unlink` failures with `console.error`, so
+  a logout can "succeed" with the credential file still on disk — and
+  auto-login as the previous account on the next boot.
+
+## Decisions (grilled with Bruno, 2026-09-06)
+
+1. **Cancellation: minimal flag, checked between courses.** `CONC-001` and
+   this task blocked each other. `BackgroundSyncService.cancel()` sets a flag
+   that the sync loop checks before each course and before publishing; logout
+   and clear-all await it, so the wait is bounded by one course. `CONC-001`
+   replaces the flag with the coordinator's `AbortSignal` and keeps the tests
+   in `background-sync-cancel.test.ts` green.
+2. **Confirmation lives in the main process, inside the handler.**
+   `dialog.showMessageBox` with the downloads warning in `detail`; declining
+   returns `CANCELLED` and nothing is touched. The renderer's double-click
+   goes away. The E2E stubs the dialog exactly as `security-boundaries.spec.ts`
+   does.
+3. **After clear-all the app stays open and returns to the login page.** Main
+   resets its in-memory state (cache, settings to defaults, log streams
+   reopened, scheduler restarted) and answers `ok()`; the renderer wipes its
+   storage and navigates. No `app.relaunch()`.
+
+Made by the spec session without asking (conservative, each pinned by a test):
+
+- Logout does **not** stop the scheduler — settings still say
+  `runInBackground`; without a credential file `syncNow()` no-ops.
+- Logout keeps the account-scoped renderer cache (DATA-001's "fast return").
+- The renderer, on a `STORAGE` failure from clear-all, still wipes its own
+  storage and returns to login, after showing the recovery message. On
+  `CANCELLED` it does nothing.
+- Order of the destructive part is free, but **nothing destructive happens
+  before the session is closed**, and the credential file goes first.
+
+## Contract
+
+### `BackgroundSyncService` (`background-sync.service.ts`)
+
+- `cancel(): Promise<void>`. Resolves immediately when no run is in flight.
+  Otherwise requests cancellation and resolves only when the in-flight
+  `syncNow()` has stopped. A cancelled run: fetches no further course, sends
+  no `background-sync-update`, shows no OS notification, commits no baseline
+  (`cacheService.updateCourseState` not called) and does not write
+  `lastBackgroundSync`. Whatever it already fetched is dropped — the next run
+  re-diffs and the renderer dedupes notification ids.
+- After `cancel()` resolves, the next `syncNow()` runs normally (the flag does
+  not leak across runs).
+- The check happens at least before each course's `getCourseFiles` (after the
+  pacing delay is fine) and before the publish/commit block.
+
+### `PlaywrightLoginService` (`playwright-login.service.ts`)
+
+- New `logout(): Promise<void>`: `close()` **plus** forget `storedCookies`
+  (→ `[]`), `storedUsername` and `storedPassword` (→ `null`). Afterwards
+  `getCookies()` returns `[]`, `reloginWithStoredCredentials()` returns
+  `{ success: false, error: 'No stored credentials available' }` and
+  `getCourses()` fails without launching a browser.
+- `close()` is **unchanged**: `getCourses()` calls `close()` and relaunches
+  with `storedCookies`; clearing them there would break every sync.
+
+### `HttpScraperService` (`http-scraper.service.ts`)
+
+- New `resetLog(): void`: ends the current `scraper.log` write stream and opens
+  a fresh one with `flags: 'w'` (truncate). Same state as first launch.
+
+### `SigaaService` (`sigaa.service.ts`)
+
+- `logout()` calls `playwrightLogin.logout()` (not `close()`), still resets
+  the HTTP session and nulls the active account.
+- New `clearDiagnostics(): void` → `httpScraper.resetLog()`.
+
+### `PersistenceService` (`persistence.service.ts`)
+
+- `clearCredentials()` **propagates** the `unlink` failure (no more
+  `console.error` swallow). Absent file is still not an error.
+- New `reset(): void`: in-memory settings back to `DEFAULT_SETTINGS`
+  **before** touching the disk, then remove `settings.json` and
+  `credentials.json` (absent is fine). A disk failure propagates, but the
+  in-memory reset has already happened, so a later `saveSettings()` never
+  resurrects old values.
+
+### `CacheService` (`cache.service.ts`)
+
+- New `clear(): void`: in-memory cache back to `{ schemaVersion: 2, accounts: {} }`
+  **before** removing `cache.json` (absent is fine). Failure propagates. A
+  later `updateCourseState()` writes a file containing only the new bucket.
+
+### `LoggerService` — `clear()` already truncates `sigaa-me.log`. Unchanged.
+
+### `electron/main.ts`
+
+- The file logger (`logs/app_<ts>.log`) becomes resettable:
+  `resetAppLog(): Promise<void>` closes the current stream (await `finish`),
+  removes the whole `logs/` directory, recreates it and opens a new stream
+  with a fresh name; the `console.*` wrappers write to the new stream. This is
+  what makes the deletion safe on Windows, where an open handle blocks
+  `unlink`.
+- `registerIpcHandlers` receives, in addition to today's deps:
+  `cache: cacheService`, `logger`, `userDataPath: app.getPath('userData')`,
+  `resetAppLog`, `clearBrowserStorage: () => session.defaultSession.clearStorageData()`,
+  and `backgroundSync` now exposes `stop`, `start` and `cancel` too.
+
+### `IpcDeps` (`register-handlers.ts`)
+
+```ts
+sigaaService: Pick<SigaaService, ... | 'logout' | 'clearDiagnostics'>;
+persistence: Pick<PersistenceService, ... | 'clearCredentials' | 'reset'>;
+backgroundSync: Pick<BackgroundSyncService, 'restart' | 'stop' | 'start' | 'cancel'>;
+cache: Pick<CacheService, 'clear'>;
+logger: Pick<LoggerService, 'clear'>;
+userDataPath: string;
+resetAppLog: () => Promise<void>;
+clearBrowserStorage: () => Promise<void>;
+```
+
+`tests/unit/ipc-validation.test.ts` builds an `IpcDeps` by hand; the
+implementer adds the new fields there (typecheck), nothing else in that file
+changes.
+
+### `logout` handler
+
+Order: `persistence.clearCredentials()` → `await backgroundSync.cancel()` →
+`await sigaaService.logout()`. Credential first so that no new sync can start
+in the gap (`syncNow` aborts on `loadCredentials() === null`). Does **not**
+call `stop`, `cache.clear`, `persistence.reset`, `resetAppLog` or
+`clearBrowserStorage`. Each step is attempted even if an earlier one threw; a
+throw anywhere makes the result `fail('STORAGE', <error text>)` — the session
+is still closed, but the renderer must know the credential is still on disk.
+
+Build these failures with `fail('STORAGE', ...)`, not `failFromMessage`: its
+regex classifies any message containing "credentials" as `SESSION_EXPIRED`
+(that is what the current handler returns for a failed `clearCredentials`).
+
+### `clear-all-data` handler
+
+1. `dialog.showMessageBox(win, opts)` with `type: 'warning'`,
+   `buttons: ['Apagar tudo', 'Cancelar']`, `defaultId === cancelId === 1`,
+   `title: 'Limpar todos os dados'`, `message: 'Apagar todos os dados locais do SIGAA-ME?'`,
+   `detail` that names what goes ("credenciais salvas, cache de disciplinas,
+   notificações, configurações e logs desta máquina, de todas as contas") and
+   ends with **"Os arquivos baixados na sua pasta de downloads não serão
+   apagados."** `response !== 0` → `fail('CANCELLED', 'Limpeza cancelada.')`
+   and no dep is called.
+2. Close the session, in this order: `persistence.clearCredentials()`,
+   `backgroundSync.stop()`, `await backgroundSync.cancel()`,
+   `await sigaaService.logout()`.
+3. Only then, destructive steps — each attempted even if another threw:
+   `cache.clear()`, `persistence.reset()`, `logger.clear()`,
+   `sigaaService.clearDiagnostics()`, `await resetAppLog()`, remove every
+   entry of `userDataPath` whose name starts with `debug_`
+   (`fs.readdirSync` + `fs.unlinkSync`, sync `fs` like the rest of the
+   process), `await clearBrowserStorage()`.
+4. If `getSettings().openAtLogin` was `true` before the reset,
+   `app.setLoginItemSettings({ openAtLogin: false, ... })` (same `path`/`args`
+   shape as `update-app-setting`). Calling it unconditionally is acceptable.
+5. `backgroundSync.start()` — first-launch behaviour: scheduler on with default
+   settings, no credential → it no-ops.
+6. Result: `ok()` only after every awaited step resolved. If any step threw:
+   `fail('STORAGE', message)` where `message` contains the text of every
+   failure **and** the `userDataPath`, and tells the user to close the app and
+   delete that folder by hand. Also `console.error` each failure (that goes to
+   the fresh app log).
+
+### Renderer (`src/pages/dashboard.ts`)
+
+- One live sync listener at a time: a module-level unsubscribe is called
+  before re-subscribing on mount and on logout/clear-all. Mounting the
+  dashboard twice and firing one update merges and toasts once.
+- **Logout click**: `const r = await window.api.logout()`; if `!r.success`,
+  `toast.error(r.error.message)`. In every case: unsubscribe,
+  `clearActiveAccount()`, `location.hash = '#/login'`. Account-scoped
+  `localStorage` is kept.
+- **Clear-all click**: a single click calls `window.api.clearAllData()` — no
+  double-click, no `dataset.confirming`. On `success`: unsubscribe,
+  `clearAllLocalData()`, `toast.success(...)`, then `#/login` (a short delay
+  for the toast is fine; the test advances timers by 2s). On
+  `error.code === 'CANCELLED'`: nothing changes, no toast. On any other
+  failure: `toast.error(r.error.message)`, then the same wipe and navigation
+  as success.
+
+### E2E (`tests/e2e/clear-all.spec.ts`, no credential)
+
+Launches the real app with a temporary `userData`, stubs
+`dialog.showMessageBox` from main, plants the DATA-001 session/courses
+fixture and files under `userData` (`cache.json`, `logs/app_old.log`,
+`debug_*.html`, marker text in `sigaa-me.log`/`scraper.log`), sets a
+non-default theme through `window.api.updateSetting`, then: declining leaves
+everything; accepting removes the files, empties the renderer storage,
+returns the live process' settings to defaults and lands on the login page
+with no console error. It is the only test that exercises the open-handle
+log deletion on Windows; run it there before closing.
+
+## Test map
+
+| Criterion / behaviour | Test |
+|---|---|
+| Dialog gate, wording, CANCELLED touches nothing | `clear-all-data.test.ts` › clear-all-data › confirmation |
+| Session closed before anything destructive; credential first; `start()` last | `clear-all-data.test.ts` › order |
+| Every store, capture and partition; `ok()` only after async steps | `clear-all-data.test.ts` › removes everything / returns only after |
+| OS login item disabled | `clear-all-data.test.ts` › login item |
+| Partial failure → `STORAGE` with error text + `userDataPath`, other steps still run | `clear-all-data.test.ts` › partial failure |
+| Logout order; scheduler untouched; `STORAGE` on credential failure | `clear-all-data.test.ts` › logout |
+| `login-request` without remember-me reports a stuck credential | `clear-all-data.test.ts` › login-request |
+| `cancel()` semantics (in-flight, idle, no leak, resolves after stop) | `background-sync-cancel.test.ts` |
+| `CacheService.clear()`, `PersistenceService.reset()`, `clearCredentials()` throws | `persisted-schemas.test.ts` › DATA-002 |
+| Playwright `logout()` forgets session; `close()` still keeps it | `playwright-lifecycle.test.ts` |
+| `SigaaService.logout()` → `playwrightLogin.logout()`; `clearDiagnostics()` | `sigaa-service.test.ts` › DATA-002 |
+| Single listener; logout/clear-all renderer outcomes per result code | `dashboard-session-actions.test.ts` |
+| First-launch state on disk and in the live process (Windows handles) | `clear-all.spec.ts` |
+
+Red today, for the right reasons: `cancel`, `reset`, `clear`, `logout` (on
+`PlaywrightLoginService`), `clearDiagnostics` do not exist; the handlers call
+none of the new deps; the dashboard still double-clicks and ignores results.
 
 #### Implementation notes
 

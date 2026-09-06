@@ -10,6 +10,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const harness = vi.hoisted(() => {
     const events: string[] = [];
     let nextId = 0;
+    /** O que `context.cookies()` devolve — o login guarda isso como sessão. */
+    const state = { cookies: [] as { name: string; value: string; domain: string; path: string }[] };
 
     function makeFakePage() {
         return {
@@ -28,7 +30,7 @@ const harness = vi.hoisted(() => {
         return {
             newPage: vi.fn(async () => makeFakePage()),
             addCookies: vi.fn(async () => {}),
-            cookies: vi.fn(async () => [])
+            cookies: vi.fn(async () => state.cookies)
         };
     }
 
@@ -47,7 +49,7 @@ const harness = vi.hoisted(() => {
         return makeFakeBrowser(id);
     });
 
-    return { events, launch };
+    return { events, launch, state };
 });
 
 vi.mock('playwright', () => ({
@@ -92,5 +94,55 @@ describe('PlaywrightLoginService browser lifecycle', () => {
 
         await service.close();
         await expect(service.close()).resolves.not.toThrow();
+    });
+});
+
+// ── DATA-002: sair de verdade ────────────────────────────────────────────────
+//
+// `close()` solta o navegador mas guarda `storedCookies`, `storedUsername` e
+// `storedPassword` — de propósito: `getCourses()` fecha e relança com eles a
+// cada sync. Logout precisa de outro método, que esqueça a sessão: sem isso,
+// depois de "Sair", um sync em voo relança o Chrome com os cookies e a senha de
+// quem acabou de sair.
+describe('PlaywrightLoginService.logout() (DATA-002)', () => {
+    const SESSION = [{ name: 'JSESSIONID', value: 'abc', domain: 'si3.ufc.br', path: '/' }];
+
+    beforeEach(() => {
+        harness.events.length = 0;
+        harness.launch.mockClear();
+        harness.state.cookies = SESSION;
+    });
+
+    it('positive control: close() alone keeps the stored session, which getCourses relies on', async () => {
+        const service = new PlaywrightLoginService();
+        expect((await service.login('user', 'pass')).success).toBe(true);
+
+        await service.close();
+
+        expect(await service.getCookies()).toEqual(SESSION);
+    });
+
+    it('logout() forgets cookies and credentials: nothing can relaunch a browser on behalf of who left', async () => {
+        const service = new PlaywrightLoginService();
+        expect((await service.login('user', 'pass')).success).toBe(true);
+        expect(await service.getCookies()).toEqual(SESSION);
+
+        await service.logout();
+        harness.launch.mockClear();
+
+        expect(await service.getCookies()).toEqual([]);
+        expect(await service.reloginWithStoredCredentials()).toEqual({
+            success: false,
+            error: 'No stored credentials available',
+        });
+        const courses = await service.getCourses();
+        expect(courses.success).toBe(false);
+        expect(harness.launch).not.toHaveBeenCalled();
+    });
+
+    it('logout() is idempotent and safe before any login', async () => {
+        const service = new PlaywrightLoginService();
+        await expect(service.logout()).resolves.not.toThrow();
+        await expect(service.logout()).resolves.not.toThrow();
     });
 });
