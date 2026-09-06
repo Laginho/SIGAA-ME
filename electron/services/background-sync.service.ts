@@ -2,6 +2,7 @@ import { app, BrowserWindow, Notification } from 'electron';
 import { SigaaService } from './sigaa.service';
 import { persistenceService } from './persistence.service';
 import { cacheService } from './cache.service';
+import { getActiveAccount } from './account-context.service';
 import * as path from 'path';
 import type { CourseSnapshot, CourseSummary, NotificationItem } from '../../shared/domain';
 import type { BackgroundSyncUpdate } from '../../shared/ipc';
@@ -92,6 +93,16 @@ export class BackgroundSyncService {
                 return;
             }
 
+            // A conta ativa só é resolvida agora, depois do caminho de
+            // re-login: é a conta a quem a sessão pertence de fato. Sem ela o
+            // resultado não é de ninguém — não é enviado ao renderer nem vira
+            // linha de base (DATA-001).
+            const accountId = getActiveAccount();
+            if (!accountId) {
+                console.warn('[BackgroundSync] No active account; discarding this sync result instead of attributing it to nobody.');
+                return;
+            }
+
             if (courses.length === 0) {
                 console.log('[BackgroundSync] No courses found to sync.');
                 return;
@@ -120,10 +131,10 @@ export class BackgroundSyncService {
                     // Check if this is a cold-start (first sync for this course, no prior cache).
                     // On cold-start, all items appear "new" in the diff, but they're not truly new —
                     // we just populate the baseline and skip notifications.
-                    const cachedState = cacheService.getCourseState(course.id);
+                    const cachedState = cacheService.getCourseState(accountId, course.id);
                     const isColdStart = cachedState.files.length === 0 && cachedState.news.length === 0;
 
-                    const diff = cacheService.diffCourseState(course.id, currentFiles, currentNews);
+                    const diff = cacheService.diffCourseState(accountId, course.id, currentFiles, currentNews);
 
                     // Defer the baseline commit until after delivery (see flush below) —
                     // committing here would mark items "seen" even if a later throw in
@@ -221,6 +232,7 @@ export class BackgroundSyncService {
                 const window = this.getWindow();
                 if (window && !window.isDestroyed()) {
                     const update: BackgroundSyncUpdate = {
+                        accountId,
                         courses: allCoursesData,
                         notifications: newNotifications,
                         timestamp: Date.now()
@@ -256,7 +268,7 @@ export class BackgroundSyncService {
             // A crash before this point means re-notifying next sync — the renderer
             // dedupes notification ids, so duplicates are absorbed (notification-store.ts:111-118).
             for (const c of pendingCommits) {
-                cacheService.updateCourseState(c.courseId, c.fileIds, c.newsIds);
+                cacheService.updateCourseState(accountId, c.courseId, c.fileIds, c.newsIds);
             }
 
         } catch (error) {

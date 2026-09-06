@@ -34,14 +34,14 @@ const cacheState = vi.hoisted(() => {
 
 vi.mock('../../electron/services/cache.service', () => ({
     cacheService: {
-        getCourseState: vi.fn((courseId: string) => {
+        getCourseState: vi.fn((_accountId: string, courseId: string) => {
             cacheState.callLog.push('getCourseState');
             return cacheState.baselines.get(courseId) ?? { files: [], news: [] };
         }),
         // Mirrors the production filter (item.id required, String-coerced comparison)
         // ONLY so the fake behaves like the real cache for the sync loop's purposes —
         // cache.service.ts itself is characterized separately in cache-service.test.ts.
-        diffCourseState: vi.fn((courseId: string, currentFiles: any[], currentNews: any[]) => {
+        diffCourseState: vi.fn((_accountId: string, courseId: string, currentFiles: any[], currentNews: any[]) => {
             cacheState.callLog.push('diffCourseState');
             const baseline = cacheState.baselines.get(courseId) ?? { files: [], news: [] };
             return {
@@ -49,7 +49,7 @@ vi.mock('../../electron/services/cache.service', () => ({
                 newNews: currentNews.filter(item => item.id && !baseline.news.includes(String(item.id)))
             };
         }),
-        updateCourseState: vi.fn((courseId: string, files: string[], news: string[]) => {
+        updateCourseState: vi.fn((_accountId: string, courseId: string, files: string[], news: string[]) => {
             cacheState.callLog.push('updateCourseState');
             cacheState.baselines.set(courseId, { files, news });
         })
@@ -75,6 +75,12 @@ vi.mock('../../electron/services/persistence.service', () => ({
 }));
 
 import { BackgroundSyncService } from '../../electron/services/background-sync.service';
+import { setActiveAccount } from '../../electron/services/account-context.service';
+
+// DATA-001: sem conta ativa o sync descarta o resultado. Estes casos
+// caracterizam o loop com alguém logado; o caso sem conta vive em
+// tests/integration/background-sync-account.test.ts.
+const ACC = 'a'.repeat(64);
 
 function makeWindow() {
     const send = vi.fn((_channel: string, payload: unknown) => {
@@ -102,12 +108,14 @@ describe('BackgroundSyncService.syncNow', () => {
     beforeEach(() => {
         cacheState.baselines.clear();
         cacheState.callLog.length = 0;
+        setActiveAccount(ACC);
         vi.clearAllMocks();
         vi.useFakeTimers();
     });
 
     afterEach(() => {
         vi.useRealTimers();
+        setActiveAccount(null);
     });
 
     it('produces no notifications on a cold start but still populates courses and commits the baseline', async () => {
@@ -150,7 +158,7 @@ describe('BackgroundSyncService.syncNow', () => {
         await p;
 
         const payload = (window.webContents.send as any).mock.calls[0][1];
-        expect(Object.keys(payload).sort()).toEqual(['courses', 'notifications', 'timestamp']);
+        expect(Object.keys(payload).sort()).toEqual(['accountId', 'courses', 'notifications', 'timestamp']);
         expect(payload.notifications).toHaveLength(1);
         expect(payload.notifications[0]).toMatchObject({ type: 'file', id: 'file-c1-f2.pdf' });
     });

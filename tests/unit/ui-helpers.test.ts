@@ -4,13 +4,17 @@
  *
  * Tests for the pure utility functions in src/utils/ui-helpers.ts:
  *   - formatSyncLabel: timestamp → human-readable relative badge
- *   - isNewsCached: checks localStorage for pre-fetched news content
+ *   - isNewsCached: checks the active account cache for pre-fetched news content
  *
  * No Electron, no network. Pure logic only.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { setActiveAccount, writeAccountItem } from '../../src/data/account-storage';
 import { formatSyncLabel, isNewsCached } from '../../src/utils/ui-helpers';
+
+// DATA-001: o cache é por conta.
+const ACCOUNT = { id: 'acc-test', name: 'ALUNO' };
 
 // ── formatSyncLabel ──────────────────────────────────────
 
@@ -77,38 +81,41 @@ describe('isNewsCached', () => {
 
     beforeEach(() => {
         localStorage.clear();
+        sessionStorage.clear();
+        setActiveAccount(ACCOUNT);
     });
 
     afterEach(() => {
         localStorage.clear();
+        sessionStorage.clear();
     });
 
     it('returns true when news content exists in cache', () => {
-        localStorage.setItem('coursesWithFiles', buildCache());
+        writeAccountItem('courses', buildCache());
         expect(isNewsCached(COURSE_ID, NEWS_ID)).toBe(true);
     });
 
     it('returns false when the news item exists but has no content', () => {
-        localStorage.setItem('coursesWithFiles', buildCache());
+        writeAccountItem('courses', buildCache());
         expect(isNewsCached(COURSE_ID, 'news-789')).toBe(false);
     });
 
     it('returns false when the news ID does not exist', () => {
-        localStorage.setItem('coursesWithFiles', buildCache());
+        writeAccountItem('courses', buildCache());
         expect(isNewsCached(COURSE_ID, 'nonexistent-news')).toBe(false);
     });
 
     it('returns false when the course ID does not exist', () => {
-        localStorage.setItem('coursesWithFiles', buildCache());
+        writeAccountItem('courses', buildCache());
         expect(isNewsCached('wrong-course', NEWS_ID)).toBe(false);
     });
 
-    it('returns false when localStorage is empty', () => {
+    it('returns false when the account cache is empty', () => {
         expect(isNewsCached(COURSE_ID, NEWS_ID)).toBe(false);
     });
 
-    it('returns false when localStorage contains invalid JSON', () => {
-        localStorage.setItem('coursesWithFiles', 'not-valid-json{{');
+    it('returns false when the account cache contains invalid JSON', () => {
+        writeAccountItem('courses', 'not-valid-json{{');
         expect(isNewsCached(COURSE_ID, NEWS_ID)).toBe(false);
     });
 });

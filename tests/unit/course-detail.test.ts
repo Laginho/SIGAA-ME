@@ -14,6 +14,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { toast } from '../../src/components/toast';
+import { setActiveAccount, writeAccountItem } from '../../src/data/account-storage';
 import { renderCourseDetailPage } from '../../src/pages/course-detail';
 import { fail, ok } from '../../shared/errors';
 
@@ -25,9 +26,12 @@ describe('course-detail: falha de download', () => {
     beforeEach(() => {
         document.body.innerHTML = '';
         localStorage.clear();
+        sessionStorage.clear();
         vi.restoreAllMocks();
 
-        localStorage.setItem('coursesWithFiles', JSON.stringify([{
+        // DATA-001: o cache é por conta.
+        setActiveAccount({ id: 'acc-test', name: 'ALUNO' });
+        writeAccountItem('courses', JSON.stringify([{
             id: 'c1',
             name: 'Cálculo I',
             code: 'CB0001',
@@ -70,7 +74,7 @@ describe('course-detail: falha de download', () => {
     it('renderiza a lista mesmo quando checkFilesExistence devolve INVALID_REQUEST (SEC-002)', async () => {
         // Há um download registrado, então a checagem de existência é chamada. Se o
         // main rejeitar o pedido, a poda do cache é pulada — a lista não pode sumir.
-        localStorage.setItem('downloadedFiles', JSON.stringify({ c1: { 'Lista 3.pdf': { path: 'C:/Users/aluno/SIGAA/Lista 3.pdf' } } }));
+        writeAccountItem('downloads', JSON.stringify({ c1: { 'Lista 3.pdf': { path: 'C:/Users/aluno/SIGAA/Lista 3.pdf' } } }));
         (window as any).api.checkFilesExistence = vi.fn().mockResolvedValue(fail('INVALID_REQUEST', 'lista de caminhos inválida'));
         vi.spyOn(console, 'error').mockImplementation(() => undefined);
         const container = document.createElement('div');

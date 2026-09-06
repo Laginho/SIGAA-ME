@@ -4,8 +4,8 @@
  *
  * Roda sem credencial de propósito. O boot real chama `tryAutoLogin()`, que faz
  * login de verdade no SIGAA: lento, dependente de rede, não determinístico.
- * Para conferir UI isso é ruído, então plantamos fixture em
- * `sessionStorage`/`localStorage` e navegamos por hash.
+ * Para conferir UI isso é ruído, então plantamos fixture nas chaves de sessão e
+ * de conta e navegamos por hash.
  *
  * Os PNGs em `_agent_tmp/shots/` existem para um humano (ou um agente rodando
  * num Linux sem tela) olhar o resultado. Eles não são snapshots comparados
@@ -18,7 +18,13 @@ import { launchApp, type LaunchedApp } from './helpers/launch';
 
 const SHOT_DIR = '_agent_tmp/shots';
 
-const ACCOUNT = { name: 'ALUNO DE TESTE', photoUrl: '' };
+// DATA-001: o perfil precisa de `id` — as chaves de dados são namespaced por
+// ele, e sem id nada é lido. Espelha `SESSION_ACCOUNT_KEY`/`accountKey` de
+// `src/data/account-storage.ts`; o `page.evaluate` roda no renderer e não pode
+// importar o módulo.
+const ACCOUNT = { id: 'e2e-account', name: 'ALUNO DE TESTE' };
+const SESSION_ACCOUNT_KEY = 'sigaa-me:v2:session:account';
+const COURSES_KEY = `sigaa-me:v2:${ACCOUNT.id}:courses`;
 const COURSES = [
     {
         id: 'c1', name: 'Estruturas de Dados', code: 'CK0210', period: '2026.1',
@@ -43,10 +49,10 @@ test.describe('Verificação visual das rotas', () => {
 
     test.beforeAll(async () => {
         launched = await launchApp('.test-user-data-visual');
-        await launched.page.evaluate(([account, courses]) => {
-            sessionStorage.setItem('account', JSON.stringify(account));
-            localStorage.setItem('coursesWithFiles', JSON.stringify(courses));
-        }, [ACCOUNT, COURSES] as const);
+        await launched.page.evaluate(([sessionKey, coursesKey, account, courses]) => {
+            sessionStorage.setItem(sessionKey as string, JSON.stringify(account));
+            localStorage.setItem(coursesKey as string, JSON.stringify(courses));
+        }, [SESSION_ACCOUNT_KEY, COURSES_KEY, ACCOUNT, COURSES] as const);
     });
 
     test.afterAll(async () => {

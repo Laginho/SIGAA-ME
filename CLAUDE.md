@@ -117,7 +117,8 @@ Duas armadilhas medidas em 2026-08-05, ambas custam meia hora se você não soub
    quê. Num container com Playwright: `ln -s <chromium do playwright> ~/bin/google-chrome`.
 2. **Não espere o boot real.** O boot chama `window.api.tryAutoLogin()`, que faz
    login de verdade no SIGAA. Para inspecionar UI isso é ruído: plante fixture em
-   `sessionStorage.account` e `localStorage.coursesWithFiles` e navegue por hash,
+   `sessionStorage["sigaa-me:v2:session:account"]` (um `AccountProfile` com `id`) e
+   `localStorage["sigaa-me:v2:<id>:courses"]` e navegue por hash,
    como o spec faz.
 
 ### Os tiers de teste

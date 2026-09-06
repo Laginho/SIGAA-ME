@@ -1,4 +1,5 @@
 import { sanitizeNewsHtml } from '../security/html-sanitizer';
+import { readAccountItem, writeAccountItem } from '../data/account-storage';
 
 /**
  * Utility: Sync Badge Label Formatter
@@ -41,12 +42,13 @@ function formatClock(date: Date): string {
 /**
  * Utility: News Cache Checker
  *
- * Returns true if the given newsId already has its content cached in localStorage.
+ * Returns true if the given newsId already has its content cached for the
+ * active account.
  * Extracted from course-detail.ts (openNewsModal) to be independently unit-testable.
  */
 export function isNewsCached(courseId: string, newsId: string): boolean {
     try {
-        const raw = localStorage.getItem('coursesWithFiles');
+        const raw = readAccountItem('courses');
         if (!raw) return false;
         const courses = JSON.parse(raw);
         const course = courses.find((c: any) => c.id === courseId);
@@ -60,7 +62,7 @@ export interface MergeOptions {
     /** When true, courses absent from `incoming` are removed (use only after a
      *  complete successful sync over the full enrollment). Default false. */
     replaceSet?: boolean;
-    /** When true, `cacheTimestamp` is left untouched: caching a news body is
+    /** When true, the sync stamp is left untouched: caching a news body is
      *  not a sync, and the dashboard shows that stamp as "Sync manual". */
     keepTimestamp?: boolean;
 }
@@ -83,8 +85,8 @@ function isIncomingNews(value: unknown): value is IncomingNews {
 /**
  * Utility: Merge Courses Into Cache
  *
- * Writes `incoming` courses into the `coursesWithFiles` blob without wiping
- * data a partial or fast sync doesn't touch:
+ * Writes `incoming` courses into the active account's `courses` blob without
+ * wiping data a partial or fast sync doesn't touch:
  *   - News bodies (`content`) already cached are re-injected when the
  *     incoming item lacks one (a fast sync only returns headers).
  *   - Courses not present in `incoming` are kept unless `replaceSet: true`
@@ -95,7 +97,7 @@ function isIncomingNews(value: unknown): value is IncomingNews {
  * modals merge through here too (SEC-001).
  */
 export function mergeCoursesIntoCache(incoming: IncomingCourse[], opts: MergeOptions = {}, timestamp: number = Date.now()): void {
-    const existingRaw = localStorage.getItem('coursesWithFiles');
+    const existingRaw = readAccountItem('courses');
     let existingCourses: IncomingCourse[] = [];
     if (existingRaw) {
         try {
@@ -127,7 +129,7 @@ export function mergeCoursesIntoCache(incoming: IncomingCourse[], opts: MergeOpt
         }
     }
     // Sanitizar antes de cachear (SEC-001): o `content` é HTML bruto do
-    // SIGAA e este é o único escritor de `coursesWithFiles` — cobre os
+    // SIGAA e este é o único escritor do blob de disciplinas — cobre os
     // quatro caminhos de escrita num lugar só.
     for (const course of incoming) {
         if (course.news) {
@@ -148,9 +150,14 @@ export function mergeCoursesIntoCache(incoming: IncomingCourse[], opts: MergeOpt
         }
     }
     try {
-        localStorage.setItem('coursesWithFiles', JSON.stringify(merged));
+        writeAccountItem('courses', JSON.stringify(merged));
     } catch (err: any) {
-        throw new Error('Cache local cheio (localStorage) — ' + err.message);
+        // Cota estourada é a falha esperada aqui e precisa de um texto que o
+        // usuário entenda. Qualquer outra (sem conta ativa, por exemplo) sobe
+        // como está — rotulá-la de "cache cheio" mandaria o usuário limpar
+        // dados por causa de um bug de fluxo.
+        if (err?.name !== 'QuotaExceededError') throw err;
+        throw new Error('Cache local cheio (armazenamento do navegador) — ' + err.message);
     }
-    if (!opts.keepTimestamp) localStorage.setItem('cacheTimestamp', timestamp.toString());
+    if (!opts.keepTimestamp) writeAccountItem('sync-timestamp', timestamp.toString());
 }

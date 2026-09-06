@@ -1,13 +1,14 @@
 import '../styles/sync-selection.css';
 import { h } from '../utils/dom';
 import { mergeCoursesIntoCache } from '../utils/ui-helpers';
+import { getActiveAccount, readAccountItem, setActiveAccount, writeAccountItem } from '../data/account-storage';
 import type { CourseSnapshot, CourseSummary } from '../../shared/domain';
 
 /**
  * Guarda de runtime por cima do tipo. O contrato diz `CourseSummary[]`, mas o
  * dado nasce do HTML do portal: se o SIGAA mudar e o parser passar a devolver
  * outra forma, isso aparece aqui como falha explícita (QA-003), em vez de
- * `undefined` vazando para dentro do localStorage.
+ * `undefined` vazando para dentro do cache local.
  */
 function isCourseLike(value: unknown): value is CourseSummary {
   if (typeof value !== 'object' || value === null) return false;
@@ -18,7 +19,7 @@ function isCourseLike(value: unknown): value is CourseSummary {
 
 export function renderSyncSelectionPage(app: HTMLDivElement) {
   // Check if user has cached data (meaning they can go back)
-  const hasCache = localStorage.getItem('coursesWithFiles');
+  const hasCache = readAccountItem('courses');
 
   app.innerHTML = `
     <div class="sync-selection-container">
@@ -176,10 +177,11 @@ async function startSync(app: HTMLDivElement, mode: 'fast' | 'full') {
 
     // Persist photo URL if returned
     if (result.data.photoUrl) {
-      const account = JSON.parse(sessionStorage.getItem('account') || '{}');
-      account.photoUrl = result.data.photoUrl;
-      sessionStorage.setItem('account', JSON.stringify(account));
-      localStorage.setItem('userPhotoUrl', result.data.photoUrl);
+      const account = getActiveAccount();
+      if (account) {
+        setActiveAccount({ ...account, photoUrl: result.data.photoUrl });
+        writeAccountItem('photo', result.data.photoUrl);
+      }
     }
 
     updateProgress(20, 'Disciplinas Encontradas', `${courses.length} disciplinas identificadas.`);
@@ -226,7 +228,7 @@ async function startSync(app: HTMLDivElement, mode: 'fast' | 'full') {
     // only dropped from the cache on a fully clean sync.
     if (failures.length > 0) {
       const savedSoFar = (() => {
-        try { return JSON.parse(localStorage.getItem('coursesWithFiles') || '[]').length; } catch { return 0; }
+        try { return JSON.parse(readAccountItem('courses') || '[]').length; } catch { return 0; }
       })();
       const detail = failures.map(f => `${f.name} — ${f.message}`).join('; ');
       showError(`${failures.length} disciplina(s) falharam: ${detail}`, savedSoFar);
@@ -242,7 +244,7 @@ async function startSync(app: HTMLDivElement, mode: 'fast' | 'full') {
   } catch (error: any) {
     console.error('Sync failed:', error);
     const savedSoFar = (() => {
-      try { return JSON.parse(localStorage.getItem('coursesWithFiles') || '[]').length; } catch { return 0; }
+      try { return JSON.parse(readAccountItem('courses') || '[]').length; } catch { return 0; }
     })();
     showError(`Erro: ${error.message}`, savedSoFar);
   }

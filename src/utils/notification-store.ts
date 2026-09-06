@@ -1,16 +1,16 @@
 /**
  * Notification Store
  *
- * Lightweight localStorage-based manager for:
+ * Gerenciador leve, por conta, de:
  *  1. Read/Unread state of news items and files
  *  2. Notification history (the feed shown in the bell dropdown)
  *
- * All state lives in localStorage so it survives app restarts
- * without needing any backend persistence changes.
+ * Todo o estado vive no armazenamento com escopo de conta (DATA-001), então
+ * sobrevive a reinícios do app sem precisar de persistência no main.
  */
 
-const READ_ITEMS_KEY = 'readItems';
-const NOTIFICATIONS_KEY = 'notificationsHistory';
+import { readAccountItem, removeAccountItem, writeAccountItem } from '../data/account-storage';
+
 const MAX_NOTIFICATIONS = 15;
 
 // O main constrói estes itens no background sync e os manda pelo IPC, então o
@@ -23,7 +23,7 @@ import type { NotificationItem } from '../../shared/domain';
 /** Get the set of read item keys */
 function getReadSet(): Set<string> {
   try {
-    const raw = localStorage.getItem(READ_ITEMS_KEY);
+    const raw = readAccountItem('read-items');
     return raw ? new Set(JSON.parse(raw)) : new Set();
   } catch {
     return new Set();
@@ -31,7 +31,7 @@ function getReadSet(): Set<string> {
 }
 
 function saveReadSet(set: Set<string>) {
-  localStorage.setItem(READ_ITEMS_KEY, JSON.stringify([...set]));
+  writeAccountItem('read-items', JSON.stringify([...set]));
 }
 
 /** Build a unique key for an item */
@@ -90,7 +90,7 @@ export function getUnreadCount(): number {
 
 function getNotifications(): NotificationItem[] {
   try {
-    const raw = localStorage.getItem(NOTIFICATIONS_KEY);
+    const raw = readAccountItem('notifications');
     return raw ? JSON.parse(raw) : [];
   } catch {
     return [];
@@ -98,7 +98,7 @@ function getNotifications(): NotificationItem[] {
 }
 
 function saveNotifications(items: NotificationItem[]) {
-  localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(items));
+  writeAccountItem('notifications', JSON.stringify(items));
 }
 
 /** Push new notification items (deduplicates by id) */
@@ -125,7 +125,7 @@ export function getAllNotifications(): NotificationItem[] {
 
 /** Clear all notification history */
 export function clearAllNotifications() {
-  localStorage.removeItem(NOTIFICATIONS_KEY);
+  removeAccountItem('notifications');
 }
 
 /**
@@ -134,9 +134,9 @@ export function clearAllNotifications() {
  * show as "new" after the update).
  */
 export function seedExistingItemsAsRead() {
-  if (localStorage.getItem(READ_ITEMS_KEY)) return; // Already seeded
+  if (readAccountItem('read-items')) return; // Already seeded
 
-  const raw = localStorage.getItem('coursesWithFiles');
+  const raw = readAccountItem('courses');
   if (!raw) return;
 
   try {
