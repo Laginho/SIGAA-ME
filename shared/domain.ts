@@ -18,7 +18,13 @@
 
 // ----------------------------------------------------------------------- conta
 
-/** Login do SIGAA (matrícula). É o que `DATA-001` usa para separar dados por conta. */
+/**
+ * Hash do login (`sha256` do usuário normalizado, hex minúsculo), derivado no
+ * main por `deriveAccountId`. É o que separa os dados por conta (`DATA-001`):
+ * cada balde do `cache.json` e cada chave do renderer é namespaced por ele.
+ *
+ * A matrícula em si **não** atravessa o IPC — o renderer só vê o hash.
+ */
 export type AccountId = string
 
 export interface AccountProfile {

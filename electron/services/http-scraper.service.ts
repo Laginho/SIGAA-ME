@@ -89,6 +89,18 @@ export class HttpScraperService {
         this.log(`[HttpScraper] Cookies set. Count: ${this.cookies.length}`);
     }
 
+    /**
+     * Zera o que amarra esta instância a uma sessão JSF: cookies e os
+     * ViewStates por turma. Chamado por `SigaaService` na troca de conta e no
+     * logout (DATA-001) — sem isso o catálogo da conta anterior continuaria
+     * sendo usado para montar requisições da conta nova.
+     */
+    resetSession() {
+        this.cookies = [];
+        this.courseData.clear();
+        this.log('[HttpScraper] Session reset (cookies and course ViewStates cleared).');
+    }
+
     private getCookieHeader(url: string): string {
         const urlObj = new URL(url);
         const validCookies = this.cookies.filter(cookie => {
