@@ -28,6 +28,14 @@ escreve os testes não é quem os faz passar.**
    válida**. Uma passada; discordância vira teste, não debate. Fecha a issue,
    commita e abre o PR.
 
+**Fluxo alternativo (em teste desde 2026-09-06):** Fable especifica, Sonnet
+implementa, Opus revisa e abre o PR. Motivo: benchmark mediu o Opus como revisor
+bom o suficiente e muito mais barato, e tirar o Fable da revisão evita o viés de
+mesmo modelo entre spec e review. Primeira cobaia: `DATA-002`, que é tarefa de
+fronteira de confiança — a exceção acima está suspensa de propósito para medir o
+caso difícil; o revisor sabe disso e olha a ordem dos passos e a falha parcial
+com mais desconfiança.
+
 Tarefa trivial vai direto, sem loop. Amarrações (gate, convenções de teste,
 commits, registro na issue): `docs/agents/orchestration.md`.
 
