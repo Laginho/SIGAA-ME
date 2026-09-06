@@ -1,6 +1,7 @@
 import { HttpScraperService, type ParsedFile, type ParsedNews } from './http-scraper.service';
 import { PlaywrightLoginService, type ParsedCourse } from './playwright-login.service';
 import { logger } from './logger.service';
+import { deriveAccountId, getActiveAccount, setActiveAccount } from './account-context.service';
 import * as fs from 'fs';
 import * as path from 'path';
 import { resolveDownloadTarget, ensureDirInsideRoot, sanitizeSegment } from './download-path';
@@ -75,8 +76,15 @@ export class SigaaService {
         }
     }
 
+    /**
+     * Único ponto de entrada de login manual, auto-login e re-login do sync em
+     * background — por isso é aqui que a identidade de conta é amarrada
+     * (DATA-001). O que sai daqui é o hash do login, nunca a matrícula: o
+     * renderer não precisa dela e não deve tê-la no `sessionStorage`.
+     */
     async login(username: string, password: string): Promise<AppResult<AccountProfile>> {
         try {
+            const accountId = deriveAccountId(username);
             logger.info('SIGAA: Attempting login...');
             const result = await this.playwrightLogin.login(username, password);
 
@@ -84,12 +92,23 @@ export class SigaaService {
                 logger.error('SIGAA: Login failed', result.error);
                 return failFromMessage(result.error, 'Falha no login');
             }
+
+            // Conta diferente da anterior: o catálogo de sessão do scraper é da
+            // conta que saiu e não pode ser reaproveitado. Zera antes de
+            // instalar os cookies novos.
+            const previous = getActiveAccount();
+            if (previous !== null && previous !== accountId) {
+                logger.info('SIGAA: Different account signed in; resetting the HTTP scraper session.');
+                this.httpScraper.resetSession();
+            }
+            setActiveAccount(accountId);
+
             if (result.cookies) {
                 logger.info('SIGAA: Login successful, setting cookies for HTTP scraper');
                 this.httpScraper.setCookies(result.cookies);
             }
             // A foto só existe na página do portal; `getCourses` a devolve.
-            return ok({ id: username, name: result.userName || 'User' });
+            return ok({ id: accountId, name: result.userName || 'User' });
         } catch (error) {
             logger.error('SIGAA: Login error', error);
             return failFromMessage(errorMessage(error));
@@ -98,6 +117,8 @@ export class SigaaService {
 
     async logout(): Promise<void> {
         logger.info('SIGAA: Logging out, closing Playwright session...');
+        this.httpScraper.resetSession();
+        setActiveAccount(null);
         await this.playwrightLogin.close();
     }
 

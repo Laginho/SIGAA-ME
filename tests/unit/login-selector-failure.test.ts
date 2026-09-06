@@ -12,6 +12,7 @@ vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
 });
 
 import { renderLoginPage } from '../../src/pages/login';
+import { getActiveAccount } from '../../src/data/account-storage';
 
 async function flushLoginRequest() {
     await Promise.resolve();
@@ -50,7 +51,7 @@ describe('Login selector-drift recovery (renderer E2E boundary)', () => {
         expect(document.querySelector('.toast--error')?.textContent).toContain('SIGAA login selector drift');
         expect((document.getElementById('loginBtn') as HTMLButtonElement).disabled).toBe(false);
         expect((document.getElementById('loginBtn') as HTMLButtonElement).textContent).toBe('Entrar');
-        expect(sessionStorage.getItem('account')).toBeNull();
+        expect(getActiveAccount()).toBeNull();
         expect(window.location.hash).toBe('');
     });
 });

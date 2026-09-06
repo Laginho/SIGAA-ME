@@ -1,5 +1,6 @@
 import '../styles/login.css';
 import { toast } from '../components/toast';
+import { setActiveAccount } from '../data/account-storage';
 
 export function renderLoginPage(app: HTMLDivElement) {
   app.innerHTML = `
@@ -66,8 +67,8 @@ export function renderLoginPage(app: HTMLDivElement) {
 
       if (result.success) {
         console.log('Login success!');
-        // Store account data in sessionStorage
-        sessionStorage.setItem('account', JSON.stringify(result.data));
+        // Amarra esta janela à conta: as chaves de dados passam a ser as dela.
+        setActiveAccount(result.data);
         // Navigate to dashboard using hash
         window.location.hash = '#/dashboard';
       } else {

@@ -8,6 +8,7 @@ import { execSync } from 'child_process'
 import { persistenceService } from './services/persistence.service'
 import { BackgroundSyncService } from './services/background-sync.service'
 import { cacheService } from './services/cache.service'
+import { getActiveAccount } from './services/account-context.service'
 import { registerIpcHandlers } from './ipc/register-handlers'
 import { installNavigationGuard } from './security/navigation-policy'
 
@@ -77,7 +78,12 @@ const sigaaService = new SigaaService()
 const backgroundSyncService = new BackgroundSyncService(sigaaService, () => win)
 
 async function simulateNewFile(): Promise<boolean> {
-  const forgotten = cacheService.forgetLastFile();
+  const accountId = getActiveAccount();
+  if (!accountId) {
+    console.log('[Dev] Nenhuma conta ativa para simular.');
+    return false;
+  }
+  const forgotten = cacheService.forgetLastFile(accountId);
   if (!forgotten) {
     console.log('[Dev] Nenhum arquivo em cache para simular.');
     return false;

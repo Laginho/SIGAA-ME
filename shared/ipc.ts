@@ -13,6 +13,7 @@
  */
 
 import type {
+  AccountId,
   AccountProfile,
   CourseFile,
   CourseId,
@@ -150,8 +151,15 @@ export interface RendererApi {
 
 // ------------------------------------------------------------------- eventos
 
-/** Payload de `background-sync-update`. */
+/**
+ * Payload de `background-sync-update`.
+ *
+ * O `accountId` é de quem era a sessão quando o sync rodou. O renderer recusa
+ * um evento que não case com a conta ativa dele (DATA-001): sem isso, um sync
+ * disparado antes de uma troca de conta escreveria no cache da conta errada.
+ */
 export interface BackgroundSyncUpdate {
+  accountId: AccountId
   courses: CourseSnapshot[]
   notifications: NotificationItem[]
   timestamp: number

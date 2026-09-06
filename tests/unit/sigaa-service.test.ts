@@ -73,6 +73,7 @@ vi.mock('electron', () => ({
 }));
 
 import { SigaaService } from '../../electron/services/sigaa.service';
+import { deriveAccountId } from '../../electron/services/account-context.service';
 
 const SCRIPT = "jsfcljs(document.getElementById('formAva'),'formAva:j_id_jsp_1,formAva:j_id_jsp_1,id,123,key,abc','');";
 const PARSED_DOC = { id: '123', name: 'doc.pdf', type: 'file', key: 'abc', script: SCRIPT };
@@ -104,7 +105,8 @@ describe('SigaaService (Unit)', () => {
 
             expect(mockPlaywright.login).toHaveBeenCalledWith('user', 'pass');
             expect(mockHttp.setCookies).toHaveBeenCalledWith([{ name: 'TEST', value: '123' }]);
-            expect(result).toEqual({ success: true, data: { id: 'user', name: 'Aluno Teste' } });
+            // DATA-001: o id que atravessa o IPC é o hash do login, não a matrícula.
+            expect(result).toEqual({ success: true, data: { id: deriveAccountId('user'), name: 'Aluno Teste' } });
         });
 
         it('returns a coded failure when Playwright fails', async () => {

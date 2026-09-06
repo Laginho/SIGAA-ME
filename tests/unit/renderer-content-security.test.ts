@@ -21,6 +21,10 @@ import path from 'path';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ESLint } from 'eslint';
 import { ok } from '../../shared/errors';
+import { readAccountItem, setActiveAccount, writeAccountItem } from '../../src/data/account-storage';
+
+// DATA-001: o cache é por conta; o perfil precisa de um id.
+const ACCOUNT = { id: 'acc-test', name: 'ALUNO' };
 
 const root = process.cwd();
 
@@ -155,9 +159,9 @@ describe('dashboard: conteúdo do SIGAA não cria nó executável', () => {
     beforeEach(() => {
         document.body.innerHTML = '';
         localStorage.clear();
+        sessionStorage.clear();
         vi.restoreAllMocks();
-        localStorage.removeItem('notificationsHistory');
-        localStorage.removeItem('readItems');
+        setActiveAccount(ACCOUNT);
     });
 
     function setupApi() {
@@ -170,7 +174,7 @@ describe('dashboard: conteúdo do SIGAA não cria nó executável', () => {
     }
 
     it('não cria img/script/iframe nem handlers inline a partir de dados maliciosos', async () => {
-        localStorage.setItem('coursesWithFiles', JSON.stringify([{
+        writeAccountItem('courses', JSON.stringify([{
             id: "c1' onclick='alert(1)",
             name: '<b>Cálculo</b><script>alert(1)</script>',
             code: '<iframe src=x>',
@@ -184,7 +188,7 @@ describe('dashboard: conteúdo do SIGAA não cria nó executável', () => {
         document.body.appendChild(app);
 
         const { renderDashboardPage } = await import('../../src/pages/dashboard');
-        renderDashboardPage(app as HTMLDivElement, { name: 'ALUNO <img src=x onerror=alert(1)>', photoUrl: 'javascript:alert(1)' });
+        renderDashboardPage(app as HTMLDivElement, { id: ACCOUNT.id, name: 'ALUNO <img src=x onerror=alert(1)>', photoUrl: 'javascript:alert(1)' });
         await flushAll();
 
         expect(app.querySelectorAll('img, script, iframe, [onclick], [onerror]').length).toBe(0);
@@ -200,13 +204,13 @@ describe('dashboard: conteúdo do SIGAA não cria nó executável', () => {
     });
 
     it('permite a foto do perfil quando a URL vem do allowlist si3.ufc.br', async () => {
-        localStorage.setItem('coursesWithFiles', JSON.stringify([]));
+        writeAccountItem('courses', JSON.stringify([]));
         setupApi();
         const app = document.createElement('div');
         document.body.appendChild(app);
 
         const { renderDashboardPage } = await import('../../src/pages/dashboard');
-        renderDashboardPage(app as HTMLDivElement, { name: 'ALUNO', photoUrl: 'https://si3.ufc.br/sigaa/foto.jpg' });
+        renderDashboardPage(app as HTMLDivElement, { id: ACCOUNT.id, name: 'ALUNO', photoUrl: 'https://si3.ufc.br/sigaa/foto.jpg' });
         await flushAll();
 
         const img = app.querySelector('img.user-photo') as HTMLImageElement | null;
@@ -215,7 +219,7 @@ describe('dashboard: conteúdo do SIGAA não cria nó executável', () => {
     });
 
     it('linhas de notificação exibem literal e criam nenhum nó executável', async () => {
-        localStorage.setItem('coursesWithFiles', JSON.stringify([]));
+        writeAccountItem('courses', JSON.stringify([]));
         setupApi();
         const app = document.createElement('div');
         document.body.appendChild(app);
@@ -233,7 +237,7 @@ describe('dashboard: conteúdo do SIGAA não cria nó executável', () => {
             read: false,
         }]);
 
-        renderDashboardPage(app as HTMLDivElement, { name: 'ALUNO' });
+        renderDashboardPage(app as HTMLDivElement, { id: ACCOUNT.id, name: 'ALUNO' });
         await flushAll();
 
         const bell = document.getElementById('notificationBellBtn') as HTMLButtonElement;
@@ -263,13 +267,13 @@ describe('course-detail: conteúdo do SIGAA não cria nó executável, sanitiza 
     beforeEach(() => {
         document.body.innerHTML = '';
         localStorage.clear();
+        sessionStorage.clear();
         vi.restoreAllMocks();
-        localStorage.removeItem('notificationsHistory');
-        localStorage.removeItem('readItems');
+        setActiveAccount(ACCOUNT);
     });
 
     function setupCache(courseOverrides: Record<string, unknown> = {}) {
-        localStorage.setItem('coursesWithFiles', JSON.stringify([{
+        writeAccountItem('courses', JSON.stringify([{
             id: 'c1',
             name: 'Cálculo I',
             code: 'CB0001',
@@ -337,8 +341,8 @@ describe('course-detail: conteúdo do SIGAA não cria nó executável, sanitiza 
     it('sanitiza na escrita no cache e na leitura no modal quando content vem via getNewsDetail', async () => {
         setupCache({ news: [{ id: 'n1', title: 'T', date: 'D', notification: '', /* no content */ }] });
         setupApi();
-        // Ver notícia não é sync: o rótulo "Sync manual" do dashboard lê cacheTimestamp.
-        localStorage.setItem('cacheTimestamp', '111');
+        // Ver notícia não é sync: o rótulo "Sync manual" do dashboard lê o carimbo.
+        writeAccountItem('sync-timestamp', '111');
         const container = document.createElement('div');
         document.body.appendChild(container);
 
@@ -353,10 +357,10 @@ describe('course-detail: conteúdo do SIGAA não cria nó executável, sanitiza 
         const modalBody = container.querySelector('#modalBody .modal-body') as HTMLElement | null;
         expect(modalBody?.querySelectorAll('script, img, [onerror]').length).toBe(0);
 
-        const stored = JSON.parse(localStorage.getItem('coursesWithFiles') || '[]');
+        const stored = JSON.parse(readAccountItem('courses') || '[]');
         const storedContent = stored[0].news[0].content as string;
         expect(storedContent).not.toContain('<script');
         expect(storedContent).not.toContain('onerror');
-        expect(localStorage.getItem('cacheTimestamp')).toBe('111');
+        expect(readAccountItem('sync-timestamp')).toBe('111');
     });
 });
