@@ -1,5 +1,5 @@
 # PROC-002 — Validar Astra high como especificador
-Status: open
+Status: resolved
 Priority: P2
 Started: 2026-09-07
 
@@ -118,9 +118,32 @@ issue. Zero achados é resposta válida. Não abra ledger.md nem outra issue.
 |---|---|---|---|
 | DEV-001 | 2 casos em `dev-cache-mutation-boundary.test.ts` (boot dev + empacotado contra main real); editou `preload-dev-gate.test.ts` movendo a cobertura de `testApi` | 3 A-leves (Fable cego): A1 leg empacotada usa `--sigaa-dev` literal em vez do argv injetado pelo main; A2 spec não nomeia mecanismo e os dublês de IPC fecham as alternativas; A3 harness não distingue sinal antes/depois da janela (AC3 sem teste). Opus na revisão: 0 achado de spec (1 C, comentário em `vite-env.d.ts`); PR #8 merged | Reprova por acúmulo (2+ A-leves). Ressalva: A2 e A3 vêm da mesma omissão |
 | OBS-001 (controle: Fable especifica, Astra audita) | 46 casos em `logger-redaction.test.ts` + `logging-boundary.test.ts`, 24 arquivos, 1.185 linhas; removeu `log-reset.test.ts`; `beforeAll` falha por ausência da API, então nenhum corpo novo executou | Astra cego, 6 achados, todos confirmados no código: 1 A bloqueante (#3: removeu o teste de falha real em `LoggerService.clear`; `EPERM` engolido vira sucesso com log antigo intacto, fronteira de dado); 4 A-leves (#2 traversal exige nome sem `..` mas `sanitizeSegment` produz `.._evil.html`, força editar `download-path.ts`; #4 fallback Playwright de download está ligado e sem prova de redação, spec repetiu afirmação errada do CLAUDE.md; #5 cenário de background nunca sai do cold start, log do título de notícia sem prova; #6 `filter(Boolean)` aceita linhas sem op id); 1 nota de método (#1) | Reprova (1 A bloqueante). Spec 6x maior que o do DEV-001 |
-| PORTAL-001 | 16 casos em `portal-adapter.test.ts` + 2 em `portal-adapter-ownership.test.ts` (guarda AST), endureceu 2 casos existentes; sessão estourou tokens antes do commit, guia commitou `d82e28e` | Fable cego, 5 achados, todos confirmados no código: 3 A-leves (#1 cinco casos exercitam `enterCourseHTTP` e o ramo sem `preFetchedHtml`, sem chamador em produção; #2 invalidação de estado JSF testada só para sessão expirada, `sigaa.service.ts:298` reenvia ViewState velho em drift sem teste que pegue; #3 landmarks de portal só nos docs sintéticos, `h1` não existe na produção); 2 notas (#4 ownership test não vê `TemplateTail`; #5 mock de login sem `locator`). Opus: pendente | Reprova por acúmulo (3 A-leves, 0 bloqueante). Ressalva: veredito vem só da regra "dois A-leves" |
+| PORTAL-001 | 16 casos em `portal-adapter.test.ts` + 2 em `portal-adapter-ownership.test.ts` (guarda AST), endureceu 2 casos existentes; sessão estourou tokens antes do commit, guia commitou `d82e28e` | Fable cego, 5 achados, todos confirmados no código: 3 A-leves (#1 cinco casos exercitam `enterCourseHTTP` e o ramo sem `preFetchedHtml`, sem chamador em produção; #2 invalidação de estado JSF testada só para sessão expirada, `sigaa.service.ts:298` reenvia ViewState velho em drift sem teste que pegue; #3 landmarks de portal só nos docs sintéticos, `h1` não existe na produção); 2 notas (#4 ownership test não vê `TemplateTail`; #5 mock de login sem `locator`). Correção do spec feita pelo Fable high (Astra indisponível), não pelo especificador. Opus na revisão: 2 achados de spec, ambos A-leves (`enterCourseAndGetHTML` sem validação do documento inicial, linha "Entrar na turma" da matriz sem teste, sessão expirada saía como `NOT_FOUND`; invalidação de JSF sem cobrir a porta da exceção). PR #10 merged | Reprova por acúmulo (5 A-leves, 0 bloqueante). Ressalva: veredito vem só da regra "dois A-leves" |
 
 ## Fechamento
+
+**Veredito (2026-09-07): PROC-002 encerrada sem aprovar o Astra.** Nas duas amostras
+do Astra (DEV-001, PORTAL-001) zero achado bloqueante, 3 e 5 A-leves; no controle
+(OBS-001, Fable) 1 bloqueante. O buraco é do papel, não do modelo: nenhum spec
+passou limpo pela auditoria cega, e a auditoria pegou tudo que o Opus pegaria
+depois, mais cedo. A regra "dois A-leves viram bloqueante" decidiu os dois
+vereditos do Astra sozinha e vem de bug em código; para spec é dura demais, mas
+não foi revisada porque o Astra ficou indisponível e Bruno decidiu seguir com o
+Fable especificando, no ciclo novo abaixo. Se o Astra voltar, reabrir com a
+régua revisada.
+
+**Ciclo adotado em 2026-09-07 (economia de tokens do modelo forte):**
+
+1. Fable high: grilling, issue, critérios de aceite, e em prosa o nome de cada
+   teste com a asserção que ele faz e o que é dublê e o que é produção. Sem
+   arquivo de teste.
+2. Sonnet #1: expande a prosa em arquivos de teste, roda, confirma vermelho por
+   asserção, commita `test: specify ... (<ID>)`. Para.
+3. Auditoria cega do spec (passo 2 desta issue), agora sobre o commit do Sonnet
+   #1. Obrigatória: o modo de falha "teste vazio/testa cópia" passou para o
+   Sonnet e o Fable não vê o arquivo.
+4. Sonnet #2, sessão limpa com issue e testes: green, commita.
+5. Opus: revisão, correção em cima, PR.
 
 Se aprovado: registrar no `CLAUDE.md` (fluxo vigente, três tarefas, data) e
 atualizar a memória do loop. Se reprovado: registrar o motivo aqui e manter o

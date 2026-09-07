@@ -34,6 +34,15 @@ Fable high sobre o mesmo diff em `DATA-002`, `CONC-001` e `DL-002`; zero achado
 bloqueante além do Opus. Motivo original: Opus é muito mais barato,
 e tirar o Fable da revisão evita o viés de mesmo modelo entre spec e review.
 
+**Ciclo em adoção desde 2026-09-07 (`PROC-002`):** o Fable não escreve arquivo de
+teste. Ele entrega issue, critérios e, em prosa, o nome de cada teste com a
+asserção e os dublês. Um Sonnet expande isso em testes vermelhos e commita; outro
+modelo forte audita o spec cego (protocolo na `PROC-002`); um segundo Sonnet, em
+sessão limpa, faz passar; Opus revisa e abre o PR. Astra high foi testado como
+especificador em `DEV-001` e `PORTAL-001`: nenhum achado bloqueante, mas está
+indisponível. Conclusão da `PROC-002`: todo spec deixa buraco; o que segura é a
+auditoria cega por outro modelo.
+
 Tarefa trivial vai direto, sem loop. Amarrações (gate, convenções de teste,
 commits, registro na issue): `docs/agents/orchestration.md`.
 
