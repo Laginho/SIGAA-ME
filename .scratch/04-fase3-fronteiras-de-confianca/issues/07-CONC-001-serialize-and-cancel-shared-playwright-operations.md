@@ -328,3 +328,86 @@ Observations, not defects:
 - DATA-002 left a note that `resetAppLog` might move out of `main.ts` "when
   CONC-001 touches that stretch". CONC-001 does not touch `main.ts`, by
   Contract. The note stays open.
+
+## Revisão cega (Fable)
+
+2026-09-07. Sessão limpa; leu `CLAUDE.md`, `docs/agents/orchestration.md`,
+`ARCHITECTURE.md` e esta issue só até `#### Resolution (2026-09-07)`. Não abriu
+o ledger nem o PR. Diff revisado: `git diff 50c98bd..9dfeaff -- electron src
+shared tests` — três arquivos, todos em `electron/services/`
+(`session-operation-coordinator.service.ts` novo, `sigaa.service.ts`,
+`background-sync.service.ts`); nada em `src/`, `shared/` ou `tests/`.
+
+**Achados: nenhum.**
+
+### Cadeia de chamadores percorrida
+
+- `SigaaService.*` ← `electron/ipc/register-handlers.ts` (`login-request`,
+  `try-auto-login`, `get-courses`, `get-course-files`, `download-file`,
+  `download-all-files`, `get-news-detail`, `load-all-news`, `logout`,
+  `clear-all-data`) e `electron/main.ts` (`before-quit`).
+- `BackgroundSyncService.syncNow/cancel/start/stop/restart` ← `main.ts`
+  (`whenReady`, tray "Sincronizar Agora", `simulateNewFile`) e
+  `register-handlers.ts` (`update-app-setting`, `logout`, `clear-all-data`).
+- Toda chamada a `this.playwrightLogin.*` em `sigaa.service.ts` (linhas 80,
+  117, 131, 152, 160, 195, 233, 243, 287, 385, 392, 401, 434, 486, 534, 589,
+  609, 635) está dentro de um `operations.run(...)` ou de um método privado
+  só chamado de dentro de um. `clearDiagnostics` só toca `httpScraper.resetLog`.
+  `PlaywrightLoginService` não é referenciado fora de `sigaa.service.ts` e
+  `download.service.ts`. Não existe operação "não rastreada".
+- Nenhum `run`/`cancel` é emitido de callback criado dentro de outra operação
+  (interval do sync nasce em `start()`, chamado só de contexto raiz); a
+  única reentrância é a pretendida, `runSync` → `SigaaService.*`.
+
+### Cenários conferidos contra o contrato
+
+- Usuário abre disciplina com sync em voo: `interactive` aborta o
+  `background`; `enterCourseAndGetHTML` em curso termina; `runSync` dorme os
+  2s, vê `signal.aborted`, retorna sem publicar nem commitar; a interativa
+  começa. Pinado por `background-sync-serialization.test.ts`.
+- Logout durante `downloadAllFiles`: para no próximo arquivo com
+  `CANCELLED`; `playwrightLogin.logout()` só depois. Pinado em
+  `sigaa-service.test.ts`.
+- Handler `logout`/`clear-all-data`: `clearCredentials` → `cancel('background')`
+  → `logout()` (`shutdown`). Sync que o interval enfileirar no intervalo roda,
+  não acha credencial e sai. `isSyncing` é limpo no `finally` de `runSync`
+  mesmo quando a operação entra já abortada.
+- `cancel('background')` com o sync só na fila resolve na hora; o `shutdown`
+  seguinte é FIFO atrás da interativa em voo e do background abortado, então
+  o navegador nunca fecha por baixo de ninguém.
+- Rejeição de `fn` libera o slot; `done` nunca rejeita; `abort()` repetido
+  é no-op; dois `advance()` no mesmo tick não iniciam duas operações
+  (`start` seta `running` sincronamente).
+- Propagação do `AsyncLocalStorage`: a continuação do `await run(...)` no
+  handler IPC captura o contexto do handler, não o da operação; `advance()`
+  entra em `context.run(nextOp)` explícito. A armadilha do callback tardio é
+  coberta pelo flag `finished` e pelo último teste de nesting.
+
+### Verificação
+
+- `npm run quality`: typecheck limpo; ESLint 0 erros, 71 warnings
+  (`no-explicit-any` legado; 77 em 2026-09-03, só caiu); vitest
+  `Test Files 38 passed (38)`, `Tests 461 passed | 4 skipped (465)`.
+- Prova de vermelho: `sigaa.service.ts` e `background-sync.service.ts` em
+  50c98bd e o módulo do coordenador removido → os seis arquivos da seção
+  Verification dão `Test Files 6 failed (6)`, `Tests 8 failed | 25 passed
+  (33)`: 4 arquivos não carregam (módulo ausente), 5 falhas em
+  `sigaa-service.test.ts › session operations (CONC-001)` e 3 em
+  `background-sync-serialization.test.ts`. Os dois testes-guarda
+  ("the sync alone completes", "cancel() still drains") ficam verdes, como o
+  mapa de testes previa. Fontes restauradas para 9dfeaff; `git status` limpo.
+
+### Observações (não são achados; comportamento decidido na spec)
+
+- Qualquer ação interativa descarta o sync inteiro, inclusive o que já foi
+  buscado (decisões 4 e 7). Usuário ativo faz `lastBackgroundSync` nunca
+  avançar e cada tentativa recomeçar do zero. Se isso incomodar, a saída é
+  publicar parcial com marca de incompleto, o que a criterion 4 hoje proíbe.
+- Aborto que chega durante `getCourseFiles` só é notado depois do
+  `setTimeout` de 2s da disciplina seguinte (decisão 6). No `before-quit`
+  esses 2s entram no teto de 5s.
+- `login` checa o signal só na primeira linha. Um `shutdown` que chegue com
+  o login em voo deixa o login completar e o handler `login-request` salvar
+  a credencial depois de o logout ter rodado. Hoje não há caminho de UI para
+  login e logout coexistirem (loading page durante `tryAutoLogin`, botão de
+  logout só no dashboard); se um dia houver, isso vira achado.
