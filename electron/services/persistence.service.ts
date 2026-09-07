@@ -46,14 +46,23 @@ const VALIDATORS: { [K in keyof Required<AppSettings>]: (value: unknown) => valu
 };
 
 export class PersistenceService {
-    private settingsPath: string;
-    private credentialsPath: string;
-    private settings: AppSettings;
+    private loaded: AppSettings | null = null;
 
-    constructor() {
-        this.settingsPath = path.join(app.getPath('userData'), 'settings.json');
-        this.credentialsPath = path.join(app.getPath('userData'), 'credentials.json');
-        this.settings = this.loadSettings();
+    /**
+     * Resolvidos a cada uso, nunca no import (DEV-002): o singleton é
+     * importado pelo `main.ts` antes do `app.setPath('userData', ...)` que isola
+     * o dev, então um caminho fixado no construtor apontaria para a produção.
+     */
+    private get settingsPath(): string {
+        return path.join(app.getPath('userData'), 'settings.json');
+    }
+
+    private get credentialsPath(): string {
+        return path.join(app.getPath('userData'), 'credentials.json');
+    }
+
+    private get settings(): AppSettings {
+        return this.loaded ??= this.loadSettings();
     }
 
     /**
@@ -168,7 +177,7 @@ export class PersistenceService {
      * do default, nunca do que havia antes.
      */
     public reset(): void {
-        this.settings = { ...DEFAULT_SETTINGS };
+        this.loaded = { ...DEFAULT_SETTINGS };
         if (fs.existsSync(this.settingsPath)) fs.unlinkSync(this.settingsPath);
         if (fs.existsSync(this.credentialsPath)) fs.unlinkSync(this.credentialsPath);
     }
