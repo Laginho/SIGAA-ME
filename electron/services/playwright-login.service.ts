@@ -11,6 +11,7 @@ import {
     classifyLoginException,
     describeMissingCourseListSelectors,
     isLoginDocument,
+    validateCourseListDocument,
     validateLoginStart
 } from '../sigaa/portal-adapter';
 
@@ -456,6 +457,18 @@ export class PlaywrightLoginService {
             }
 
             // Enter the course
+            // Documento inicial antes de clicar: a URL não ser a de login não prova
+            // que a sessão vive — o SIGAA devolve o formulário de login na própria
+            // paginaInicial.do. Sem esta checagem, sessão expirada saía daqui como
+            // "Course link not found in portal", que `classifyMessage` lê como
+            // NOT_FOUND, e ninguém tenta relogar.
+            const portalCheck = validateCourseListDocument(await page.content());
+            if (portalCheck) {
+                logger.warn(`Playwright: Portal document rejected before course entry: ${portalCheck.code}`);
+                if (portalCheck.code === 'SESSION_EXPIRED') this.page = null;
+                return { success: false, error: portalCheck.message, errorCode: portalCheck.code };
+            }
+
             console.log(`Playwright: Entering course ${courseId} (${courseName})...`);
             const entered = await page.evaluate(({ id, sel }) => {
                 const inputs = Array.from(document.querySelectorAll(sel.courseIdInput));
@@ -503,7 +516,11 @@ export class PlaywrightLoginService {
                 }
 
                 // Don't close page - keep it for potential retry
-                return { success: false, error: `Course link not found in portal. Available IDs: ${debugInfo.courseIds.join(', ')}` };
+                return {
+                    success: false,
+                    error: `Course link not found in portal. Available IDs: ${debugInfo.courseIds.join(', ')}`,
+                    errorCode: 'NOT_FOUND'
+                };
             }
 
             if (entered.success) {

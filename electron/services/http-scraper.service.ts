@@ -684,6 +684,11 @@ export class HttpScraperService {
         } catch (error: any) {
             console.error('[HttpScraper] Error fetching course files:', error);
             this.log(`[HttpScraper] Error fetching course files: ${error.message}`);
+            // Exceção também é falha de atualização: o ViewState anterior desta
+            // turma não pode sobreviver para o próximo download (ver failCourse).
+            // Sem `errorCode`, para `failFromResult` ainda classificar timeout de
+            // rede como PORTAL_UNAVAILABLE pela mensagem.
+            this.courseData.delete(courseId);
             return { success: false, error: error.message };
         }
     }

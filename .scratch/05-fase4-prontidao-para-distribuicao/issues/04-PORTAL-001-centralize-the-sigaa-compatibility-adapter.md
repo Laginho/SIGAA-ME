@@ -1,5 +1,5 @@
 # PORTAL-001 — Centralize the SIGAA compatibility adapter
-Status: claimed
+Status: resolved
 Priority: P1
 Blocked by: ARCH-001
 Tracker status at migration: `NOT STARTED`
@@ -139,7 +139,7 @@ npm run quality
 
 #### Implementation notes
 
-- Commit: —
+- Commit: 1578d00 (Sonnet, implementação) + REVCOMMIT (Opus, revisão)
 - O comando antigo `test:integration` não existe no package.json atual;
   usar os comandos acima sem adicionar script npm nesta especificação.
 - Versão anterior do adapter: inexistente. A implementação deve declarar
@@ -282,3 +282,60 @@ exige tocar arquivo fora do limite (os únicos outros testes que constroem
 `PlaywrightLoginService` são `scraper.test.ts`, live, e os três já ajustados;
 `sigaa-service.test.ts` mocka os dois scrapers por módulo e só assere códigos
 deduzidos de mensagens legadas, que não mudam).
+
+## Revisão (Opus, 2026-09-07)
+
+Diff revisado: `1578d00`, contra a issue e contra a matriz de transições.
+Cadeia subida a partir de tudo que o diff toca: `register-handlers.ts` →
+`SigaaService` (login/getCourses/getCourseFiles/downloadFile/downloadAllFiles/
+loadAllNews) → os dois scrapers; `background-sync.service.ts:78-110` para os
+consumidores de `AppErrorCode`; `shared/errors.ts` para `failFromResult`.
+
+Confere: seletores e parsing JSF centralizados e consumidos pelos dois serviços;
+`classify()` no lugar do substring `verTelaLogin.do`; `parseAvaForm` sem
+fallback para o primeiro formulário; revalidação da resposta do POST de
+Conteúdo; `failCourse` invalidando por turma e o catálogo inteiro em
+`SESSION_EXPIRED`; `failFromResult` preservando o código na origem; nenhum
+cookie, HTML, ViewState ou URL interna novo atravessando o IPC.
+
+### Achados corrigidos nesta passada
+
+1. **`enterCourseAndGetHTML` não validava o documento inicial** — a linha
+   "Entrar na turma" da matriz. A única checagem de sessão era
+   `page.url().includes('verTelaLogin')`, e o SIGAA devolve o formulário de
+   login na própria `paginaInicial.do` sem trocar a URL. Nesse caso o
+   `page.evaluate` não achava o `input[name="idTurma"]` e a operação saía como
+   `Course link not found in portal`, que `classifyMessage` lê como
+   **`NOT_FOUND`** — sessão expirada disfarçada de turma ausente, no caminho de
+   produção usado por arquivos, download, notícias e sync. Agora o documento
+   passa por `validateCourseListDocument` antes do clique (`SESSION_EXPIRED`
+   para login, `SELECTOR_DRIFT` para estrutura desconhecida), e o ramo de turma
+   realmente ausente declara `errorCode: 'NOT_FOUND'` em vez de depender da
+   heurística de mensagem.
+
+2. **A invalidação do estado JSF não cobria a falha por exceção.**
+   `failCourse` cobre todo retorno de erro de `getCourseFiles`, mas o `catch`
+   do método devolvia `{ success: false, error }` sem tocar em `courseData`.
+   No retry de `downloadFile` (`sigaa.service.ts:298-303`), `retryScript` cai
+   em `?? targetScript` e o POST seguinte reaproveita o ViewState velho — o
+   mesmo bug do achado 2 da auditoria, pela porta da exceção. O `catch` agora
+   apaga o catálogo da turma. Sem `errorCode`, de propósito: assim um timeout
+   de rede continua virando `PORTAL_UNAVAILABLE` pela mensagem em vez de
+   `UNKNOWN`.
+
+Teste de regressão: `tests/integration/portal-course-entry.test.ts` (3 casos).
+Com os dois serviços revertidos, 2 falham e o controle `NOT_FOUND` continua
+verde.
+
+### Não corrigido, registrado
+
+- `tests/integration/download-real.test.ts` compara `readdirSync(os.tmpdir())`
+  antes e depois; `download-boundary.test.ts` cria `sigaa-me-boundary-*` em
+  `os.tmpdir()` a partir de outro worker. Falha intermitente do gate, sem
+  relação com o PORTAL-001 (o arquivo passa isolado). Fica para uma issue
+  própria.
+- `enterCourseHTTP`, o ramo sem `preFetchedHtml` de `getCourseFiles` e
+  `httpScraper.getNewsDetail` seguem sem chamador em produção, como a
+  especificação previu. Passe pré-release.
+
+Gate: `npm run quality` verde — 528 passed, 4 skipped, 0 erro de lint.
