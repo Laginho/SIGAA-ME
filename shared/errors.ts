@@ -86,6 +86,21 @@ export function failFromMessage(message: string | undefined, fallback = 'Erro de
   return fail(classifyMessage(text), text)
 }
 
+/**
+ * `fail()` a partir do retorno de um scraper que já pode trazer `errorCode`
+ * (PORTAL-001). Preserva o código emitido na origem em vez de rededuzi-lo da
+ * mensagem; `classifyMessage` fica só para o que ainda não declara código
+ * (exceção não mapeada, retorno legado).
+ */
+export function failFromResult(
+  result: { error?: string; errorCode?: AppErrorCode } | undefined,
+  fallback = 'Erro desconhecido'
+): AppFailure {
+  const text = result?.error || fallback
+  if (result?.errorCode) return fail(result.errorCode, text)
+  return failFromMessage(text, fallback)
+}
+
 export function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }

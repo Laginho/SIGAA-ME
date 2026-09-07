@@ -14,14 +14,17 @@ const harness = vi.hoisted(() => {
     const state = { cookies: [] as { name: string; value: string; domain: string; path: string }[] };
 
     function makeFakePage() {
+        let atLogin = false;
         return {
-            goto: vi.fn(async () => {}),
+            goto: vi.fn(async (url: string) => { atLogin = url.includes('verTelaLogin'); }),
             fill: vi.fn(async () => {}),
-            click: vi.fn(async () => {}),
+            click: vi.fn(async () => { atLogin = false; }),
             waitForLoadState: vi.fn(async () => {}),
-            url: vi.fn(() => 'https://si3.ufc.br/sigaa/portais/discente/discente.jsf'),
+            url: vi.fn(() => atLogin ? 'https://si3.ufc.br/sigaa/verTelaLogin.do' : 'https://si3.ufc.br/sigaa/paginaInicial.do'),
             $: vi.fn(async () => null),
-            content: vi.fn(async () => '<html></html>'),
+            content: vi.fn(async () => atLogin
+                ? '<form action="/sigaa/logar.do"><input name="user.login"><input name="user.senha"><input name="entrar" type="submit"></form>'
+                : '<h1>Portal do Discente</h1><a href="/sigaa/verPortalDiscente.do">Menu Discente</a><span class="nome_usuario">User</span>'),
             on: vi.fn()
         };
     }

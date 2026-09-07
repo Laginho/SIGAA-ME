@@ -17,7 +17,7 @@ import type {
     NewsSummary,
 } from '../../shared/domain';
 import type { DownloadFileRef } from '../../shared/ipc';
-import { type AppResult, errorMessage, fail, failFromMessage, ok } from '../../shared/errors';
+import { type AppResult, errorMessage, fail, failFromMessage, failFromResult, ok } from '../../shared/errors';
 
 // ---------------------------------------------------------------------------
 // Redução parser -> domínio (ARCH-001).
@@ -81,7 +81,7 @@ export class SigaaService {
 
                 if (!result.success) {
                     logger.error('SIGAA: Login failed', result.error);
-                    return failFromMessage(result.error, 'Falha no login');
+                    return failFromResult(result, 'Falha no login');
                 }
 
                 // Conta diferente da anterior: o catálogo de sessão do scraper é da
@@ -132,7 +132,7 @@ export class SigaaService {
 
                 if (!result.success || !result.courses) {
                     logger.error('SIGAA: Failed to fetch courses', result.error);
-                    return failFromMessage(result.error, 'Failed to fetch courses');
+                    return failFromResult(result, 'Failed to fetch courses');
                 }
                 logger.info(`SIGAA: Found ${result.courses.length} courses`);
                 return ok({ courses: result.courses.map(toCourseSummary), photoUrl: result.photoUrl });
@@ -152,7 +152,7 @@ export class SigaaService {
                 const entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
 
                 if (!entryResult.success || !entryResult.html) {
-                    return failFromMessage(entryResult.error, 'Failed to enter course');
+                    return failFromResult(entryResult, 'Failed to enter course');
                 }
 
                 if (entryResult.cookies) {
@@ -168,7 +168,7 @@ export class SigaaService {
                 // Antes, falha de parse (sessão expirada, deriva de seletor) virava
                 // `success: true` com listas vazias — e uma disciplina vazia no cache.
                 if (!dashboardParse.success) {
-                    return failFromMessage(dashboardParse.error, 'Failed to parse course page');
+                    return failFromResult(dashboardParse, 'Failed to parse course page');
                 }
                 const files = (dashboardParse.files ?? []).map(toCourseFile);
                 const news = (dashboardParse.news ?? []).map(toNewsSummary);
@@ -232,7 +232,7 @@ export class SigaaService {
             logger.info('SIGAA: Entering course via Full Browser for download (State reliability)...');
             const entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
             if (!entryResult.success || !entryResult.html) {
-                return failFromMessage(entryResult.error, 'Failed to enter course');
+                return failFromResult(entryResult, 'Failed to enter course');
             }
             if (entryResult.cookies) {
                 this.httpScraper.setCookies(entryResult.cookies);
@@ -287,7 +287,7 @@ export class SigaaService {
             const retryEntryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
 
             if (!retryEntryResult.success || !retryEntryResult.html) {
-                return failFromMessage(retryEntryResult.error, 'Failed to refresh session for retry');
+                return failFromResult(retryEntryResult, 'Failed to refresh session for retry');
             }
 
             // Update HttpScraper with fresh state
@@ -406,7 +406,7 @@ export class SigaaService {
 
             if (!entryResult.success || !entryResult.html) {
                 logger.error(`SIGAA: Failed to enter course for batch download: ${entryResult.error}`);
-                return failFromMessage(entryResult.error, 'Failed to enter course for download');
+                return failFromResult(entryResult, 'Failed to enter course for download');
             }
 
             // Set cookies from Playwright session
@@ -421,7 +421,7 @@ export class SigaaService {
 
             if (!parseResult.success) {
                 logger.error(`SIGAA: Failed to parse course files: ${parseResult.error}`);
-                return failFromMessage(parseResult.error, 'Failed to parse course for download');
+                return failFromResult(parseResult, 'Failed to parse course for download');
             }
 
             // O script de cada arquivo vem da página fresca, nunca do renderer.
@@ -589,7 +589,7 @@ export class SigaaService {
                 const result = await this.playwrightLogin.getNewsDetail(courseId, courseName, newsId);
 
                 if (!result.success || !result.news) {
-                    return failFromMessage(result.error, 'Failed to fetch news detail');
+                    return failFromResult(result, 'Failed to fetch news detail');
                 }
                 return ok(result.news);
             } catch (error) {
@@ -608,7 +608,7 @@ export class SigaaService {
                 // 1. Enter Course to get fresh News List (and ViewState)
                 const entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName);
                 if (!entryResult.success || !entryResult.html) {
-                    return failFromMessage(entryResult.error, 'Failed to enter course');
+                    return failFromResult(entryResult, 'Failed to enter course');
                 }
 
                 if (entryResult.cookies) {
@@ -618,7 +618,7 @@ export class SigaaService {
                 // 2. Parse News Headers
                 const parseResult = await this.httpScraper.getCourseFiles(courseId, 'Unknown', entryResult.html);
                 if (!parseResult.success) {
-                    return failFromMessage(parseResult.error, 'Failed to parse course page');
+                    return failFromResult(parseResult, 'Failed to parse course page');
                 }
                 const newsItems = parseResult.news ?? [];
 
