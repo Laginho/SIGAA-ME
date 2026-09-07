@@ -20,7 +20,7 @@ declare global {
          */
         api: RendererApi;
         /**
-         * Ponte de teste, exposta só com `--sigaa-dev` (SEC-002).
+         * Ponte de teste, exposta só quando o main não está empacotado (DEV-001).
          * Produção não tem `testApi`.
          */
         testApi?: {

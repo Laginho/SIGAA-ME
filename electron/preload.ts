@@ -63,7 +63,10 @@ const api: RendererApi = {
 
 contextBridge.exposeInMainWorld('api', api)
 
-if (process.argv.includes('--sigaa-dev')) {
+// Autoridade vem de `process.env`, definido pelo main só quando `!app.isPackaged`
+// (DEV-001). `argv` não serve: um preload empacotado pode receber o mesmo argv
+// que o main dev injetou.
+if (process.env.SIGAA_DEV_BRIDGE === '1') {
   contextBridge.exposeInMainWorld('testApi', {
     simulateNewFile: () => ipcRenderer.invoke('test-simulate-new-file'),
   })

@@ -1,7 +1,7 @@
 # OBS-001 — Centralize, redact, rotate, and clear logs
 Status: open
 Priority: P2
-Blocked by: DL-002
+Blocked by: DL-002 (fechada em 2026-09-07)
 Tracker status at migration: `NOT STARTED`
 
 - Owner: —
