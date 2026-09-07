@@ -1,5 +1,5 @@
 # DEV-001 — Remove production developer cache mutation actions
-Status: claimed
+Status: resolved
 Priority: P2
 Tracker status at migration: `PARTIAL`
 
@@ -62,29 +62,29 @@ Tracker status at migration: `PARTIAL`
 
 #### Acceptance criteria
 
-- [ ] **AC1 — Packaged surface:** with `app.isPackaged === true`, the tray
+- [x] **AC1 — Packaged surface:** with `app.isPackaged === true`, the tray
   contains only the existing ordinary actions `Abrir SIGAA-ME`,
   `Sincronizar Agora`, and `Sair`, plus separators. No developer simulation
   action is present. `test-simulate-new-file` is not registered.
-- [ ] **AC2 — Flag is insufficient:** after a packaged main launch, the preload
+- [x] **AC2 — Flag is insufficient:** after a packaged main launch, the preload
   exposes neither `testApi` nor any simulation member on `api`, including when
   its argv explicitly contains `--sigaa-dev`. Cover both `NODE_ENV=production`
   and `NODE_ENV=development`. Absence of the flag remains safe. Loading the
   preload must not mutate cache or trigger a sync to discover its permissions.
-- [ ] **AC3 — Development remains usable:** an unpackaged main launch without a
+- [x] **AC3 — Development remains usable:** an unpackaged main launch without a
   Vite server still provides the explicit `testApi.simulateNewFile` bridge used
   by E2E, even under `NODE_ENV=production`. Retain the existing development tray
   action and registered handler. Calling the real bridge reaches the real
   handler and main simulation: it removes one file only from the active
   account, preserves news and other accounts, invokes sync, and returns `true`.
   No active account or no cached file returns `false` without invoking sync.
-- [ ] **AC4 — Boundary constraints:** `window.api` stays typed as `RendererApi`
+- [x] **AC4 — Boundary constraints:** `window.api` stays typed as `RendererApi`
   without simulation or generic IPC; `window.testApi` stays optional with the
   existing boolean return contract. Preserve `sandbox: true`,
   `contextIsolation: true`, and `nodeIntegration: false`. Do not import main-only
   Electron `app` into the sandboxed preload. Authorization must derive from
   the actual main packaging state, with no simulation call as a capability probe.
-- [ ] **AC5 — Scope and verification:** the two DEV-001 cases pass after the
+- [x] **AC5 — Scope and verification:** the two DEV-001 cases pass after the
   implementation and `npm run quality` is green. Preserve existing IPC
   validation and avoid private cache access. No changes to `docs/PLANO.md`,
   other issues, scraping, or sync behavior. No build, live login, or full E2E
@@ -278,3 +278,61 @@ sem teste que falhe para o erro de ordem.
   mais e chamaria `syncNow` duas vezes, e as linhas 132 e 134 falham.
 
 Sem implementação, sem ledger, sem outra issue tocada.
+
+## Revisão (Opus, 2026-09-07)
+
+Sessão limpa, sem ver a sessão que especificou. Lido: diff completo de
+`2a31b0e`, `electron/main.ts`, `electron/preload.ts`,
+`electron/ipc/register-handlers.ts`, `src/vite-env.d.ts`,
+`tests/integration/dev-cache-mutation-boundary.test.ts`,
+`tests/unit/preload-dev-gate.test.ts`, `tests/e2e/app.spec.ts`.
+
+### Verificação empírica do mecanismo
+
+A suíte inteira é mockada; ela não podia provar a única premissa que o diff
+assume — que um preload **sandboxed** enxerga `process.env` definido no main
+antes de `new BrowserWindow`. Rodei um app Electron mínimo com o binário deste
+repositório, `sandbox: true`, `contextIsolation: true`, `nodeIntegration: false`:
+
+```text
+PRELOAD sandboxed=true env="1" argv=["--sigaa-dev"]
+```
+
+O sinal chega. AC3 se sustenta no app real, não só no dublê.
+
+### Achados
+
+Um, cosmético, corrigido em cima:
+
+- `src/vite-env.d.ts:23` ainda documentava `testApi` como "exposta só com
+  `--sigaa-dev` (SEC-002)". Depois do diff isso é falso — o portão é
+  `SIGAA_DEV_BRIDGE`. Este arquivo é justamente o que derivou do main e causou
+  o `BUG-008` (regra 6 do `CLAUDE.md`); deixar a descrição errada aqui é o
+  mesmo modo de falha em escala menor. Sem cenário de falha em runtime.
+
+### Sem achado, registrado
+
+- `main.ts:153` (`additionalArguments: ['--sigaa-dev']`) virou código morto:
+  nada mais lê o token. Deixado de propósito. O teste usa o valor real de
+  `additionalArguments` como entrada adversarial na leg empacotada
+  (`loadPreload([...productionArgs, ...devArgs])`); removê-lo esvaziaria essa
+  asserção ou obrigaria a voltar com um literal, que foi o achado A1 do audit.
+  Custo de manter: zero em runtime.
+- Vazamento de `SIGAA_DEV_BRIDGE=1` para processos filhos do main em dev
+  (Playwright/Chrome, `execSync`). Nenhum consumidor no repositório;
+  `grep` por `SIGAA_DEV` fora de `.scratch/` só encontra os três pontos do diff.
+- `delete` no ramo empacotado cobre também o caso de o usuário exportar a
+  variável no shell antes de abrir o app empacotado. Testei mentalmente o
+  contrário — o main apaga antes de qualquer janela existir.
+- `preload-dev-gate.test.ts:81` ainda se chama "com `--sigaa-dev`", entrada que
+  hoje não significa nada. As asserções do arquivo (`api` sem simulação e sem
+  IPC genérico) continuam válidas e o cabeçalho já aponta para DEV-001.
+- Só existe um `new BrowserWindow` no repositório, depois do bloco do sinal.
+
+### Gate em `2a31b0e` + correção
+
+```text
+tsc --noEmit: ok
+eslint: 0 errors, 67 warnings (no-explicit-any legado)
+vitest: Test Files 41 passed (41) · Tests 503 passed | 4 skipped (507)
+```
