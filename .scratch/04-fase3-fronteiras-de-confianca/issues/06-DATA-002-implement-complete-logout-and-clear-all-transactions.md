@@ -1,5 +1,5 @@
 # DATA-002 — Implement complete logout and clear-all transactions
-Status: claimed
+Status: resolved
 Priority: P1
 Blocked by: DATA-001
 Tracker status at migration: `NOT STARTED`
@@ -324,6 +324,93 @@ none of the new deps; the dashboard still double-clicks and ignores results.
 
 #### Implementation notes
 
-- Commit: —
-- Stores cleared: —
-- Intentionally preserved data: downloaded documents only
+- Commit: `fe0594d` (implementação + correções da revisão)
+- Stores cleared: credentials.json, cache.json, settings.json, sigaa-me.log,
+  scraper.log, `logs/` (whole dir, reopened), every `debug_*` under
+  `userData`, and `session.defaultSession.clearStorageData()` for the
+  renderer partition.
+- Intentionally preserved data: downloaded documents only.
+- `npx tsc --noEmit`, `npx eslint .` (0 errors, pre-existing warnings only)
+  and `npx vitest run` all green (435 passed, 4 skipped).
+- Two pre-existing tests needed fixing as a side effect of this contract,
+  both outside the "Primary files"/"New/extended tests" list above:
+  - `tests/unit/persisted-schemas.test.ts` had a scope bug (`DEFAULTS`
+    declared inside a sibling `describe`, unreachable from the new
+    `DATA-002 — clearing the stores` block) — hoisted the constant to module
+    scope; not a production-code issue.
+  - `tests/unit/account-context.test.ts` (DATA-001) asserted
+    `SigaaService.logout()` calls `playwrightLogin.close()`; the DATA-002
+    contract explicitly moves that to `playwrightLogin.logout()`, so the
+    mock/assertion were updated to match (added a `logout` fake, asserted it
+    instead of `close`).
+- `login-request` handler (`register-handlers.ts`) also needed a fix not
+  called out in the contract: with `rememberMe: false` it called
+  `persistence.clearCredentials()` uncaught. That was safe while
+  `clearCredentials()` swallowed its own errors; now that DATA-002 makes it
+  propagate, an unlink failure there would reject the whole IPC call instead
+  of returning `STORAGE`. Wrapped it in the same try/catch pattern as the
+  `rememberMe: true` branch (this is exactly the `login-request` test in
+  the test map).
+- Not run here (Windows/E2E only, per this repo's tiers):
+  `npx playwright test clear-all.spec.ts`, `npm run build`.
+
+---
+
+## Revisão (Opus, 2026-09-06)
+
+Primeira cobaia do fluxo alternativo (Fable especifica, Sonnet implementa, Opus
+revisa). O contrato foi seguido: ordem dos passos, `fail('STORAGE', ...)` em vez
+de `failFromMessage`, `attempt()` rodando todo passo mesmo depois de um throw,
+dialog no main com o aviso sobre os downloads, `cancel()` como flag entre
+disciplinas, um listener vivo por vez no dashboard. Cadeia de chamadores subida
+para tudo que o diff toca; o que não virou achado está em "Observações".
+
+**Dois achados, ambos com cenário concreto, ambos corrigidos aqui com teste que
+falha sem a correção.**
+
+1. **`HttpScraperService.resetLog()` não truncava `scraper.log`.** O `end()` do
+   stream antigo não era aguardado: o handle novo (`flags: 'w'`) truncava, e o
+   antigo terminava de descarregar o buffer **depois**, no offset antigo.
+   Medido em `node` no Windows: um log com ~6 MB pendentes voltava a 6 MB com o
+   conteúdo velho intacto — `clear-all-data` devolvendo `ok()` e deixando o
+   diagnóstico da conta anterior no disco. Reproduzido com 20k linhas em
+   `tests/unit/log-reset.test.ts` (`expected 1920000 to be less than 1024` sem
+   a correção). `resetLog()` virou `Promise<void>` e `clearDiagnostics()`
+   devolve a promise; o `await attempt(...)` do handler já a aguardava, então
+   nada mais mudou. O E2E não pegava isso: ele planta uma linha só, que o SO
+   descarrega na hora.
+
+2. **`LoggerService.clear()` engolia a falha do `writeFileSync`** (rule 3 do
+   CLAUDE.md). O contrato o congelou como "unchanged", mas o único chamador é o
+   `clear-all-data`, dentro de `attempt()`, e o critério de aceite é "exclusão
+   parcial devolve erro de armazenamento": com `sigaa-me.log` travado, o app
+   dizia "Dados locais removidos." com o log intacto. O `try/catch` saiu (o
+   `write()` continua com o dele, ali engolir é o certo).
+
+Gate na branch, no Windows: `tsc` limpo, lint 0 erros / 71 warnings legados,
+`437 passed | 4 skipped (441)` em 36 arquivos. `npx vite build` +
+`npx playwright test`: **25 passed**, incluindo `clear-all.spec.ts` (3) — a
+verificação que o implementador não pôde rodar — e, sem querer, os tiers com
+credencial do `app.spec.ts`, que também passaram (login real; não repetir em
+loop).
+
+Observações, não defeitos:
+
+- `syncNow()` atribui `this.currentRun` **depois** de chamar `runSync()`. Quando
+  não há credencial, `runSync` termina inteiro de forma síncrona, o `finally`
+  zera `currentRun` e a atribuição seguinte o deixa apontando para uma promise
+  já resolvida. `cancel()` a aguarda e resolve na hora — sem trava, sem run
+  errado, porque a atribuição sempre segue o start do run correspondente.
+- O `win!` no `dialog.showMessageBox` não pode ser `null` na prática:
+  `isTrustedSender` já rejeitou a chamada com janela nula, e não há `await`
+  entre esse teste e o `getWindow()` do handler.
+- `backgroundSync.start()` é o único passo fora de `attempt()`; um throw ali
+  rejeitaria o IPC, e o dashboard não tem mais `try/catch`. `start()` só faz
+  `clearInterval` + `getSettings()` + `setInterval`, então não é alcançável.
+- `resetAppLog()` está correto no Windows apesar da aparência: medido em `node`,
+  o callback do `end()` de um `fs.WriteStream` roda com o fd já fechado, e o
+  `rmSync` do `logs/` passou 5/5 com 8 MB por iteração.
+- Um download em voo não é cancelado por nenhuma das duas transações (só o
+  background sync é). Fora do escopo desta tarefa; é problema do `CONC-001`.
+
+Pendente (Bruno, manual): `npm run build` / empacotamento.
