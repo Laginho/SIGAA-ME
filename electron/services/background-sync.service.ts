@@ -7,12 +7,16 @@ import * as path from 'path';
 import type { CourseSnapshot, CourseSummary, NotificationItem } from '../../shared/domain';
 import type { BackgroundSyncUpdate } from '../../shared/ipc';
 import { isRetryable } from '../../shared/errors';
+import type { AppSettings } from '../../shared/ipc';
 
 export class BackgroundSyncService {
     private sigaaService: SigaaService;
     private intervalId: NodeJS.Timeout | null = null;
     private isSyncing = false;
     private getWindow: () => BrowserWindow | null;
+    /** Flag mínima checada entre disciplinas (decisão 1 do DATA-002); CONC-001 troca por AbortSignal. */
+    private cancelRequested = false;
+    private currentRun: Promise<void> | null = null;
 
     constructor(sigaaService: SigaaService, getWindow?: () => BrowserWindow | null) {
         this.sigaaService = sigaaService;
@@ -41,18 +45,35 @@ export class BackgroundSyncService {
         this.start();
     }
 
-    public async syncNow() {
+    /**
+     * Resolve de imediato sem sync em voo. Com um em voo, pede a parada e só
+     * resolve quando ele efetivamente parar — logout e clear-all aguardam isto
+     * antes de fechar o navegador por baixo dele.
+     */
+    public async cancel(): Promise<void> {
+        this.cancelRequested = true;
+        const run = this.currentRun;
+        if (run) await run;
+        this.cancelRequested = false;
+    }
+
+    public syncNow(): Promise<void> {
         if (this.isSyncing) {
             console.log('[BackgroundSync] Already syncing, skipping...');
-            return;
+            return Promise.resolve();
         }
 
         const settings = persistenceService.getSettings();
-        if (!settings.runInBackground) return;
+        if (!settings.runInBackground) return Promise.resolve();
 
         this.isSyncing = true;
         console.log('[BackgroundSync] Triggering background sync...');
+        const run = this.runSync(settings);
+        this.currentRun = run;
+        return run;
+    }
 
+    private async runSync(settings: AppSettings): Promise<void> {
         try {
             // 1. Ensure logged in
             const creds = persistenceService.loadCredentials();
@@ -117,6 +138,13 @@ export class BackgroundSyncService {
             const pendingCommits: { courseId: string; fileIds: string[]; newsIds: string[] }[] = [];
 
             for (const course of courses) {
+                // Cancelamento checado a cada disciplina (decisão 1 do DATA-002):
+                // nenhuma disciplina a mais é buscada depois de um cancel().
+                if (this.cancelRequested) {
+                    console.log('[BackgroundSync] Cancelled; stopping before the next course.');
+                    return;
+                }
+
                 console.log(`[BackgroundSync] Checking course: ${course.name}`);
 
                 // Wait briefly to avoid hammering the SIGAA server
@@ -224,6 +252,12 @@ export class BackgroundSyncService {
                 }
             }
 
+            // Cancelado depois da última disciplina: nada é publicado nem commitado.
+            if (this.cancelRequested) {
+                console.log('[BackgroundSync] Cancelled; discarding this run before publish/commit.');
+                return;
+            }
+
             console.log(`[BackgroundSync] Sync complete.`);
             persistenceService.updateSetting('lastBackgroundSync', Date.now());
 
@@ -278,6 +312,7 @@ export class BackgroundSyncService {
             console.error('[BackgroundSync] Error during sync:', error);
         } finally {
             this.isSyncing = false;
+            this.currentRun = null;
         }
     }
 }
