@@ -3,9 +3,10 @@
  *
  * Consequências de tirar a ponte `ipcRenderer` e isolar o `simulateNewFile`:
  *
- * - O `api` exposto via `exposeInMainWorld` passa a ser o único membro em
- *   produção (sem `ipcRenderer`, sem `testApi`). Com `--sigaa-dev`, entra o
- *   `testApi` com `simulateNewFile` — e o `api` **não** tem mais o método.
+ * - O `api` exposto via `exposeInMainWorld` não contém `simulateNewFile` nem
+ *   IPC genérico. A autorização de `testApi` pelo main, inclusive quando o
+ *   preload recebe `--sigaa-dev` em produção, é coberta por
+ *   `tests/integration/dev-cache-mutation-boundary.test.ts` (DEV-001).
  * - Os eventos `download-progress` e `background-sync-update` chamam o
  *   callback com **um** argumento (só o dado), e o `unsubscribe` devolvido
  *   desliga exatamente o mesmo `subscription`.
@@ -77,23 +78,14 @@ describe('preload dev gate', () => {
         expect('simulateNewFile' in apiObject()).toBe(false);
     });
 
-    it('com --sigaa-dev expõe api e testApi; simulateNewFile mora só no testApi', async () => {
+    it('com --sigaa-dev mantém simulação e IPC genérico fora de api', async () => {
         process.argv = [...originalArgv, '--sigaa-dev'];
         await importPreload();
 
         const names = exposedNames();
-        expect(names).toHaveLength(2);
         expect(names).toContain('api');
-        expect(names).toContain('testApi');
         expect(names).not.toContain('ipcRenderer');
         expect('simulateNewFile' in apiObject()).toBe(false);
-
-        const testApiCall = contextBridgeMock.exposeInMainWorld.mock.calls.find(
-            (c: [string, unknown]) => c[0] === 'testApi'
-        );
-        expect(testApiCall).toBeDefined();
-        const testApi = testApiCall![1] as Record<string, unknown>;
-        expect(typeof testApi.simulateNewFile).toBe('function');
     });
 
     it('onDownloadProgress repassa só o dado e devolve unsubscribe do mesmo subscription', async () => {
