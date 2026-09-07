@@ -314,6 +314,12 @@ teve três conclusões erradas em sequência, e vale como aula:
 3. O `ARCHITECTURE.md` descreve um fallback Playwright para download. Ele existe
    como código e **não está ligado**.
 
+**Desatualizado desde o `BUG-004`:** `sigaa.service.ts` hoje chama
+`playwrightLogin.downloadFile` via `downloadViaPlaywright` depois de o HTTP falhar
+duas vezes. O fallback **está ligado**. A auditoria do `OBS-001` (2026-09-07) pegou
+um spec repetindo a afirmação antiga daqui; a lição do item 2 vale contra este
+próprio parágrafo: suba a cadeia, não confie no documento.
+
 Duas lições: busca por `import ... from` não encontra `await import()`, e provar
 que um arquivo é importado **não** prova que ele é alcançável — é preciso subir a
 cadeia de chamadores até um ponto de entrada real (handler IPC, `main.ts`, teste).
