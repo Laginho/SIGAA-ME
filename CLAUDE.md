@@ -56,6 +56,14 @@ Valem para qualquer papel, e principalmente para o implementador.
 - **Defina "pronto" antes de começar.** Pronto é: testes da issue passam,
   `npm run quality` verde, nada fora do limite tocado. Regra de estilo nenhuma
   substitui isso.
+- **Busca vai para subagente Sonnet.** Sessão de modelo caro não explora o
+  repositório: 30 leituras para achar 2 arquivos relevantes é o maior
+  desperdício de token do loop. Delegue com o `Agent`, `subagent_type:
+  "Explore"` e **`model: "sonnet"`** — sem o `model`, o subagente cobra a taxa
+  do modelo da sessão. Ele gasta o contexto dele na varredura e devolve só a
+  conclusão: a sessão recebe caminhos e faixas de linha, não os arquivos.
+  Depois abra os 3 que importam. Vale para o revisor também — os chamadores
+  saem de `grep`, e você lê a função que chama, não o arquivo inteiro.
 - **Prosa direta.** Sem metáfora, sem floreio, sem parêntese explicativo.
   Frase curta, resultado primeiro. Em código, comentário só quando o porquê não
   está óbvio no próprio código.
