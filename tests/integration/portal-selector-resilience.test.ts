@@ -43,17 +43,24 @@ function createLocator(options: { visible?: boolean; clickError?: Error; text?: 
 
 function createNavigationHarness(url = 'https://si3.ufc.br/sigaa/paginaInicial.do') {
     const studentPortal = createLocator({ visible: true });
+    const loginDocument = '<form action="/sigaa/logar.do"><input name="user.login"><input name="user.senha"><input name="entrar" type="submit"></form>';
+    const portalDocument = '<h1>Portal do Discente</h1><a href="/sigaa/verPortalDiscente.do">Menu Discente</a><span class="nome_usuario">User</span>';
+    let currentDocument = url.includes('verTelaLogin') ? loginDocument : portalDocument;
+    let currentUrl = url;
     const page: any = {
-        goto: vi.fn().mockResolvedValue(undefined),
+        goto: vi.fn(async (target: string) => {
+            currentDocument = target.includes('verTelaLogin') || url.includes('verTelaLogin') ? loginDocument : portalDocument;
+            currentUrl = url.includes('verTelaLogin') ? url : target;
+        }),
         fill: vi.fn().mockResolvedValue(undefined),
-        click: vi.fn().mockResolvedValue(undefined),
+        click: vi.fn(async () => { currentDocument = portalDocument; currentUrl = url; }),
         waitForLoadState: vi.fn().mockResolvedValue(undefined),
         waitForTimeout: vi.fn().mockResolvedValue(undefined),
         waitForFunction: vi.fn().mockResolvedValue(undefined),
-        url: vi.fn(() => url),
+        url: vi.fn(() => currentUrl),
         $: vi.fn().mockResolvedValue(null),
         evaluate: vi.fn(),
-        content: vi.fn().mockResolvedValue('<html><title>Portal</title></html>'),
+        content: vi.fn(async () => currentDocument),
         on: vi.fn(),
         locator: vi.fn(() => studentPortal),
         isClosed: vi.fn(() => false)
@@ -118,7 +125,7 @@ describe('Playwright portal navigation resilience', () => {
 
         const result = await service.getCourses();
 
-        expect(result).toEqual({ success: false, error: 'Session expired - please login again' });
+        expect(result).toEqual({ success: false, error: 'Session expired - please login again', errorCode: 'SESSION_EXPIRED' });
         expect(browser.close).toHaveBeenCalledOnce();
     });
 
@@ -143,6 +150,8 @@ describe('Playwright portal navigation resilience', () => {
         const missing = createLocator({ visible: false, text: ['Início', 'Turmas', 'Ajuda'] });
         const page: any = {
             locator: vi.fn(() => missing),
+            url: () => 'https://si3.ufc.br/sigaa/ava/index.jsf',
+            content: vi.fn().mockResolvedValue('<form name="formAva" action="/sigaa/ava/index.jsf"><input name="javax.faces.ViewState" value="fixture-state"></form>'),
             waitForTimeout: vi.fn()
         };
         const service = new PlaywrightLoginService();
@@ -159,11 +168,14 @@ describe('Playwright portal navigation resilience', () => {
 
     it('returns an actionable error as soon as JSF files selectors time out instead of waiting indefinitely', async () => {
         const visible = createLocator({ visible: true });
+        let clicked = false;
+        visible.click.mockImplementation(async () => { clicked = true; });
         const page: any = {
             locator: vi.fn(() => visible),
+            url: () => 'https://si3.ufc.br/sigaa/ava/index.jsf',
             waitForFunction: vi.fn().mockRejectedValue(new Error('Timeout 8000ms exceeded')),
             waitForTimeout: vi.fn(),
-            content: vi.fn()
+            content: vi.fn(async () => clicked ? '<main>Unexpected layout</main>' : '<form name="formAva" action="/sigaa/ava/index.jsf"><input name="javax.faces.ViewState" value="fixture-state"></form>')
         };
         const service = new PlaywrightLoginService();
         (service as any).browser = {};
@@ -198,6 +210,7 @@ describe('HTTP scraper structural validation', () => {
 
         expect(result).toEqual({
             success: false,
+            errorCode: 'SESSION_EXPIRED',
             error: 'Session expired: SIGAA returned the login page instead of course content. Re-authenticate before requesting files.'
         });
     });
