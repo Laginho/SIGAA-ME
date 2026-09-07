@@ -33,6 +33,12 @@ Tracker status at migration: `NOT STARTED`
   sync em background e ação do usuário sobre a mesma página Playwright até esta
   tarefa ser implementada. Ver `DÉBITO-03`.
 - Return `OPERATION_CANCELLED` rather than a generic failure.
+- **2026-09-06, from the DATA-002 spec:** the DATA-002 ↔ CONC-001 dependency
+  cycle was broken in DATA-002's favour. DATA-002 adds
+  `BackgroundSyncService.cancel()` — a flag checked between courses and
+  before publishing, awaited by logout/clear-all. This task replaces that flag
+  with the coordinator's `AbortSignal`; the behaviour to preserve is stated in
+  `tests/integration/background-sync-cancel.test.ts`.
 
 #### Acceptance criteria
 

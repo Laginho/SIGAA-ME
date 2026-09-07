@@ -18,6 +18,7 @@
  * `'c1'` some; o arquivo gravado não tem `schemaVersion`; `getSettings()`
  * devolve o que estiver no disco, `junk` e string em `syncInterval` inclusos.
  */
+import * as fs from 'fs';
 import * as path from 'path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -51,6 +52,16 @@ import { PersistenceService } from '../../electron/services/persistence.service'
 
 const A = 'a'.repeat(64);
 const B = 'b'.repeat(64);
+
+const DEFAULTS = {
+    theme: 'light',
+    autoSync: true,
+    lastDownloadPath: null,
+    runInBackground: true,
+    syncInterval: 60,
+    autoDownloadUpdates: true,
+    openAtLogin: false,
+};
 
 function readCacheFile(): any {
     return JSON.parse(storage.files.get(cacheFile) ?? 'null');
@@ -155,16 +166,6 @@ describe('CacheService — CacheFileV2, one bucket per account', () => {
 });
 
 describe('PersistenceService — settings.json versioned and validated', () => {
-    const DEFAULTS = {
-        theme: 'light',
-        autoSync: true,
-        lastDownloadPath: null,
-        runInBackground: true,
-        syncInterval: 60,
-        autoDownloadUpdates: true,
-        openAtLogin: false,
-    };
-
     beforeEach(() => {
         storage.files.clear();
         vi.clearAllMocks();
@@ -219,5 +220,111 @@ describe('PersistenceService — settings.json versioned and validated', () => {
         expect(file.schemaVersion).toBe(1);
         expect(file.theme).toBe('dark');
         expect(service.getSettings()).not.toHaveProperty('schemaVersion');
+    });
+});
+
+// ── DATA-002: apagar os stores sem deixar a memória ressuscitá-los ──────────
+//
+// A ordem "memória primeiro, disco depois" é o critério "clear-all não pode
+// correr com uma escrita em background": se o `unlink` falhar, um `save` mais
+// tarde grava defaults/vazio, nunca o que estava lá. `clearCredentials()` deixa
+// de engolir o erro — um logout que "deu certo" com o arquivo ainda no disco
+// vira auto-login na conta errada no próximo boot.
+describe('DATA-002 — clearing the stores', () => {
+    const credentialsFile = path.join(USER_DATA, 'credentials.json');
+
+    beforeEach(() => {
+        storage.files.clear();
+        vi.clearAllMocks();
+    });
+
+    describe('CacheService.clear()', () => {
+        it('removes cache.json and forgets every bucket; a later write contains only the new bucket', () => {
+            const service = new CacheService();
+            service.updateCourseState(A, 'c1', ['1', '2'], ['9']);
+            expect(storage.files.has(cacheFile)).toBe(true);
+
+            service.clear();
+
+            expect(storage.files.has(cacheFile)).toBe(false);
+            expect(service.getCourseState(A, 'c1')).toEqual({ files: [], news: [] });
+
+            service.updateCourseState(B, 'c2', ['7'], []);
+            const file = readCacheFile();
+            expect(Object.keys(file.accounts)).toEqual([B]);
+        });
+
+        it('is not an error when cache.json does not exist', () => {
+            const service = new CacheService();
+            expect(() => service.clear()).not.toThrow();
+        });
+
+        it('resets memory before touching the disk, so a failed unlink still cannot resurrect old buckets', () => {
+            const service = new CacheService();
+            service.updateCourseState(A, 'c1', ['1'], []);
+            vi.mocked(fs.unlinkSync).mockImplementationOnce(() => { throw new Error('EPERM: cache.json'); });
+
+            expect(() => service.clear()).toThrow('EPERM: cache.json');
+
+            expect(service.getCourseState(A, 'c1')).toEqual({ files: [], news: [] });
+            service.updateCourseState(B, 'c2', ['7'], []);
+            expect(Object.keys(readCacheFile().accounts)).toEqual([B]);
+        });
+    });
+
+    describe('PersistenceService.reset()', () => {
+        it('removes settings.json and credentials.json and returns the live settings to the defaults', () => {
+            const service = new PersistenceService();
+            service.updateSetting('theme', 'dark');
+            service.updateSetting('syncInterval', 15);
+            service.saveCredentials('aluno', 'senha');
+            expect(storage.files.has(settingsFile)).toBe(true);
+            expect(storage.files.has(credentialsFile)).toBe(true);
+
+            service.reset();
+
+            expect(storage.files.has(settingsFile)).toBe(false);
+            expect(storage.files.has(credentialsFile)).toBe(false);
+            expect(service.getSettings()).toEqual(DEFAULTS);
+            expect(service.loadCredentials()).toBeNull();
+
+            // Uma escrita posterior parte do default, não do que havia antes.
+            service.updateSetting('runInBackground', false);
+            const file = JSON.parse(storage.files.get(settingsFile) ?? 'null');
+            expect(file.theme).toBe('light');
+            expect(file.syncInterval).toBe(60);
+            expect(file.runInBackground).toBe(false);
+        });
+
+        it('is not an error when the files do not exist', () => {
+            const service = new PersistenceService();
+            expect(() => service.reset()).not.toThrow();
+            expect(service.getSettings()).toEqual(DEFAULTS);
+        });
+
+        it('resets memory before touching the disk, so a failed unlink still leaves defaults in the live process', () => {
+            const service = new PersistenceService();
+            service.updateSetting('theme', 'dark');
+            vi.mocked(fs.unlinkSync).mockImplementationOnce(() => { throw new Error('EACCES: settings.json'); });
+
+            expect(() => service.reset()).toThrow('EACCES: settings.json');
+
+            expect(service.getSettings()).toEqual(DEFAULTS);
+        });
+    });
+
+    describe('PersistenceService.clearCredentials()', () => {
+        it('propagates an unlink failure instead of logging it and reporting success', () => {
+            const service = new PersistenceService();
+            service.saveCredentials('aluno', 'senha');
+            vi.mocked(fs.unlinkSync).mockImplementationOnce(() => { throw new Error('EPERM: credentials.json'); });
+
+            expect(() => service.clearCredentials()).toThrow('EPERM: credentials.json');
+        });
+
+        it('still treats an absent file as nothing to do', () => {
+            const service = new PersistenceService();
+            expect(() => service.clearCredentials()).not.toThrow();
+        });
     });
 });

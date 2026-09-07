@@ -119,7 +119,14 @@ export class SigaaService {
         logger.info('SIGAA: Logging out, closing Playwright session...');
         this.httpScraper.resetSession();
         setActiveAccount(null);
-        await this.playwrightLogin.close();
+        // logout(), não close(): close() guarda cookies/credencial de propósito
+        // para o próximo sync relançar sozinho (DATA-002).
+        await this.playwrightLogin.logout();
+    }
+
+    /** Zera diagnósticos em disco (DATA-002), sem tocar na sessão. */
+    clearDiagnostics(): Promise<void> {
+        return this.httpScraper.resetLog();
     }
 
     async getCourses(): Promise<AppResult<{ courses: CourseSummary[]; photoUrl?: string }>> {

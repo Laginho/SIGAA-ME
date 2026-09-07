@@ -29,6 +29,7 @@ const fakes = vi.hoisted(() => ({
     resetSession: vi.fn(),
     setCookies: vi.fn(),
     close: vi.fn(async () => undefined),
+    logout: vi.fn(async () => undefined),
     loginResult: { success: true, cookies: [{ name: 'JSESSIONID', value: 'abc' }], userName: 'FULANO DE TAL' } as Record<string, unknown>,
 }));
 
@@ -36,6 +37,7 @@ vi.mock('../../electron/services/playwright-login.service', () => ({
     PlaywrightLoginService: class {
         login = vi.fn(async () => fakes.loginResult);
         close = fakes.close;
+        logout = fakes.logout;
         getCookies = vi.fn(() => []);
         getUserAgent = vi.fn(async () => 'ua');
     },
@@ -159,7 +161,9 @@ describe('SigaaService.login binds the session to an account id', () => {
 
         expect(getActiveAccount()).toBeNull();
         expect(fakes.resetSession).toHaveBeenCalledTimes(1);
-        expect(fakes.close).toHaveBeenCalledTimes(1);
+        // logout(), não close(): close() sozinho preserva cookies/credencial
+        // de propósito, para o próximo sync relançar sozinho (DATA-002).
+        expect(fakes.logout).toHaveBeenCalledTimes(1);
     });
 
     it('never writes the username or the hash input to any log', async () => {

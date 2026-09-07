@@ -101,6 +101,22 @@ export class HttpScraperService {
         this.log('[HttpScraper] Session reset (cookies and course ViewStates cleared).');
     }
 
+    /**
+     * Zera o diagnóstico em disco (DATA-002): mesmo estado do primeiro boot.
+     *
+     * O `end()` precisa ser aguardado. Sem isso o stream antigo continua
+     * descarregando o buffer **depois** de o handle novo truncar, e no offset
+     * antigo: medido em 2026-09-06, um `scraper.log` de 6 MB voltava a 6 MB com
+     * o conteúdo velho intacto — "limpar tudo" devolvendo ok() e deixando o log.
+     */
+    async resetLog(): Promise<void> {
+        await new Promise<void>((resolve) => { this.logStream.end(() => resolve()); });
+        this.logStream = fs.createWriteStream(this.logPath, { flags: 'w' });
+        this.logStream.on('error', (err) => {
+            console.error('Log stream error:', err);
+        });
+    }
+
     private getCookieHeader(url: string): string {
         const urlObj = new URL(url);
         const validCookies = this.cookies.filter(cookie => {

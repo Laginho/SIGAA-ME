@@ -23,6 +23,13 @@ import {
  * depois dela: sem esta guarda, ele escreveria as disciplinas de quem saiu no
  * cache de quem entrou.
  */
+/**
+ * Um listener vivo por vez (DATA-002): sem isto, cada montagem do dashboard
+ * soma outro `onBackgroundSyncUpdate`, e um evento é mesclado e "toastado" uma
+ * vez por montagem ainda de pé.
+ */
+let unsubscribeSync: (() => void) | null = null;
+
 export function handleBackgroundSyncUpdate(data: BackgroundSyncUpdate): void {
   const active = getActiveAccount();
   if (!active || data.accountId !== active.id) {
@@ -179,50 +186,33 @@ export function renderDashboardPage(app: HTMLDivElement, account: AccountProfile
     window.location.hash = '#/settings';
   });
 
-  // Logout handler - clears credentials and session, but keeps cached data
+  // Logout: a confirmação já é o dialog nativo do main, e o resultado dele
+  // decide o toast; a janela sempre encerra a sessão local (mantém o cache
+  // desta conta, para o próximo login dela ser rápido).
   document.getElementById('logoutBtn')?.addEventListener('click', async () => {
-    try {
-      await window.api.logout();
-    } catch (e) {
-      console.error('Logout error:', e);
-    }
-    // Só a sessão: o cache com escopo desta conta fica, para o próximo login
-    // dela ser rápido. Ele é invisível para qualquer outra conta.
+    const result = await window.api.logout();
+    if (!result.success) toast.error(result.error.message);
+    unsubscribeSync?.();
+    unsubscribeSync = null;
     clearActiveAccount();
     window.location.hash = '#/login';
   });
 
-  // Clear data handler
+  // Clear-all: um clique só — a confirmação é o dialog nativo do main
+  // (decisão 2 do DATA-002), não um segundo clique aqui.
   document.getElementById('clearDataBtn')?.addEventListener('click', async () => {
-    const btn = document.getElementById('clearDataBtn') as HTMLButtonElement;
-    if (btn.dataset.confirming) {
-      // Second click — execute
-      delete btn.dataset.confirming;
-      btn.innerHTML = '🗑️';
-      btn.title = 'Limpar todos os dados locais';
-      try {
-        await window.api.clearAllData();
-      } catch (e) {
-        console.error('Clear data error:', e);
-      }
-      clearAllLocalData();
+    const result = await window.api.clearAllData();
+    if (!result.success && result.error.code === 'CANCELLED') return;
+
+    if (result.success) {
       toast.success('Dados locais removidos.');
-      setTimeout(() => { window.location.hash = '#/login'; }, 1200);
     } else {
-      // First click — ask for confirmation via button state
-      btn.dataset.confirming = '1';
-      btn.innerHTML = '⚠️';
-      btn.title = 'Clique novamente para confirmar a exclusão de todos os dados';
-      toast.info('Clique novamente no botão ⚠️ para confirmar a limpeza de dados.');
-      setTimeout(() => {
-        // Reset if user doesn't confirm within 4s
-        if (btn.dataset.confirming) {
-          delete btn.dataset.confirming;
-          btn.innerHTML = '🗑️';
-          btn.title = 'Limpar todos os dados locais';
-        }
-      }, 4000);
+      toast.error(result.error.message);
     }
+    unsubscribeSync?.();
+    unsubscribeSync = null;
+    clearAllLocalData();
+    setTimeout(() => { window.location.hash = '#/login'; }, 2000);
   });
 
   // Refresh button handler
@@ -231,8 +221,10 @@ export function renderDashboardPage(app: HTMLDivElement, account: AccountProfile
     window.location.hash = '#/sync-selection';
   });
 
-  // Listen for background sync updates to refresh dashboard in real-time
-  window.api.onBackgroundSyncUpdate(handleBackgroundSyncUpdate);
+  // Listen for background sync updates to refresh dashboard in real-time —
+  // um listener vivo por vez (DATA-002).
+  unsubscribeSync?.();
+  unsubscribeSync = window.api.onBackgroundSyncUpdate(handleBackgroundSyncUpdate);
 
   // Load courses from cache
   loadCoursesFromCache();

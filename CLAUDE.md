@@ -28,8 +28,39 @@ escreve os testes não é quem os faz passar.**
    válida**. Uma passada; discordância vira teste, não debate. Fecha a issue,
    commita e abre o PR.
 
+**Fluxo alternativo (em teste desde 2026-09-06):** Fable especifica, Sonnet
+implementa, Opus revisa e abre o PR. Motivo: benchmark mediu o Opus como revisor
+bom o suficiente e muito mais barato, e tirar o Fable da revisão evita o viés de
+mesmo modelo entre spec e review. Primeira cobaia: `DATA-002`, que é tarefa de
+fronteira de confiança — a exceção acima está suspensa de propósito para medir o
+caso difícil; o revisor sabe disso e olha a ordem dos passos e a falha parcial
+com mais desconfiança.
+
 Tarefa trivial vai direto, sem loop. Amarrações (gate, convenções de teste,
 commits, registro na issue): `docs/agents/orchestration.md`.
+
+## Como trabalhar numa sessão
+
+Valem para qualquer papel, e principalmente para o implementador.
+
+- **Edite, não reescreva.** Mudança em arquivo existente é edição pontual do
+  trecho afetado. Reescrever o arquivo inteiro gasta tokens e, pior, apaga em
+  silêncio o que o diff teria preservado.
+- **Limites explícitos.** Só toque no que a tarefa pede. Implementador não edita
+  arquivo de teste — quem escreve os testes não é quem os faz passar. Ninguém
+  edita `docs/PLANO.md` nem issue em `.scratch/` que não seja a sua. Se algo
+  fora do limite precisa mudar, diga no relatório em vez de mudar.
+- **Ninguém está assistindo.** Ação reversível coberta pelo pedido original
+  (editar, rodar o gate, commitar na branch da tarefa) segue sem perguntar.
+  Parar para pedir permissão bloqueia o trabalho. Só pare em ação destrutiva,
+  ação externa (push, PR, mensagem) ou mudança de escopo. Autonomia sem o
+  limite acima vira creep de escopo; os dois andam juntos.
+- **Defina "pronto" antes de começar.** Pronto é: testes da issue passam,
+  `npm run quality` verde, nada fora do limite tocado. Regra de estilo nenhuma
+  substitui isso.
+- **Prosa direta.** Sem metáfora, sem floreio, sem parêntese explicativo.
+  Frase curta, resultado primeiro. Em código, comentário só quando o porquê não
+  está óbvio no próprio código.
 
 ## Comandos
 
