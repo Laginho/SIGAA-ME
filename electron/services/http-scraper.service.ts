@@ -3,8 +3,8 @@ import * as cheerio from 'cheerio';
 import * as fs from 'fs';
 import * as path from 'path';
 import { app } from 'electron';
-import mime from 'mime-types';
 import { sanitizeSegment, isInsideRoot } from './download-path';
+import { MAX_DOWNLOAD_BYTES, fileNameFromContentDisposition, finalizeDownload } from './file-validation.service';
 
 /**
  * Arquivo como o parser o vê, com o que o main precisa para baixar. `script` e
@@ -862,84 +862,6 @@ export class HttpScraperService {
         }
     }
 
-    // Magic Bytes signatures.
-    //
-    // BUG-001: esta tabela é a ÚNICA fonte, usada tanto para nomear o arquivo
-    // (`detectExtension`) quanto para verificá-lo (`verifyHead`). Duas tabelas
-    // que precisam concordar é o padrão que já quebrou este repositório duas
-    // vezes — ver `QA-005` e `BUG-007`.
-    private static readonly SIGNATURES: Record<string, string[]> = {
-        '.pdf': ['25504446'], // %PDF
-        '.zip': ['504B0304'], // PK..
-        '.docx': ['504B0304'], // PK..
-        '.xlsx': ['504B0304'], // PK..
-        '.pptx': ['504B0304'], // PK..
-        '.png': ['89504E47'], // .PNG
-        '.jpg': ['FFD8FF'],
-        '.jpeg': ['FFD8FF'],
-        '.gif': ['47494638'], // GIF8
-        '.rar': ['52617221'], // Rar!
-    };
-
-    // Ordem de tentativa ao deduzir a extensão a partir do conteúdo. `.zip` vem
-    // por último de propósito: docx/xlsx/pptx têm a MESMA assinatura, então sem
-    // `Content-Disposition` não há como distingui-los, e `.zip` é a resposta
-    // honesta em vez de um chute entre os três.
-    private static readonly DETECT_ORDER = ['.pdf', '.png', '.jpg', '.gif', '.rar', '.zip'];
-
-    /** Primeiros 8 bytes do arquivo — o suficiente para toda assinatura da tabela. */
-    private async readHead(filePath: string): Promise<Buffer> {
-        const handle = await fs.promises.open(filePath, 'r');
-        try {
-            const buffer = Buffer.alloc(8);
-            await handle.read(buffer, 0, 8, 0);
-            return buffer;
-        } finally {
-            await handle.close();
-        }
-    }
-
-    /**
-     * Extensão deduzida do conteúdo, ou `''` quando nenhuma assinatura casa.
-     *
-     * BUG-001: string vazia é resposta válida e deliberada. Antes daqui existia
-     * um fallback que assumia `.pdf` para conteúdo desconhecido; a verificação
-     * seguinte então exigia `%PDF`, não achava, e **apagava um arquivo íntegro**.
-     * Um `.txt` sem extensão é inconveniente; um `.txt` deletado é perda de dado.
-     */
-    private detectExtension(head: Buffer): string {
-        const hex = head.toString('hex').toUpperCase();
-        for (const ext of HttpScraperService.DETECT_ORDER) {
-            if (HttpScraperService.SIGNATURES[ext].some(sig => hex.startsWith(sig))) {
-                this.log(`[HttpScraper] Extension detected from content: ${ext}`);
-                return ext;
-            }
-        }
-        return '';
-    }
-
-    private verifyHead(head: Buffer, expectedExtension: string): boolean {
-        const hex = head.toString('hex').toUpperCase();
-
-        // Só há o que contradizer se a extensão tiver assinatura conhecida. Um
-        // binário legítimo sem assinatura registrada passa — rejeitá-lo seria
-        // repetir o BUG-001 por outro caminho.
-        const expected = HttpScraperService.SIGNATURES[expectedExtension];
-        if (expected && !expected.some(sig => hex.startsWith(sig))) {
-            this.log(`[HttpScraper] Magic Byte mismatch for ${expectedExtension}. Found: ${hex}`);
-            return false;
-        }
-
-        // Check for HTML error pages (often start with <html, <!DOC, or whitespace then <)
-        const contentStart = head.toString('utf8').trim().substring(0, 5).toLowerCase();
-        if (contentStart.startsWith('<html') || contentStart.startsWith('<!doc')) {
-            this.log(`[HttpScraper] File appears to be HTML (likely error page)`);
-            return false;
-        }
-
-        return true;
-    }
-
     async downloadFile(
         courseId: string,
         fileId: string,
@@ -1008,82 +930,37 @@ export class HttpScraperService {
 
             this.updateCookies(response);
 
-            this.log(`[HttpScraper] Response headers: Content-Type=${response.headers['content-type']}, Content-Length=${response.headers['content-length']}`);
+            const contentType: string | undefined = response.headers['content-type'];
+            const contentLength = parseInt(response.headers['content-length'] || '0', 10);
+            const hintFileName = fileNameFromContentDisposition(response.headers['content-disposition']);
 
-            // Check if content-type indicates HTML (error page)
-            const contentType = response.headers['content-type'];
-            if (contentType && (contentType.includes('text/html') || contentType.includes('application/xhtml'))) {
-                this.log('[HttpScraper] WARNING: Response Content-Type is HTML. Likely an error page.');
+            this.log(`[HttpScraper] Response headers: Content-Type=${contentType}, Content-Length=${response.headers['content-length']}`);
+
+            // DL-002: teto antes de tocar disco. Um Content-Length maior que o
+            // limite é recusado sem criar o `.part`, e o stream é destruído para
+            // não continuar puxando dados que não vamos usar.
+            if (contentLength > MAX_DOWNLOAD_BYTES) {
+                this.log(`[HttpScraper] Rejecting download: Content-Length ${contentLength} exceeds ${MAX_DOWNLOAD_BYTES}`);
+                response.data.destroy();
+                return { success: false, error: `Arquivo excede o limite de ${MAX_DOWNLOAD_BYTES} bytes` };
             }
 
-            // Determine filename and ensure it has an extension
-            // We PRORITIZE the `fileName` passed from the UI (e.g. "LISTA 1") because SIGAA often 
-            // sends mangled course names in the Content-Disposition header (like "ANA&#769...").
-            let finalFileName = fileName;
-            let detectedExtension = '';
-
-            // 1. Try to get the EXTENSION from Content-Disposition header
-            const contentDisposition = response.headers['content-disposition'];
-            if (contentDisposition) {
-                const filenameMatch = contentDisposition.match(/filename\*?=['"]?(?:UTF-8'')?([^'";\n]+)['"]?/i);
-                if (filenameMatch) {
-                    const dispositionFilename = decodeURIComponent(filenameMatch[1].trim());
-                    this.log(`[HttpScraper] Server suggested filename: "${dispositionFilename}"`);
-                    
-                    // Only extract the extension, DON'T overwrite the clean UI filename
-                    const extMatch = path.extname(dispositionFilename).toLowerCase();
-                    if (extMatch && extMatch.length > 1) {
-                        detectedExtension = extMatch;
-                        this.log(`[HttpScraper] Extracted extension from header: ${detectedExtension}`);
-                    }
-                }
+            // DL-001: nome vem do usuário/UI, sanitizado antes de tocar disco.
+            // A extensão final (dica do servidor, MIME, ou conteúdo) só é
+            // decidida depois do download, em `finalizeDownload`.
+            const safeFileName = sanitizeSegment(fileName, 150);
+            if (!isInsideRoot(basePath, path.join(basePath, safeFileName))) {
+                throw new Error('Nome de arquivo/pasta inválido');
             }
-
-            // 2. If no extension from header, infer from Content-Type using mime-types
-            if (!detectedExtension && !path.extname(finalFileName)) {
-                const contentTypeBase = contentType?.split(';')[0]?.trim();
-                if (contentTypeBase) {
-                    const mimeExt = mime.extension(contentTypeBase);
-                    if (mimeExt && mimeExt !== 'bin') {
-                        detectedExtension = '.' + mimeExt;
-                        this.log(`[HttpScraper] Extracted extension from mime-type: ${detectedExtension}`);
-                    }
-                }
-                // 3. Se nada disso resolveu, a extensão sai do CONTEÚDO, depois
-                //    do download — ver `detectExtension`. Aqui havia um fallback
-                //    para `.pdf` que fazia o app apagar `.txt`, `.csv` e `.odt`
-                //    servidos como octet-stream (`BUG-001`).
-            }
-
-            // Apply the requested extension if the filename doesn't already have it
-            if (detectedExtension && !finalFileName.toLowerCase().endsWith(detectedExtension)) {
-                finalFileName = finalFileName + detectedExtension;
-                this.log(`[HttpScraper] Appended extension. Final filename: ${finalFileName}`);
-            }
-
-            // DL-001: política única de caminho
-            finalFileName = sanitizeSegment(finalFileName, 150);
-            if (!isInsideRoot(basePath, path.join(basePath, finalFileName))) throw new Error('Nome de arquivo/pasta inválido');
-
 
             // BUG-001: o download vai para `.part` e só ganha o nome definitivo
-            // depois de verificado. Duas coisas dependem disso: a extensão pode
-            // vir do conteúdo (que só existe depois de gravado), e um download
-            // interrompido nunca deixa um arquivo com o nome final no lugar.
-            const partPath = path.join(basePath, finalFileName + '.part');
+            // depois de verificado. Um download interrompido nunca deixa um
+            // arquivo com o nome final no lugar.
+            const partPath = path.join(basePath, safeFileName + '.part');
             const writer = fs.createWriteStream(partPath);
 
-            const totalLength = parseInt(response.headers['content-length'] || '0', 10);
             let downloadedLength = 0;
-
-            response.data.on('data', (chunk: any) => {
-                downloadedLength += chunk.length;
-                if (onProgress && totalLength > 0) {
-                    onProgress(Math.round((downloadedLength / totalLength) * 100));
-                }
-            });
-
-            response.data.pipe(writer);
+            let tooLarge = false;
 
             const descartarParcial = async (motivo: string) => {
                 try {
@@ -1094,39 +971,46 @@ export class HttpScraperService {
                 }
             };
 
+            response.data.on('data', (chunk: any) => {
+                downloadedLength += chunk.length;
+                if (onProgress && contentLength > 0) {
+                    onProgress(Math.round((downloadedLength / contentLength) * 100));
+                }
+                // DL-002: sem Content-Length (chunked), o teto só pode ser
+                // vigiado durante o streaming — um corpo sem fim encheria o disco.
+                if (!tooLarge && downloadedLength > MAX_DOWNLOAD_BYTES) {
+                    tooLarge = true;
+                    this.log(`[HttpScraper] Aborting download: streamed bytes exceeded ${MAX_DOWNLOAD_BYTES}`);
+                    response.data.destroy(new Error(`Arquivo excede o limite de ${MAX_DOWNLOAD_BYTES} bytes`));
+                }
+            });
+
+            response.data.pipe(writer);
+
             return new Promise((resolve, reject) => {
                 writer.on('finish', async () => {
+                    if (tooLarge) return; // resolvido pelo handler de erro do stream
                     try {
-                        const stats = await fs.promises.stat(partPath);
-                        const head = await this.readHead(partPath);
+                        const result = await finalizeDownload({
+                            partPath,
+                            dir: basePath,
+                            fileName: safeFileName,
+                            hintFileName,
+                            contentType
+                        });
 
-                        // Se nem a UI, nem o Content-Disposition, nem o MIME deram
-                        // extensão, ela sai do conteúdo. Nunca de um chute: a
-                        // verificação abaixo lê os mesmos bytes, então detecção e
-                        // verificação não têm como se contradizer.
-                        if (!path.extname(finalFileName)) {
-                            finalFileName += this.detectExtension(head);
+                        if (result.ok) {
+                            this.log(`[HttpScraper] Download complete: ${result.filePath}`);
+                            resolve({ success: true, filePath: result.filePath });
+                        } else {
+                            this.log(`[HttpScraper] Validation failed (${result.reason}): ${result.error}`);
+                            resolve({ success: false, error: result.error });
                         }
-
-                        const ext = path.extname(finalFileName).toLowerCase();
-                        if (!this.verifyHead(head, ext)) {
-                            this.log(`[HttpScraper] ERROR: File verification failed. Size: ${stats.size} bytes.`);
-                            await descartarParcial('verificação falhou');
-                            resolve({ success: false, error: 'Downloaded file failed verification (Invalid signature or HTML error page).' });
-                            return;
-                        }
-
-                        const filePath = path.join(basePath, finalFileName);
-                        await fs.promises.rename(partPath, filePath);
-
-                        this.log(`[HttpScraper] Download complete: ${filePath} (Size: ${stats.size} bytes)`);
-                        resolve({ success: true, filePath });
                     } catch (err) {
-                        // Falha ao ler, verificar ou renomear. O parcial não pode
+                        // Falha ao ler, validar ou renomear. O parcial não pode
                         // ficar para trás se apresentando como download bom.
                         const message = err instanceof Error ? err.message : String(err);
                         this.log(`[HttpScraper] Post-download error: ${message}`);
-                        await descartarParcial('erro pós-download');
                         resolve({ success: false, error: message });
                     }
                 });
@@ -1135,10 +1019,10 @@ export class HttpScraperService {
                     await descartarParcial('erro de escrita');
                     reject({ success: false, error: err.message });
                 });
-                // Erro NA ORIGEM (conexão caiu no meio do stream). Sem isto o
-                // `writer` nunca emite `finish` nem `error`, e esta Promise nunca
-                // resolve: a UI fica em "baixando" para sempre e o `.part` fica no
-                // disco. `pipe()` não propaga erro do source para o destino.
+                // Erro NA ORIGEM (conexão caiu, ou o teto de tamanho abortou o
+                // stream). Sem isto o `writer` nunca emite `finish` nem `error`, e
+                // esta Promise nunca resolve. `pipe()` não propaga erro do source
+                // para o destino.
                 response.data.on('error', (err: Error) => {
                     this.log(`[HttpScraper] Download stream error: ${err.message}`);
                     writer.destroy();
