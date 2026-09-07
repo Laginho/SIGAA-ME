@@ -414,3 +414,111 @@ Observações, não defeitos:
   background sync é). Fora do escopo desta tarefa; é problema do `CONC-001`.
 
 Pendente (Bruno, manual): `npm run build` / empacotamento.
+
+## Revisão cega (Fable)
+
+Data: 2026-09-06. Sessão limpa; leu a issue só até "## Revisão (Opus", não
+abriu PR nem ledger. Diff revisado: `git diff a92a3e1..fe0594d -- electron src
+shared tests`. Além do diff, subiu a cadeia de chamadores de tudo que ele toca:
+`sigaaService.logout()` (`before-quit` no `main.ts` também chama — agora esquece
+cookies/credencial no encerramento, o que é o comportamento certo),
+`syncNow()` (intervalo, tray "Sincronizar Agora", `simulateNewFile`),
+`cacheService.updateCourseState` (só o `runSync`, então a única escrita que
+poderia recriar `cache.json` é a que `cancel()` drena),
+`persistence.loadCredentials()` (lê o disco a cada chamada, então "credencial
+primeiro" de fato fecha a porta a um `syncNow` novo, inclusive um disparado
+pela tray enquanto o dialog está aberto), o preload (`onBackgroundSyncUpdate`
+devolve o `off`), a partição da janela (sem `partition`, logo
+`session.defaultSession` é a certa) e o launch do Playwright (não persistente;
+nada dele sobra em disco fora do que o handler apaga).
+
+Rodado aqui, no Windows:
+
+| O que | Resultado |
+|---|---|
+| `npm run quality` | verde: typecheck ok, ESLint 0 erros / 71 warnings (legado), `437 passed \| 4 skipped (441)` |
+| `npx vite build` + `npx playwright test clear-all.spec.ts` | 3 passed (5.6s) — o teste do handle aberto no Windows, que a implementação não tinha rodado |
+
+### Achado 1 — `resetAppLog` que falha no `rmSync` deixa o main sem log até reiniciar
+
+`electron/main.ts`, `resetAppLog()`. A ordem é `await end()` → `rmSync(logsDir)`
+→ `mkdirSync` → `logStream = openLogStream()`. Se o `rmSync` lançar, as duas
+últimas linhas não rodam e `logStream` continua sendo o stream já encerrado.
+
+Cenário concreto: qualquer arquivo dentro de `logs/` travado por outro processo
+(um `app_*.log` antigo aberto num editor que segura o handle, ou antivírus
+lendo) faz `rmSync` estourar com `EBUSY`/`EPERM` — `force: true` só ignora
+`ENOENT`. A partir daí:
+
+1. `attempt()` captura a exceção e chama `console.error('Reiniciar log do app
+   falhou:', ...)`. O wrapper escreve em `logStream`, que está `ending` e já
+   `destroyed` (o `end(cb)` dispara o callback dentro do `finish`, e o
+   `autoDestroy` roda antes do microtask que continua o `await`). O Node
+   responde `ERR_STREAM_WRITE_AFTER_END` e, como o stream já está destruído,
+   `errorOrDestroy` retorna sem emitir nada: **a linha é descartada em
+   silêncio**. Verificado em script isolado (Node 24; a semântica é a mesma no
+   Node 20 do Electron 30).
+2. O mesmo vale para todo `console.log/error/warn` do processo main dali até o
+   próximo boot — inclusive o `[BackgroundSync] Starting sync scheduler` do
+   `start()` logo em seguida, e qualquer erro real que aconteça depois. O
+   terminal ainda recebe (o `originalConsole*` roda antes), mas o arquivo não.
+3. O handler devolve `STORAGE` com o texto certo e o `userDataPath`, então o
+   critério "exclusão parcial devolve erro de armazenamento" está cumprido.
+   O que cai é o parágrafo do Contract que diz que cada falha vai
+   `console.error` "para o log novo do app": nessa falha específica não existe
+   log novo, e a única evidência da causa fica no toast de 2s do renderer.
+
+Correção esperada (não aplicada — revisão não toca código): `try { rmSync }
+finally { mkdirSync(...); logStream = openLogStream(); }`, ou o
+`mkdirSync`/`openLogStream` antes de relançar. Teste que falharia sem ela:
+`resetAppLog` com `fs.rmSync` mockado para lançar, depois `console.log('x')`,
+e assertar que o novo `app_*.log` existe e contém `x`. Hoje `main.ts` não é
+importável em teste (efeitos colaterais no import), então a prova cabe ou num
+`log-reset.test.ts` que extraia `resetAppLog` para um módulo, ou como
+observação manual.
+
+Observação ligada, sem cenário concreto neste fluxo: entre o `end()` e o
+`finish` do stream (`writable === false`, `destroyed === false`), um
+`console.*` de qualquer lugar do main emite `'error'` no `logStream`, que não
+tem listener, e vira **exceção não tratada no processo main** (verificado no
+mesmo script: `UNCAUGHT: ERR_STREAM_WRITE_AFTER_END`). No clear-all essa
+janela é praticamente vazia — agendador parado, sync drenado, Playwright já
+fechado, renderer preso no `invoke` — por isso não conta como achado. O
+`HttpScraperService.log()` já se protege com `if (this.logStream.writable)`;
+o wrapper de `console.*` do `main.ts` não. A mesma correção (guardar por
+`writable` ou dar um `on('error')` ao stream) cobre os dois.
+
+### Sem achado, mas conferido de propósito
+
+- **Ordem dos passos e falha parcial** (o que o fluxo alternativo pediu para
+  olhar com mais desconfiança): credencial → `stop` → `cancel` → `logout` →
+  destrutivo → `start`; cada passo em `attempt`, resultado só depois de todo
+  `await`. A leitura de `openAtLogin` acontece antes do `reset()`. Nada
+  destrutivo antes de a sessão fechar.
+- **`cancel()` não vaza**: `cancelRequested` volta a `false` depois do `await
+  run`; qualquer `syncNow()` novo vem de timer/IPC (macrotask), então não
+  consegue entrar entre o `finally` do `runSync` e a continuação do `cancel`.
+  Um `cancel()` durante a fase de login/`getCourses` deixa o run terminar essa
+  fase e sair na primeira checagem do loop — o Contract permite isso
+  explicitamente.
+- **Fora do `attempt`** no clear-all ficam `dialog.showMessageBox`,
+  `getSettings()`, `app.setLoginItemSettings` e `backgroundSync.start()`; o
+  `handle()` não captura exceção, e o `click` do renderer perdeu o `try/catch`.
+  Nenhum desses tem caminho de `throw` que eu consiga provocar, então não é
+  achado.
+- **Fetch em primeiro plano em voo durante o logout/clear-all** (um
+  `get-course-files` iniciado antes do clique): não escreve em `cache.json`
+  (só o `runSync` escreve) e é o escopo que a Decisão 1 deixou para o
+  `CONC-001`.
+
+Resultado: **1 achado**, severidade baixa, não bloqueia o fechamento; entra
+como correção pequena ou como nota para o `CONC-001`, que vai mexer no mesmo
+trecho.
+
+### Fechamento do achado 1 (2026-09-06)
+
+Corrigido direto na branch, sem loop (trivial): `rmSync` em `try/finally` que
+sempre reabre o stream, e os wrappers de `console.*` guardam por
+`logStream.writable`, como o `HttpScraperService.log()` já fazia. Sem teste
+automatizado: `main.ts` não é importável em teste; fica como nota para quando
+`resetAppLog` sair para um módulo (`CONC-001` mexe no trecho).
