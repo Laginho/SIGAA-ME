@@ -9,7 +9,8 @@
  * suíte para `fs` mockado, mas ali o motivo era um `C:\` hardcoded — ambiente,
  * não comportamento. Aqui o objeto sob teste **é** a gravação em arquivo e o
  * rename: mockar o `fs` mockaria justamente o que se quer provar. O destino é
- * um `mkdtemp` em `os.tmpdir()`, portável, e removido no `afterEach`.
+ * uma subpasta de um `mkdtemp` em `os.tmpdir()`, portável, e removido no
+ * `afterEach`.
  *
  * **Por que o `courseData` é populado via `getCourseFiles`.** O `downloadFile`
  * depende de um `Map` privado. Enchê-lo com `scraper['courseData']` seria o
@@ -58,11 +59,17 @@ const resposta = (body: Buffer | string, contentType: string, extra: Record<stri
 });
 
 let scraper: HttpScraperService;
+/** Pai do `destino`, privado deste teste. As asserções de contenção comparam o
+ *  conteúdo do pai; se fosse o `os.tmpdir()`, um `mkdtemp` de outro worker do
+ *  vitest entraria na lista e o teste falharia por engano. */
+let sandbox: string;
 let destino: string;
 
 beforeEach(async () => {
     vi.clearAllMocks();
-    destino = mkdtempSync(path.join(os.tmpdir(), 'sigaa-me-download-'));
+    sandbox = mkdtempSync(path.join(os.tmpdir(), 'sigaa-me-download-'));
+    destino = path.join(sandbox, 'destino');
+    mkdirSync(destino);
     scraper = new HttpScraperService();
     scraper.setCookies([{ name: 'JSESSIONID', value: 'fixture', domain: 'si3.ufc.br' }]);
     // Popula o `courseData` (ViewState, action, formName) pelo mesmo caminho da
@@ -71,7 +78,7 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
-    rmSync(destino, { recursive: true, force: true });
+    rmSync(sandbox, { recursive: true, force: true });
 });
 
 const arquivosNoDestino = () => readdirSync(destino);
