@@ -49,10 +49,16 @@ function sigMatches(headHex: string, sig: string): boolean {
     return headHex.length >= sig.length ? headHex.startsWith(sig) : sig.startsWith(headHex);
 }
 
+/**
+ * Nomear exige a assinatura INTEIRA, não um prefixo: uma resposta vazia ou
+ * truncada casa o prefixo de qualquer assinatura e sairia daqui batizada
+ * `.pdf` — o mesmo chute que o BUG-001 arrancou. `validateHead` continua
+ * aceitando prefixo, que lá é o lado seguro: não rejeitar arquivo curto legítimo.
+ */
 function extensionFromSignature(head: Buffer): string {
     const hex = head.toString('hex').toUpperCase();
     for (const ext of DETECT_ORDER) {
-        if (SIGNATURES[ext].some(sig => sigMatches(hex, sig))) return ext;
+        if (SIGNATURES[ext].some(sig => hex.length >= sig.length && hex.startsWith(sig))) return ext;
     }
     return '';
 }

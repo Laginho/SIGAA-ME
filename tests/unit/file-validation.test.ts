@@ -85,6 +85,13 @@ describe('resolveFileName — ordem: extensão existente → dica → MIME → a
         expect(resolveFileName({ fileName: 'a', head: PK })).toBe('a.zip');
     });
 
+    it('resposta vazia ou truncada não ganha extensão: prefixo não é assinatura', () => {
+        // Um corpo vazio casa o PREFIXO de qualquer assinatura. Nomear por isso
+        // devolveria `LISTA 1.pdf` para zero byte — o chute que o BUG-001 arrancou.
+        expect(resolveFileName({ fileName: 'LISTA 1', head: Buffer.alloc(0) })).toBe('LISTA 1');
+        expect(resolveFileName({ fileName: 'LISTA 1', head: Buffer.from('%') })).toBe('LISTA 1');
+    });
+
     it('OLE (doc/xls/ppt) e texto sem dica ficam sem extensão — nunca .bin, nunca chute', () => {
         expect(resolveFileName({ fileName: 'Apostila', head: OLE })).toBe('Apostila');
         expect(resolveFileName({ fileName: 'LISTA 1', head: TEXTO })).toBe('LISTA 1');
