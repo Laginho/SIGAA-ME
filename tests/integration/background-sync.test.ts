@@ -75,6 +75,7 @@ vi.mock('../../electron/services/persistence.service', () => ({
 }));
 
 import { BackgroundSyncService } from '../../electron/services/background-sync.service';
+import { SessionOperationCoordinator } from '../../electron/services/session-operation-coordinator.service';
 import { setActiveAccount } from '../../electron/services/account-context.service';
 
 // DATA-001: sem conta ativa o sync descarta o resultado. Estes casos
@@ -95,6 +96,7 @@ function makeWindow() {
 
 function makeSigaaService(overrides: Partial<Record<'getCourses' | 'getCourseFiles' | 'login' | 'downloadAllFiles' | 'getNewsDetail', any>> = {}) {
     return {
+        operations: new SessionOperationCoordinator(), // CONC-001
         getCourses: vi.fn(async () => ok({ courses: [] })),
         getCourseFiles: vi.fn(async () => ok({ files: [], news: [] })),
         login: vi.fn(async () => ok({ id: 'u', name: 'U' })),
