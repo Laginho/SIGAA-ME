@@ -19,8 +19,7 @@ escreve os testes não é quem os faz passar.**
    critérios de aceite, e os **testes falhando**, contra código de produção.
    Antes de declarar um contrato, abrir o handler **e** o serviço por trás dele.
 2. **Implementar** (modelo mais barato, sessão limpa, só a issue e os testes):
-   fazer os testes passarem e refatorar. Nada além disso. Tarefa de fronteira de
-   confiança ou concorrência (ex.: `CONC-001`) vai para o modelo forte também.
+   fazer os testes passarem e refatorar. Nada além disso.
 3. **Revisar** (modelo forte, sessão limpa, sem ver a sessão que especificou):
    conferir o diff contra a issue **e** o que a issue não disse — subir a cadeia
    de chamadores de tudo que o diff toca. Só reporta achado com cenário de falha
@@ -28,13 +27,12 @@ escreve os testes não é quem os faz passar.**
    válida**. Uma passada; discordância vira teste, não debate. Fecha a issue,
    commita e abre o PR.
 
-**Fluxo alternativo (em teste desde 2026-09-06):** Fable especifica, Sonnet
-implementa, Opus revisa e abre o PR. Motivo: benchmark mediu o Opus como revisor
-bom o suficiente e muito mais barato, e tirar o Fable da revisão evita o viés de
-mesmo modelo entre spec e review. Primeira cobaia: `DATA-002`, que é tarefa de
-fronteira de confiança — a exceção acima está suspensa de propósito para medir o
-caso difícil; o revisor sabe disso e olha a ordem dos passos e a falha parcial
-com mais desconfiança.
+**Fluxo vigente (validado em 2026-09-07, `PROC-001`):** Fable especifica, Sonnet
+implementa e commita, Opus revisa, commita a correção em cima e abre o PR. O Fable
+só volta ao código num passe pré-release no repo inteiro. Validação: revisão cega do
+Fable high sobre o mesmo diff em `DATA-002`, `CONC-001` e `DL-002`; zero achado
+bloqueante além do Opus. Motivo original: Opus é muito mais barato,
+e tirar o Fable da revisão evita o viés de mesmo modelo entre spec e review.
 
 Tarefa trivial vai direto, sem loop. Amarrações (gate, convenções de teste,
 commits, registro na issue): `docs/agents/orchestration.md`.

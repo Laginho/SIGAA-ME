@@ -178,3 +178,94 @@ então nenhum chamador muda; o `.part` do caminho HTTP é removido pelo
 Desvio consciente do contrato: os ramos de popup não passam `contentType`. O
 `route` que preenche `detectedContentType` está na `page`, não no popup, então o
 valor ali seria de outra resposta. Sem ele, dica e assinatura decidem.
+
+---
+
+## Revisão cega (Fable)
+
+Data: 2026-09-07. Diff revisado: `git diff 2d65032..70fcb4b -- electron src shared tests`.
+Lido: `CLAUDE.md`, `docs/agents/orchestration.md`, `ARCHITECTURE.md` e esta issue até
+"## Revisão (2026-09-07)". Não lidos, de propósito: o resto da issue, o ledger, o PR e o
+commit `78f69f1`. O diff toca só três arquivos em `electron/services/`; nenhum teste foi
+editado pela implementação.
+
+### Cadeia de chamadores conferida
+
+- `register-handlers.ts` `download-file` / `download-all-files` → `SigaaService.downloadFile`
+  / `downloadAllFiles` (raiz = `settings.lastDownloadPath`; `targetDir` sai de
+  `resolveDownloadTarget` + `ensureDirInsideRoot` antes de qualquer rede).
+- HTTP: `SigaaService._downloadFileInternal` → `HttpScraperService.downloadFile(…, targetDir, script)`
+  → `finalizeDownload({ dir: targetDir })`. `session-expired` vira `success: false`; o
+  orquestrador já refaz a sessão e tenta de novo, então o motivo não precisa atravessar.
+- Playwright: `SigaaService.downloadViaPlaywright` → `PlaywrightLoginService.downloadFile`
+  → `await import('./download.service')` → `DownloadService.downloadFile` →
+  `finalizeDownload({ dir: courseFolder })`. `JSF_SESSION_EXPIRED` sobe até
+  `PlaywrightLoginService.downloadFile`, que tenta uma vez mais com reentrada na turma;
+  `downloadCourseFiles` também trata (sem chamador hoje, como o cabeçalho do arquivo diz).
+- Teto de tamanho: `Content-Length` acima do teto destrói o stream antes do `.part`; chunked
+  acima do teto chama `response.data.destroy(err)`, que marca `errored` de forma síncrona,
+  então o `end` não dispara e `finish` não corre junto com o handler de erro. Sem resolução
+  dupla da Promise.
+- `isHtml` contra a única fixture real do SIGAA (`course-page-real-with-tasks.html`, começa
+  em `<!DOCTYPE html>`): rejeita. Prólogo `<?xml`, BOM e espaços cobertos pelos testes.
+
+### Achado
+
+**A1 — Nomear pelo conteúdo aceita assinatura parcial e inventa extensão para corpo vazio ou
+truncado.** `extensionFromSignature` usa `sigMatches`, que trata `head` menor que a
+assinatura como casamento por prefixo. Essa regra foi especificada só para `validateHead`
+("head menor que a assinatura passa se for prefixo"), não para a resolução do nome. Como
+`.pdf` é o primeiro em `DETECT_ORDER` e toda assinatura começa com string vazia, um corpo
+de 0 bytes vira `.pdf`.
+
+Cenários concretos, rodados contra `70fcb4b` (todos falham):
+
+```text
+resolveFileName({ fileName: 'a', head: Buffer.alloc(0) })      → 'a.pdf'   (esperado 'a')
+resolveFileName({ fileName: 'a', head: Buffer.from('%') })     → 'a.pdf'   (esperado 'a')
+resolveFileName({ fileName: 'a', head: Buffer.from('PK') })    → 'a.zip'   (esperado 'a')
+finalizeDownload({ partPath: 'LISTA 1.part' vazio, fileName: 'LISTA 1', hintFileName: 'download.html' })
+                                                               → ok, 'LISTA 1.pdf' de 0 bytes
+```
+
+Ponta a ponta no caminho HTTP, com `axios` mockado como em `download-boundary.test.ts`:
+resposta 200, `Content-Type: application/octet-stream`, `Content-Length: 0`, corpo vazio →
+`success: true`, e o destino fica com `LISTA 1.pdf` de 0 bytes. Antes do diff, `readHead`
+devolvia 8 bytes zerados, nenhuma assinatura casava e o nome ficava `LISTA 1`. É o chute que
+o `BUG-001` tirou, voltando por outra porta: `validateHead(vazio, '.pdf')` passa pelo mesmo
+prefixo, então nada contradiz o nome inventado.
+
+Correção mínima: em `extensionFromSignature`, exigir `hex.startsWith(sig)` (assinatura
+inteira); manter o prefixo só em `validateHead`. Teste que passa a existir: os quatro casos
+acima em `tests/unit/file-validation.test.ts`.
+
+Gravidade: não apaga dado, mas rotula errado e contraria a spec ("Sem nada: devolve
+`fileName` como veio"). Corrigir antes de fechar.
+
+### Sem achado, registrado
+
+- Os ramos de popup não passam `contentType` a `finalizeDownload`, ao contrário do que a
+  spec pediu para "os três ramos". Não há cenário de falha: `detectedContentType` vem do
+  `page.route` da página principal, e a resposta do popup não passa por ele; passar o valor
+  atribuiria ao arquivo do popup o tipo de um recurso da página. A omissão é a leitura certa.
+- A reutilização de `filePath + '.pdf'` já existente saiu junto com os literais `.pdf`. Um
+  segundo download Playwright de "LISTA 1" não encontra `LISTA 1.pdf`, baixa de novo e o
+  `rename` sobrescreve. Custo: um download a mais; sem perda.
+- `checkAndClearCorruptFile` mantém o `catch` que só faz `console.error` e devolve `true`
+  (reaproveita o arquivo). Padrão anterior ao diff; o default seguro é não apagar, e não
+  achei input que o torne destrutivo.
+- `tests/integration/download-real.test.ts`, teste "traversal no nome do arquivo é
+  sanitizado…", compara `readdirSync(os.tmpdir())` antes e depois. Falha quando outro arquivo
+  de teste cria `mkdtemp` no mesmo `tmpdir` em paralelo (reproduzido com um arquivo de
+  rascunho meu; com a suíte como está, passa). Fora do diff; vale um follow-up.
+
+### Gate em `70fcb4b`
+
+```text
+tsc --noEmit: ok
+eslint: 0 errors, 67 warnings (no-explicit-any legado)
+vitest: Test Files 40 passed (40) · Tests 500 passed | 4 skipped (504)
+```
+
+Arquivos de rascunho usados na verificação foram removidos; árvore de trabalho limpa,
+`HEAD` de volta em `dl-002-file-validation`.
