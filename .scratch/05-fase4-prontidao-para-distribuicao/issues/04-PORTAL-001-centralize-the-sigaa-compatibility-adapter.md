@@ -109,7 +109,8 @@ são sintéticos inline, com tokens fictícios; não são novas capturas reais.
 
 Os casos cobrem códigos de sessão e seletor, formulário alheio, link Sair,
 estados antes/depois do POST, turma ausente, falso sucesso por `#conteudo`,
-token obsoleto e estados inicial/final de login. O mock de browser expõe
+token obsoleto após sessão expirada, token obsoleto após drift de parsing e
+estados inicial/final de login. O mock de browser expõe
 `content()` e `url()` para inspecionar os documentos; não retorna uma
 classificação pronta. Caso o adapter use mais APIs do Playwright, a sessão
 de especificação deve completar esse transporte; não substituir os documentos
@@ -146,6 +147,42 @@ npm run quality
   sessão. Nenhum material bruto ou credencial real foi usado; canary não rodou.
 - Esta sessão termina no vermelho. Não é resolução da issue nem aprovação
   para implementar na mesma sessão.
+
+#### Notas pós-auditoria para o implementador
+
+Adicionadas em 2026-09-07 a partir dos achados 2, 3 e 5 e da nota do achado 1
+da auditoria abaixo. Valem como critério de aceite.
+
+- **Landmarks admissíveis de STUDENT_HOME/STUDENT_PORTAL.** Só os sinais que a
+  produção já usa e que, portanto, existem no portal real:
+  `a[href="/sigaa/verPortalDiscente.do"]`, o texto "Portal do Discente",
+  `input[name="idTurma"]`, `a[id*="turmaVirtual"]` e `.nome_usuario`.
+  **Proibido** reconhecer por sinal que só existe nos documentos sintéticos dos
+  testes: a tag `h1`, o `name="entry"` do formulário ou qualquer id `entry:*`.
+  Os mocks contêm esses sinais por conveniência; o portal real não garante
+  nenhum deles.
+- **Reconhecimento no caminho Playwright é
+  `classify(await page.content(), page.url())`.** Sem `locator`, `$$`,
+  `waitForSelector` ou `evaluate` para decidir estado. O mock de login expõe só
+  `content()`, `url()` e `$` (que devolve `null`); qualquer outra API quebra os
+  três casos de login por TypeError, e o implementador não edita teste.
+  A verificação existente de `#nomeTurma` na entrada de turma fica como está.
+- **Invalidação em qualquer falha de atualização, não só sessão expirada.**
+  Caso novo em `portal-adapter.test.ts`: `getCourseFiles(courseHtml)` ok,
+  `getCourseFiles('<main>…')` drift, `downloadFile` não pode chamar
+  `axios.post`. Hoje o POST sai com o ViewState antigo porque o retorno de
+  erro acontece antes do `courseData.set` e o estado anterior sobrevive.
+  Limpar `courseData` só quando o código é `SESSION_EXPIRED` passa a suíte
+  antiga e mantém o bug (`sigaa.service.ts:298-303`, `:493-494`, `:539-540`
+  reaproveitam o script antigo quando o retry falha).
+- **Código sem chamador em produção.** `enterCourseHTTP`
+  (`http-scraper.service.ts:189`), o ramo sem `preFetchedHtml` de
+  `getCourseFiles` (`:325-445`, GET `discente.jsf` + POST Conteúdo) e
+  `httpScraper.getNewsDetail` não têm chamador em `electron/`, `src/` ou
+  `shared/`; só os testes desta issue os chamam. Faça neles o mínimo para os
+  casos passarem pelo adapter. **Não remova** esses métodos: fica para o passe
+  pré-release. O revisor não tem cadeia real para validar esses cinco casos e
+  deve tratá-los como cobertura do próprio adapter, não do fluxo do app.
 
 ## Auditoria cega do spec (Fable)
 
@@ -235,6 +272,10 @@ de `fail(code, message)` (`shared/errors.ts:51`). O caso do link Sair espera
    implementador não pode editar o teste. A issue deveria dizer que o
    reconhecimento no caminho Playwright é `classify(await page.content(),
    page.url())`, sem locator. Baixo, evita ida e volta.
+
+Achados 2, 3 e 5 e a nota do achado 1 aplicados em 2026-09-07 (seção "Notas
+pós-auditoria" acima e caso novo em `portal-adapter.test.ts`). Achado 4 fica
+como instrução ao revisor.
 
 Nada encontrado em: teste que passa sem implementar, parser copiado, teste que
 exige tocar arquivo fora do limite (os únicos outros testes que constroem

@@ -142,6 +142,19 @@ describe('PORTAL-001: production service compatibility boundary', () => {
         expect(result).toMatchObject({ success: false, errorCode: 'SESSION_EXPIRED' });
     });
 
+    it('invalidates old course request state after a drifted refresh, not only after session expiry', async () => {
+        const service = scraper();
+        const initial = await service.getCourseFiles('123', 'Algorithms', courseHtml);
+        expect(initial.success).toBe(true);
+        const refresh = await service.getCourseFiles('123', 'Algorithms', '<main>Unexpected layout</main>');
+        expect(refresh.success).toBe(false);
+        runtime.axios.post.mockRejectedValue(new Error('Unexpected stale download request'));
+        const result = await service.downloadFile('123', '42', 'example.txt', 'C:/tmp/portal-tests',
+            "jsfcljs(document.forms['formAva'],'download,download,id,42,key,fixture-key','');");
+        expect(runtime.axios.post).not.toHaveBeenCalled();
+        expect(result.success).toBe(false);
+    });
+
     it('does not fill credentials into an unrecognized starting login document', async () => {
         const { page } = loginBrowser('<main>Unexpected layout</main>', portalHtml);
         const result = await new PlaywrightLoginService().login('fixture-user', 'fixture-password');
