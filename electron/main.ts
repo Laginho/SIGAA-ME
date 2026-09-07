@@ -133,7 +133,18 @@ registerIpcHandlers({
 
 function createWindow() {
   const isHiddenStartup = process.argv.includes('--hidden');
-  
+
+  // Autoridade do bridge de dev (DEV-001): sinal por env, não por argv, porque
+  // um preload empacotado recebe o mesmo argv que o main dev injetou. Precisa
+  // ser definido antes de `new BrowserWindow(...)` — o renderer herda o
+  // ambiente do main só no spawn da janela — e apagado quando empacotado,
+  // porque um valor deixado por um boot dev anterior vazaria para este.
+  if (!app.isPackaged) {
+    process.env.SIGAA_DEV_BRIDGE = '1';
+  } else {
+    delete process.env.SIGAA_DEV_BRIDGE;
+  }
+
   const window = new BrowserWindow({
     show: !isHiddenStartup,
     icon: path.join(process.env.VITE_PUBLIC, 'icon.png'),
