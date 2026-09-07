@@ -1,5 +1,5 @@
 # CONC-001 — Serialize and cancel shared Playwright operations
-Status: claimed
+Status: resolved
 Priority: P1
 Blocked by: DATA-002 (resolved 2026-09-06)
 Tracker status at migration: `NOT STARTED`
@@ -245,5 +245,86 @@ closes the browser immediately and nothing returns `CANCELLED`.
 #### Implementation notes
 
 - Commit: —
-- Queue policy: —
-- Cancellation boundaries: —
+- Queue policy: single-slot FIFO with one `AbortController` per operation;
+  `interactive`/`auth` abort `background` (running or queued) on enqueue,
+  `shutdown` aborts everything; nested `run()` (detected via
+  `AsyncLocalStorage`) runs inline with the outer signal instead of
+  re-queueing, so `BackgroundSyncService`'s calls into `SigaaService` never
+  deadlock.
+- Cancellation boundaries: first line of every wrapped `SigaaService` method;
+  `downloadAllFiles` before each file of the main loop, each retry-file, each
+  retry attempt and each Playwright-fallback file; `downloadFile` before the
+  step-4 retry re-entry and before both Playwright-fallback call sites;
+  `loadAllNews` before each `getNewsDetail`; `BackgroundSyncService.runSync`
+  at the start, right before each `getCourseFiles` (after the 2s pacing
+  delay), before each auto-fetch `getNewsDetail`, and before the
+  publish/commit block.
+
+#### Resolution (2026-09-07)
+
+Review session (Opus, clean; did not see the spec or implementation sessions).
+Read the whole diff against the Contract and then walked up the caller chain of
+everything it touches.
+
+Contract, item by item: `busyCount`/`startBusy`/`stopBusy` gone; `readonly
+operations` on the service; the eight public methods wrapped with the kinds the
+Contract names and `clearDiagnostics` left alone; every cancellation boundary
+the Contract lists is present, including both `downloadViaPlaywright` call
+sites in `_downloadFileInternal` and all four in `_downloadAllFilesInternal`;
+`cancelRequested`/`currentRun` gone and `cancel()` delegating to
+`operations.cancel('background')`. The coordinator is pure Node — one import,
+`node:async_hooks`.
+
+Caller chain beyond the issue:
+
+- `register-handlers.ts` and `main.ts` really are unchanged and really are
+  covered. The nine `sigaaService.*` call sites are all IPC handlers or the
+  sync, none of them nested in another operation's async context, so each one
+  acquires the slot for real. `clearDiagnostics` is the only unwrapped method
+  and it touches neither Playwright nor the HTTP session.
+- Nothing outside `SigaaService` holds a `PlaywrightLoginService` (grep:
+  only a comment in the dead `download.service.ts`), so wrapping the service's
+  own methods closes the whole surface.
+- `BackgroundSyncService`'s five calls into `SigaaService` are nested and run
+  inline on the background signal — no deadlock, and `downloadAllFiles`'
+  first-line check means an aborted sweep does not download either, even
+  though `runSync` has no explicit check in front of it.
+- `isSyncing` is still cleared exactly once: `syncNow` sets it before queueing,
+  and a queued-then-aborted background operation still runs `runSync`
+  (decision 3), whose `finally` clears it. No path leaves the flag stuck.
+- `before-quit` now waits for the in-flight operation inside the same 5s race —
+  the Contract says so explicitly ("still capped by the same 5s").
+- The DATA-002 leftover ("a fetch in flight during logout/clear-all is not
+  cancelled by either transaction") is closed: `logout` is `shutdown`, which
+  aborts the running interactive operation and only then closes the browser.
+
+Red-green, reproduced by the reviewer on Windows:
+`git stash push -u -- electron/services/{sigaa,background-sync,session-operation-coordinator}.service.ts`
+→ `6 failed (6) | 8 failed | 25 passed (33)`; restored →
+`6 passed (6) | 63 passed (63)`.
+
+Gate on the branch: `tsc` clean, lint 0 errors / 71 legacy warnings,
+`461 passed | 4 skipped (465)` in 38 files.
+
+Findings: none with a concrete failure scenario.
+
+Observations, not defects:
+
+- **A synchronous throw from `fn` would wedge the slot forever.** `start()`
+  attaches `.finally` to the promise `fn` returns; a `fn` that throws before
+  returning one never reaches `markDone()`, so `running` stays set, every later
+  `run` queues forever and `cancel` never resolves. Not reachable today: all
+  nine `fn`s are `async` arrows or return a promise from an `async` method. It
+  is a deviation from "Throws propagate to the run caller and release the
+  slot", so worth one line of hardening the next time this file is opened.
+- **`getCourses` returning `CANCELLED` inside `runSync` logs at error level.**
+  A superseded sync falls into the last `else` of the `getCourses` branch and
+  writes `getCourses failed (CANCELLED); aborting without re-login`. Behaviour
+  is right (it returns without touching anything); the log line reads like a
+  failure on what is now the most common path.
+- **`const CANCELLED` is one shared frozen-by-convention object** returned from
+  seven methods. No consumer mutates an `AppResult`, and the IPC boundary
+  structured-clones it, so nothing to fix — just do not start mutating results.
+- DATA-002 left a note that `resetAppLog` might move out of `main.ts` "when
+  CONC-001 touches that stretch". CONC-001 does not touch `main.ts`, by
+  Contract. The note stays open.
