@@ -146,3 +146,98 @@ npm run quality
   sessão. Nenhum material bruto ou credencial real foi usado; canary não rodou.
 - Esta sessão termina no vermelho. Não é resolução da issue nem aprovação
   para implementar na mesma sessão.
+
+## Auditoria cega do spec (Fable)
+
+2026-09-07. Lidos: esta issue, `git show d82e28e -- tests`, `register-handlers.ts`
+(`login-request`, `try-auto-login`, `get-courses`, `get-course-files`),
+`SigaaService` (login/getCourses/getCourseFiles/downloadFile/downloadAllFiles/
+loadAllNews), `HttpScraperService` (enterCourseHTTP, getCourseFiles,
+downloadFile, getNewsDetail), `PlaywrightLoginService` (login, getCourses,
+enterCourseAndGetHTML, close), `background-sync.service.ts:78-110`,
+`shared/errors.ts`. Não implementei nada.
+
+**Vermelho confirmado.** `npx vitest run` nos quatro arquivos tocados: 20
+falhas, 12 verdes. Todas as 20 falham por asserção (`toMatchObject`/`toEqual`/
+`not.toHaveBeenCalled`), nenhuma por setup, import ou TypeError. Os 5 casos de
+`playwright-lifecycle.test.ts` e os 6 positivos de
+`portal-selector-resilience.test.ts` seguem verdes: controles preservados.
+`eslint` nos quatro arquivos: limpo. `tsc --noEmit`: limpo, mas o `tsconfig`
+inclui só `src`, `electron`, `shared` — os testes não são tipados pelo gate, e o
+`errorCode` nos spies do `SigaaService` não é verificado contra o tipo de
+retorno dos scrapers. O implementador precisa adicionar `errorCode?:
+AppErrorCode` a esses tipos por conta própria; o gate não vai cobrar.
+
+**Contratos batem.** Os três casos de `SigaaService` esperam exatamente o shape
+de `fail(code, message)` (`shared/errors.ts:51`). O caso do link Sair espera
+`{ success: true, files: [], news: [] }`, que é o retorno de
+`http-scraper.service.ts:711`. O caso do token obsoleto depende de
+`courseData` não ser sobrescrito em falha: os dois retornos de erro
+(`:347`, `:463`) acontecem antes do `courseData.set` em `:487`. Confere.
+
+### Achados
+
+1. **Cinco casos exercitam código sem chamador.** `enterCourseHTTP`
+   (`http-scraper.service.ts:189`) não tem chamador em `electron/`, `src/` ou
+   `shared/`; só o teste novo o chama. O ramo sem `preFetchedHtml` de
+   `getCourseFiles` (`:325-445`, GET `discente.jsf` + POST Conteúdo) também é
+   inalcançável: os nove call sites em `sigaa.service.ts` (`:167, :255, :264,
+   :298, :420, :436, :493, :539, :619`) passam HTML guardado por early return.
+   `httpScraper.getNewsDetail` idem. Casos afetados: "classifies session
+   expiry after the HTTP files POST", "does not submit a files action when
+   its starting document lacks ViewState", "distinguishes an expired entry
+   page from an absent course", "reports NOT_FOUND only after recognizing the
+   student portal structure", "rejects a course entry end state containing
+   only the generic conteudo element". O critério "Entrada HTTP de turma
+   diferencia..." e a linha "Abrir Conteúdo" da matriz descrevem esse código.
+   A frase "A seção Conteúdo também é alcançada pelo download em lote" é
+   verdadeira só via `navigateToFilesSection` (Playwright), não via o POST
+   HTTP. Não é teste errado: o método existe e o ownership test o obriga a
+   passar pelo adapter. Mas o revisor não tem cadeia real para validar esses
+   cinco, e a issue deveria dizer isso para o implementador fazer o mínimo
+   neles. Remover o código morto está fora do escopo autorizado; fica como
+   nota para o passe pré-release.
+
+2. **Invalidação testada só para sessão expirada; o bug real é qualquer
+   falha.** Cenário: `sigaa.service.ts:298-303`. O parse do retry devolve
+   drift (`<main>` no lugar da turma); `retryParseResult.success` não é
+   checado, `retryScript` cai em `?? targetScript` e `downloadFile` posta o
+   ViewState antigo de `courseData`. O mesmo padrão em `:493-494`
+   (`retryParsedFiles = retryParseResult.files`) e `:539-540`. Uma
+   implementação que só limpe `courseData` quando o código é
+   `SESSION_EXPIRED` passa a suíte inteira e mantém esse bug. O critério diz
+   "ao falhar a atualização", mas nenhum caso cobre falha por drift. Caso
+   faltante: `getCourseFiles(courseHtml)` ok, `getCourseFiles('<main>…')`
+   drift, `downloadFile` → `axios.post` não chamado.
+
+3. **Landmarks de STUDENT_HOME/STUDENT_PORTAL sem âncora real.** Os três
+   documentos sintéticos de home/portal (adapter `portalHtml`, resilience
+   `portalDocument`, lifecycle) compartilham `<h1>Portal do Discente</h1>`.
+   Um reconhecedor por `h1` passa tudo e pode quebrar o login real sem que a
+   suíte veja. Os sinais que o código de produção já usa, e portanto existem
+   no portal real: `a[href="/sigaa/verPortalDiscente.do"]`
+   (`playwright-login.service.ts:271, :431`), texto "Portal do Discente"
+   (`:545`), `input[name="idTurma"]` e `a[id*="turmaVirtual"]` (`:449-456`),
+   `.nome_usuario` (`:134`). A issue deveria listar esses como os landmarks
+   admissíveis e proibir sinais que só existem nos docs sintéticos (tag `h1`,
+   `name="entry"`). Sem isso o implementador, que só vê issue e testes, não
+   tem como distinguir sinal real de invenção do mock.
+
+4. **Ownership test não inspeciona `TemplateMiddle`/`TemplateTail`.**
+   `` `${prefixo}input[name="idTurma"]` `` tem head vazio e o seletor no tail;
+   `'in' + 'put[...]'` também escapa. A issue já declara a guarda parcial;
+   registro para o revisor grep-ar concatenação e template com expressão.
+   Baixo.
+
+5. **Mock de login expõe só `content()`, `url()` e `$` (null).** Se o adapter
+   reconhecer estado por `page.locator(...)`, `page.$$` ou `waitForSelector`,
+   os três casos de login quebram por TypeError, não por asserção, e o
+   implementador não pode editar o teste. A issue deveria dizer que o
+   reconhecimento no caminho Playwright é `classify(await page.content(),
+   page.url())`, sem locator. Baixo, evita ida e volta.
+
+Nada encontrado em: teste que passa sem implementar, parser copiado, teste que
+exige tocar arquivo fora do limite (os únicos outros testes que constroem
+`PlaywrightLoginService` são `scraper.test.ts`, live, e os três já ajustados;
+`sigaa-service.test.ts` mocka os dois scrapers por módulo e só assere códigos
+deduzidos de mensagens legadas, que não mudam).
