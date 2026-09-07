@@ -1162,6 +1162,19 @@ export class PlaywrightLoginService {
         }
     }
 
+    /**
+     * Sai de verdade (DATA-002): `close()` mais esquecer cookies e credencial
+     * guardados. `close()` sozinho os preserva de propósito — `getCourses()`
+     * fecha e relança com eles a cada sync — então sem isto um sync em voo
+     * relançaria o Chrome com a sessão e a senha de quem acabou de sair.
+     */
+    async logout() {
+        await this.close();
+        this.storedCookies = [];
+        this.storedUsername = null;
+        this.storedPassword = null;
+    }
+
     async close() {
         if (this.browser) {
             console.log('Playwright: Closing browser...');

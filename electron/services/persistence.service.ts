@@ -154,14 +154,23 @@ export class PersistenceService {
         }
     }
 
+    /** Propaga a falha do `unlink` (DATA-002): um logout "que deu certo" com a
+     * credencial ainda no disco vira auto-login na conta errada no boot seguinte. */
     public clearCredentials(): void {
-        try {
-            if (fs.existsSync(this.credentialsPath)) {
-                fs.unlinkSync(this.credentialsPath);
-            }
-        } catch (error) {
-            console.error('PersistenceService: Failed to clear encrypted credentials:', error);
+        if (fs.existsSync(this.credentialsPath)) {
+            fs.unlinkSync(this.credentialsPath);
         }
+    }
+
+    /**
+     * Volta ao estado do primeiro boot (DATA-002). A memória é resetada ANTES
+     * do disco: se o `unlink` falhar, um `saveSettings()` depois ainda parte
+     * do default, nunca do que havia antes.
+     */
+    public reset(): void {
+        this.settings = { ...DEFAULT_SETTINGS };
+        if (fs.existsSync(this.settingsPath)) fs.unlinkSync(this.settingsPath);
+        if (fs.existsSync(this.credentialsPath)) fs.unlinkSync(this.credentialsPath);
     }
 
     private saveSettings() {

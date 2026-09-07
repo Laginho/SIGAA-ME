@@ -53,6 +53,16 @@ import { PersistenceService } from '../../electron/services/persistence.service'
 const A = 'a'.repeat(64);
 const B = 'b'.repeat(64);
 
+const DEFAULTS = {
+    theme: 'light',
+    autoSync: true,
+    lastDownloadPath: null,
+    runInBackground: true,
+    syncInterval: 60,
+    autoDownloadUpdates: true,
+    openAtLogin: false,
+};
+
 function readCacheFile(): any {
     return JSON.parse(storage.files.get(cacheFile) ?? 'null');
 }
@@ -156,16 +166,6 @@ describe('CacheService — CacheFileV2, one bucket per account', () => {
 });
 
 describe('PersistenceService — settings.json versioned and validated', () => {
-    const DEFAULTS = {
-        theme: 'light',
-        autoSync: true,
-        lastDownloadPath: null,
-        runInBackground: true,
-        syncInterval: 60,
-        autoDownloadUpdates: true,
-        openAtLogin: false,
-    };
-
     beforeEach(() => {
         storage.files.clear();
         vi.clearAllMocks();
