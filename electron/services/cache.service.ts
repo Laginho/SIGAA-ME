@@ -126,6 +126,18 @@ export class CacheService {
     }
 
     /**
+     * Esquece todo balde de toda conta (DATA-002). Memória primeiro, disco
+     * depois: um `unlink` que falhar ainda deixa o processo vivo sem os baldes
+     * antigos, e a próxima escrita contém só o que vier dali em diante.
+     */
+    public clear(): void {
+        this.cache = { schemaVersion: 2, accounts: {} };
+        if (fs.existsSync(this.cachePath)) {
+            fs.unlinkSync(this.cachePath);
+        }
+    }
+
+    /**
      * Só para simulação em desenvolvimento: esquece o último arquivo da primeira
      * turma da conta que tiver algum, persiste, e devolve o que esqueceu (ou null).
      */

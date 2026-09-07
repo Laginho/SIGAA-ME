@@ -32,6 +32,7 @@ vi.mock('../../electron/services/playwright-login.service', () => {
         PlaywrightLoginService: class {
             login = vi.fn();
             close = vi.fn();
+            logout = vi.fn();
             getCourses = vi.fn();
             enterCourseAndGetHTML = vi.fn();
             navigateToFilesSection = vi.fn();
@@ -49,6 +50,8 @@ vi.mock('../../electron/services/http-scraper.service', () => {
         HttpScraperService: class {
             setCookies = vi.fn();
             setUserAgent = vi.fn();
+            resetSession = vi.fn();
+            resetLog = vi.fn();
             getCourseFiles = vi.fn();
             downloadFile = vi.fn();
         }
@@ -73,7 +76,7 @@ vi.mock('electron', () => ({
 }));
 
 import { SigaaService } from '../../electron/services/sigaa.service';
-import { deriveAccountId } from '../../electron/services/account-context.service';
+import { deriveAccountId, getActiveAccount, setActiveAccount } from '../../electron/services/account-context.service';
 
 const SCRIPT = "jsfcljs(document.getElementById('formAva'),'formAva:j_id_jsp_1,formAva:j_id_jsp_1,id,123,key,abc','');";
 const PARSED_DOC = { id: '123', name: 'doc.pdf', type: 'file', key: 'abc', script: SCRIPT };
@@ -406,6 +409,25 @@ describe('SigaaService (Unit)', () => {
 
             expect(mockPlaywright.navigateToFilesSection).not.toHaveBeenCalled();
             expect(mockHttp.downloadFile).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    // ── DATA-002: logout esquece a sessão; diagnósticos são zeráveis ──
+    describe('logout() / clearDiagnostics() (DATA-002)', () => {
+        it('logout forgets the Playwright session (not just close), resets the HTTP session and the active account', async () => {
+            setActiveAccount(deriveAccountId('user'));
+
+            await service.logout();
+
+            expect(mockPlaywright.logout).toHaveBeenCalledTimes(1);
+            expect(mockHttp.resetSession).toHaveBeenCalledTimes(1);
+            expect(getActiveAccount()).toBeNull();
+        });
+
+        it('clearDiagnostics resets the scraper log', () => {
+            service.clearDiagnostics();
+
+            expect(mockHttp.resetLog).toHaveBeenCalledTimes(1);
         });
     });
 });

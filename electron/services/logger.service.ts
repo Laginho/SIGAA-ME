@@ -50,12 +50,14 @@ export class LoggerService {
         return this.logPath;
     }
 
+    /**
+     * Propaga a falha (DATA-002, achado da revisão). O único chamador é o
+     * handler `clear-all-data`, e o critério de aceite dele é "exclusão parcial
+     * devolve erro de armazenamento": engolir aqui fazia o app dizer "dados
+     * removidos" com `sigaa-me.log` intacto no disco.
+     */
     clear() {
-        try {
-            fs.writeFileSync(this.logPath, '');
-        } catch (error) {
-            console.error('Failed to clear log file:', error);
-        }
+        fs.writeFileSync(this.logPath, '');
     }
 }
 

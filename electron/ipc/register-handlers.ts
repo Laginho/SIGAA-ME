@@ -10,13 +10,16 @@
 
 import { app, dialog, ipcMain, type BrowserWindow } from 'electron';
 import fs from 'node:fs';
+import path from 'node:path';
 import { isInsideRoot } from '../services/download-path';
 import type { SigaaService } from '../services/sigaa.service';
 import type { PersistenceService } from '../services/persistence.service';
 import type { BackgroundSyncService } from '../services/background-sync.service';
+import type { CacheService } from '../services/cache.service';
+import type { LoggerService } from '../services/logger.service';
 import type { DownloadProgress } from '../../shared/ipc';
 import type { DownloadStatus } from '../../shared/domain';
-import { errorMessage, fail, failFromMessage, ok } from '../../shared/errors';
+import { errorMessage, fail, ok } from '../../shared/errors';
 import {
   parseCourseRequest,
   parseDownloadAllFilesPayload,
@@ -39,6 +42,7 @@ export interface IpcDeps {
     | 'getNewsDetail'
     | 'loadAllNews'
     | 'logout'
+    | 'clearDiagnostics'
   >;
   persistence: Pick<
     PersistenceService,
@@ -48,8 +52,15 @@ export interface IpcDeps {
     | 'saveCredentials'
     | 'clearCredentials'
     | 'loadCredentials'
+    | 'reset'
   >;
-  backgroundSync: Pick<BackgroundSyncService, 'restart'>;
+  backgroundSync: Pick<BackgroundSyncService, 'restart' | 'stop' | 'start' | 'cancel'>;
+  cache: Pick<CacheService, 'clear'>;
+  logger: Pick<LoggerService, 'clear'>;
+  /** `app.getPath('userData')`: onde os `debug_*` a apagar vivem. */
+  userDataPath: string;
+  resetAppLog: () => Promise<void>;
+  clearBrowserStorage: () => Promise<void>;
   getWindow: () => BrowserWindow | null;
   allowedOrigin: string;
   /** `app.isPackaged`: decide se `test-simulate-new-file` existe. */
@@ -58,6 +69,17 @@ export interface IpcDeps {
 }
 
 const noPayload = (): Record<string, never> => ({});
+
+/** Roda `step`; uma falha vira texto em `failures` (e log), sem impedir o próximo passo. */
+async function attempt(step: () => void | Promise<void>, failures: string[], label: string): Promise<void> {
+  try {
+    await step();
+  } catch (error) {
+    const message = errorMessage(error);
+    failures.push(message);
+    console.error(`${label} falhou:`, message);
+  }
+}
 
 export function registerIpcHandlers(deps: IpcDeps): void {
   function handle<Req, Res>(
@@ -97,7 +119,15 @@ export function registerIpcHandlers(deps: IpcDeps): void {
           return fail('STORAGE', `Login succeeded, but the session could not be remembered: ${message}`);
         }
       } else {
-        deps.persistence.clearCredentials();
+        // `clearCredentials()` agora propaga falha do `unlink` (DATA-002): sem
+        // isto o handler devolveria sucesso com a credencial ainda no disco.
+        try {
+          deps.persistence.clearCredentials();
+        } catch (error) {
+          const message = errorMessage(error);
+          console.error('Failed to clear credentials:', message);
+          return fail('STORAGE', message);
+        }
       }
       return result;
     },
@@ -227,30 +257,80 @@ export function registerIpcHandlers(deps: IpcDeps): void {
     () => fail('INVALID_REQUEST', 'update-app-setting: chave ou valor inválido'),
   );
 
+  // Ordem: a credencial some primeiro para que nenhum sync novo consiga
+  // começar no intervalo (`syncNow` aborta sem ela); só depois de a sessão
+  // estar drenada e fechada o handler devolve sucesso. Cada passo roda mesmo
+  // que um anterior tenha falhado — a sessão precisa terminar de fechar de
+  // qualquer forma, mas o resultado avisa que a credencial pode ter sobrado.
   handle('logout', noPayload, async () => {
     console.log('Logout: Clearing credentials and closing session...');
-    try {
-      deps.persistence.clearCredentials();
-      await deps.sigaaService.logout();
-      return ok();
-    } catch (error) {
-      const message = errorMessage(error);
-      console.error('Logout error:', message);
-      return failFromMessage(message);
-    }
+    const failures: string[] = [];
+    await attempt(() => deps.persistence.clearCredentials(), failures, 'Limpar credencial');
+    await attempt(() => deps.backgroundSync.cancel(), failures, 'Encerrar sincronização');
+    await attempt(() => deps.sigaaService.logout(), failures, 'Fechar sessão');
+    if (failures.length > 0) return fail('STORAGE', failures.join('; '));
+    return ok();
   }, () => fail('INVALID_REQUEST', 'logout: não recebe payload'));
 
   handle('clear-all-data', noPayload, async () => {
-    console.log('Clear all data: Clearing credentials and closing session...');
-    try {
-      deps.persistence.clearCredentials();
-      await deps.sigaaService.logout();
-      return ok();
-    } catch (error) {
-      const message = errorMessage(error);
-      console.error('Clear all data error:', message);
-      return failFromMessage(message);
+    const win = deps.getWindow();
+    const { response } = await dialog.showMessageBox(win!, {
+      type: 'warning',
+      buttons: ['Apagar tudo', 'Cancelar'],
+      defaultId: 1,
+      cancelId: 1,
+      title: 'Limpar todos os dados',
+      message: 'Apagar todos os dados locais do SIGAA-ME?',
+      detail:
+        'Isso remove credenciais salvas, cache de disciplinas, notificações, ' +
+        'configurações e logs desta máquina, de todas as contas. ' +
+        'Os arquivos baixados na sua pasta de downloads não serão apagados.',
+    });
+    if (response !== 0) return fail('CANCELLED', 'Limpeza cancelada.');
+
+    console.log('Clear all data: closing session before destructive cleanup...');
+    const failures: string[] = [];
+
+    // 1. Fecha a sessão — nada destrutivo antes disto.
+    await attempt(() => deps.persistence.clearCredentials(), failures, 'Limpar credencial');
+    await attempt(() => deps.backgroundSync.stop(), failures, 'Parar agendador');
+    await attempt(() => deps.backgroundSync.cancel(), failures, 'Encerrar sincronização');
+    await attempt(() => deps.sigaaService.logout(), failures, 'Fechar sessão');
+
+    // Lido antes do reset: depois dele `getSettings()` já mostra o default.
+    const openAtLoginBefore = deps.persistence.getSettings().openAtLogin;
+
+    // 2. Só agora, os passos destrutivos.
+    await attempt(() => deps.cache.clear(), failures, 'Limpar cache');
+    await attempt(() => deps.persistence.reset(), failures, 'Limpar configurações');
+    await attempt(() => deps.logger.clear(), failures, 'Limpar log');
+    await attempt(() => deps.sigaaService.clearDiagnostics(), failures, 'Limpar diagnósticos');
+    await attempt(() => deps.resetAppLog(), failures, 'Reiniciar log do app');
+    await attempt(() => {
+      for (const entry of fs.readdirSync(deps.userDataPath)) {
+        if (entry.startsWith('debug_')) fs.unlinkSync(path.join(deps.userDataPath, entry));
+      }
+    }, failures, 'Apagar diagnósticos salvos');
+    await attempt(() => deps.clearBrowserStorage(), failures, 'Limpar armazenamento do navegador');
+
+    if (openAtLoginBefore) {
+      app.setLoginItemSettings({
+        openAtLogin: false,
+        path: process.execPath,
+        args: app.isPackaged ? ['--hidden'] : [app.getAppPath(), '--hidden'],
+      });
     }
+
+    // 3. Estado de "primeiro launch": agendador de volta, sem credencial ele não-opera.
+    deps.backgroundSync.start();
+
+    if (failures.length > 0) {
+      return fail(
+        'STORAGE',
+        `${failures.join('; ')}. Feche o SIGAA-ME e apague a pasta manualmente: ${deps.userDataPath}`,
+      );
+    }
+    return ok();
   }, () => fail('INVALID_REQUEST', 'clear-all-data: não recebe payload'));
 
   if (!deps.isPackaged) {

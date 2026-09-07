@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, shell, Tray, Menu } from 'electron'
+import { app, BrowserWindow, dialog, session, shell, Tray, Menu } from 'electron'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import path from 'node:path'
 import fs from 'node:fs'
@@ -8,6 +8,7 @@ import { execSync } from 'child_process'
 import { persistenceService } from './services/persistence.service'
 import { BackgroundSyncService } from './services/background-sync.service'
 import { cacheService } from './services/cache.service'
+import { logger } from './services/logger.service'
 import { getActiveAccount } from './services/account-context.service'
 import { registerIpcHandlers } from './ipc/register-handlers'
 import { installNavigationGuard } from './security/navigation-policy'
@@ -29,9 +30,15 @@ if (!fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir, { recursive: true });
 }
 
-const logFileName = `app_${new Date().toISOString().replace(/[:.]/g, '-')}.log`;
-const logFilePath = path.join(logsDir, logFileName);
-const logStream = fs.createWriteStream(logFilePath, { flags: 'a' });
+function openLogStream(): fs.WriteStream {
+  const logFilePath = path.join(logsDir, `app_${new Date().toISOString().replace(/[:.]/g, '-')}.log`);
+  return fs.createWriteStream(logFilePath, { flags: 'a' });
+}
+
+// `let`, não `const`: `resetAppLog` (DATA-002) troca o stream em uso, e os
+// wrappers de `console.*` abaixo fecham sobre esta variável — nunca sobre o
+// stream que existia quando foram definidos.
+let logStream = openLogStream();
 
 const originalConsoleLog = console.log;
 const originalConsoleError = console.error;
@@ -47,21 +54,37 @@ const formatLog = (level: string, args: unknown[]) => {
 
 console.log = (...args: unknown[]) => {
   originalConsoleLog.apply(console, args);
-  logStream.write(formatLog('INFO', args));
+  if (logStream.writable) logStream.write(formatLog('INFO', args));
 };
 
 console.error = (...args: unknown[]) => {
   originalConsoleError.apply(console, args);
-  logStream.write(formatLog('ERROR', args));
+  if (logStream.writable) logStream.write(formatLog('ERROR', args));
 };
 
 console.warn = (...args: unknown[]) => {
   originalConsoleWarn.apply(console, args);
-  logStream.write(formatLog('WARN', args));
+  if (logStream.writable) logStream.write(formatLog('WARN', args));
 };
 
 console.log('=== SIGAA-ME App Started ===');
-console.log(`Log file: ${logFilePath}`);
+
+/**
+ * Clear-all-data (DATA-002): fecha o stream, apaga `logs/` inteiro e reabre
+ * com nome novo. É o que torna a exclusão segura no Windows, onde um handle
+ * aberto faz um `unlink` ingênuo falhar.
+ */
+async function resetAppLog(): Promise<void> {
+  await new Promise<void>((resolve) => { logStream.end(() => resolve()); });
+  try {
+    fs.rmSync(logsDir, { recursive: true, force: true });
+  } finally {
+    // Mesmo se o rmSync falhar (EBUSY/EPERM num arquivo travado), o main
+    // precisa voltar a ter um stream aberto; senão fica sem log até reiniciar.
+    fs.mkdirSync(logsDir, { recursive: true });
+    logStream = openLogStream();
+  }
+}
 // ===== END FILE LOGGER SETUP =====
 
 process.env.APP_ROOT = path.join(__dirname, '..')
@@ -97,6 +120,11 @@ registerIpcHandlers({
   sigaaService,
   persistence: persistenceService,
   backgroundSync: backgroundSyncService,
+  cache: cacheService,
+  logger,
+  userDataPath: app.getPath('userData'),
+  resetAppLog,
+  clearBrowserStorage: () => session.defaultSession.clearStorageData(),
   getWindow: () => win,
   allowedOrigin: VITE_DEV_SERVER_URL ? new URL(VITE_DEV_SERVER_URL).origin : 'file:',
   isPackaged: app.isPackaged,
