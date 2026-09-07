@@ -1,5 +1,5 @@
 # DÉBITO-03 — Sem proteção contra concorrência no Playwright
-Status: open
+Status: resolved
 Priority: —
 Tracker status at migration: (sem linha de status — débito aceito conscientemente)
 
@@ -10,3 +10,5 @@ Tracker status at migration: (sem linha de status — débito aceito conscientem
 - **Gatilho:** obrigatório na Fase 3. Sobe de prioridade imediatamente se
   aparecer qualquer bug de sincronização corrompendo dados.
 - **Mitigação:** nenhuma. O risco existe hoje e é conhecido.
+- **Fechado em 2026-09-07:** resolvido pelo `CONC-001` (coordenador de operações
+  de sessão, um slot, cancelamento por `AbortSignal`).
