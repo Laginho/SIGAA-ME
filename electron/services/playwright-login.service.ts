@@ -4,6 +4,16 @@ import * as path from 'path';
 import { app } from 'electron';
 import { logger } from './logger.service';
 import type { NewsDetail } from '../../shared/domain';
+import type { AppErrorCode } from '../../shared/errors';
+import { COURSE_HOME, FILES_MENU, LOGIN, NEWS, STUDENT_HOME, STUDENT_PORTAL, newsFormSelector } from '../sigaa/selectors';
+import {
+    classifyLoginEnd,
+    classifyLoginException,
+    describeMissingCourseListSelectors,
+    isLoginDocument,
+    validateCourseListDocument,
+    validateLoginStart
+} from '../sigaa/portal-adapter';
 
 /**
  * Linha da lista de turmas como o portal a entrega. `href`/`onclick` são
@@ -50,27 +60,7 @@ export class PlaywrightLoginService {
     private storedUsername: string | null = null;
     private storedPassword: string | null = null;
 
-    private formatLoginFailure(error: unknown): string {
-        const message = error instanceof Error ? error.message : String(error);
-        const selectorLabels: Array<[string, string]> = [
-            ['input[name="user.login"]', 'username field'],
-            ['input[name="user.senha"]', 'password field'],
-            ['input[name="entrar"]', 'login button']
-        ];
-        const selector = selectorLabels.find(([candidate]) => message.includes(candidate));
-
-        if (selector) {
-            return `SIGAA login selector drift: the ${selector[1]} (${selector[0]}) was not found or did not become usable. The SIGAA login page may have changed. Playwright: ${message}`;
-        }
-
-        if (/timeout/i.test(message)) {
-            return `SIGAA login navigation timed out. Check portal availability or recent page changes. Playwright: ${message}`;
-        }
-
-        return message;
-    }
-
-    async login(username: string, password: string): Promise<{ success: boolean; cookies?: any[]; userName?: string; photoUrl?: string; error?: string }> {
+    async login(username: string, password: string): Promise<{ success: boolean; cookies?: any[]; userName?: string; photoUrl?: string; error?: string; errorCode?: AppErrorCode }> {
         try {
             console.log('Playwright: Launching browser...');
 
@@ -89,31 +79,51 @@ export class PlaywrightLoginService {
             const page = await context.newPage();
 
             console.log('Playwright: Navigating to login page...');
-            await page.goto('https://si3.ufc.br/sigaa/verTelaLogin.do');
+            await page.goto(LOGIN.url);
+
+            // Validar o documento inicial antes de preencher qualquer campo — o
+            // reconhecimento é sempre pelo formulário, nunca pela URL isolada.
+            const startHtml = await page.content();
+            const startCheck = validateLoginStart(startHtml);
+            if (startCheck) {
+                await this.close();
+                return { success: false, error: startCheck.message, errorCode: startCheck.code };
+            }
 
             console.log('Playwright: Filling in credentials...');
-            await page.fill('input[name="user.login"]', username);
-            await page.fill('input[name="user.senha"]', password);
+            await page.fill(LOGIN.username, username);
+            await page.fill(LOGIN.password, password);
 
             console.log('Playwright: Clicking login button...');
-            await page.click('input[name="entrar"]');
+            await page.click(LOGIN.submit);
 
             // Wait for navigation after login
             console.log('Playwright: Waiting for navigation...');
             await page.waitForLoadState('networkidle');
 
-            // Check if login was successful
             const currentUrl = page.url();
             console.log('Playwright: Current URL after login:', currentUrl);
 
-            // If we're still on the login page, login failed
-            if (currentUrl.includes('verTelaLogin') || currentUrl.includes('logar.do')) {
-                // Check for error message on page
-                const errorElement = await page.$('.erro, .mensagemErro, .alert');
+            // Validar o documento final: só um pouso reconhecido (home ou portal)
+            // autentica. Nem a URL ter deixado de ser a de login, nem um
+            // `#conteudo` isolado, provam a transição.
+            const endHtml = await page.content();
+            const endState = classifyLoginEnd(endHtml);
+
+            if (endState === 'still-login') {
+                const errorElement = await page.$(LOGIN.errorMessage);
                 const errorMessage = errorElement ? await errorElement.textContent() : 'Unknown error';
 
                 await this.close();
-                return { success: false, error: errorMessage || 'Login failed - still on login page' };
+                return { success: false, error: errorMessage || 'Login failed - still on login page', errorCode: 'SESSION_EXPIRED' };
+            }
+            if (endState === 'unrecognized') {
+                await this.close();
+                return {
+                    success: false,
+                    errorCode: 'SELECTOR_DRIFT',
+                    error: `SIGAA login selector drift: the page after login was neither the login form nor a recognized student home/portal. Current URL: ${currentUrl}`
+                };
             }
 
             // Login successful! Extract user data from the page
@@ -122,9 +132,8 @@ export class PlaywrightLoginService {
             // DEBUG: Save login page HTML for selector inspection (dev only)
             if (!app.isPackaged) {
                 try {
-                    const loginPageHtml = await page.content();
                     const debugPath = path.join(app.getPath('userData'), 'debug_login_page.html');
-                    fs.writeFileSync(debugPath, loginPageHtml);
+                    fs.writeFileSync(debugPath, endHtml);
                     console.log('Playwright: Saved debug_login_page.html for inspection');
                 } catch (e) {
                     console.warn('Playwright: Failed to save debug HTML:', e);
@@ -132,7 +141,7 @@ export class PlaywrightLoginService {
             }
 
             // Stay on current page after login to extract user info
-            const nameElement = await page.$('.nome_usuario, .info-usuario .nome');
+            const nameElement = await page.$(LOGIN.userNameFallback);
             const userName = nameElement ? await nameElement.textContent() : null;
 
             // Note: Photo is only available on portal page, not login page
@@ -165,7 +174,8 @@ export class PlaywrightLoginService {
         } catch (error: any) {
             console.error('Playwright: Error during login:', error);
             await this.close();
-            return { success: false, error: this.formatLoginFailure(error) };
+            const classified = classifyLoginException(error);
+            return { success: false, error: classified.message, errorCode: classified.errorCode };
         }
     }
 
@@ -224,13 +234,13 @@ export class PlaywrightLoginService {
         }
     }
 
-    async getCourses(): Promise<{ success: boolean; courses?: ParsedCourse[]; photoUrl?: string; error?: string }> {
+    async getCourses(): Promise<{ success: boolean; courses?: ParsedCourse[]; photoUrl?: string; error?: string; errorCode?: AppErrorCode }> {
         try {
             logger.info('Playwright: Launching browser to fetch courses...');
 
             // Check if we have stored cookies
             if (!this.storedCookies || this.storedCookies.length === 0) {
-                return { success: false, error: 'No stored session - please login first' };
+                return { success: false, error: 'No stored session - please login first', errorCode: 'SESSION_EXPIRED' };
             }
 
             // A previous browser may still be running (earlier sync or login).
@@ -258,17 +268,18 @@ export class PlaywrightLoginService {
             await page.goto('https://si3.ufc.br/sigaa/paginaInicial.do');
             await page.waitForLoadState('networkidle');
 
-            // Check if we got redirected to login (cookies expired)
-            if (page.url().includes('verTelaLogin')) {
+            // Check if we got redirected to login (cookies expired). Reconhecimento
+            // pelo documento, não pela URL — o mock de teste só expõe content()/url().
+            if (isLoginDocument(await page.content())) {
                 await this.close();
-                return { success: false, error: 'Session expired - please login again' };
+                return { success: false, error: 'Session expired - please login again', errorCode: 'SESSION_EXPIRED' };
             }
 
             // Click on student portal link
             console.log('Playwright: Looking for "Menu Discente" link...');
             try {
                 // Click on "Menu Discente" link using exact href - use .first() to avoid strict mode error
-                const studentLink = page.locator('a[href="/sigaa/verPortalDiscente.do"]').first();
+                const studentLink = page.locator(STUDENT_HOME.menuDiscenteLink).first();
                 await studentLink.click({ timeout: 5000 });
                 await page.waitForLoadState('networkidle');
                 console.log('Playwright: Clicked Menu Discente, current URL:', page.url());
@@ -298,15 +309,15 @@ export class PlaywrightLoginService {
 
             // Extract courses with robust selector-based logic
             console.log('Playwright: Extracting courses from page...');
-            const courseExtraction = await page.evaluate(() => {
+            const courseExtraction = await page.evaluate((sel) => {
                 const results: ParsedCourse[] = [];
                 // Find all rows that might contain courses
                 const rows = document.querySelectorAll('tr');
 
                 for (const row of rows) {
                     // Look for the hidden ID input and the course link
-                    const idInput = row.querySelector('input[name="idTurma"]') as HTMLInputElement;
-                    const nameLink = row.querySelector('a[id*="turmaVirtual"]');
+                    const idInput = row.querySelector(sel.courseIdInput) as HTMLInputElement;
+                    const nameLink = row.querySelector(sel.virtualClassroomLink);
                     const periodCell = row.querySelector('td.info center'); // Period is often in a center tag
 
                     if (idInput && nameLink && nameLink.textContent) {
@@ -335,19 +346,20 @@ export class PlaywrightLoginService {
                 return {
                     courses: results,
                     selectorDiagnostics: {
-                        courseIdInputs: document.querySelectorAll('input[name="idTurma"]').length,
-                        virtualClassroomLinks: document.querySelectorAll('a[id*="turmaVirtual"]').length
+                        courseIdInputs: document.querySelectorAll(sel.courseIdInput).length,
+                        virtualClassroomLinks: document.querySelectorAll(sel.virtualClassroomLink).length
                     }
                 };
-            });
+            }, { courseIdInput: STUDENT_PORTAL.courseIdInput, virtualClassroomLink: STUDENT_PORTAL.virtualClassroomLink });
 
             const { courses, selectorDiagnostics } = courseExtraction;
             if (selectorDiagnostics.courseIdInputs === 0 || selectorDiagnostics.virtualClassroomLinks === 0) {
-                const missingSelectors = [
-                    selectorDiagnostics.courseIdInputs === 0 ? 'input[name="idTurma"]' : null,
-                    selectorDiagnostics.virtualClassroomLinks === 0 ? 'a[id*="turmaVirtual"]' : null
-                ].filter(Boolean).join(', ');
-                throw new Error(`SIGAA portal selector drift: the course list is missing ${missingSelectors}. The portal layout may have changed.`);
+                await this.close();
+                return {
+                    success: false,
+                    errorCode: 'SELECTOR_DRIFT',
+                    error: describeMissingCourseListSelectors(selectorDiagnostics.courseIdInputs, selectorDiagnostics.virtualClassroomLinks)
+                };
             }
 
             console.log('Playwright: Found courses:', courses.length);
@@ -391,7 +403,7 @@ export class PlaywrightLoginService {
         }
     }
 
-    async enterCourseAndGetHTML(courseId: string, courseName: string): Promise<{ success: boolean; html?: string; cookies?: any[]; error?: string }> {
+    async enterCourseAndGetHTML(courseId: string, courseName: string): Promise<{ success: boolean; html?: string; cookies?: any[]; error?: string; errorCode?: AppErrorCode }> {
         try {
             if (!this.browser || !this.context) {
                 // If browser is closed, relaunch it
@@ -427,7 +439,7 @@ export class PlaywrightLoginService {
                 }
 
                 // Click on "Menu Discente" link
-                const studentLink = page.locator('a[href="/sigaa/verPortalDiscente.do"]').first();
+                const studentLink = page.locator(STUDENT_HOME.menuDiscenteLink).first();
                 if (await studentLink.isVisible()) {
                     await studentLink.click();
                     await page.waitForLoadState('networkidle');
@@ -445,15 +457,27 @@ export class PlaywrightLoginService {
             }
 
             // Enter the course
+            // Documento inicial antes de clicar: a URL não ser a de login não prova
+            // que a sessão vive — o SIGAA devolve o formulário de login na própria
+            // paginaInicial.do. Sem esta checagem, sessão expirada saía daqui como
+            // "Course link not found in portal", que `classifyMessage` lê como
+            // NOT_FOUND, e ninguém tenta relogar.
+            const portalCheck = validateCourseListDocument(await page.content());
+            if (portalCheck) {
+                logger.warn(`Playwright: Portal document rejected before course entry: ${portalCheck.code}`);
+                if (portalCheck.code === 'SESSION_EXPIRED') this.page = null;
+                return { success: false, error: portalCheck.message, errorCode: portalCheck.code };
+            }
+
             console.log(`Playwright: Entering course ${courseId} (${courseName})...`);
-            const entered = await page.evaluate((id: string) => {
-                const inputs = Array.from(document.querySelectorAll('input[name="idTurma"]'));
+            const entered = await page.evaluate(({ id, sel }) => {
+                const inputs = Array.from(document.querySelectorAll(sel.courseIdInput));
                 const targetInput = inputs.find(input => (input as HTMLInputElement).value === id);
 
                 if (targetInput) {
                     const row = targetInput.closest('tr');
                     if (row) {
-                        const link = row.querySelector('a[id*="turmaVirtual"]') as HTMLElement;
+                        const link = row.querySelector(sel.virtualClassroomLink) as HTMLElement;
                         if (link) {
                             console.log('Clicking course:', link.innerText);
                             link.click();
@@ -462,18 +486,18 @@ export class PlaywrightLoginService {
                     }
                 }
                 return { success: false };
-            }, courseId);
+            }, { id: courseId, sel: { courseIdInput: STUDENT_PORTAL.courseIdInput, virtualClassroomLink: STUDENT_PORTAL.virtualClassroomLink } });
 
             if (!entered.success) {
                 // Get debug info about what courses ARE on the portal
-                const debugInfo = await page.evaluate(() => {
-                    const inputs = Array.from(document.querySelectorAll('input[name="idTurma"]'));
+                const debugInfo = await page.evaluate((courseIdInputSelector) => {
+                    const inputs = Array.from(document.querySelectorAll(courseIdInputSelector));
                     return {
                         courseIds: inputs.map(input => (input as HTMLInputElement).value),
                         pageTitle: document.title,
                         bodyText: document.body.innerText.substring(0, 500)
                     };
-                });
+                }, STUDENT_PORTAL.courseIdInput);
 
                 console.error(`Playwright: Course ${courseId} not found in portal. Current URL: ${page.url()}`);
                 console.error(`Playwright: Available course IDs: ${debugInfo.courseIds.join(', ')}`);
@@ -492,7 +516,11 @@ export class PlaywrightLoginService {
                 }
 
                 // Don't close page - keep it for potential retry
-                return { success: false, error: `Course link not found in portal. Available IDs: ${debugInfo.courseIds.join(', ')}` };
+                return {
+                    success: false,
+                    error: `Course link not found in portal. Available IDs: ${debugInfo.courseIds.join(', ')}`,
+                    errorCode: 'NOT_FOUND'
+                };
             }
 
             if (entered.success) {
@@ -524,7 +552,7 @@ export class PlaywrightLoginService {
 
             // VERIFY: only the #nomeTurma header identifies the course actually
             // loaded — see isExpectedCoursePage for why the whole page can't be used.
-            const nomeTurma = (await page.locator('#nomeTurma').textContent({ timeout: 5000 }).catch(() => '')) ?? '';
+            const nomeTurma = (await page.locator(COURSE_HOME.nomeTurmaSelector).textContent({ timeout: 5000 }).catch(() => '')) ?? '';
             const nomeTurmaClean = nomeTurma.trim().replace(/\s+/g, ' ');
             if (!isExpectedCoursePage(nomeTurma, courseName)) {
                 const errorMsg = `Playwright: Course verification failed! Page header shows "${nomeTurmaClean}" instead of "${courseName}" — the JSF session is likely still on the previous course.`;
@@ -542,7 +570,7 @@ export class PlaywrightLoginService {
             } catch (e) {
                 logger.warn('Playwright: Could not verify "Menu Turma Virtual". We might be on the portal or a different page.');
                 const content = await page.content();
-                if (content.includes('Portal do Discente')) {
+                if (content.includes(STUDENT_HOME.portalDiscenteText)) {
                     throw new Error('Still on Portal Page after clicking course.');
                 }
             }
@@ -576,7 +604,7 @@ export class PlaywrightLoginService {
             logger.info('Playwright: Navigating to Files Section (Materiais > Conteúdo)...');
 
             // 1. First, check if Materiais accordion is closed and needs opening
-            const materiaisMenu = page.locator('.itemMenuHeaderMateriais').first();
+            const materiaisMenu = page.locator(FILES_MENU.itemMenuHeaderMateriais).first();
             if (await materiaisMenu.isVisible().catch(() => false)) {
                 // Check if the accordion content is visible yet
                 const contentContainer = materiaisMenu.locator('xpath=following-sibling::div').first();
@@ -597,15 +625,15 @@ export class PlaywrightLoginService {
             // 2. Use native Playwright locators with regex to bypass encoding issues
             // This natively simulates a real mouse click which ensures JSF form submission triggers correctly
             logger.info('Playwright: Looking for Conteúdo link...');
-            const conteudoLocator = page.locator('a, .itemMenu').filter({ hasText: /Conte.do/i }).first();
-            
+            const conteudoLocator = page.locator(FILES_MENU.conteudoLinkSelector).filter({ hasText: FILES_MENU.conteudoTextPattern }).first();
+
             if (await conteudoLocator.isVisible().catch(() => false)) {
                 logger.info('Playwright: Found Conteúdo link, clicking natively...');
                 await conteudoLocator.click();
             } else {
                 logger.warn('Playwright: Could not find Conteúdo link via locators!');
                 // Log page state for debugging
-                const allMenuText = await page.locator('.itemMenu, a').allTextContents();
+                const allMenuText = await page.locator(FILES_MENU.conteudoLinkSelector).allTextContents();
                 logger.warn(`Playwright: Available text contents: (truncated) ${allMenuText.join(', ').substring(0, 300)}`);
                 return { success: false, error: 'SIGAA selector drift: the "Conteúdo" files navigation link was not found. Open the saved portal diagnostics and update the portal selectors.' };
             }
@@ -614,17 +642,17 @@ export class PlaywrightLoginService {
             // Wait for the file download links to appear.
             logger.info('Playwright: Waiting for files content to render...');
             try {
-                await page.waitForFunction(() => {
-                    const links = document.querySelectorAll('a[onclick*="jsfcljs"][onclick*=",id,"]');
+                await page.waitForFunction((selector) => {
+                    const links = document.querySelectorAll(selector);
                     return links.length > 0;
-                }, { timeout: 8000 });
+                }, FILES_MENU.fileLinkReadySelector, { timeout: 8000 });
                 logger.info('Playwright: Files content detected (found jsfcljs links).');
             } catch (error) {
                 const message = error instanceof Error ? error.message : String(error);
                 logger.warn(`Playwright: Files content selector timed out: ${message}`);
                 return {
                     success: false,
-                    error: `SIGAA selector drift: the files section did not render a[onclick*="jsfcljs"][onclick*=",id,"] before the timeout. The course layout may have changed. Playwright: ${message}`
+                    error: `SIGAA selector drift: the files section did not render ${FILES_MENU.fileLinkReadySelector} before the timeout. The course layout may have changed. Playwright: ${message}`
                 };
             }
 
@@ -650,14 +678,14 @@ export class PlaywrightLoginService {
 
             // Enter the course
             console.log(`Playwright: Entering course ${courseId}...`);
-            const entered = await page.evaluate((id: string) => {
-                const inputs = Array.from(document.querySelectorAll('input[name="idTurma"]'));
+            const entered = await page.evaluate(({ id, sel }: { id: string; sel: { courseIdInput: string; virtualClassroomLink: string } }) => {
+                const inputs = Array.from(document.querySelectorAll(sel.courseIdInput));
                 const targetInput = inputs.find(input => (input as HTMLInputElement).value === id);
 
                 if (targetInput) {
                     const row = targetInput.closest('tr');
                     if (row) {
-                        const link = row.querySelector('a[id*="turmaVirtual"]') as HTMLElement;
+                        const link = row.querySelector(sel.virtualClassroomLink) as HTMLElement;
                         if (link) {
                             console.log('Clicking course:', link.innerText);
                             link.click();
@@ -666,7 +694,7 @@ export class PlaywrightLoginService {
                     }
                 }
                 return { success: false };
-            }, courseId);
+            }, { id: courseId, sel: { courseIdInput: STUDENT_PORTAL.courseIdInput, virtualClassroomLink: STUDENT_PORTAL.virtualClassroomLink } });
 
             if (!entered.success) {
                 console.error('Playwright: Course not found in portal');
@@ -741,15 +769,15 @@ export class PlaywrightLoginService {
                 // The AVA homepage (ava/index.jsf) does NOT contain the file download links!
                 // They live in the "Conteúdo" sub-page accessible via the sidebar menu.
                 console.log('Playwright: Navigating to files section (Conteúdo)...');
-                const filesNavSuccess = await page.evaluate(async () => {
-                    const menuItems = Array.from(document.querySelectorAll('.itemMenu'));
+                const filesNavSuccess = await page.evaluate(async (itemMenuSelector) => {
+                    const menuItems = Array.from(document.querySelectorAll(itemMenuSelector));
                     const contentItem = menuItems.find(item => item.textContent?.trim() === 'Conteúdo');
                     if (contentItem) {
                         const link = contentItem.closest('a');
                         if (link) { link.click(); return true; }
                     }
                     return false;
-                });
+                }, FILES_MENU.itemMenu);
 
                 if (!filesNavSuccess) {
                     // Try clicking "Materiais" first if it's an accordion
@@ -758,15 +786,15 @@ export class PlaywrightLoginService {
                     if (materiaisVisible) {
                         await page.click('text=Materiais');
                         await page.waitForTimeout(500);
-                        await page.evaluate(() => {
-                            const menuItems = Array.from(document.querySelectorAll('.itemMenu'));
+                        await page.evaluate((itemMenuSelector) => {
+                            const menuItems = Array.from(document.querySelectorAll(itemMenuSelector));
                             const contentItem = menuItems.find(item => item.textContent?.trim() === 'Conteúdo');
                             if (contentItem) {
                                 const link = contentItem.closest('a');
                                 if (link) { link.click(); return true; }
                             }
                             return false;
-                        });
+                        }, FILES_MENU.itemMenu);
                     }
                 }
 
@@ -862,15 +890,15 @@ export class PlaywrightLoginService {
 
                 // CRITICAL: Navigate to the files/materials section (Materiais > Conteúdo)
                 console.log('Playwright: Navigating to files section for batch download...');
-                const batchFilesNavSuccess = await page.evaluate(async () => {
-                    const menuItems = Array.from(document.querySelectorAll('.itemMenu'));
+                const batchFilesNavSuccess = await page.evaluate(async (itemMenuSelector) => {
+                    const menuItems = Array.from(document.querySelectorAll(itemMenuSelector));
                     const contentItem = menuItems.find(item => item.textContent?.trim() === 'Conteúdo');
                     if (contentItem) {
                         const link = contentItem.closest('a');
                         if (link) { link.click(); return true; }
                     }
                     return false;
-                });
+                }, FILES_MENU.itemMenu);
 
                 if (!batchFilesNavSuccess) {
                     console.log('Playwright: "Conteúdo" not found directly, trying "Materiais" accordion...');
@@ -878,15 +906,15 @@ export class PlaywrightLoginService {
                     if (materiaisVisible) {
                         await page.click('text=Materiais');
                         await page.waitForTimeout(500);
-                        await page.evaluate(() => {
-                            const menuItems = Array.from(document.querySelectorAll('.itemMenu'));
+                        await page.evaluate((itemMenuSelector) => {
+                            const menuItems = Array.from(document.querySelectorAll(itemMenuSelector));
                             const contentItem = menuItems.find(item => item.textContent?.trim() === 'Conteúdo');
                             if (contentItem) {
                                 const link = contentItem.closest('a');
                                 if (link) { link.click(); return true; }
                             }
                             return false;
-                        });
+                        }, FILES_MENU.itemMenu);
                     }
                 }
 
@@ -956,7 +984,7 @@ export class PlaywrightLoginService {
             let found = false;
 
             // Strategy 1: Find form with hidden input containing the news ID
-            const formSelector = `form:has(input[name="id"][value="${newsId}"])`;
+            const formSelector = newsFormSelector(newsId);
             const newsForm = await page.$(formSelector);
 
             if (newsForm) {
@@ -972,8 +1000,8 @@ export class PlaywrightLoginService {
             // Strategy 2: Fallback - look in page.evaluate for more complex DOM traversal
             if (!found) {
                 console.log(`Playwright: Form selector failed, using page.evaluate...`);
-                found = await page.evaluate((id) => {
-                    const inputs = document.querySelectorAll('input[name="id"]');
+                found = await page.evaluate(({ id, idInputSelector }) => {
+                    const inputs = document.querySelectorAll(idInputSelector);
                     for (const input of inputs) {
                         if ((input as HTMLInputElement).value === id) {
                             const form = input.closest('form');
@@ -987,7 +1015,7 @@ export class PlaywrightLoginService {
                         }
                     }
                     return false;
-                }, newsId);
+                }, { id: newsId, idInputSelector: NEWS.idInput });
             }
             
             // Session Timeout Recovery Strategy:

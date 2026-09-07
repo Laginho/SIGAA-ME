@@ -56,6 +56,14 @@ Valem para qualquer papel, e principalmente para o implementador.
 - **Defina "pronto" antes de começar.** Pronto é: testes da issue passam,
   `npm run quality` verde, nada fora do limite tocado. Regra de estilo nenhuma
   substitui isso.
+- **Busca vai para subagente Sonnet.** Sessão de modelo caro não explora o
+  repositório: 30 leituras para achar 2 arquivos relevantes é o maior
+  desperdício de token do loop. Delegue com o `Agent`, `subagent_type:
+  "Explore"` e **`model: "sonnet"`** — sem o `model`, o subagente cobra a taxa
+  do modelo da sessão. Ele gasta o contexto dele na varredura e devolve só a
+  conclusão: a sessão recebe caminhos e faixas de linha, não os arquivos.
+  Depois abra os 3 que importam. Vale para o revisor também — os chamadores
+  saem de `grep`, e você lê a função que chama, não o arquivo inteiro.
 - **Prosa direta.** Sem metáfora, sem floreio, sem parêntese explicativo.
   Frase curta, resultado primeiro. Em código, comentário só quando o porquê não
   está óbvio no próprio código.
@@ -313,6 +321,12 @@ teve três conclusões erradas em sequência, e vale como aula:
    também é HTTP.
 3. O `ARCHITECTURE.md` descreve um fallback Playwright para download. Ele existe
    como código e **não está ligado**.
+
+**Desatualizado desde o `BUG-004`:** `sigaa.service.ts` hoje chama
+`playwrightLogin.downloadFile` via `downloadViaPlaywright` depois de o HTTP falhar
+duas vezes. O fallback **está ligado**. A auditoria do `OBS-001` (2026-09-07) pegou
+um spec repetindo a afirmação antiga daqui; a lição do item 2 vale contra este
+próprio parágrafo: suba a cadeia, não confie no documento.
 
 Duas lições: busca por `import ... from` não encontra `await import()`, e provar
 que um arquivo é importado **não** prova que ele é alcançável — é preciso subir a
