@@ -104,7 +104,7 @@ issue. Zero achados é resposta válida. Não abra ledger.md nem outra issue.
 
 | Tarefa | Astra: testes / critérios | Achados de spec (Fable cego + Opus), classe | Veredito |
 |---|---|---|---|
-| DEV-001 | | | |
+| DEV-001 | 2 casos em `dev-cache-mutation-boundary.test.ts` (boot dev + empacotado contra main real); editou `preload-dev-gate.test.ts` movendo a cobertura de `testApi` | 3 A-leves (Fable cego): A1 leg empacotada usa `--sigaa-dev` literal em vez do argv injetado pelo main; A2 spec não nomeia mecanismo e os dublês de IPC fecham as alternativas; A3 harness não distingue sinal antes/depois da janela (AC3 sem teste). Nada do Opus ainda | Reprova por acúmulo (2+ A-leves). Ressalva: A2 e A3 vêm da mesma omissão |
 | OBS-001 | | | |
 | PORTAL-001 | | | |
 

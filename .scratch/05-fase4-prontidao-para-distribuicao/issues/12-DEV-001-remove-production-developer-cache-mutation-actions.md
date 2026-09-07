@@ -147,3 +147,113 @@ solely by supplying argv anymore.
   counted as red evidence. All Vitest runs explicitly disabled live SIGAA tests.
 - Only this issue and the two test files changed. No implementation, build,
   live E2E, push, or changes to the plan or another issue.
+
+## Auditoria cega do spec (Fable)
+
+Sessão separada, 2026-09-07, em `474a5f2`. Lido: issue, diff, `electron/main.ts`,
+`electron/preload.ts`, `electron/ipc/register-handlers.ts`, `sender-policy.ts`,
+`cache.service.ts`, `account-context.service.ts`, `src/vite-env.d.ts`,
+`tests/e2e/app.spec.ts`, `tests/unit/preload-dev-gate.test.ts`,
+`tests/unit/preload-contract.test.ts`, e os dois outros testes que importam o
+main (`navigation-policy.test.ts`, `updater-consent.test.ts`).
+
+`RUN_LIVE_SIGAA_TESTS=false npx vitest run`: **1 failed | 40 passed (41);
+2 failed | 501 passed | 4 skipped (507)**. Os dois casos novos falham por
+asserção em `dev-cache-mutation-boundary.test.ts:164`
+(`expected true to be false`), depois de executarem com sucesso o boot dev, a
+mutação real, o boot empacotado e a checagem de tray/handler. Confere com o
+registro da especificação.
+
+Contrato descrito na issue bate com o código: `simulateNewFile` em
+`main.ts:103-117` (sem payload, `Promise<boolean>`, `false` sem conta ou sem
+arquivo, `await syncNow()` e `true`); registro condicional em
+`register-handlers.ts:336-340` com `noPayload` e `() => false` no inválido;
+tray em `main.ts:266-272` com os três rótulos. Nenhum achado nesse eixo.
+
+### A1 — Teste passa sem implementar o critério: o flag é literal, não o que o main injeta
+
+`dev-cache-mutation-boundary.test.ts:163` alimenta o preload empacotado com o
+literal `'--sigaa-dev'`. A leg dev alimenta o preload com `devArgs`, capturado
+de `additionalArguments`. Hoje os dois são iguais por coincidência de texto,
+não por construção.
+
+Cenário que passa verde e mantém a exposição: o implementador renomeia o token
+nos dois lados (`additionalArguments: ['--sigaa-dev-bridge']` no main e
+`process.argv.includes('--sigaa-dev-bridge')` no preload). Leg dev: `devArgs`
+traz o token novo, `testApi` aparece. Leg empacotada sem flag: nada. Leg
+empacotada com `'--sigaa-dev'`: o preload ignora o token antigo, `testApi`
+ausente, `expect.soft` passa. Um preload empacotado que receba
+`--sigaa-dev-bridge` expõe a ponte, que é exatamente o que AC2 proíbe
+("argv alone cannot grant access").
+
+Correção no teste, uma linha:
+`await loadPreload([...productionArgs, ...devArgs])`. Com isso o preload
+empacotado recebe argv idêntico ao do preload dev, qualquer que seja o token, e
+argv deixa de poder ser a autoridade. Vale ajustar o comentário da linha 161.
+
+### A2 — Os dublês fixam os primitivos de IPC; a solução síncrona natural exige editar testes fora do limite
+
+A issue diz que os critérios não exigem canal novo e pede solução "local", mas
+não nomeia um mecanismo pelo qual um preload sandboxed descubra
+`app.isPackaged`. Os dublês existentes fecham as opções, e o implementador não
+pode editar arquivo de teste:
+
+- `ipcMain: { handle }` neste teste e em `navigation-policy.test.ts:82` e
+  `updater-consent.test.ts:38`. Um gate síncrono via `ipcMain.on` +
+  `event.returnValue` quebra os três arquivos no `import(main)` com
+  `TypeError: ipcMain.on is not a function`.
+- `ipcRenderer: { invoke, on, off }` em `loadPreload`. `ipcRenderer.sendSync`
+  no preload é `TypeError` em `loadPreload`, embora seja export disponível no
+  renderer, ao contrário do que a seção Verification afirma ("supplies only
+  renderer-available Electron exports").
+- `ipcMock.invoke` em `preload-dev-gate.test.ts:29` devolve `undefined`. Um
+  probe assíncrono `ipcRenderer.invoke('...').then(expor)` no topo do preload
+  quebra os cinco testes daquele arquivo com
+  `Cannot read properties of undefined (reading 'then')`. Medi que
+  `await import()` do Vitest esvazia a cadeia de microtasks, então o probe
+  funcionaria neste harness, mas só embrulhado em `Promise.resolve(...)` para
+  tolerar o dublê. E `preload-contract.test.ts` exige que todo canal invocado
+  no preload tenha `handle('...')` em `register-handlers.ts`.
+
+O que sobra sem tocar em teste: sinal controlado pelo main fora de argv, legível
+de forma síncrona no preload sandboxed. Na prática é `process.env`, definido
+quando `!app.isPackaged` e **apagado explicitamente** quando empacotado. O
+apagamento não é opcional: os dois boots correm no mesmo processo Node, e um
+`process.env` deixado pelo boot dev faria a leg empacotada expor `testApi` na
+linha 156. Isso é um acerto do teste, mas a issue devia dizer isso ao
+implementador em vez de deixá-lo redescobrir por eliminação.
+
+### A3 — Sinal por `process.env` é verificado num processo só; o momento em que o main o define não é coberto
+
+Consequência de A2. No Electron o renderer herda o ambiente do processo
+principal **no spawn**, e o preload sandboxed lê `process.env`. Um sinal
+definido antes de `new BrowserWindow(...)` chega ao preload. Um sinal definido
+depois não chega.
+
+Cenário: o implementador define `process.env.X` dentro de `whenReady().then`,
+depois de `createWindow()` (por exemplo junto do tray, onde já existe um ramo
+`app.isPackaged`). Neste teste, main e preload compartilham o mesmo `process`,
+o valor está lá quando `loadPreload` roda, tudo verde. No app dev real o preload
+não vê o sinal, `window.testApi` fica `undefined`, e o E2E morre em
+`app.spec.ts:204` com `TypeError` em vez de cair no ramo "cache vazio".
+
+Correção barata no harness: o dublê de `BrowserWindow` captura
+`{ ...process.env }` no momento da construção, e `loadPreload` roda o preload
+com **esse** snapshot em `process.env`, não com o ambiente vivo. Assim o teste
+distingue "definido antes da janela" de "definido depois". Sem isso, AC3 fica
+sem teste que falhe para o erro de ordem.
+
+### Notas menores, sem cenário de falha
+
+- `Primary files` lista `src/vite-env.d.ts` e `tests/e2e/app.spec.ts`, e
+  Implementation notes diz que ambos permanecem inalterados. Uma das duas
+  afirmações sobra.
+- O boot empacotado corre com `process.argv` do main contendo `--sigaa-dev`
+  (`bootMain`, linha 100). Isso pega qualquer implementação que passe a
+  confiar no argv do main, porque `handlers.has('test-simulate-new-file')`
+  precisa ser `false`. Acerto do spec, vale manter.
+- A proibição de probe via simulação (AC4) está coberta pela leg dev: um
+  `invoke('test-simulate-new-file')` no load do preload esqueceria um arquivo a
+  mais e chamaria `syncNow` duas vezes, e as linhas 132 e 134 falham.
+
+Sem implementação, sem ledger, sem outra issue tocada.
