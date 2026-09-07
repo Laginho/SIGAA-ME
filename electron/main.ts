@@ -54,17 +54,17 @@ const formatLog = (level: string, args: unknown[]) => {
 
 console.log = (...args: unknown[]) => {
   originalConsoleLog.apply(console, args);
-  logStream.write(formatLog('INFO', args));
+  if (logStream.writable) logStream.write(formatLog('INFO', args));
 };
 
 console.error = (...args: unknown[]) => {
   originalConsoleError.apply(console, args);
-  logStream.write(formatLog('ERROR', args));
+  if (logStream.writable) logStream.write(formatLog('ERROR', args));
 };
 
 console.warn = (...args: unknown[]) => {
   originalConsoleWarn.apply(console, args);
-  logStream.write(formatLog('WARN', args));
+  if (logStream.writable) logStream.write(formatLog('WARN', args));
 };
 
 console.log('=== SIGAA-ME App Started ===');
@@ -76,9 +76,14 @@ console.log('=== SIGAA-ME App Started ===');
  */
 async function resetAppLog(): Promise<void> {
   await new Promise<void>((resolve) => { logStream.end(() => resolve()); });
-  fs.rmSync(logsDir, { recursive: true, force: true });
-  fs.mkdirSync(logsDir, { recursive: true });
-  logStream = openLogStream();
+  try {
+    fs.rmSync(logsDir, { recursive: true, force: true });
+  } finally {
+    // Mesmo se o rmSync falhar (EBUSY/EPERM num arquivo travado), o main
+    // precisa voltar a ter um stream aberto; senão fica sem log até reiniciar.
+    fs.mkdirSync(logsDir, { recursive: true });
+    logStream = openLogStream();
+  }
 }
 // ===== END FILE LOGGER SETUP =====
 
