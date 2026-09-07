@@ -1,21 +1,32 @@
 # CONC-001 — Serialize and cancel shared Playwright operations
-Status: open
+Status: resolved
 Priority: P1
-Blocked by: DATA-002
+Blocked by: DATA-002 (resolved 2026-09-06)
 Tracker status at migration: `NOT STARTED`
 
-- Owner: —
-- Dependencies: `ARCH-001`
-- Primary files:
-  - New: `electron/services/session-operation-coordinator.service.ts`
-  - New: `shared/operation.ts`
-  - `electron/services/sigaa.service.ts`
-  - `electron/services/background-sync.service.ts`
-  - `electron/services/playwright-login.service.ts`
-  - `electron/main.ts`
-  - `src/pages/course-detail.ts`
+- Owner: spec session (Fable), 2026-09-06; implementation goes to Sonnet, review to Opus (alternative flow, second subject after `DATA-002`)
+- Dependencies: `ARCH-001`, `DATA-002`
+- Primary files (corrected 2026-09-06 by the spec session; see Contract):
+  - New: `electron/services/session-operation-coordinator.service.ts` —
+    `SessionOperationCoordinator` and the `OperationKind` type
+  - `electron/services/sigaa.service.ts` — `busyCount` goes; every public
+    method that touches Playwright runs inside `this.operations.run(...)`;
+    cancellation checks in the loops
+  - `electron/services/background-sync.service.ts` — `cancelRequested` flag
+    goes; `runSync` receives the coordinator's `AbortSignal`
+  - ~~New: `shared/operation.ts`~~ — not needed: the renderer never sees an
+    operation kind. The type lives next to the coordinator.
+  - ~~`electron/services/playwright-login.service.ts`~~,
+    ~~`electron/main.ts`~~, ~~`src/pages/course-detail.ts`~~ — unchanged. The
+    coordinator is owned by `SigaaService`, so `main.ts` wires nothing new;
+    the IPC handlers call the same methods; the renderer already knows
+    `CANCELLED` (see Decisions, 2).
   - New: `tests/unit/session-operation-coordinator.test.ts`
   - New: `tests/integration/background-sync-serialization.test.ts`
+  - Extended: `tests/unit/sigaa-service.test.ts` (`session operations (CONC-001)`)
+  - Fixtures only: `tests/integration/background-sync.test.ts`,
+    `background-sync-account.test.ts`, `background-sync-cancel.test.ts` — the
+    fake `SigaaService` gains `operations: new SessionOperationCoordinator()`
 
 #### Required behavior
 
@@ -32,7 +43,9 @@ Tracker status at migration: `NOT STARTED`
   que o `pauseSync` fingia dar está **ausente e é conhecida** — nada serializa
   sync em background e ação do usuário sobre a mesma página Playwright até esta
   tarefa ser implementada. Ver `DÉBITO-03`.
-- Return `OPERATION_CANCELLED` rather than a generic failure.
+- ~~Return `OPERATION_CANCELLED` rather than a generic failure.~~ Return
+  `CANCELLED` (`shared/errors.ts` already defines it as "operação abortada";
+  see Decisions, 2).
 - **2026-09-06, from the DATA-002 spec:** the DATA-002 ↔ CONC-001 dependency
   cycle was broken in DATA-002's favour. DATA-002 adds
   `BackgroundSyncService.cancel()` — a flag checked between courses and
@@ -52,12 +65,349 @@ Tracker status at migration: `NOT STARTED`
 #### Verification
 
 ```text
-npm run test:unit -- session-operation-coordinator
-npm run test:integration -- background-sync-serialization
+npx vitest run tests/unit/session-operation-coordinator.test.ts tests/integration/background-sync-serialization.test.ts tests/unit/sigaa-service.test.ts tests/integration/background-sync.test.ts tests/integration/background-sync-account.test.ts tests/integration/background-sync-cancel.test.ts
+npm run quality
 ```
+
+(`npm run test:unit` / `test:integration` do not exist in `package.json`;
+the file list above is the equivalent.)
+
+---
+
+## What is actually there today (spec session, 2026-09-06)
+
+- **`SigaaService.busyCount`** is a counter with two log lines. Every public
+  method does `startBusy()` / `stopBusy()` and nothing reads the count. Two
+  callers — the background sync's `getCourseFiles` and an IPC
+  `get-course-files` — navigate the same `this.page` of
+  `PlaywrightLoginService` at the same time. `enterCourseAndGetHTML` reuses
+  that single page on purpose (a fresh page gets "Acesso Negado"), so there is
+  no per-caller isolation to fall back on.
+- **`BackgroundSyncService.cancel()`** (DATA-002) is a boolean checked before
+  each course and before publish, awaited by the `logout` and `clear-all-data`
+  handlers. It stops the sync; it does nothing for an in-flight interactive
+  operation — the Opus review of DATA-002 left "a download in flight is not
+  cancelled by either transaction" to this task.
+- **`SigaaService.logout()`** resets the HTTP session, nulls the active
+  account and calls `playwrightLogin.logout()` immediately. A download or
+  `loadAllNews` in flight sees the browser closed under it and fails with a
+  message classified as `SESSION_EXPIRED`.
+- **`before-quit`** in `main.ts` races `sigaaService.logout()` against 5s.
+  Unchanged by this task; with the coordinator, that logout now also waits
+  for the in-flight operation, still capped by the same 5s.
+- Nothing distinguishes "cancelled" from "failed" in any result today.
+
+## Decisions (spec session, 2026-09-06, without grilling — Bruno was not in the session)
+
+Each one is pinned by a test; overturn one by changing its test.
+
+1. **One coordinator, owned by `SigaaService`, acquired inside `SigaaService`.**
+   `readonly operations: SessionOperationCoordinator` on the service;
+   `BackgroundSyncService` uses `this.sigaaService.operations`. Acquisition
+   happens inside each public `SigaaService` method (where `startBusy` was),
+   not in the IPC handlers — so `register-handlers.ts` and `main.ts` do not
+   change, and every caller (IPC, sync, tray, `before-quit`) is covered by
+   construction. The sync's own calls into `SigaaService` are therefore
+   **nested** `run`s; the coordinator makes them run inline (see Contract).
+2. **`CANCELLED`, not a new `OPERATION_CANCELLED` code.** `AppErrorCode` already
+   has `CANCELLED` documented as "O usuário cancelou (dialog fechado, operação
+   abortada). Não é falha." — exactly this. The renderer already treats it as
+   "not an error" on the clear-all path. Adding a second code for the same
+   meaning would be a second thing for every consumer to handle.
+3. **Aborted operations still run, with an aborted signal; the coordinator
+   never fabricates a result.** `run<T>` cannot invent an `AppResult<T>`. A
+   queued operation that gets aborted is still called when its turn comes and
+   `fn` checks `signal.aborted` first thing. This keeps one uniform rule for
+   `fn` ("check the signal at every boundary, including the first line") and
+   zero special cases in the coordinator.
+4. **`interactive` and `auth` abort `background`; `shutdown` aborts everything;
+   `background` aborts nothing.** `auth` (login) is user-initiated and
+   replaces the session, so a sync of the old session must not continue. The
+   kind stays in the type for logging and for the day the two need to differ.
+5. **FIFO within the slot.** No priority reordering: an aborted operation is a
+   no-op, so letting it drain in order is simpler than a priority queue and
+   costs one microtask.
+6. **The interactive caller waits for the current course, not the current
+   sync.** Cancellation is checked immediately before each
+   `getCourseFiles`, so the wait is bounded by one Playwright course entry.
+   The 2s pacing `setTimeout` is not abort-aware (would save at most 2s; not
+   worth a listener).
+7. **A cancelled `downloadAllFiles` returns `CANCELLED`, dropping the partial
+   counts.** Files already written stay on disk and are skipped as duplicates
+   next time. The alternative (an `ok` with partial `results`) would make a
+   cancelled batch indistinguishable from a complete one — acceptance
+   criterion 4 says no.
+8. **Reentrancy through `AsyncLocalStorage`** (`node:async_hooks`, stdlib).
+   A `run` issued from within a running operation's async context runs
+   inline with that operation's signal. The one trap is a callback scheduled
+   inside an operation that fires after it ended (it inherits the store):
+   the coordinator must treat a **finished** stored operation as "no
+   operation" and acquire normally. Pinned by the last nesting test.
+
+## Contract
+
+### `SessionOperationCoordinator` (`electron/services/session-operation-coordinator.service.ts`)
+
+```ts
+export type OperationKind = 'interactive' | 'background' | 'auth' | 'shutdown';
+
+export class SessionOperationCoordinator {
+  /** Waits for the slot, calls `fn(signal)`, returns/throws what `fn` did. */
+  run<T>(kind: OperationKind, fn: (signal: AbortSignal) => Promise<T>): Promise<T>;
+  /** Aborts every operation of `kind` (running or queued); resolves when the running one, if of that kind, has finished. */
+  cancel(kind: OperationKind): Promise<void>;
+}
+```
+
+- **Single slot, FIFO.** At most one operation's `fn` is executing at any
+  time. Operations start in the order `run` was called.
+- **One `AbortController` per operation.** `fn` receives its signal, not
+  aborted unless something aborted it (before or during the run).
+- **On `run(kind)`:** `interactive` and `auth` abort every `background`
+  operation (running or queued); `shutdown` aborts every operation of every
+  kind; `background` aborts nothing. Then the new operation is queued.
+- **`cancel(kind)`:** aborts every operation of `kind`; if the running
+  operation is of that kind, resolves after its `fn` settled; otherwise
+  resolves at once. Never rejects.
+- **Nested `run`:** if called from inside a running operation's async
+  context (`AsyncLocalStorage`), `fn` is called inline with the **outer**
+  signal, and the requested `kind` has no effect (a nested `interactive`
+  inside a `background` does not abort its caller). A stored operation that
+  has already finished does not count as "inside": such a `run` queues
+  normally.
+- **Throws propagate** to the `run` caller and release the slot.
+- **Not terminal:** after a `shutdown` finished, new operations run.
+- No timers, no logging requirement, no Electron import — pure Node.
+
+### `SigaaService` (`sigaa.service.ts`)
+
+- `busyCount`, `startBusy`, `stopBusy` are removed.
+- New `readonly operations = new SessionOperationCoordinator()`.
+- Every public method that touches Playwright wraps its whole body:
+  `getCourses`, `getCourseFiles`, `downloadFile`, `downloadAllFiles`,
+  `getNewsDetail`, `loadAllNews` → `run('interactive', ...)`; `login` →
+  `run('auth', ...)`; `logout` → `run('shutdown', ...)` (the whole body: HTTP
+  reset, active account, `playwrightLogin.logout()`). `clearDiagnostics` is
+  not an operation.
+- Cancellation checks, each returning `fail('CANCELLED', <message>)` without
+  touching Playwright or HTTP afterwards:
+  - first line of every wrapped method (covers "queued then aborted");
+  - `downloadAllFiles`: before each file of the main loop, before each retry
+    attempt, before each Playwright fallback;
+  - `downloadFile`: before the retry re-entry (step 4) and before the
+    Playwright fallback;
+  - `loadAllNews`: before each `getNewsDetail`.
+- The message text is free (`'Operação cancelada.'` is fine); tests assert
+  the code only.
+
+### `BackgroundSyncService` (`background-sync.service.ts`)
+
+- `cancelRequested` and `currentRun` go. `syncNow()` returns
+  `this.sigaaService.operations.run('background', signal => this.runSync(settings, signal))`
+  (still guarded by `isSyncing`; `isSyncing` is cleared in `runSync`'s
+  `finally` as today).
+- `runSync(settings, signal)` checks `signal.aborted` and returns: at the
+  very start; **immediately before each `getCourseFiles`** (after the 2s
+  pacing delay); before each `getNewsDetail` of the auto-fetch loop; before
+  the publish/commit block. A cancelled run publishes nothing, commits
+  nothing and does not write `lastBackgroundSync` (unchanged from DATA-002).
+- `cancel()` → `return this.sigaaService.operations.cancel('background')`.
+  The four tests in `background-sync-cancel.test.ts` stay green unchanged
+  (fixture only).
+
+### Unchanged on purpose
+
+`register-handlers.ts` (logout still does `clearCredentials → cancel →
+logout`; the `cancel` is now redundant with the `shutdown` and harmless),
+`main.ts`, `playwright-login.service.ts`, the renderer, `shared/*`.
+
+## Test map
+
+| Criterion / behaviour | Test | Red today? |
+|---|---|---|
+| One at a time, FIFO, return value, throw releases slot, signal shape | `session-operation-coordinator.test.ts` › one operation at a time | yes (module missing) |
+| interactive/auth abort running and queued background and wait; background aborts nothing; shutdown aborts all, waits, not terminal | › priority between kinds | yes |
+| `cancel(kind)` semantics (running, idle, queued) | › cancel(kind) | yes |
+| Nested run inline with outer signal; finished-op callback acquires fresh | › nesting | yes |
+| Background sync and course navigation never share the page (`inFlight.max === 1`); cancelled sweep publishes nothing | `background-sync-serialization.test.ts` › user while sync / sync while user | yes |
+| Logout waits for the course in flight, closes the browser after | › logout during a sync | yes |
+| Nested background calls do not deadlock | › the sync alone completes | green today (guard) |
+| `cancel()` still drains through the coordinator | › DATA-002 contract kept | green today (guard) |
+| Two interactive calls serialize; `downloadAllFiles`/`downloadFile`/`loadAllNews` stop at the boundary with `CANCELLED`; queued op behind logout is `CANCELLED` without Playwright | `sigaa-service.test.ts` › session operations (CONC-001) | yes |
+| DATA-002 `cancel()` semantics preserved | `background-sync-cancel.test.ts` (fixture gains `operations`) | yes (import) |
+
+Red today, for the right reasons: `session-operation-coordinator.service.ts`
+does not exist (every file that imports it fails to load); with a stub module
+the serialization tests would fail because the second caller enters the page
+while the first is still on it, and the `SigaaService` tests because `logout`
+closes the browser immediately and nothing returns `CANCELLED`.
 
 #### Implementation notes
 
 - Commit: —
-- Queue policy: —
-- Cancellation boundaries: —
+- Queue policy: single-slot FIFO with one `AbortController` per operation;
+  `interactive`/`auth` abort `background` (running or queued) on enqueue,
+  `shutdown` aborts everything; nested `run()` (detected via
+  `AsyncLocalStorage`) runs inline with the outer signal instead of
+  re-queueing, so `BackgroundSyncService`'s calls into `SigaaService` never
+  deadlock.
+- Cancellation boundaries: first line of every wrapped `SigaaService` method;
+  `downloadAllFiles` before each file of the main loop, each retry-file, each
+  retry attempt and each Playwright-fallback file; `downloadFile` before the
+  step-4 retry re-entry and before both Playwright-fallback call sites;
+  `loadAllNews` before each `getNewsDetail`; `BackgroundSyncService.runSync`
+  at the start, right before each `getCourseFiles` (after the 2s pacing
+  delay), before each auto-fetch `getNewsDetail`, and before the
+  publish/commit block.
+
+#### Resolution (2026-09-07)
+
+Review session (Opus, clean; did not see the spec or implementation sessions).
+Read the whole diff against the Contract and then walked up the caller chain of
+everything it touches.
+
+Contract, item by item: `busyCount`/`startBusy`/`stopBusy` gone; `readonly
+operations` on the service; the eight public methods wrapped with the kinds the
+Contract names and `clearDiagnostics` left alone; every cancellation boundary
+the Contract lists is present, including both `downloadViaPlaywright` call
+sites in `_downloadFileInternal` and all four in `_downloadAllFilesInternal`;
+`cancelRequested`/`currentRun` gone and `cancel()` delegating to
+`operations.cancel('background')`. The coordinator is pure Node — one import,
+`node:async_hooks`.
+
+Caller chain beyond the issue:
+
+- `register-handlers.ts` and `main.ts` really are unchanged and really are
+  covered. The nine `sigaaService.*` call sites are all IPC handlers or the
+  sync, none of them nested in another operation's async context, so each one
+  acquires the slot for real. `clearDiagnostics` is the only unwrapped method
+  and it touches neither Playwright nor the HTTP session.
+- Nothing outside `SigaaService` holds a `PlaywrightLoginService` (grep:
+  only a comment in the dead `download.service.ts`), so wrapping the service's
+  own methods closes the whole surface.
+- `BackgroundSyncService`'s five calls into `SigaaService` are nested and run
+  inline on the background signal — no deadlock, and `downloadAllFiles`'
+  first-line check means an aborted sweep does not download either, even
+  though `runSync` has no explicit check in front of it.
+- `isSyncing` is still cleared exactly once: `syncNow` sets it before queueing,
+  and a queued-then-aborted background operation still runs `runSync`
+  (decision 3), whose `finally` clears it. No path leaves the flag stuck.
+- `before-quit` now waits for the in-flight operation inside the same 5s race —
+  the Contract says so explicitly ("still capped by the same 5s").
+- The DATA-002 leftover ("a fetch in flight during logout/clear-all is not
+  cancelled by either transaction") is closed: `logout` is `shutdown`, which
+  aborts the running interactive operation and only then closes the browser.
+
+Red-green, reproduced by the reviewer on Windows:
+`git stash push -u -- electron/services/{sigaa,background-sync,session-operation-coordinator}.service.ts`
+→ `6 failed (6) | 8 failed | 25 passed (33)`; restored →
+`6 passed (6) | 63 passed (63)`.
+
+Gate on the branch: `tsc` clean, lint 0 errors / 71 legacy warnings,
+`461 passed | 4 skipped (465)` in 38 files.
+
+Findings: none with a concrete failure scenario.
+
+Observations, not defects:
+
+- **A synchronous throw from `fn` would wedge the slot forever.** `start()`
+  attaches `.finally` to the promise `fn` returns; a `fn` that throws before
+  returning one never reaches `markDone()`, so `running` stays set, every later
+  `run` queues forever and `cancel` never resolves. Not reachable today: all
+  nine `fn`s are `async` arrows or return a promise from an `async` method. It
+  is a deviation from "Throws propagate to the run caller and release the
+  slot", so worth one line of hardening the next time this file is opened.
+- **`getCourses` returning `CANCELLED` inside `runSync` logs at error level.**
+  A superseded sync falls into the last `else` of the `getCourses` branch and
+  writes `getCourses failed (CANCELLED); aborting without re-login`. Behaviour
+  is right (it returns without touching anything); the log line reads like a
+  failure on what is now the most common path.
+- **`const CANCELLED` is one shared frozen-by-convention object** returned from
+  seven methods. No consumer mutates an `AppResult`, and the IPC boundary
+  structured-clones it, so nothing to fix — just do not start mutating results.
+- DATA-002 left a note that `resetAppLog` might move out of `main.ts` "when
+  CONC-001 touches that stretch". CONC-001 does not touch `main.ts`, by
+  Contract. The note stays open.
+
+## Revisão cega (Fable)
+
+2026-09-07. Sessão limpa; leu `CLAUDE.md`, `docs/agents/orchestration.md`,
+`ARCHITECTURE.md` e esta issue só até `#### Resolution (2026-09-07)`. Não abriu
+o ledger nem o PR. Diff revisado: `git diff 50c98bd..9dfeaff -- electron src
+shared tests` — três arquivos, todos em `electron/services/`
+(`session-operation-coordinator.service.ts` novo, `sigaa.service.ts`,
+`background-sync.service.ts`); nada em `src/`, `shared/` ou `tests/`.
+
+**Achados: nenhum.**
+
+### Cadeia de chamadores percorrida
+
+- `SigaaService.*` ← `electron/ipc/register-handlers.ts` (`login-request`,
+  `try-auto-login`, `get-courses`, `get-course-files`, `download-file`,
+  `download-all-files`, `get-news-detail`, `load-all-news`, `logout`,
+  `clear-all-data`) e `electron/main.ts` (`before-quit`).
+- `BackgroundSyncService.syncNow/cancel/start/stop/restart` ← `main.ts`
+  (`whenReady`, tray "Sincronizar Agora", `simulateNewFile`) e
+  `register-handlers.ts` (`update-app-setting`, `logout`, `clear-all-data`).
+- Toda chamada a `this.playwrightLogin.*` em `sigaa.service.ts` (linhas 80,
+  117, 131, 152, 160, 195, 233, 243, 287, 385, 392, 401, 434, 486, 534, 589,
+  609, 635) está dentro de um `operations.run(...)` ou de um método privado
+  só chamado de dentro de um. `clearDiagnostics` só toca `httpScraper.resetLog`.
+  `PlaywrightLoginService` não é referenciado fora de `sigaa.service.ts` e
+  `download.service.ts`. Não existe operação "não rastreada".
+- Nenhum `run`/`cancel` é emitido de callback criado dentro de outra operação
+  (interval do sync nasce em `start()`, chamado só de contexto raiz); a
+  única reentrância é a pretendida, `runSync` → `SigaaService.*`.
+
+### Cenários conferidos contra o contrato
+
+- Usuário abre disciplina com sync em voo: `interactive` aborta o
+  `background`; `enterCourseAndGetHTML` em curso termina; `runSync` dorme os
+  2s, vê `signal.aborted`, retorna sem publicar nem commitar; a interativa
+  começa. Pinado por `background-sync-serialization.test.ts`.
+- Logout durante `downloadAllFiles`: para no próximo arquivo com
+  `CANCELLED`; `playwrightLogin.logout()` só depois. Pinado em
+  `sigaa-service.test.ts`.
+- Handler `logout`/`clear-all-data`: `clearCredentials` → `cancel('background')`
+  → `logout()` (`shutdown`). Sync que o interval enfileirar no intervalo roda,
+  não acha credencial e sai. `isSyncing` é limpo no `finally` de `runSync`
+  mesmo quando a operação entra já abortada.
+- `cancel('background')` com o sync só na fila resolve na hora; o `shutdown`
+  seguinte é FIFO atrás da interativa em voo e do background abortado, então
+  o navegador nunca fecha por baixo de ninguém.
+- Rejeição de `fn` libera o slot; `done` nunca rejeita; `abort()` repetido
+  é no-op; dois `advance()` no mesmo tick não iniciam duas operações
+  (`start` seta `running` sincronamente).
+- Propagação do `AsyncLocalStorage`: a continuação do `await run(...)` no
+  handler IPC captura o contexto do handler, não o da operação; `advance()`
+  entra em `context.run(nextOp)` explícito. A armadilha do callback tardio é
+  coberta pelo flag `finished` e pelo último teste de nesting.
+
+### Verificação
+
+- `npm run quality`: typecheck limpo; ESLint 0 erros, 71 warnings
+  (`no-explicit-any` legado; 77 em 2026-09-03, só caiu); vitest
+  `Test Files 38 passed (38)`, `Tests 461 passed | 4 skipped (465)`.
+- Prova de vermelho: `sigaa.service.ts` e `background-sync.service.ts` em
+  50c98bd e o módulo do coordenador removido → os seis arquivos da seção
+  Verification dão `Test Files 6 failed (6)`, `Tests 8 failed | 25 passed
+  (33)`: 4 arquivos não carregam (módulo ausente), 5 falhas em
+  `sigaa-service.test.ts › session operations (CONC-001)` e 3 em
+  `background-sync-serialization.test.ts`. Os dois testes-guarda
+  ("the sync alone completes", "cancel() still drains") ficam verdes, como o
+  mapa de testes previa. Fontes restauradas para 9dfeaff; `git status` limpo.
+
+### Observações (não são achados; comportamento decidido na spec)
+
+- Qualquer ação interativa descarta o sync inteiro, inclusive o que já foi
+  buscado (decisões 4 e 7). Usuário ativo faz `lastBackgroundSync` nunca
+  avançar e cada tentativa recomeçar do zero. Se isso incomodar, a saída é
+  publicar parcial com marca de incompleto, o que a criterion 4 hoje proíbe.
+- Aborto que chega durante `getCourseFiles` só é notado depois do
+  `setTimeout` de 2s da disciplina seguinte (decisão 6). No `before-quit`
+  esses 2s entram no teto de 5s.
+- `login` checa o signal só na primeira linha. Um `shutdown` que chegue com
+  o login em voo deixa o login completar e o handler `login-request` salvar
+  a credencial depois de o logout ter rodado. Hoje não há caminho de UI para
+  login e logout coexistirem (loading page durante `tryAutoLogin`, botão de
+  logout só no dashboard); se um dia houver, isso vira achado.

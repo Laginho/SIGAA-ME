@@ -2,11 +2,12 @@
  * DATA-002 — `BackgroundSyncService.cancel()`: a fronteira segura mínima que
  * logout e clear-all aguardam antes de fechar a sessão e apagar o disco.
  *
- * É uma flag, não um `AbortSignal` (decisão 1 da issue): o loop a confere
- * antes de cada disciplina e antes de publicar. Um sync cancelado não busca
- * mais nenhuma disciplina, não manda `background-sync-update`, não commita a
- * linha de base nem grava `lastBackgroundSync`. O `CONC-001` troca a flag pelo
- * coordenador e mantém estes testes verdes.
+ * Nasceu como flag (decisão 1 da issue); desde o `CONC-001` é o `AbortSignal`
+ * do coordenador, e `cancel()` delega a `operations.cancel('background')`. O
+ * comportamento pinado aqui não mudou: o loop confere antes de cada disciplina
+ * e antes de publicar. Um sync cancelado não busca mais nenhuma disciplina,
+ * não manda `background-sync-update`, não commita a linha de base nem grava
+ * `lastBackgroundSync`.
  *
  * Harness igual ao de `background-sync.test.ts` (electron, cache e persistence
  * mockados, timers falsos para o `setTimeout` de 2s entre disciplinas). A
@@ -57,6 +58,7 @@ const persistenceMock = vi.hoisted(() => ({
 vi.mock('../../electron/services/persistence.service', () => ({ persistenceService: persistenceMock }));
 
 import { BackgroundSyncService } from '../../electron/services/background-sync.service';
+import { SessionOperationCoordinator } from '../../electron/services/session-operation-coordinator.service';
 import { setActiveAccount } from '../../electron/services/account-context.service';
 
 const ACC = 'a'.repeat(64);
@@ -85,6 +87,9 @@ function makeSigaaService() {
         .mockImplementationOnce(() => first.promise)
         .mockImplementation(async () => FILES);
     const sigaa = {
+        // CONC-001: o sync roda dentro do coordenador do SigaaService; aqui um
+        // real, sem ninguém mais na fila.
+        operations: new SessionOperationCoordinator(),
         getCourses: vi.fn(async () => ok({ courses: COURSES })),
         getCourseFiles,
         login: vi.fn(async () => ok({ id: ACC, name: 'U' })),

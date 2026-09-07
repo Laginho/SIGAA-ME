@@ -67,6 +67,7 @@ vi.mock('../../electron/services/persistence.service', () => ({
 }));
 
 import { BackgroundSyncService } from '../../electron/services/background-sync.service';
+import { SessionOperationCoordinator } from '../../electron/services/session-operation-coordinator.service';
 import { deriveAccountId, setActiveAccount } from '../../electron/services/account-context.service';
 
 function makeWindow() {
@@ -76,6 +77,7 @@ function makeWindow() {
 
 function makeSigaaService() {
     return {
+        operations: new SessionOperationCoordinator(), // CONC-001
         getCourses: vi.fn(async () => ok({ courses: [{ id: 'c1', name: 'Course 1', code: 'C1', period: '2026.1' }] })),
         getCourseFiles: vi.fn(async () => ok({ files: [{ id: 'old', name: 'old.pdf', type: 'file' }, { id: 'new', name: 'new.pdf', type: 'file' }], news: [] })),
         login: vi.fn(async () => ok({ id: deriveAccountId('aluno01'), name: 'U' })),

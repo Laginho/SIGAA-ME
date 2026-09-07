@@ -204,10 +204,8 @@ Nome de disciplina, nome de arquivo, título de notícia, corpo de notícia, fot
 perfil — tudo isso é **entrada não confiável**. Use `textContent`.
 
 O corpo da notícia é a única exceção que pode precisar de HTML, e só depois de
-sanitização com allowlist estrita (tarefa `SEC-001`, ainda não feita).
-
-Não existe sanitizador no projeto hoje. Se precisar de um, essa é a tarefa
-`SEC-001` — não improvise um inline.
+sanitização com allowlist estrita. O sanitizador é `src/security/html-sanitizer.ts`
+(`SEC-001`, fechada em 2026-09-04) — use ele, não improvise um inline.
 
 ### 2. Nunca `as any` para atravessar o IPC
 
@@ -229,8 +227,9 @@ falhou no caso do `pauseSync`.
 
 ### 4. Canal IPC novo precisa de tipo e validação
 
-O preload hoje expõe `ipcRenderer` genérico (`send`/`on`/`invoke`), o que permite
-ao renderer invocar qualquer canal. Isso é a tarefa `SEC-002` e está aberto.
+O preload expunha `ipcRenderer` genérico (`send`/`on`/`invoke`), o que permitia
+ao renderer invocar qualquer canal. `SEC-002` (fechada em 2026-09-04) trocou isso
+por uma API nomeada e validada. Não reintroduza o genérico.
 
 **Não amplie essa superfície.** Todo canal novo: nomeado explicitamente, com
 tipo, e com validação de payload no main. Nunca passe script JSF, ViewState,

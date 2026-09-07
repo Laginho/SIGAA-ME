@@ -430,4 +430,149 @@ describe('SigaaService (Unit)', () => {
             expect(mockHttp.resetLog).toHaveBeenCalledTimes(1);
         });
     });
+
+    // ── CONC-001: um dono da sessão por vez; logout é a fronteira segura ──
+    //
+    // Cada método público que toca o Playwright roda dentro de
+    // `this.operations.run(...)`. `logout()` é `shutdown`: aborta o que está em
+    // voo, espera parar, e só então fecha o navegador. A operação abortada
+    // devolve `CANCELLED` na próxima fronteira (entre arquivos, entre
+    // tentativas, entre notícias) — nunca continua nem inventa sucesso.
+    describe('session operations (CONC-001)', () => {
+        const FILES3 = [
+            PARSED_DOC,
+            { ...PARSED_DOC, id: '124', name: 'b.pdf', script: SCRIPT.replace('id,123', 'id,124') },
+            { ...PARSED_DOC, id: '125', name: 'c.pdf', script: SCRIPT.replace('id,123', 'id,125') },
+        ];
+        const REFS3 = FILES3.map(f => ({ id: f.id, name: f.name }));
+        const NEWS3 = ['N1', 'N2', 'N3'].map(id => ({ id, title: `Aviso ${id}`, date: '01/01/2026', notification: 'Sim', script: SCRIPT }));
+        const ENTERED = { success: true, html: '<html></html>' };
+
+        function deferred<T>() {
+            let resolve!: (value: T) => void;
+            const promise = new Promise<T>(res => { resolve = res; });
+            return { promise, resolve };
+        }
+        const tick = () => new Promise<void>(resolve => setTimeout(resolve, 0));
+
+        beforeEach(() => {
+            mockPlaywright.enterCourseAndGetHTML.mockResolvedValue(ENTERED);
+            mockPlaywright.navigateToFilesSection.mockResolvedValue({ success: true, html: '<files></files>' });
+            mockHttp.getCourseFiles.mockResolvedValue({ success: true, files: FILES3, news: [] });
+        });
+
+        it('two interactive calls never overlap on the Playwright page', async () => {
+            const first = deferred<typeof ENTERED>();
+            mockPlaywright.enterCourseAndGetHTML
+                .mockImplementationOnce(() => first.promise)
+                .mockResolvedValue(ENTERED);
+
+            const a = service.getCourseFiles('C1', 'A');
+            const b = service.getCourseFiles('C2', 'B');
+            await tick();
+            expect(mockPlaywright.enterCourseAndGetHTML).toHaveBeenCalledTimes(1);
+
+            first.resolve(ENTERED);
+            await Promise.all([a, b]);
+
+            expect(mockPlaywright.enterCourseAndGetHTML.mock.calls.map((call: unknown[]) => call[0])).toEqual(['C1', 'C2']);
+        });
+
+        it('downloadAllFiles stops between files when logout arrives, answers CANCELLED, and the browser closes only afterwards', async () => {
+            const first = deferred<{ success: boolean; filePath?: string }>();
+            mockHttp.downloadFile
+                .mockImplementationOnce(() => first.promise)
+                .mockResolvedValue({ success: true, filePath: '/mock/downloads/Math/x.pdf' });
+
+            const download = service.downloadAllFiles('C1', 'Math', REFS3, '/mock/downloads');
+            await tick();
+            expect(mockHttp.downloadFile).toHaveBeenCalledTimes(1);
+
+            const logout = service.logout();
+            await tick();
+            // Ainda há um download em voo: o navegador não pode fechar por baixo dele.
+            expect(mockPlaywright.logout).not.toHaveBeenCalled();
+
+            first.resolve({ success: true, filePath: '/mock/downloads/Math/doc.pdf' });
+            const result = await download;
+            await logout;
+
+            expect(result.success).toBe(false);
+            if (!result.success) expect(result.error.code).toBe('CANCELLED');
+            expect(mockHttp.downloadFile).toHaveBeenCalledTimes(1);
+            expect(mockPlaywright.downloadFile).not.toHaveBeenCalled();
+            expect(mockPlaywright.logout).toHaveBeenCalledTimes(1);
+        });
+
+        it('downloadFile does not re-enter the course for a retry once logout was requested', async () => {
+            mockHttp.getCourseFiles.mockResolvedValue({ success: true, files: [PARSED_DOC] });
+            const first = deferred<{ success: boolean; error?: string }>();
+            mockHttp.downloadFile
+                .mockImplementationOnce(() => first.promise)
+                .mockResolvedValue({ success: false, error: 'HTTP Error 302' });
+
+            const download = service.downloadFile('C1', 'Math', DOC_REF, '/mock/downloads');
+            await tick();
+            expect(mockHttp.downloadFile).toHaveBeenCalledTimes(1);
+            const logout = service.logout();
+            await tick();
+
+            first.resolve({ success: false, error: 'HTTP Error 302' });
+            const result = await download;
+            await logout;
+
+            expect(result.success).toBe(false);
+            if (!result.success) expect(result.error.code).toBe('CANCELLED');
+            // Sem a segunda entrada na disciplina nem o fallback Playwright.
+            expect(mockPlaywright.enterCourseAndGetHTML).toHaveBeenCalledTimes(1);
+            expect(mockHttp.downloadFile).toHaveBeenCalledTimes(1);
+            expect(mockPlaywright.downloadFile).not.toHaveBeenCalled();
+        });
+
+        it('loadAllNews stops between news items once logout was requested', async () => {
+            mockHttp.getCourseFiles.mockResolvedValue({ success: true, files: [], news: NEWS3 });
+            const first = deferred<{ success: boolean; news?: { content: string } }>();
+            mockPlaywright.getNewsDetail
+                .mockImplementationOnce(() => first.promise)
+                .mockResolvedValue({ success: true, news: { content: 'x' } });
+
+            const load = service.loadAllNews('C1', 'Math');
+            await tick();
+            expect(mockPlaywright.getNewsDetail).toHaveBeenCalledTimes(1);
+            const logout = service.logout();
+            await tick();
+
+            first.resolve({ success: true, news: { content: 'primeira' } });
+            const result = await load;
+            await logout;
+
+            expect(result.success).toBe(false);
+            if (!result.success) expect(result.error.code).toBe('CANCELLED');
+            expect(mockPlaywright.getNewsDetail).toHaveBeenCalledTimes(1);
+        });
+
+        it('an operation queued behind a logout answers CANCELLED without touching Playwright', async () => {
+            const first = deferred<{ success: boolean; filePath?: string }>();
+            mockHttp.downloadFile
+                .mockImplementationOnce(() => first.promise)
+                .mockResolvedValue({ success: true, filePath: '/mock/downloads/Math/x.pdf' });
+
+            const download = service.downloadAllFiles('C1', 'Math', REFS3, '/mock/downloads');
+            await tick();
+            const later = service.getCourseFiles('C2', 'B');
+            const logout = service.logout();
+            await tick();
+
+            first.resolve({ success: true, filePath: '/mock/downloads/Math/doc.pdf' });
+            await download;
+            const result = await later;
+            await logout;
+
+            expect(result.success).toBe(false);
+            if (!result.success) expect(result.error.code).toBe('CANCELLED');
+            // Só a entrada do download; a disciplina C2 nunca foi aberta.
+            expect(mockPlaywright.enterCourseAndGetHTML.mock.calls.map((call: unknown[]) => call[0])).toEqual(['C1']);
+            expect(mockPlaywright.logout).toHaveBeenCalledTimes(1);
+        });
+    });
 });
