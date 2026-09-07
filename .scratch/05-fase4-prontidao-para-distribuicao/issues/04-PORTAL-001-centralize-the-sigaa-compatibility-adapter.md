@@ -139,7 +139,7 @@ npm run quality
 
 #### Implementation notes
 
-- Commit: 1578d00 (Sonnet, implementação) + REVCOMMIT (Opus, revisão)
+- Commit: 1578d00 (Sonnet, implementação) + 0b7566d (Opus, revisão)
 - O comando antigo `test:integration` não existe no package.json atual;
   usar os comandos acima sem adicionar script npm nesta especificação.
 - Versão anterior do adapter: inexistente. A implementação deve declarar
