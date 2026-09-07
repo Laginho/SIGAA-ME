@@ -47,12 +47,21 @@ function parseBucket(value: unknown): AccountBucket | null {
 }
 
 export class CacheService {
-    private cachePath: string;
-    private cache: CacheFileV2;
+    private loaded: CacheFileV2 | null = null;
 
-    constructor() {
-        this.cachePath = path.join(app.getPath('userData'), 'cache.json');
-        this.cache = this.loadCache();
+    /**
+     * Resolvido a cada uso, nunca no import (DEV-002). Este módulo é um
+     * singleton importado pelo `main.ts`, e imports são içados: qualquer
+     * `app.getPath` no construtor roda antes do `app.setPath('userData', ...)`
+     * que isola o dev da produção, e o `cache.json` de dev acabava em
+     * `%APPDATA%\sigaa-me` em vez de `sigaa-me-dev`.
+     */
+    private get cachePath(): string {
+        return path.join(app.getPath('userData'), 'cache.json');
+    }
+
+    private get cache(): CacheFileV2 {
+        return this.loaded ??= this.loadCache();
     }
 
     /**
@@ -131,7 +140,7 @@ export class CacheService {
      * antigos, e a próxima escrita contém só o que vier dali em diante.
      */
     public clear(): void {
-        this.cache = { schemaVersion: 2, accounts: {} };
+        this.loaded = { schemaVersion: 2, accounts: {} };
         if (fs.existsSync(this.cachePath)) {
             fs.unlinkSync(this.cachePath);
         }
