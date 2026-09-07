@@ -1,5 +1,6 @@
 # PROC-001 — Validar Opus como revisor (e Sonnet como implementador)
-Status: open
+Status: resolved
+Closed: 2026-09-07
 Priority: P2
 Started: 2026-09-06
 
@@ -56,9 +57,23 @@ Por tarefa:
 |---|---|---|---|
 | DATA-002 | 2 (resetLog sem await; LoggerService.clear engolia erro) | 1 A-leve: `resetAppLog` com `rmSync` falhando deixa `logStream` encerrado, main sem log em arquivo até reiniciar. Opus olhou o trecho e o declarou correto. Não é segurança/dado/concorrência. Comparação assimétrica: `fe0594d` já traz as correções do Opus | Opus passa (0 A bloqueante) |
 | CONC-001 | 0 (4 observações: throw síncrono em `fn` travaria o slot, não alcançável; `CANCELLED` logado como erro no `runSync`; `CANCELLED` objeto compartilhado; nota do `resetAppLog`) | 0. Fable cego também zero achados, 3 observações. Comparação simétrica: Opus não alterou código. O Fable não anotou o throw síncrono que o Opus anotou; o Opus não anotou o `login` que só checa o signal na primeira linha (Fable) | Opus passa (0 A) |
-| — | | | |
+| DL-002 | 1 (`extensionFromSignature` aceitava prefixo: corpo vazio virava `.pdf`) | 0. Fable cego achou o mesmo e único achado, com os mesmos cenários. Comparação simétrica: diff `2d65032..70fcb4b`, anterior à correção do Opus | Opus passa (0 A) |
 
 ## Fechamento
+
+**Resultado (2026-09-07): Opus aprovado como revisor.** Três tarefas de fronteira de
+confiança ou concorrência (`DATA-002`, `CONC-001`, `DL-002`), zero A bloqueante.
+Um A-leve no DATA-002 (`resetAppLog` sem log em caso de `rmSync` falhar), corrigido
+em `2a5c2ff`. No CONC-001 e no DL-002 o Fable cego não achou nada além do Opus.
+
+**Sonnet aprovado por osmose, com ressalva.** Três achados em três tarefas, todos
+corrigidos pelo revisor. Um deles (`resetLog` sem `await`, DATA-002) deixava dado da
+conta anterior no disco: fronteira de confiança com teste no contrato que não pegava.
+O revisor segurou. Sonnet continua servindo para essa classe de tarefa enquanto o
+Opus revisar; não dispensa revisão.
+
+Regras que saem daqui: implementador commita antes de entregar, revisor commita a
+correção em cima. Revisor não roda os tiers com credencial.
 
 Se aprovado: registrar no `CLAUDE.md` com as três tarefas e a data; o Fable
 passa a aparecer só na especificação e no passe pré-release. Se reprovado:
