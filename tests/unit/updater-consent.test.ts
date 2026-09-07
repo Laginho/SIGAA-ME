@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import * as os from 'os';
 
 const harness = vi.hoisted(() => {
   const handlers = new Map<string, (...args: any[]) => any>();
@@ -23,7 +24,7 @@ const harness = vi.hoisted(() => {
 
 vi.mock('electron', () => ({
   app: {
-    getPath: vi.fn(() => '/tmp'),
+    getPath: vi.fn(() => os.tmpdir()),
     getName: vi.fn(() => 'test-app'),
     setPath: vi.fn(),
     getAppPath: vi.fn(() => '/tmp'),
