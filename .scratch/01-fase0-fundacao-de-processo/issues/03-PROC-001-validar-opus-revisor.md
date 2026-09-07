@@ -55,7 +55,7 @@ Por tarefa:
 | Tarefa | Opus: achados | Fable cego: a mais (A/B/C) | Veredito |
 |---|---|---|---|
 | DATA-002 | 2 (resetLog sem await; LoggerService.clear engolia erro) | 1 A-leve: `resetAppLog` com `rmSync` falhando deixa `logStream` encerrado, main sem log em arquivo até reiniciar. Opus olhou o trecho e o declarou correto. Não é segurança/dado/concorrência. Comparação assimétrica: `fe0594d` já traz as correções do Opus | Opus passa (0 A bloqueante) |
-| — | | | |
+| CONC-001 | 0 (4 observações: throw síncrono em `fn` travaria o slot, não alcançável; `CANCELLED` logado como erro no `runSync`; `CANCELLED` objeto compartilhado; nota do `resetAppLog`) | 0. Fable cego também zero achados, 3 observações. Comparação simétrica: Opus não alterou código. O Fable não anotou o throw síncrono que o Opus anotou; o Opus não anotou o `login` que só checa o signal na primeira linha (Fable) | Opus passa (0 A) |
 | — | | | |
 
 ## Fechamento

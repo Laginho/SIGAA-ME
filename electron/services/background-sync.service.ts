@@ -14,9 +14,6 @@ export class BackgroundSyncService {
     private intervalId: NodeJS.Timeout | null = null;
     private isSyncing = false;
     private getWindow: () => BrowserWindow | null;
-    /** Flag mínima checada entre disciplinas (decisão 1 do DATA-002); CONC-001 troca por AbortSignal. */
-    private cancelRequested = false;
-    private currentRun: Promise<void> | null = null;
 
     constructor(sigaaService: SigaaService, getWindow?: () => BrowserWindow | null) {
         this.sigaaService = sigaaService;
@@ -50,11 +47,8 @@ export class BackgroundSyncService {
      * resolve quando ele efetivamente parar — logout e clear-all aguardam isto
      * antes de fechar o navegador por baixo dele.
      */
-    public async cancel(): Promise<void> {
-        this.cancelRequested = true;
-        const run = this.currentRun;
-        if (run) await run;
-        this.cancelRequested = false;
+    public cancel(): Promise<void> {
+        return this.sigaaService.operations.cancel('background');
     }
 
     public syncNow(): Promise<void> {
@@ -68,13 +62,12 @@ export class BackgroundSyncService {
 
         this.isSyncing = true;
         console.log('[BackgroundSync] Triggering background sync...');
-        const run = this.runSync(settings);
-        this.currentRun = run;
-        return run;
+        return this.sigaaService.operations.run('background', signal => this.runSync(settings, signal));
     }
 
-    private async runSync(settings: AppSettings): Promise<void> {
+    private async runSync(settings: AppSettings, signal: AbortSignal): Promise<void> {
         try {
+            if (signal.aborted) return;
             // 1. Ensure logged in
             const creds = persistenceService.loadCredentials();
             if (!creds) {
@@ -138,17 +131,18 @@ export class BackgroundSyncService {
             const pendingCommits: { courseId: string; fileIds: string[]; newsIds: string[] }[] = [];
 
             for (const course of courses) {
-                // Cancelamento checado a cada disciplina (decisão 1 do DATA-002):
-                // nenhuma disciplina a mais é buscada depois de um cancel().
-                if (this.cancelRequested) {
-                    console.log('[BackgroundSync] Cancelled; stopping before the next course.');
-                    return;
-                }
-
                 console.log(`[BackgroundSync] Checking course: ${course.name}`);
 
                 // Wait briefly to avoid hammering the SIGAA server
                 await new Promise(resolve => setTimeout(resolve, 2000));
+
+                // Cancelamento checado a cada disciplina (decisão 1 do DATA-002,
+                // signal do coordenador desde o CONC-001): nenhuma disciplina a
+                // mais é buscada depois de um cancel().
+                if (signal.aborted) {
+                    console.log('[BackgroundSync] Cancelled; stopping before the next course.');
+                    return;
+                }
 
                 const contentResult = await this.sigaaService.getCourseFiles(course.id, course.name);
 
@@ -222,6 +216,7 @@ export class BackgroundSyncService {
                         if (settings.autoDownloadUpdates && diff.newNews.length > 0) {
                             console.log(`[BackgroundSync] Auto-fetching content for ${diff.newNews.length} new news items...`);
                             for (const newsItem of diff.newNews) {
+                                if (signal.aborted) return;
                                 try {
                                     await new Promise(resolve => setTimeout(resolve, 1500));
                                     const detail = await this.sigaaService.getNewsDetail(course.id, course.name, newsItem.id);
@@ -253,7 +248,7 @@ export class BackgroundSyncService {
             }
 
             // Cancelado depois da última disciplina: nada é publicado nem commitado.
-            if (this.cancelRequested) {
+            if (signal.aborted) {
                 console.log('[BackgroundSync] Cancelled; discarding this run before publish/commit.');
                 return;
             }
@@ -312,7 +307,6 @@ export class BackgroundSyncService {
             console.error('[BackgroundSync] Error during sync:', error);
         } finally {
             this.isSyncing = false;
-            this.currentRun = null;
         }
     }
 }
