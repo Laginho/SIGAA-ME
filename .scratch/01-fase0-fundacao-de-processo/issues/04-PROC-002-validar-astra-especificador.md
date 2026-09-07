@@ -63,6 +63,18 @@ precisa; basta rodar `npx vitest run` no commit de spec e confirmar que cada
 teste novo falha por **asserção**, não por import quebrado ou `tsc`. Teste
 que falha por motivo errado é A-leve.
 
+## Controle (adicionado 2026-09-07, após DEV-001)
+
+A amostra DEV-001 reprovou por acúmulo, mas o protocolo não tinha baseline:
+nenhum spec do Fable passou pela mesma auditoria. Em `OBS-001` os papéis
+invertem: **Fable high especifica, Astra high audita cego**, com os mesmos
+prompts e a mesma classificação. Isso separa "o Astra deixa buraco" de "todo
+spec deixa buraco". `PORTAL-001` volta ao arranjo original.
+
+A regra "dois A-leves viram bloqueante" foi copiada da PROC-001, onde A-leve
+era bug em código. Aqui é buraco de spec que o revisor ainda pode pegar. Só
+revisar a régua com o controle na mão.
+
 ## Critério
 
 - **Astra aprovado:** zero A bloqueante nas três tarefas.
@@ -105,7 +117,7 @@ issue. Zero achados é resposta válida. Não abra ledger.md nem outra issue.
 | Tarefa | Astra: testes / critérios | Achados de spec (Fable cego + Opus), classe | Veredito |
 |---|---|---|---|
 | DEV-001 | 2 casos em `dev-cache-mutation-boundary.test.ts` (boot dev + empacotado contra main real); editou `preload-dev-gate.test.ts` movendo a cobertura de `testApi` | 3 A-leves (Fable cego): A1 leg empacotada usa `--sigaa-dev` literal em vez do argv injetado pelo main; A2 spec não nomeia mecanismo e os dublês de IPC fecham as alternativas; A3 harness não distingue sinal antes/depois da janela (AC3 sem teste). Nada do Opus ainda | Reprova por acúmulo (2+ A-leves). Ressalva: A2 e A3 vêm da mesma omissão |
-| OBS-001 | | | |
+| OBS-001 (controle: Fable especifica, Astra audita) | | | |
 | PORTAL-001 | | | |
 
 ## Fechamento
