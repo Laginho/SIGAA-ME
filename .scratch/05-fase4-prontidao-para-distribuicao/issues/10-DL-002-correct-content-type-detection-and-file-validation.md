@@ -1,5 +1,5 @@
 # DL-002 — Correct content-type detection and file validation
-Status: claimed
+Status: resolved
 Priority: P2
 Blocked by: —
 Tracker status at migration: `NOT STARTED`
@@ -41,9 +41,13 @@ npx vitest run tests/unit/file-validation.test.ts tests/integration/download-bou
 
 #### Implementation notes
 
-- Commit: —
-- Supported signatures: —
-- Maximum size: —
+- Commits: `2d65032` (testes), `70fcb4b` (implementação), + correção da revisão.
+- Supported signatures: `.pdf`; `.zip/.docx/.xlsx/.pptx/.odt/.ods/.odp` (PK);
+  `.doc/.xls/.ppt` (OLE); `.png`; `.jpg/.jpeg`; `.gif`; `.rar`; `.7z`; `.gz`.
+- Maximum size: `MAX_DOWNLOAD_BYTES = 500 MiB`, importado do módulo pelos dois
+  caminhos. O HTTP recusa por `Content-Length` antes de criar o `.part` e aborta
+  o stream quando os bytes recebidos passam do teto; o Playwright entrega o
+  arquivo inteiro via `saveAs`, então só pode checar depois de gravado.
 
 ---
 
@@ -148,3 +152,29 @@ Assinaturas (prefixo hex): `.pdf 25504446`; `.zip .docx .xlsx .pptx .odt .ods .o
   forçado, `.txt` que menciona SIGAA sobrevive, HTML rejeitado, sessão expirada propaga,
   arquivo existente preservado). `MAX_DOWNLOAD_BYTES` mockado para 4096 no arquivo inteiro.
 - `tests/integration/download-real.test.ts` — inalterado e verde.
+
+---
+
+## Revisão (2026-09-07)
+
+Um achado, corrigido nesta branch.
+
+**`resolveFileName` batizava resposta vazia de `.pdf`.** `extensionFromSignature`
+usava o mesmo `sigMatches` do `validateHead`, que aceita a cabeça como PREFIXO da
+assinatura — regra certa para validar (não rejeitar arquivo curto legítimo), errada
+para nomear: cabeça vazia é prefixo de todas, e `.pdf` é o primeiro do
+`DETECT_ORDER`. Um 200 com corpo vazio virava `LISTA 1.pdf` e era reportado como
+sucesso — a mesma classe de chute que o `BUG-001` arrancou. Nomear passou a exigir
+a assinatura inteira; `validateHead` continua aceitando prefixo.
+
+Verificado nos outros pontos, sem achado: os três ramos do Playwright removem o
+`.part` e fecham o popup em toda falha; `session-expired` continua chegando ao
+`playwright-login.service.ts` como `JSF_SESSION_EXPIRED` e disparando a nova
+tentativa; o antigo erro "servidor retornou", que era lançado, agora vira
+`{ success: false }` — o `catch` externo já convertia os dois no mesmo retorno,
+então nenhum chamador muda; o `.part` do caminho HTTP é removido pelo
+`finalizeDownload` em toda falha pós-download.
+
+Desvio consciente do contrato: os ramos de popup não passam `contentType`. O
+`route` que preenche `detectedContentType` está na `page`, não no popup, então o
+valor ali seria de outra resposta. Sem ele, dica e assinatura decidem.
