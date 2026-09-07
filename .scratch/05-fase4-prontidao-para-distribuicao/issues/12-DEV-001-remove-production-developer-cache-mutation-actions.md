@@ -114,6 +114,27 @@ that `api` never contains simulation or generic IPC remain. The existing
 standalone preload tests do not start main and cannot authorize development
 solely by supplying argv anymore.
 
+#### Mecanismo
+
+- O sinal de autorização vai por `process.env`. O main define a variável quando
+  `!app.isPackaged`, **antes** de `new BrowserWindow(...)`, e a **apaga
+  explicitamente** quando empacotado. O preload sandboxed lê `process.env` de
+  forma síncrona e expõe `testApi` só com o sinal presente.
+- Ordem importa: o renderer herda o ambiente do main no spawn. Sinal definido
+  depois de `createWindow()` não chega ao preload. O dublê de `BrowserWindow` no
+  teste captura `{ ...process.env }` na construção e o preload roda com esse
+  snapshot, então definir tarde falha em AC3.
+- Apagar quando empacotado não é opcional: os dois boots do teste correm no
+  mesmo processo Node, e um valor deixado pelo boot dev vazaria para a leg
+  empacotada.
+- `argv` não serve: a leg empacotada recebe o mesmo argv que o main dev injetou
+  (`[...productionArgs, ...devArgs]`), qualquer que seja o token.
+- `ipcMain.on` + `ipcRenderer.sendSync` e um probe via `ipcRenderer.invoke` não
+  servem: os dublês existentes (`ipcMain: { handle }` aqui, em
+  `navigation-policy.test.ts` e `updater-consent.test.ts`; `ipcRenderer` sem
+  `sendSync`; `invoke` devolvendo `undefined` em `preload-dev-gate.test.ts`)
+  quebram, e o implementador não edita teste.
+
 #### Implementation notes
 
 - Specification only; production sources and `tests/e2e/app.spec.ts` remain

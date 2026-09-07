@@ -14,7 +14,11 @@ const harness = vi.hoisted(() => {
         setPath: vi.fn(), on: vi.fn(), quit: vi.fn(),
         whenReady: () => Promise.resolve(),
     };
+    // Electron spawns the renderer with the main environment as it is at window
+    // construction. The preload later runs against this snapshot, not the live env.
+    const windowEnv: { current: NodeJS.ProcessEnv | undefined } = { current: undefined };
     const BrowserWindow = vi.fn(function (_options: BrowserWindowConstructorOptions) {
+        windowEnv.current = { ...process.env };
         return {
             webContents: { id: 7, on: vi.fn(), setWindowOpenHandler: vi.fn(), send: vi.fn() },
             on: vi.fn(), loadURL: vi.fn(), loadFile: vi.fn(), show: vi.fn(), hide: vi.fn(),
@@ -55,7 +59,7 @@ const harness = vi.hoisted(() => {
         session: { defaultSession: { clearStorageData: vi.fn() } },
         shell: { openExternal: vi.fn() },
     };
-    return { handlers, exposed, files, syncNow, app, BrowserWindow, buildFromTemplate, ipcRenderer, contextBridge, fs, mainElectron };
+    return { handlers, exposed, files, syncNow, app, windowEnv, BrowserWindow, buildFromTemplate, ipcRenderer, contextBridge, fs, mainElectron };
 });
 
 vi.mock('node:fs', () => ({ ...harness.fs, default: harness.fs }));
@@ -110,6 +114,8 @@ async function loadPreload(args: string[]) {
     // A sandboxed preload has no `app` export. Packaging authority belongs to main.
     vi.doMock('electron', () => ({ contextBridge: harness.contextBridge, ipcRenderer: harness.ipcRenderer }));
     harness.exposed.clear();
+    expect(harness.windowEnv.current).toBeDefined();
+    process.env = { ...harness.windowEnv.current };
     process.argv = ['electron-renderer', ...args];
     await import('../../electron/preload');
     expect(harness.exposed.get('api')).toBeDefined();
@@ -158,9 +164,9 @@ describe('DEV-001: packaging controls the cache mutation bridge', () => {
             expect(harness.exposed.has('testApi')).toBe(false);
 
             const cacheBefore = new Map(harness.files);
-            // Deliberately supply the flag at the preload boundary too: main already
-            // omits it, but the accepted requirement is that argv alone cannot grant access.
-            await loadPreload([...productionArgs, '--sigaa-dev']);
+            // Deliberately feed the packaged preload the exact argv the unpackaged
+            // main injected, whatever token it uses: argv alone cannot grant access.
+            await loadPreload([...productionArgs, ...devArgs]);
             expect.soft(harness.exposed.has('testApi')).toBe(false);
             expect(harness.files).toEqual(cacheBefore);
             expect(harness.syncNow).not.toHaveBeenCalled();
