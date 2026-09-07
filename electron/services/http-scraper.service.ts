@@ -5,6 +5,18 @@ import * as path from 'path';
 import { app } from 'electron';
 import { sanitizeSegment, isInsideRoot } from './download-path';
 import { MAX_DOWNLOAD_BYTES, fileNameFromContentDisposition, finalizeDownload } from './file-validation.service';
+import type { AppErrorCode } from '../../shared/errors';
+import { AVA, FILES_MENU, JSF, NEWS, formByName, jsfParam } from '../sigaa/selectors';
+import {
+    COURSE_FILES_SESSION_EXPIRED_MESSAGE,
+    describeMissingAvaForm,
+    findCourseRow,
+    isLoginDocument,
+    missingViewStateBeforePostMessage,
+    parseAvaForm,
+    validateCourseEntryEnd,
+    validateCourseListDocument
+} from '../sigaa/portal-adapter';
 
 /**
  * Arquivo como o parser o vê, com o que o main precisa para baixar. `script` e
@@ -38,15 +50,6 @@ interface Cookie {
     path?: string;
     domain: string;
     expires?: Date;
-}
-
-/**
- * Lê um parâmetro do `jsfcljs(...)` do onclick — `...,id,555','` devolve `555`.
- * A classe exclui a quote de fechamento: era `[^,]+` em dois lugares e capturava
- * `555'`, que virava identidade de arquivo no cache.json (BUG-009).
- */
-function jsfParam(onclick: string, name: string): string | undefined {
-    return onclick.match(new RegExp(`,${name},([^,'"]+)`))?.[1];
 }
 
 export class HttpScraperService {
@@ -186,7 +189,23 @@ export class HttpScraperService {
         this.log(`[HttpScraper] User-Agent set to: ${ua}`);
     }
 
-    async enterCourseHTTP(courseId: string): Promise<{ success: boolean; html?: string; error?: string }> {
+    /**
+     * Ao falhar a atualização de uma turma, os dados JSF anteriores dessa
+     * turma não podem sobreviver para o próximo download: sem isto, o POST
+     * seguinte reaproveita um ViewState velho como se ainda fosse válido.
+     * Sessão expirada invalida o catálogo inteiro — não só a turma corrente,
+     * já que a sessão sob todas elas caiu junto.
+     */
+    private failCourse(courseId: string, errorCode: AppErrorCode, error: string): { success: false; error: string; errorCode: AppErrorCode } {
+        if (errorCode === 'SESSION_EXPIRED') {
+            this.courseData.clear();
+        } else {
+            this.courseData.delete(courseId);
+        }
+        return { success: false, error, errorCode };
+    }
+
+    async enterCourseHTTP(courseId: string): Promise<{ success: boolean; html?: string; error?: string; errorCode?: AppErrorCode }> {
         try {
             this.log(`[HttpScraper] Entering course ${courseId} via HTTP...`);
 
@@ -203,13 +222,17 @@ export class HttpScraperService {
             });
             this.updateCookies(portalResponse);
 
-            const $ = cheerio.load(portalResponse.data);
+            // 2. Validate the document actually is the student portal before trusting anything in it.
+            const listCheck = validateCourseListDocument(portalResponse.data);
+            if (listCheck) {
+                this.log(`[HttpScraper] Portal document rejected: ${listCheck.code} ${listCheck.message}`);
+                return { success: false, error: listCheck.message, errorCode: listCheck.code };
+            }
 
-            // 2. Find the input for this course ID
-            const idInput = $(`input[name="idTurma"][value="${courseId}"]`);
-            if (idInput.length === 0) {
-                const title = $('title').text().trim();
-                this.log(`[HttpScraper] Error: Course ID ${courseId} not found. Page Title: "${title}"`);
+            // 3. Find the course row and its JSF link parameters.
+            const lookup = findCourseRow(portalResponse.data, courseId);
+            if (lookup.status === 'not_found') {
+                this.log(`[HttpScraper] Error: Course ID ${courseId} not found in recognized portal.`);
                 if (!app.isPackaged) {
                     try {
                         const safeId = String(courseId).replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -219,46 +242,26 @@ export class HttpScraperService {
                         );
                     } catch (e) { console.error('Failed to save debug file', e); }
                 }
-                return { success: false, error: `Course ID input not found in portal (Title: ${title})` };
+                return { success: false, error: `Course ${courseId} not found in portal`, errorCode: 'NOT_FOUND' };
+            }
+            if (lookup.status === 'malformed') {
+                return {
+                    success: false,
+                    error: 'SIGAA portal selector drift: could not extract the JSF link parameters for the requested course.',
+                    errorCode: 'SELECTOR_DRIFT'
+                };
             }
 
-            // 3. Find the surrounding form
-            const form = idInput.closest('form');
-            if (form.length === 0) {
-                return { success: false, error: 'Course form not found' };
-            }
-
-            const formName = form.attr('name');
-            const formAction = form.attr('action') || '/sigaa/verPortalDiscente.do';
-
-            // 4. Find the link to extract onclick parameters
-            // The link usually has id containing "turmaVirtual"
-            const link = idInput.closest('tr').find('a[id*="turmaVirtual"]');
-            const onclick = link.attr('onclick');
-
-            if (!onclick || !formName) {
-                return { success: false, error: 'Could not extract form parameters from course link' };
-            }
-
-            // Parse jsfcljs parameters
-            // Pattern: jsfcljs(document.forms['FORM_NAME'],'PARAM1,PARAM1','');
-            const match = onclick.match(/jsfcljs\(document\.forms\['([^']+)'\],'([^']+)'/);
-            if (!match) {
-                return { success: false, error: 'Invalid jsfcljs format in course link' };
-            }
-
-            const paramsStr = match[2]; // e.g. "form_acessarTurmaVirtual:turmaVirtual,form_acessarTurmaVirtual:turmaVirtual"
-            const [paramKey, paramValue] = paramsStr.split(',');
-
-            // 5. Construct Form Data
+            // 4. Construct Form Data
+            const $ = cheerio.load(portalResponse.data);
             const formData = new URLSearchParams();
-            formData.append(formName, formName);
-            formData.append('javax.faces.ViewState', $('input[name="javax.faces.ViewState"]').val() as string);
-            formData.append(paramKey, paramValue);
+            formData.append(lookup.formName, lookup.formName);
+            formData.append(AVA.viewStateField, ($(AVA.viewStateSelector).val() as string) || '');
+            formData.append(lookup.paramKey, lookup.paramValue);
             formData.append('idTurma', courseId);
 
-            // 6. Post to enter course
-            const actionUrl = `${this.baseUrl}${formAction}`;
+            // 5. Post to enter course
+            const actionUrl = `${this.baseUrl}${lookup.formAction}`;
             this.log(`[HttpScraper] Posting to ${actionUrl} to enter course...`);
 
             const enterResponse = await axios.post(actionUrl, formData.toString(), {
@@ -273,16 +276,10 @@ export class HttpScraperService {
             });
             this.updateCookies(enterResponse);
 
-            // Check if we are in the course (look for specific elements)
-            if (enterResponse.data.includes('O Sistema detectou que até agora seu professor não criou nenhum tópico de aula') ||
-                enterResponse.data.includes('Menu Turma Virtual') ||
-                enterResponse.data.includes('id="conteudo"')) {
-
-                this.log('[HttpScraper] Successfully entered course via HTTP!');
-                return { success: true, html: enterResponse.data };
-            } else {
-                // Sometimes it redirects to a frameset or something else
-                this.log('[HttpScraper] Warning: Response does not look like a course page. Saving debug file.');
+            // 6. Validate the end state — a generic `id="conteudo"` alone is not proof of entry.
+            const entryCheck = validateCourseEntryEnd(enterResponse.data);
+            if (entryCheck) {
+                this.log(`[HttpScraper] Course entry response rejected: ${entryCheck.code} ${entryCheck.message}`);
                 if (!app.isPackaged) {
                     try {
                         const safeId = String(courseId).replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -292,8 +289,11 @@ export class HttpScraperService {
                         );
                     } catch (e) { }
                 }
-                return { success: false, error: 'Failed to verify course entry (unexpected response content)' };
+                return { success: false, error: entryCheck.message, errorCode: entryCheck.code };
             }
+
+            this.log('[HttpScraper] Successfully entered course via HTTP!');
+            return { success: true, html: enterResponse.data };
 
         } catch (error: any) {
             this.log(`[HttpScraper] HTTP Entry Error: ${error.message}`);
@@ -303,10 +303,10 @@ export class HttpScraperService {
 
 
 
-    async getCourseFiles(courseId: string, courseName?: string, preFetchedHtml?: string): Promise<{ success: boolean; files?: ParsedFile[]; news?: ParsedNews[]; error?: string }> {
+    async getCourseFiles(courseId: string, courseName?: string, preFetchedHtml?: string): Promise<{ success: boolean; files?: ParsedFile[]; news?: ParsedNews[]; error?: string; errorCode?: AppErrorCode }> {
         try {
             if (this.cookies.length === 0) {
-                return { success: false, error: 'No session cookies. Please login first.' };
+                return this.failCourse(courseId, 'SESSION_EXPIRED', 'No session cookies. Please login first.');
             }
 
             this.log(`[HttpScraper] Fetching course page for ${courseName || courseId}...`);
@@ -344,11 +344,8 @@ export class HttpScraperService {
             let filesPageData = coursePageData;
             let conteudoLink: any = null;
 
-            if ($('input[name="user.login"]').length > 0 || coursePageData.includes('verTelaLogin.do')) {
-                return {
-                    success: false,
-                    error: 'Session expired: SIGAA returned the login page instead of course content. Re-authenticate before requesting files.'
-                };
+            if (isLoginDocument(coursePageData)) {
+                return this.failCourse(courseId, 'SESSION_EXPIRED', COURSE_FILES_SESSION_EXPIRED_MESSAGE);
             }
 
             // Skip navigation if using Playwright HTML (already navigated)
@@ -368,7 +365,7 @@ export class HttpScraperService {
                 this.log('[HttpScraper] Using Playwright HTML directly.');
             } else {
                 // Strategy 1: Look for "Conteúdo" in menu
-                $('.itemMenu').each((_, el) => {
+                $(FILES_MENU.itemMenu).each((_, el) => {
                     const text = $(el).text().trim();
                     if (text.includes(' Conte') || text.includes('nteudo')) {
                         this.log(`[HttpScraper] Found potential link: "${text}"`);
@@ -380,7 +377,7 @@ export class HttpScraperService {
                 // Strategy 2: Look for "Materiais" header
                 if (!conteudoLink) {
                     this.log('[HttpScraper] Strategy 1 failed. Trying Strategy 2 (Materiais header)...');
-                    const materiaisHeader = $('.itemMenuHeaderMateriais');
+                    const materiaisHeader = $(FILES_MENU.itemMenuHeaderMateriais);
                     if (materiaisHeader.length > 0) {
                         const contentExterior = materiaisHeader.parent().find('.rich-panelbar-content-exterior');
                         const firstLink = contentExterior.find('a').first();
@@ -394,13 +391,21 @@ export class HttpScraperService {
                 if (conteudoLink) {
                     this.log('[HttpScraper] Found "Conteúdo" link in sidebar. Navigating to files...');
                     const onclick = conteudoLink.attr('onclick');
-                    const match = onclick?.match(/jsfcljs\(document\.forms\['([^']+)'\],'([^']+)'/);
+                    const match = onclick?.match(JSF.linkPattern);
 
                     if (match) {
                         const formName = match[1];
                         const paramsStr = match[2];
 
-                        const form = $(`form[name="${formName}"]`);
+                        // Não envia o POST de Conteúdo sem um ViewState reconhecido no
+                        // documento de partida — um POST incompleto parece avançar a
+                        // sessão sem de fato avançar (critério de aceite do PORTAL-001).
+                        const startForm = parseAvaForm(coursePageData);
+                        if (!startForm) {
+                            return this.failCourse(courseId, 'SELECTOR_DRIFT', missingViewStateBeforePostMessage());
+                        }
+
+                        const form = $(formByName(formName));
                         const formData = new URLSearchParams();
 
                         form.find('input').each((_, el) => {
@@ -409,12 +414,8 @@ export class HttpScraperService {
                             if (name && value) formData.append(name, value);
                         });
 
-                        // Ensure ViewState is present
-                        if (!formData.has('javax.faces.ViewState')) {
-                            const globalViewState = $('input[name="javax.faces.ViewState"]').val();
-                            if (globalViewState) {
-                                formData.append('javax.faces.ViewState', globalViewState as string);
-                            }
+                        if (!formData.has(AVA.viewStateField)) {
+                            formData.append(AVA.viewStateField, startForm.viewState);
                         }
 
                         const params = paramsStr.split(',');
@@ -438,6 +439,12 @@ export class HttpScraperService {
                         });
                         this.updateCookies(filesResponse);
                         filesPageData = filesResponse.data;
+
+                        // Login na resposta do POST é sessão expirada mesmo quando o
+                        // documento anterior era válido — reavalia antes de interpretar.
+                        if (isLoginDocument(filesPageData)) {
+                            return this.failCourse(courseId, 'SESSION_EXPIRED', COURSE_FILES_SESSION_EXPIRED_MESSAGE);
+                        }
                     } else {
                         this.log('[HttpScraper] Could not parse onclick for "Conteúdo" link.');
                     }
@@ -449,51 +456,15 @@ export class HttpScraperService {
             // --- Common logic for parsing files page (whether from Playwright or Axios) ---
             const $files = cheerio.load(filesPageData);
 
-            // Extract ViewState
-            const viewState = $files('input[name="javax.faces.ViewState"]').val() as string;
-
-            // Extract other form inputs
-            // We need to find the main form (usually named 'formAva')
-            let filesForm = $files('form[name="formAva"]');
-            if (filesForm.length === 0) {
-                // Fallback to first form if formAva not found
-                filesForm = $files('form').first();
+            // O formulário AVA precisa ser reconhecido por nome, com ViewState não
+            // vazio — sem fallback para o primeiro formulário da página.
+            const avaForm = parseAvaForm(filesPageData);
+            if (!avaForm) {
+                return this.failCourse(courseId, 'SELECTOR_DRIFT', describeMissingAvaForm(filesPageData));
             }
 
-            if (!viewState || filesForm.length === 0) {
-                const missingSelectors = [
-                    !viewState ? 'input[name="javax.faces.ViewState"]' : null,
-                    filesForm.length === 0 ? 'form[name="formAva"] (or another course form)' : null
-                ].filter(Boolean).join(', ');
-                return {
-                    success: false,
-                    error: `SIGAA course selector drift: required JSF structure is missing (${missingSelectors}). The page may no longer be a course files page.`
-                };
-            }
-
-            const formAction = filesForm.attr('action') || '/sigaa/ava/index.jsf';
-            const formNameStr = filesForm.attr('name') || 'formAva';
-
-            const inputs: Record<string, string> = {};
-            filesForm.find('input').each((_, el) => {
-                const name = $files(el).attr('name');
-                const value = $files(el).attr('value');
-                if (name && value !== undefined) {
-                    inputs[name] = value;
-                }
-            });
-
-            if (viewState) {
-                this.courseData.set(courseId, {
-                    viewState,
-                    action: formAction,
-                    formName: formNameStr,
-                    inputs
-                });
-                this.log(`[HttpScraper] Stored ViewState and ${Object.keys(inputs).length} inputs for course ${courseId}`);
-            } else {
-                this.log(`[HttpScraper] WARNING: Could not extract ViewState for course ${courseId}`);
-            }
+            this.courseData.set(courseId, avaForm);
+            this.log(`[HttpScraper] Stored ViewState and ${Object.keys(avaForm.inputs).length} inputs for course ${courseId}`);
 
             const files: ParsedFile[] = [];
             const news: ParsedNews[] = [];
@@ -643,7 +614,7 @@ export class HttpScraperService {
                             // Check for form with ID
                             else if (element.type === 'tag' && element.tagName === 'form') {
                                 const form = $(element);
-                                const idInput = form.find('input[name="id"]').val();
+                                const idInput = form.find(NEWS.idInput).val();
 
                                 // Extract onclick script from the form's link (needed for HTTP fetching)
                                 const formLink = form.find('a');
@@ -717,14 +688,14 @@ export class HttpScraperService {
         }
     }
 
-    async getNewsDetail(courseId: string, newsId: string, script?: string): Promise<{ success: boolean; news?: any; error?: string }> {
+    async getNewsDetail(courseId: string, newsId: string, script?: string): Promise<{ success: boolean; news?: any; error?: string; errorCode?: AppErrorCode }> {
         try {
             this.log(`[HttpScraper] Fetching news detail ${newsId} for course ${courseId}`);
 
             // 1. Check if we have session data for this course
             const courseInfo = this.courseData.get(courseId);
             if (!courseInfo) {
-                return { success: false, error: 'Course session data not found. Please refresh the course list.' };
+                return { success: false, error: 'Course session data not found. Please refresh the course list.', errorCode: 'SESSION_EXPIRED' };
             }
 
             // 2. Prepare Form Data
@@ -738,7 +709,7 @@ export class HttpScraperService {
             }
 
             // Add ViewState
-            formData.set('javax.faces.ViewState', courseInfo.viewState);
+            formData.set(AVA.viewStateField, courseInfo.viewState);
 
             // Add Form Name
             if (!formData.has(courseInfo.formName)) {
@@ -749,7 +720,7 @@ export class HttpScraperService {
             // Example: jsfcljs(document.forms['formAva'],'formAva:noticias:0:visualizar,formAva:noticias:0:visualizar,id,12345','');
             if (script) {
                 this.log(`[HttpScraper] Using provided script: ${script}`);
-                const match = script.match(/jsfcljs\([^,]+,'([^']+)'/);
+                const match = script.match(JSF.scriptParamsPattern);
                 if (match) {
                     const paramsStr = match[1];
                     const params = paramsStr.split(',');
@@ -869,19 +840,21 @@ export class HttpScraperService {
         basePath: string,
         script: string,
         onProgress?: (progress: number) => void
-    ): Promise<{ success: boolean; filePath?: string; error?: string }> {
+    ): Promise<{ success: boolean; filePath?: string; error?: string; errorCode?: AppErrorCode }> {
         try {
             this.log(`[HttpScraper] Downloading file "${fileName}" (ID: ${fileId}) for course ${courseId}`);
 
             const courseInfo = this.courseData.get(courseId);
             if (!courseInfo) {
-                return { success: false, error: 'Course session data not found. Please refresh the course list.' };
+                // Sem catálogo JSF para a turma — ou nunca houve, ou uma atualização
+                // anterior falhou e o invalidou (failCourse). Relogar/atualizar resolve.
+                return { success: false, error: 'Course session data not found. Please refresh the course list.', errorCode: 'SESSION_EXPIRED' };
             }
 
             // Extract component ID from script
-            const match = script.match(/jsfcljs\([^,]+,'([^']+)'/);
+            const match = script.match(JSF.scriptParamsPattern);
             if (!match) {
-                return { success: false, error: 'Invalid download script format' };
+                return { success: false, error: 'Invalid download script format', errorCode: 'SELECTOR_DRIFT' };
             }
             const paramsStr = match[1];
             const params = paramsStr.split(',');
@@ -897,7 +870,7 @@ export class HttpScraperService {
             }
 
             // 2. Add/Overwrite ViewState (just in case it wasn't in inputs or needs update)
-            formData.set('javax.faces.ViewState', courseInfo.viewState);
+            formData.set(AVA.viewStateField, courseInfo.viewState);
 
             // 3. Add form name (if not in inputs)
             if (!formData.has(courseInfo.formName)) {
