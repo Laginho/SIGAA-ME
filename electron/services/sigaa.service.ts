@@ -2,6 +2,7 @@ import { HttpScraperService, type ParsedFile, type ParsedNews } from './http-scr
 import { PlaywrightLoginService, type ParsedCourse } from './playwright-login.service';
 import { logger } from './logger.service';
 import { deriveAccountId, getActiveAccount, setActiveAccount } from './account-context.service';
+import { SessionOperationCoordinator } from './session-operation-coordinator.service';
 import * as fs from 'fs';
 import * as path from 'path';
 import { resolveDownloadTarget, ensureDirInsideRoot, sanitizeSegment } from './download-path';
@@ -49,31 +50,19 @@ function findScript(files: ParsedFile[] | undefined, file: DownloadFileRef): str
     return files.find(f => f.id === file.id)?.script;
 }
 
+/** Devolvido pelas checagens de cancelamento; texto livre, os testes só olham o código. */
+const CANCELLED = fail('CANCELLED', 'Operação cancelada.');
+
 export class SigaaService {
     private playwrightLogin: PlaywrightLoginService;
     private httpScraper: HttpScraperService;
 
-    // Operation state - used for logging and reference counting
-    private busyCount = 0;
+    /** Único dono da sessão Playwright por vez (CONC-001); troca o `busyCount`, que só contava. */
+    readonly operations = new SessionOperationCoordinator();
 
     constructor() {
         this.playwrightLogin = new PlaywrightLoginService();
         this.httpScraper = new HttpScraperService();
-    }
-
-    private startBusy() {
-        this.busyCount++;
-        logger.info(`SIGAA: Service busy count: ${this.busyCount} (User Action)`);
-    }
-
-    private stopBusy() {
-        this.busyCount--;
-        if (this.busyCount <= 0) {
-            this.busyCount = 0;
-            logger.info('SIGAA: Service is free.');
-        } else {
-            logger.info(`SIGAA: Service busy count: ${this.busyCount}`);
-        }
     }
 
     /**
@@ -83,45 +72,50 @@ export class SigaaService {
      * renderer não precisa dela e não deve tê-la no `sessionStorage`.
      */
     async login(username: string, password: string): Promise<AppResult<AccountProfile>> {
-        try {
-            const accountId = deriveAccountId(username);
-            logger.info('SIGAA: Attempting login...');
-            const result = await this.playwrightLogin.login(username, password);
+        return this.operations.run('auth', async (signal) => {
+            if (signal.aborted) return CANCELLED;
+            try {
+                const accountId = deriveAccountId(username);
+                logger.info('SIGAA: Attempting login...');
+                const result = await this.playwrightLogin.login(username, password);
 
-            if (!result.success) {
-                logger.error('SIGAA: Login failed', result.error);
-                return failFromMessage(result.error, 'Falha no login');
-            }
+                if (!result.success) {
+                    logger.error('SIGAA: Login failed', result.error);
+                    return failFromMessage(result.error, 'Falha no login');
+                }
 
-            // Conta diferente da anterior: o catálogo de sessão do scraper é da
-            // conta que saiu e não pode ser reaproveitado. Zera antes de
-            // instalar os cookies novos.
-            const previous = getActiveAccount();
-            if (previous !== null && previous !== accountId) {
-                logger.info('SIGAA: Different account signed in; resetting the HTTP scraper session.');
-                this.httpScraper.resetSession();
-            }
-            setActiveAccount(accountId);
+                // Conta diferente da anterior: o catálogo de sessão do scraper é da
+                // conta que saiu e não pode ser reaproveitado. Zera antes de
+                // instalar os cookies novos.
+                const previous = getActiveAccount();
+                if (previous !== null && previous !== accountId) {
+                    logger.info('SIGAA: Different account signed in; resetting the HTTP scraper session.');
+                    this.httpScraper.resetSession();
+                }
+                setActiveAccount(accountId);
 
-            if (result.cookies) {
-                logger.info('SIGAA: Login successful, setting cookies for HTTP scraper');
-                this.httpScraper.setCookies(result.cookies);
+                if (result.cookies) {
+                    logger.info('SIGAA: Login successful, setting cookies for HTTP scraper');
+                    this.httpScraper.setCookies(result.cookies);
+                }
+                // A foto só existe na página do portal; `getCourses` a devolve.
+                return ok({ id: accountId, name: result.userName || 'User' });
+            } catch (error) {
+                logger.error('SIGAA: Login error', error);
+                return failFromMessage(errorMessage(error));
             }
-            // A foto só existe na página do portal; `getCourses` a devolve.
-            return ok({ id: accountId, name: result.userName || 'User' });
-        } catch (error) {
-            logger.error('SIGAA: Login error', error);
-            return failFromMessage(errorMessage(error));
-        }
+        });
     }
 
     async logout(): Promise<void> {
-        logger.info('SIGAA: Logging out, closing Playwright session...');
-        this.httpScraper.resetSession();
-        setActiveAccount(null);
-        // logout(), não close(): close() guarda cookies/credencial de propósito
-        // para o próximo sync relançar sozinho (DATA-002).
-        await this.playwrightLogin.logout();
+        return this.operations.run('shutdown', async () => {
+            logger.info('SIGAA: Logging out, closing Playwright session...');
+            this.httpScraper.resetSession();
+            setActiveAccount(null);
+            // logout(), não close(): close() guarda cookies/credencial de propósito
+            // para o próximo sync relançar sozinho (DATA-002).
+            await this.playwrightLogin.logout();
+        });
     }
 
     /** Zera diagnósticos em disco (DATA-002), sem tocar na sessão. */
@@ -130,62 +124,62 @@ export class SigaaService {
     }
 
     async getCourses(): Promise<AppResult<{ courses: CourseSummary[]; photoUrl?: string }>> {
-        this.startBusy();
-        try {
-            logger.info('SIGAA: Fetching courses using Playwright...');
-            const result = await this.playwrightLogin.getCourses();
+        return this.operations.run('interactive', async (signal) => {
+            if (signal.aborted) return CANCELLED;
+            try {
+                logger.info('SIGAA: Fetching courses using Playwright...');
+                const result = await this.playwrightLogin.getCourses();
 
-            if (!result.success || !result.courses) {
-                logger.error('SIGAA: Failed to fetch courses', result.error);
-                return failFromMessage(result.error, 'Failed to fetch courses');
+                if (!result.success || !result.courses) {
+                    logger.error('SIGAA: Failed to fetch courses', result.error);
+                    return failFromMessage(result.error, 'Failed to fetch courses');
+                }
+                logger.info(`SIGAA: Found ${result.courses.length} courses`);
+                return ok({ courses: result.courses.map(toCourseSummary), photoUrl: result.photoUrl });
+            } catch (error) {
+                logger.error('SIGAA: Error fetching courses', error);
+                return failFromMessage(errorMessage(error), 'Failed to fetch courses');
             }
-            logger.info(`SIGAA: Found ${result.courses.length} courses`);
-            return ok({ courses: result.courses.map(toCourseSummary), photoUrl: result.photoUrl });
-        } catch (error) {
-            logger.error('SIGAA: Error fetching courses', error);
-            return failFromMessage(errorMessage(error), 'Failed to fetch courses');
-        } finally {
-            this.stopBusy();
-        }
+        });
     }
 
     async getCourseFiles(courseId: string, courseName: string): Promise<AppResult<{ files: CourseFile[]; news: NewsSummary[] }>> {
-        this.startBusy();
-        try {
-            // 1. Enter course (Lands on Dashboard/Portal)
-            logger.info('SIGAA: entering course via Full Browser (Dashboard)...');
-            const entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
+        return this.operations.run('interactive', async (signal) => {
+            if (signal.aborted) return CANCELLED;
+            try {
+                // 1. Enter course (Lands on Dashboard/Portal)
+                logger.info('SIGAA: entering course via Full Browser (Dashboard)...');
+                const entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
 
-            if (!entryResult.success || !entryResult.html) {
-                return failFromMessage(entryResult.error, 'Failed to enter course');
+                if (!entryResult.success || !entryResult.html) {
+                    return failFromMessage(entryResult.error, 'Failed to enter course');
+                }
+
+                if (entryResult.cookies) {
+                    this.httpScraper.setCookies(entryResult.cookies);
+                    const ua = await this.playwrightLogin.getUserAgent();
+                    this.httpScraper.setUserAgent(ua);
+                }
+
+                // 2. Parse Dashboard for BOTH files and news
+                // Files with download links (jsfcljs...id...) are on the Dashboard, not the Conteúdo page
+                logger.info('SIGAA: Parsing Dashboard for files and news...');
+                const dashboardParse = await this.httpScraper.getCourseFiles(courseId, courseName, entryResult.html);
+                // Antes, falha de parse (sessão expirada, deriva de seletor) virava
+                // `success: true` com listas vazias — e uma disciplina vazia no cache.
+                if (!dashboardParse.success) {
+                    return failFromMessage(dashboardParse.error, 'Failed to parse course page');
+                }
+                const files = (dashboardParse.files ?? []).map(toCourseFile);
+                const news = (dashboardParse.news ?? []).map(toNewsSummary);
+                logger.info(`SIGAA: Found ${files.length} files and ${news.length} news items on Dashboard.`);
+
+                return ok({ files, news });
+            } catch (error) {
+                logger.error('SIGAA: Error fetching files:', error);
+                return failFromMessage(errorMessage(error), 'Failed to fetch files');
             }
-
-            if (entryResult.cookies) {
-                this.httpScraper.setCookies(entryResult.cookies);
-                const ua = await this.playwrightLogin.getUserAgent();
-                this.httpScraper.setUserAgent(ua);
-            }
-
-            // 2. Parse Dashboard for BOTH files and news
-            // Files with download links (jsfcljs...id...) are on the Dashboard, not the Conteúdo page
-            logger.info('SIGAA: Parsing Dashboard for files and news...');
-            const dashboardParse = await this.httpScraper.getCourseFiles(courseId, courseName, entryResult.html);
-            // Antes, falha de parse (sessão expirada, deriva de seletor) virava
-            // `success: true` com listas vazias — e uma disciplina vazia no cache.
-            if (!dashboardParse.success) {
-                return failFromMessage(dashboardParse.error, 'Failed to parse course page');
-            }
-            const files = (dashboardParse.files ?? []).map(toCourseFile);
-            const news = (dashboardParse.news ?? []).map(toNewsSummary);
-            logger.info(`SIGAA: Found ${files.length} files and ${news.length} news items on Dashboard.`);
-
-            return ok({ files, news });
-        } catch (error) {
-            logger.error('SIGAA: Error fetching files:', error);
-            return failFromMessage(errorMessage(error), 'Failed to fetch files');
-        } finally {
-            this.stopBusy();
-        }
+        });
     }
 
     /**
@@ -209,19 +203,18 @@ export class SigaaService {
         file: DownloadFileRef,
         basePath: string
     ): Promise<AppResult<{ filePath: string }>> {
-        this.startBusy();
-        try {
-            return await this._downloadFileInternal(courseId, courseName, file, basePath);
-        } finally {
-            this.stopBusy();
-        }
+        return this.operations.run('interactive', (signal) => {
+            if (signal.aborted) return Promise.resolve(CANCELLED);
+            return this._downloadFileInternal(courseId, courseName, file, basePath, signal);
+        });
     }
 
     private async _downloadFileInternal(
         courseId: string,
         courseName: string,
         file: DownloadFileRef,
-        basePath: string
+        basePath: string,
+        signal: AbortSignal
     ): Promise<AppResult<{ filePath: string }>> {
         // 0. Prepare Target Directory — resolve and prove containment BEFORE any network
         let targetDir: string;
@@ -272,6 +265,7 @@ export class SigaaService {
                 targetScript = findScript(parseResult.files, file);
             }
             if (!targetScript) {
+                if (signal.aborted) return CANCELLED;
                 logger.warn(`SIGAA: ${file.name} not in static parses; trying Playwright live-DOM lookup...`);
                 return await this.downloadViaPlaywright(courseId, courseName, file.name, basePath, undefined);
             }
@@ -288,6 +282,7 @@ export class SigaaService {
             console.warn('SIGAA: HTTP download failed. Refreshing session and retrying HTTP download...', httpResult.error);
 
             // 4. Refresh Session and Retry (HTTP Only)
+            if (signal.aborted) return CANCELLED;
             console.log(`SIGAA: Re-entering course ${courseId} to refresh session (Retry Attempt)...`);
             const retryEntryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
 
@@ -312,6 +307,7 @@ export class SigaaService {
                 return ok({ filePath: retryHttpResult.filePath });
             }
             logger.warn(`SIGAA: HTTP download failed twice for ${file.name}. Falling back to Playwright...`);
+            if (signal.aborted) return CANCELLED;
             return await this.downloadViaPlaywright(courseId, courseName, file.name, basePath, retryScript);
 
         } catch (error) {
@@ -327,7 +323,20 @@ export class SigaaService {
         basePath: string,
         onProgress?: (fileName: string, status: DownloadStatus) => void
     ): Promise<AppResult<DownloadResult>> {
-        this.startBusy();
+        return this.operations.run('interactive', async (signal) => {
+            if (signal.aborted) return CANCELLED;
+            return this._downloadAllFilesInternal(courseId, courseName, files, basePath, signal, onProgress);
+        });
+    }
+
+    private async _downloadAllFilesInternal(
+        courseId: string,
+        courseName: string,
+        files: DownloadFileRef[],
+        basePath: string,
+        signal: AbortSignal,
+        onProgress?: (fileName: string, status: DownloadStatus) => void
+    ): Promise<AppResult<DownloadResult>> {
         try {
             logger.info(`SIGAA: =====================================`);
             logger.info(`SIGAA: downloadAllFiles called for course ${courseName}`);
@@ -439,6 +448,7 @@ export class SigaaService {
 
             logger.info(`SIGAA: Starting download loop for ${queue.length} files...`);
             for (const file of queue) {
+                if (signal.aborted) return CANCELLED;
                 logger.info(`SIGAA: Processing file: ${file.name}`);
 
                 const targetScript = findScript(parsedFiles, file) ?? findScript(filesSectionFiles, file);
@@ -489,6 +499,7 @@ export class SigaaService {
                         .filter((f): f is DownloadFileRef => f !== undefined);
 
                     for (const file of failedFiles) {
+                        if (signal.aborted) return CANCELLED;
                         console.log(`SIGAA: Retrying HTTP download for ${file.name} (Attempt 1/3)...`);
 
                         // HTTP sem script não tem como funcionar: segue pulando.
@@ -500,6 +511,7 @@ export class SigaaService {
                         // Retry Loop
                         let retrySuccess = false;
                         for (let attempt = 1; attempt <= 3; attempt++) {
+                            if (signal.aborted) return CANCELLED;
                             if (attempt > 1) console.log(`SIGAA: Retry attempt ${attempt}/3 for ${file.name}...`);
 
                             const retryResult = await this.httpScraper.downloadFile(courseId, file.id, file.name, targetDir, retryScript);
@@ -543,6 +555,7 @@ export class SigaaService {
 
             // ponytail: um browser por arquivo no fallback; trocar por playwrightLogin.downloadAllFiles se o lote de falhas for grande com frequência
             for (let i = 0; i < results.length; i++) {
+                if (signal.aborted) return CANCELLED;
                 if (results[i].status !== 'failed') continue;
                 const fileName = results[i].fileName;
                 const originalFile = files.find(f => f.name === fileName);
@@ -564,79 +577,78 @@ export class SigaaService {
         } catch (error) {
             console.error('SIGAA: Error downloading files:', error);
             return failFromMessage(errorMessage(error), 'Download failed');
-        } finally {
-            this.stopBusy();
         }
     }
 
     async getNewsDetail(courseId: string, courseName: string, newsId: string): Promise<AppResult<NewsDetail>> {
-        this.startBusy();
-        try {
-            console.log(`SIGAA: Fetching news detail ${newsId} using Playwright...`);
-            // Use Playwright for reliable JSF session handling
-            const result = await this.playwrightLogin.getNewsDetail(courseId, courseName, newsId);
+        return this.operations.run('interactive', async (signal) => {
+            if (signal.aborted) return CANCELLED;
+            try {
+                console.log(`SIGAA: Fetching news detail ${newsId} using Playwright...`);
+                // Use Playwright for reliable JSF session handling
+                const result = await this.playwrightLogin.getNewsDetail(courseId, courseName, newsId);
 
-            if (!result.success || !result.news) {
-                return failFromMessage(result.error, 'Failed to fetch news detail');
+                if (!result.success || !result.news) {
+                    return failFromMessage(result.error, 'Failed to fetch news detail');
+                }
+                return ok(result.news);
+            } catch (error) {
+                console.error('SIGAA: Error fetching news detail:', error);
+                return failFromMessage(errorMessage(error), 'Failed to fetch news detail');
             }
-            return ok(result.news);
-        } catch (error) {
-            console.error('SIGAA: Error fetching news detail:', error);
-            return failFromMessage(errorMessage(error), 'Failed to fetch news detail');
-        } finally {
-            this.stopBusy();
-        }
+        });
     }
 
     async loadAllNews(courseId: string, courseName: string): Promise<AppResult<NewsSummary[]>> {
-        this.startBusy();
-        try {
-            logger.info(`SIGAA: Loading all news for course ${courseName} (${courseId})...`);
+        return this.operations.run('interactive', async (signal) => {
+            if (signal.aborted) return CANCELLED;
+            try {
+                logger.info(`SIGAA: Loading all news for course ${courseName} (${courseId})...`);
 
-            // 1. Enter Course to get fresh News List (and ViewState)
-            const entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName);
-            if (!entryResult.success || !entryResult.html) {
-                return failFromMessage(entryResult.error, 'Failed to enter course');
-            }
-
-            if (entryResult.cookies) {
-                this.httpScraper.setCookies(entryResult.cookies);
-            }
-
-            // 2. Parse News Headers
-            const parseResult = await this.httpScraper.getCourseFiles(courseId, 'Unknown', entryResult.html);
-            if (!parseResult.success) {
-                return failFromMessage(parseResult.error, 'Failed to parse course page');
-            }
-            const newsItems = parseResult.news ?? [];
-
-            logger.info(`SIGAA: Found ${newsItems.length} news items. Fetching content for all...`);
-
-            // 3. Fetch detail for each news item using Playwright (HTTP scraper fails due to session issues)
-            const enrichedNews: NewsSummary[] = [];
-            for (const item of newsItems) {
-                logger.info(`SIGAA: Fetching content for news "${item.title}"...`);
-
-                // Use Playwright for reliable JSF session handling instead of HTTP scraper
-                // The HTTP approach fails because sessions become stale between requests
-                const detail = await this.playwrightLogin.getNewsDetail(courseId, courseName, item.id);
-                const summary = toNewsSummary(item);
-
-                if (detail.success && detail.news) {
-                    enrichedNews.push({ ...summary, content: detail.news.content });
-                } else {
-                    logger.warn(`SIGAA: Failed to fetch news "${item.title}": ${detail.error}`);
-                    enrichedNews.push(summary); // Keep header at least
+                // 1. Enter Course to get fresh News List (and ViewState)
+                const entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName);
+                if (!entryResult.success || !entryResult.html) {
+                    return failFromMessage(entryResult.error, 'Failed to enter course');
                 }
+
+                if (entryResult.cookies) {
+                    this.httpScraper.setCookies(entryResult.cookies);
+                }
+
+                // 2. Parse News Headers
+                const parseResult = await this.httpScraper.getCourseFiles(courseId, 'Unknown', entryResult.html);
+                if (!parseResult.success) {
+                    return failFromMessage(parseResult.error, 'Failed to parse course page');
+                }
+                const newsItems = parseResult.news ?? [];
+
+                logger.info(`SIGAA: Found ${newsItems.length} news items. Fetching content for all...`);
+
+                // 3. Fetch detail for each news item using Playwright (HTTP scraper fails due to session issues)
+                const enrichedNews: NewsSummary[] = [];
+                for (const item of newsItems) {
+                    if (signal.aborted) return CANCELLED;
+                    logger.info(`SIGAA: Fetching content for news "${item.title}"...`);
+
+                    // Use Playwright for reliable JSF session handling instead of HTTP scraper
+                    // The HTTP approach fails because sessions become stale between requests
+                    const detail = await this.playwrightLogin.getNewsDetail(courseId, courseName, item.id);
+                    const summary = toNewsSummary(item);
+
+                    if (detail.success && detail.news) {
+                        enrichedNews.push({ ...summary, content: detail.news.content });
+                    } else {
+                        logger.warn(`SIGAA: Failed to fetch news "${item.title}": ${detail.error}`);
+                        enrichedNews.push(summary); // Keep header at least
+                    }
+                }
+
+                return ok(enrichedNews);
+
+            } catch (error) {
+                logger.error('SIGAA: Error loading all news:', error);
+                return failFromMessage(errorMessage(error));
             }
-
-            return ok(enrichedNews);
-
-        } catch (error) {
-            logger.error('SIGAA: Error loading all news:', error);
-            return failFromMessage(errorMessage(error));
-        } finally {
-            this.stopBusy();
-        }
+        });
     }
 }
