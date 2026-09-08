@@ -27,7 +27,7 @@ npm run test:integration -- portal
 
 #### Implementation notes
 
-- Commit: — (sessão única, direto por pedido do usuário: sem separação
+- Commit: eaf5da5 (sessão única, direto por pedido do usuário: sem separação
   especificar/implementar/revisar desta vez)
 - Fixture version: `ufc-sigaa-2026.09-v1` (`PORTAL_ADAPTER_VERSION`)
 - Escopo confirmado com o usuário antes de escrever teste: só fixtures +
