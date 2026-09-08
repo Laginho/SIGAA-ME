@@ -1,9 +1,9 @@
 # Loop de trabalho — amarrações deste repositório
 
-Três papéis, três sessões separadas. O loop existe por uma razão só: **quem
-escreve os testes não é quem os faz passar.** Foi assim que 14 testes verdes
-ficaram em cima de um parser quebrado (`tests/unit/parser.test.ts` testava uma
-cópia). Ver `CLAUDE.md`, "Loop de trabalho".
+Etapas, modelos e skills: `AGENTS.md`. Aqui ficam as amarrações que valem para
+qualquer etapa. A regra que sustenta tudo: **os testes entram num commit próprio,
+vermelhos, antes de qualquer código** — foi assim que 14 testes verdes ficaram em
+cima de um parser quebrado (`tests/unit/parser.test.ts` testava uma cópia).
 
 ## Regras que valem para todo papel
 
@@ -16,22 +16,12 @@ Não existe `CONTEXT.md`; o vocabulário do domínio está no `CLAUDE.md`, no
 
 ## Rastreador de issues
 
-**A issue é um arquivo em `.scratch/`** (desde 2026-09-03; o
-`docs/HARDENING_TRACKER.md` ficou só para links antigos resolverem). Um
-diretório por fase, `.scratch/NN-faseN-slug/`, com:
+Layout, IDs e estados: `docs/agents/issue-tracker.md`. Regras que o layout não
+diz:
 
-- `spec.md` — a seção da fase em `docs/PLANO.md`;
-- `issues/NN-ID-slug.md` — uma por tarefa (`ARCH-001`, `SEC-002`, ...). O
-  `Problem`/`Required ...` + `Acceptance criteria` dela são a especificação;
-- `ledger.md` — tabela `| Data | ID | Commit |` das tarefas **fechadas** da fase.
-
-- Linha `Status:` no topo da issue: `open`, `claimed`, `resolved`, `blocked`.
-  Quem especifica põe `claimed` ao começar; quem revisa põe `resolved` ao fechar
-  com gate verde e acrescenta a linha no `ledger.md` da fase. Uma revisão que
-  derruba uma issue fechada a devolve a `open`, marca qual critério caiu (❌ com
-  o motivo) e remove a linha do ledger.
-- A ordem das tarefas é a do `docs/PLANO.md` (a Fase 3 respeita integralmente a
-  ordem de dependência). Tarefa trivial vai direto, sem loop.
+- A ordem das tarefas é a do `docs/PLANO.md`. Uma revisão que derruba uma issue
+  fechada a devolve a `open`, marca qual critério caiu (❌ com o motivo) e
+  remove a linha do ledger.
 - Toda correção de bug precisa de um teste que falharia sem ela (`CLAUDE.md`,
   "Antes de commitar", item 5). Teste chama código de produção, não uma cópia
   (ver `tests/fixtures/README.md` e `QA-005`).
@@ -83,9 +73,9 @@ suíte (`N passed | M skipped (N+M)`), não a arredondada.
 ## Commits
 
 Conventional Commits em inglês, corpo explicando o porquê e citando a tarefa
-(`fix: ... (BUG-003)`). Testes e implementação podem ser commits separados;
-nunca squash. Autor humano dos commits é o Bruno; ninguém faz push nem merge —
-a revisão abre o PR e o Bruno mescla.
+(`fix: ... (BUG-003)`). Testes num commit próprio, antes do código; nunca
+squash. A revisão abre o PR e mescla direto se não alterou código; se alterou, o
+PR espera o Bruno.
 
 ## Registro na issue
 
