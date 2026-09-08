@@ -67,10 +67,14 @@ export function buildStructuralDiagnostic(
 }
 
 export class DiagnosticsService {
-    private readonly dir: string;
-
-    constructor() {
-        this.dir = path.join(app.getPath('userData'), 'diagnostics');
+    /**
+     * Resolvido a cada uso, nunca no import (DEV-002). Este módulo é
+     * importado pelo `main.ts` via `sigaa.service`, e imports são içados:
+     * um caminho fixado no construtor aponta para o `userData` de produção
+     * mesmo em desenvolvimento.
+     */
+    private get dir(): string {
+        return path.join(app.getPath('userData'), 'diagnostics');
     }
 
     record(diagnostic: StructuralDiagnostic): void {

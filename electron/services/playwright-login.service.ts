@@ -62,6 +62,20 @@ export class PlaywrightLoginService {
     private storedUsername: string | null = null;
     private storedPassword: string | null = null;
 
+    /**
+     * Best-effort (PORTAL-003): um diagnóstico que falha não pode alterar o
+     * erro que ele descreve. Sem a guarda, um EPERM aqui cai no `catch`
+     * genérico do método chamador, que devolve o erro sem `errorCode` — e o
+     * `SELECTOR_DRIFT` que o diagnóstico existe para explicar desaparece.
+     */
+    private recordDiagnostic(html: string, url: string, selectorCounts: Record<string, number>): void {
+        try {
+            diagnosticsService.record(buildStructuralDiagnostic(html, url, PORTAL_ADAPTER_VERSION, selectorCounts));
+        } catch (error) {
+            logger.error(`Playwright: failed to record structural diagnostic: ${String(error)}`);
+        }
+    }
+
     async login(username: string, password: string): Promise<{ success: boolean; cookies?: any[]; userName?: string; photoUrl?: string; error?: string; errorCode?: AppErrorCode }> {
         try {
             console.log('Playwright: Launching browser...');
@@ -120,6 +134,7 @@ export class PlaywrightLoginService {
                 return { success: false, error: errorMessage || 'Login failed - still on login page', errorCode: 'SESSION_EXPIRED' };
             }
             if (endState === 'unrecognized') {
+                this.recordDiagnostic(endHtml, currentUrl, {});
                 await this.close();
                 return {
                     success: false,
@@ -356,12 +371,11 @@ export class PlaywrightLoginService {
 
             const { courses, selectorDiagnostics } = courseExtraction;
             if (selectorDiagnostics.courseIdInputs === 0 || selectorDiagnostics.virtualClassroomLinks === 0) {
-                diagnosticsService.record(buildStructuralDiagnostic(
-                    await page.content(),
+                this.recordDiagnostic(
+                    await page.content().catch(() => ''),
                     page.url(),
-                    PORTAL_ADAPTER_VERSION,
                     selectorDiagnostics
-                ));
+                );
                 await this.close();
                 return {
                     success: false,
@@ -470,9 +484,11 @@ export class PlaywrightLoginService {
             // paginaInicial.do. Sem esta checagem, sessão expirada saía daqui como
             // "Course link not found in portal", que `classifyMessage` lê como
             // NOT_FOUND, e ninguém tenta relogar.
-            const portalCheck = validateCourseListDocument(await page.content());
+            const portalHtml = await page.content();
+            const portalCheck = validateCourseListDocument(portalHtml);
             if (portalCheck) {
                 logger.warn(`Playwright: Portal document rejected before course entry: ${portalCheck.code}`);
+                if (portalCheck.code === 'SELECTOR_DRIFT') this.recordDiagnostic(portalHtml, page.url(), {});
                 if (portalCheck.code === 'SESSION_EXPIRED') this.page = null;
                 return { success: false, error: portalCheck.message, errorCode: portalCheck.code };
             }

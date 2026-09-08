@@ -1,5 +1,5 @@
 # PORTAL-003 — Add privacy-safe structural diagnostics
-Status: open
+Status: claimed
 Priority: P1
 Blocked by: ARCH-001
 Tracker status at migration: `PARTIAL`
@@ -203,3 +203,85 @@ Reaberta. Etapa 2 com: teste vermelho para os dois call sites (drift grava
 diagnóstico; clear-all apaga), teste de late-binding do `userData`, teste da
 degradação do `errorCode` quando a gravação falha, e decisão explícita sobre
 AC3 (converter os 11 sítios ou remover `shouldCaptureRawArtifact` desta rodada).
+
+## Segunda rodada (2026-09-08) — os quatro bloqueantes
+
+Testes vermelhos em `d733df0`, implementação no commit seguinte. Ordem
+mantida: os testes entraram sozinhos, vermelhos, antes de qualquer código.
+
+#### A-1 — cobertura da fiação
+
+Nove testes novos. Todos falham contra o `master`:
+
+| Teste | Arquivo | Cobre |
+|---|---|---|
+| drift da lista de turmas grava diagnóstico | `portal-selector-resilience` | A-1 |
+| gravação que falha preserva o `SELECTOR_DRIFT` | idem | A-3 |
+| HTML ilegível preserva o `SELECTOR_DRIFT` | idem | A-3 |
+| pouso pós-login não reconhecido grava | idem | A-4 |
+| portal rejeitado antes da turma grava | idem | A-4 |
+| rejeição por sessão expirada **não** grava | idem | A-4 (limite) |
+| `clearDiagnostics` apaga os diagnósticos | `sigaa-service` | A-1 |
+| `app.getPath` não é chamado no import | `userdata-late-binding` | A-2 |
+| diagnóstico cai no `userData` vigente | idem | A-2 |
+
+Os testes espionam `diagnosticsService.record` em vez de olhar o disco: a
+asserção passa a ser o payload, e a suíte não escreve no `userData`. O serviço
+em si continua coberto pelo `diagnostics-redaction`.
+
+#### A-2 — `dir` virou getter
+
+Mesma forma do `cache.service.ts` e do `persistence.service.ts`: campo com
+`app.getPath` no construtor virou `private get dir()`. O construtor
+desapareceu, então o singleton de módulo não toca em `app.getPath` no import.
+
+#### A-3 — a guarda mora com os chamadores
+
+`PlaywrightLoginService.recordDiagnostic()` envolve `buildStructuralDiagnostic`
+e `record` num `try` que loga e segue. Não é o anti-padrão da regra 3: o erro é
+tratado — o `SELECTOR_DRIFT` volta intacto — não engolido. O `page.content()`
+do ponto de drift ganhou o `.catch` que a linha 607 do mesmo arquivo já usava.
+
+A primeira tentativa pôs a guarda em `diagnostics.service.ts`, e o teste de
+late-binding acusou: importar `logger.service` de lá arrastava para o teste o
+`app.getPath` em tempo de import que o `logger` ainda tem (defeito do
+`OBS-001`, não deste ticket). Método privado no serviço que já importa o
+`logger` resolve sem acoplar módulo novo — e os três chamadores estão todos
+nesse arquivo.
+
+#### A-4 — os três pontos de falha estrutural
+
+| Local | Payload |
+|---|---|
+| `login()`, `endState === 'unrecognized'` | `endHtml`, `currentUrl`, `{}` |
+| `getCourses()`, drift da lista | HTML da página, `page.url()`, contagens |
+| `enterCourseAndGetHTML()`, portal rejeitado | `portalHtml`, `page.url()`, `{}` |
+
+No terceiro, só `SELECTOR_DRIFT` grava: `SESSION_EXPIRED` no mesmo ramo é
+sessão vencida, não mudança de layout, e diagnóstico estrutural ali seria
+ruído. Um teste fixa esse limite. O `{}` nos dois pontos sem contagem é
+honesto — nenhum seletor foi contado ali, e a nota da primeira rodada sobre
+contagens serem responsabilidade do chamador continua valendo.
+
+#### Prova vermelho-verde
+
+- `git stash` dos dois serviços (volta à primeira rodada): 6 falhas — as de
+  A-2, A-3 e A-4.
+- `git checkout master --` sobre `playwright-login.service.ts` e
+  `sigaa.service.ts`: 6 falhas — agora com as de A-1 (drift grava,
+  `clearDiagnostics` apaga).
+- Com a implementação: os quatro arquivos, 69 passed.
+
+#### Gate
+
+`tsc --noEmit` limpo; `eslint .` 0 erros, 67 warnings legado (mesma contagem de
+antes); `vitest run` 46 arquivos, **557 passed | 4 skipped (561)** — eram 549
+passed | 4 skipped (553).
+
+#### Não tocado
+
+Os cinco itens menores da revisão e as ressalvas de AC2/AC3/AC4 seguem abertos:
+o `NaN` no `prune()`, os parses repetidos de cheerio, o `title` sem truncagem,
+os ~11 dumps crus ainda com `!app.isPackaged` inline, e a decisão sobre
+`shouldCaptureRawArtifact`. Eram não bloqueantes; ampliar o diff para eles
+misturaria escopo com os quatro achados.
