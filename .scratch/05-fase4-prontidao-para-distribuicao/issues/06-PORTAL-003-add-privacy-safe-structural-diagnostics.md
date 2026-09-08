@@ -1,5 +1,5 @@
 # PORTAL-003 — Add privacy-safe structural diagnostics
-Status: claimed
+Status: open
 Priority: P1
 Blocked by: ARCH-001
 Tracker status at migration: `PARTIAL`
@@ -285,3 +285,87 @@ o `NaN` no `prune()`, os parses repetidos de cheerio, o `title` sem truncagem,
 os ~11 dumps crus ainda com `!app.isPackaged` inline, e a decisão sobre
 `shouldCaptureRawArtifact`. Eram não bloqueantes; ampliar o diff para eles
 misturaria escopo com os quatro achados.
+
+## Revisão das correções (Codex, 2026-09-08) — reaberta
+
+Revisão individual, sem subagentes, a pedido do Bruno. Base fixada em
+`master` (`7890968`), HEAD revisado `2d7cd98`. Nenhum código de produção ou
+teste permanente alterado. Ainda não está pronto para push e PR.
+
+### Correções confirmadas
+
+- A-1: os testes agora detectam a remoção da gravação e da limpeza.
+- A-2: o singleton não resolve `userData` no import; a gravação usa o caminho
+  vigente, confirmada pelo teste de late-binding.
+- A-3: falha em `record()` ou na leitura adicional de HTML preserva
+  `SELECTOR_DRIFT` no caminho da lista de turmas.
+- A-4: os dois pontos pedidos na revisão anterior foram instrumentados, mas
+  a contagem anterior de três pontos era incompleta. Há retornos indiretos
+  via `startCheck.code` e `classifyLoginException()` no próprio `login()`.
+
+### Standards
+
+- **P1 — título sem redação.** `diagnostics.service.ts:62` copia texto livre
+  de uma fonte externa para o diagnóstico persistido. Contraria
+  `docs/PORTAL_COMPATIBILITY.md:211`, que pede categoria de título e exclui
+  título específico do aluno. O comentário de privacidade por construção
+  no topo do serviço também não corresponde ao comportamento.
+
+### Spec
+
+- ❌ **AC2 / P1 — dados pessoais e acadêmicos no título.** Passar
+  `<title>Aluno Teste Privado - Calculo I - Media 9.4</title>` a
+  `buildStructuralDiagnostic()` preserva esse conteúdo integralmente no JSON,
+  inclusive em produção, onde a gravação estrutural não exige consentimento.
+  O teste atual só coloca dados sensíveis no corpo. Usar categoria/allowlist
+  com fallback seguro e teste de título sensível. Truncar em 120 caracteres,
+  como sugerido na primeira revisão, **não** remove nome ou nota.
+- ❌ **AC2 / P1 — sessão no pathname.** `urlFamily()` em
+  `diagnostics.service.ts:30` conserva
+  `/sigaa/paginaInicial.do;jsessionid=TEST_SESSION_SECRET` quando recebe
+  `https://si3.ufc.br/sigaa/paginaInicial.do;jsessionid=TEST_SESSION_SECRET?foo=1`.
+  Remover query e fragmento não basta para esse formato de URL. Normalizar a
+  família de rota sem parâmetros de sessão e testar esse caso. A reprodução
+  usa dado sintético; não afirma que uma captura atual do SIGAA contém esse
+  formato.
+- ❌ **AC1 / P2 — falhas de login ainda sem diagnóstico.** HTML inicial
+  `<main>Layout novo sem formulario</main>` faz `validateLoginStart()`
+  devolver `SELECTOR_DRIFT`, mas `login()` retorna em
+  `playwright-login.service.ts:106` sem gravar. Um erro de `page.fill()` com
+  mensagem `Timeout waiting for input[name="user.login"]` também retorna
+  `SELECTOR_DRIFT` via `classifyLoginException()` no catch, com zero chamadas
+  a `record()`. Cobrir ambos os caminhos com diagnóstico best-effort, antes
+  de fechar a página, preservando a classificação mesmo se a captura falhar.
+
+### Verificação reproduzida
+
+- `npm run quality`: typecheck limpo; ESLint **0 erros, 67 warnings**;
+  Vitest **46 arquivos, 557 passed | 4 skipped (561)**.
+- Quatro arquivos da tarefa contra as fontes da primeira rodada (`360180e`):
+  **6 failed | 63 passed (69)**, por A-2/A-3/A-4, sem falha de import.
+- Mesmos testes, com `playwright-login.service.ts` e `sigaa.service.ts` de
+  `master` e o serviço de diagnóstico atual: **6 failed | 63 passed (69)**,
+  incluindo ausência de gravação e de limpeza (A-1).
+- Fontes atuais restauradas: **69 passed (69)** nos quatro arquivos.
+- Quatro provas adicionais, temporárias, chamando o código de produção:
+  título sensível, sessão no pathname, login inicial sem formulário e timeout
+  de campo de login. **4 failed | 25 skipped (29)**; os 25 são os testes do
+  harness existente excluídos pelo filtro. As duas provas de login confirmam
+  primeiro `errorCode === 'SELECTOR_DRIFT'` e falham depois na expectativa de
+  uma chamada a `record()`. As duas provas de redação falham porque os
+  marcadores sensíveis sintéticos continuam em `JSON.stringify(diagnostic)`.
+- As fontes foram restauradas byte a byte em `finally`; o teste temporário
+  foi removido. Nenhum login real, credencial, build ou E2E executado.
+- A execução do script de prova no sandbox encontrou bloqueio de leitura do
+  esbuild antes da coleta. Reexecutada fora do sandbox, com os resultados
+  acima. Essa falha de infraestrutura não foi contada como prova vermelha.
+
+### Decisão
+
+Volta à etapa 2 para os três bloqueios acima, com testes vermelhos antes do
+código. Os três achados de Spec incluem o achado de título de Standards;
+não são quatro defeitos distintos. AC3 continua com gate de desenvolvimento
+nos dumps existentes; a abstração de consentimento e a retenção dos HTMLs
+seguem como ressalvas já registradas, sem correção nesta revisão. O
+`clear-all-data` existente já remove `debug_*` na raiz do `userData`.
+Sem linha no ledger, pois a issue continua aberta. Sem push ou PR.
