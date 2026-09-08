@@ -1,5 +1,5 @@
 # PORTAL-003 — Add privacy-safe structural diagnostics
-Status: claimed
+Status: open
 Priority: P1
 Blocked by: ARCH-001
 Tracker status at migration: `PARTIAL`
@@ -79,3 +79,127 @@ npm run test:integration -- portal
   introduzido pelos arquivos desta tarefa); `vitest run` 549 passed | 4
   skipped (553) — eram 538 passed | 4 skipped (542) antes desta tarefa (11
   testes novos).
+
+## Revisão (Opus, 2026-09-08) — reaberta
+
+**Quatro achados bloqueantes.** Volta à etapa 2. Nenhum código alterado nesta
+revisão: as três correções precisam de teste vermelho antes, e a fiação inteira
+está descoberta.
+
+#### Gate, reproduzido aqui
+
+`npm run quality` na branch: `tsc --noEmit` limpo; `eslint .` 0 erros, 67
+warnings (`no-explicit-any` legado); `vitest run` 46 arquivos, 549 passed | 4
+skipped (553). Bate com o relatado.
+
+#### Achado A-1 — a fiação de produção não tem teste nenhum
+
+Removidos os dois únicos call sites novos (`playwright-login.service.ts:359-364`
+e `diagnosticsService.clear()` em `sigaa.service.ts:124`), `vitest run` devolve
+**549 passed | 4 skipped — a suíte inteira, intacta**. Os 11 testes novos
+exercitam funções puras e `new DiagnosticsService()` direto; nada exercita o
+serviço no caminho de falha real nem o clear-all.
+
+A prova vermelho-verde registrada ("Cannot find module" depois do `git stash`)
+prova que o módulo passou a existir, não que ele está ligado. É o item 5 do
+"antes de commitar" e o `QA-003` outra vez: se a correção fosse revertida,
+nenhum teste falharia.
+
+#### Achado A-2 — `app.getPath` em tempo de import: regressão do DEV-002
+
+```ts
+constructor() {
+    this.dir = path.join(app.getPath('userData'), 'diagnostics');
+}
+// ...
+export const diagnosticsService = new DiagnosticsService();
+```
+
+`main.ts:5` importa `sigaa.service`, que importa `diagnostics.service`. Imports
+são içados, então o construtor roda **antes** do `app.setPath('userData',
+'<name>-dev')` de `main.ts:20-25`. Em desenvolvimento o diagnóstico grava em
+`%APPDATA%\sigaa-me\diagnostics` (produção), e o `clearDiagnostics()` de dev
+apaga a pasta de produção — exatamente os dois consequentes que o `DEV-002`
+descreve e fechou. A revisão do DEV-002 afirmou que `logger.service.ts:10` era
+o último `app.getPath` em tempo de import do repositório; este ticket criou o
+segundo.
+
+Correção: campo vira getter, como em `cache.service.ts:59` e
+`persistence.service.ts:52`. Teste: `tests/unit/userdata-late-binding.test.ts`
+já tem o padrão (`getPath` mutável, asserta que não foi chamado no import).
+
+#### Achado A-3 — falha ao gravar diagnóstico apaga o `SELECTOR_DRIFT`
+
+`await page.content()` (sem o `.catch(() => '')` que a linha 593 do mesmo
+arquivo usa) e `mkdirSync`/`writeFileSync`/`unlinkSync` sem guarda, dentro do
+`try` de `getCourses`. Qualquer EPERM, disco cheio ou arquivo em uso cai no
+`catch` genérico da linha 407, que devolve `{ success: false, error:
+error.message }` **sem `errorCode`** — e `classifyMessage` passa a ler a falha
+como outra coisa. O diagnóstico destrói o sinal que ele existe para preservar.
+
+O `try/catch` aqui não é o anti-padrão da regra 3 do `CLAUDE.md`: o erro é
+tratado (loga e devolve o `SELECTOR_DRIFT` correto), não engolido. A guarda
+precisa envolver a expressão inteira, não só o `record()` — `page.content()` e
+`cheerio.load` também lançam.
+
+#### Achado A-4 — AC1 cobre 1 dos 3 pontos de falha estrutural
+
+Existem três `return` com `errorCode: 'SELECTOR_DRIFT'` no caminho do
+Playwright:
+
+| Local | Grava diagnóstico? |
+|---|---|
+| `playwright-login.service.ts:359` (drift na lista de disciplinas) | sim |
+| `playwright-login.service.ts:121` (`classifyLoginEnd` → `unrecognized`) | **não** |
+| `playwright-login.service.ts:473` (`validateCourseListDocument`) | **não** |
+
+A nota "para manter o diff no tamanho do que o ticket pediu" não se sustenta: o
+ticket lista esse arquivo como primary file e pede diagnóstico de falha, não de
+uma falha. Instrumentar dois `return` a mais é diff menor que a discussão.
+Nenhum sibling (`PORTAL-004`/`PORTAL-005`) reivindica esses pontos.
+
+#### Critérios de aceitação
+
+- ❌ **AC1** — 1 de 3 pontos de falha estrutural instrumentado (A-4), e o
+  ponto instrumentado não tem teste (A-1).
+- ⚠️ **AC2** — os campos derivados são seguros por construção, com uma
+  exceção: `title: $('title').first().text().trim()` **é** texto livre do
+  HTML, sem truncagem nem allowlist. O ticket pede o campo `title`, então
+  incluir não é o erro; a afirmação da nota ("nenhum desses campos copia texto
+  livre do HTML") é que é falsa, e o fixture tem título genérico, então o teste
+  passa por sorte da amostra. Truncar (~120 chars) fecha o pior caso.
+- ⚠️ **AC3** — o gate de consentimento cobre 1 de ~11 dumps de HTML cru; os
+  outros seguem com `!app.isPackaged` inline
+  (`playwright-login.service.ts:137,304,378,518,1054,1071,1188`;
+  `http-scraper.service.ts:240,287,357,768`). Como o único call site passa
+  `consent=false` fixo, o comportamento observável é idêntico ao de antes:
+  `shouldCaptureRawArtifact` é hoje abstração para zero casos reais (regra 7 do
+  `CLAUDE.md`). Ou converte os 11, ou não vale existir até o ticket de
+  consentimento.
+- ⚠️ **AC4** — retenção limitada só para os JSON de diagnóstico; os
+  `debug_*.html` continuam sem limite. `clear()` chega mesmo aos diagnósticos
+  (`sigaa.service.ts:123` → `register-handlers.ts:307`, handler
+  `clear-all-data`) — essa metade está cumprida, mas descoberta por teste
+  (A-1).
+
+#### Menores, não bloqueiam
+
+- `prune()`: `Number(name.split('-')[0])` dá `NaN` para qualquer `.json`
+  estranho no diretório, e `NaN` na comparação deixa a ordem arbitrária — pode
+  apagar o arquivo errado. Uma linha: `.filter(e => Number.isFinite(e.timestamp))`.
+- `buildStructuralDiagnostic` faz `cheerio.load` duas vezes e `classify()`
+  carrega de novo: 3+ parses do portal inteiro por diagnóstico. Passe o `$`.
+- `if (el.type === 'tag')` dentro de `$('*')` é sempre verdadeiro.
+- `existsSync` em `clear()` é redundante com `rmSync({ force: true })`; a
+  própria nota admite que ele existe para não quebrar o mock de `fs` de
+  `sigaa-service.test.ts`. Código de produção moldado por mock — o conserto é
+  `rmSync: vi.fn()` no mock.
+- `urlFamily` não revela que devolve o pathname; o JSDoc existe porque o nome
+  não conta.
+
+#### Veredito
+
+Reaberta. Etapa 2 com: teste vermelho para os dois call sites (drift grava
+diagnóstico; clear-all apaga), teste de late-binding do `userData`, teste da
+degradação do `errorCode` quando a gravação falha, e decisão explícita sobre
+AC3 (converter os 11 sítios ou remover `shouldCaptureRawArtifact` desta rodada).
