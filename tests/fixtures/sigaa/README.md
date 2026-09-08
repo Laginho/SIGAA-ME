@@ -18,9 +18,9 @@ do portal. Nenhum tem cookie, ViewState de sessão real, nome, matrícula ou CPF
 |---|---|---|
 | `login.html` | LOGIN | `classify()` reconhece o formulário; `validateLoginStart()` aceita. Reaproveitado para "sessão expirada": `validateCourseListDocument()` sobre este mesmo arquivo devolve `SESSION_EXPIRED`. |
 | `login-invalid-credentials.html` | LOGIN + erro | Mensagem de erro visível não muda o estado — ainda é LOGIN. |
-| `student-home.html` | STUDENT_HOME | Pouso pós-login sem lista de turmas. |
+| `student-home.html` | STUDENT_HOME | Pouso pós-login sem lista de turmas. Só o link `Menu Discente`, sem o texto "Portal do Discente", para fixar esse ramo de `isStudentHome()` isolado. |
 | `student-portal-empty.html` | STUDENT_PORTAL, 0 turmas | `.nome_usuario` sozinho já autentica o portal; `validateCourseListDocument()` aceita mesmo sem `idTurma`. |
-| `student-portal-populated.html` | STUDENT_PORTAL, N turmas | `idTurma` + link `turmaVirtual`; `validateCourseListDocument()` aceita. |
+| `student-portal-populated.html` | STUDENT_PORTAL, N turmas | `idTurma` + link `turmaVirtual`; `validateCourseListDocument()` aceita. Sem `.nome_usuario` de propósito: com ele a fixture classificaria pelo atalho do fallback e o ramo dos landmarks ficaria sem cobertura. |
 | `course-home.html` | COURSE_HOME | Formulário AVA fora da URL `/ava/`. |
 | `access-denied.html` | não reconhecido | Página sintética de "Acesso Negado". Hoje `classify()` devolve `UNKNOWN` e `validateCourseListDocument()` devolve `SELECTOR_DRIFT` — não existe detecção própria ainda. Ver `PORTAL-003`/`PORTAL-005`. |
 | `maintenance.html` | não reconhecido | Página de manutenção programada. Mesma lacuna do item acima. |

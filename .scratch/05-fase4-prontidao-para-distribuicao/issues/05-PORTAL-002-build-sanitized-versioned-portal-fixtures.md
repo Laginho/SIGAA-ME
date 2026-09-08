@@ -68,3 +68,30 @@ npx vitest run tests/integration/portal-selector-resilience.test.ts tests/integr
   67 warnings preexistentes; 45 arquivos passaram, 538 passed | 4 skipped
   (542). Executado fora do sandbox após bloqueio de leitura do esbuild.
 - Mantido `resolved`. Sem login real, mudança de produção ou UI.
+
+#### Auditoria da revisão (2026-09-08)
+
+- Números da revisão reproduzidos: gate 45 arquivos / 538 passed | 4 skipped,
+  foco nos dois arquivos 26 passed, nenhuma mudança de produção. Cadeia de
+  `findCourseRow` reconferida: `enterCourseHTTP` só tem chamador em
+  `tests/integration/portal-adapter.test.ts`, então o caminho morto é real.
+- Achado que a revisão não pegou: as duas fixtures de portal não cobriam o
+  ramo que existiam para cobrir. Apagar o primeiro ramo de `isStudentPortal`
+  (`idTurma` + `turmaVirtual`) ou de `isStudentHome` (`menuDiscenteLink`)
+  deixava a suíte inteira verde, porque `student-portal-populated.html` tinha
+  `.nome_usuario` e `student-home.html` tinha o texto "Portal do Discente" —
+  cada uma classificava pelo atalho do fallback.
+- Correção: tirado `.nome_usuario` da fixture populada e o `<h1>Portal do
+  Discente</h1>` da `student-home.html`. As duas mutações agora matam um teste
+  cada. Removida também a cláusula "ou sua sessão expirou" de
+  `access-denied.html`, que misturava `ACCESS_DENIED` com expiração e
+  atrapalharia `PORTAL-003`.
+- Lição de método: a prova de sensibilidade da revisão mutou a *fixture*, o
+  que só prova que o teste lê o arquivo. Num PR de fixtures a mutação que vale
+  é em `selectors.ts`/classifier — é ela que prova que a fixture ancora
+  produção, e teria exposto os dois ramos sem cobertura.
+- Aberto como limitação conhecida, não corrigido aqui: as oito fixtures são
+  sintéticas, o mesmo buraco que `tests/fixtures/README.md` já documenta
+  ("a fixture concorda com o parser por construção"). O repo já tem uma
+  captura real limpa (`course-page-real-with-tasks.html`); gravar as demais
+  pede sessão no Windows com alguém olhando.
