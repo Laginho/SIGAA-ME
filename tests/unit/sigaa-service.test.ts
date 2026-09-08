@@ -16,6 +16,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { diagnosticsService } from '../../electron/services/diagnostics.service';
 
 // QA-006: o serviço faz mkdir de verdade antes de baixar. Sem este mock o teste
 // cria C:\mock\downloads no Windows (onde passa por acidente) e falha com
@@ -428,6 +429,15 @@ describe('SigaaService (Unit)', () => {
             service.clearDiagnostics();
 
             expect(mockHttp.resetLog).toHaveBeenCalledTimes(1);
+        });
+
+        it('clearDiagnostics apaga os diagnósticos estruturais (PORTAL-003)', () => {
+            const clear = vi.spyOn(diagnosticsService, 'clear').mockImplementation(() => {});
+
+            service.clearDiagnostics();
+
+            expect(clear).toHaveBeenCalledTimes(1);
+            clear.mockRestore();
         });
     });
 
