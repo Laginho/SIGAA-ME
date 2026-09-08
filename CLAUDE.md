@@ -3,48 +3,35 @@
 App desktop Electron que faz scraping do SIGAA da UFC (`si3.ufc.br`) para dar ao
 aluno leitura offline de disciplinas, arquivos e notícias.
 
-**Leia antes de trabalhar aqui:** `docs/PLANO.md` (plano ativo e decisões
-tomadas) e `.scratch/` (status de cada tarefa, desde 2026-09-03). Em `.scratch/`
-há um diretório por fase (`NN-faseN-slug/`), cada um com `spec.md` (a seção da
-fase no PLANO), `ledger.md` (tarefas fechadas) e `issues/NN-ID-slug.md`, uma por
-tarefa, com a linha `Status:` (open/claimed/resolved/blocked) no topo. O
+**Leia antes de trabalhar aqui:** `AGENTS.md` (fluxo de trabalho por ticket),
+`docs/PLANO.md` (plano ativo e decisões tomadas) e `.scratch/` (tracker de
+tarefas; layout, IDs e estados em `docs/agents/issue-tracker.md`). O
 `CODE_REVIEW.md` é registro histórico com correções marcadas inline.
 
 ## Loop de trabalho
 
-Três papéis, **três sessões separadas**, e a regra que sustenta tudo: **quem
-escreve os testes não é quem os faz passar.**
+A tabela de etapas, modelos e skills está no `AGENTS.md`; as amarrações (gate,
+convenções de teste, commits, registro na issue) em `docs/agents/orchestration.md`.
 
-1. **Especificar** (modelo forte): grilling da tarefa, issue em `.scratch/` com
-   critérios de aceite, e os **testes falhando**, contra código de produção.
-   Antes de declarar um contrato, abrir o handler **e** o serviço por trás dele.
-2. **Implementar** (modelo mais barato, sessão limpa, só a issue e os testes):
-   fazer os testes passarem e refatorar. Nada além disso.
-3. **Revisar** (modelo forte, sessão limpa, sem ver a sessão que especificou):
-   conferir o diff contra a issue **e** o que a issue não disse — subir a cadeia
-   de chamadores de tudo que o diff toca. Só reporta achado com cenário de falha
-   concreto (input, sequência ou teste que falha); **zero achados é resposta
-   válida**. Uma passada; discordância vira teste, não debate. Fecha a issue,
-   commita e abre o PR.
+Histórico, para não repetir experimento: o PTMR (PLAN/TEST/MAKE/READ) deixou um
+plano errado atravessar TEST e MAKE (`DL-001`) e foi removido. `PROC-001`
+(2026-09-07) validou Fable especifica / Sonnet implementa / Opus revisa — revisão
+cega do Fable sobre `DATA-002`, `CONC-001` e `DL-002` não achou nada além do
+Opus. `PROC-002` testou dois Sonnets (red e green) com auditoria cega do spec;
+conclusão: todo spec deixa buraco, o que segura é a auditoria. Em 2026-09-08 o
+fluxo foi refeito do zero por grilling e ficou com **um** Sonnet fazendo red e
+green (testes em commit próprio): a trava é o `diff --stat`, não um segundo
+agente. Se a dúvida voltar, alterne por ticket e conte merges diretos.
 
-**Fluxo vigente (validado em 2026-09-07, `PROC-001`):** Fable especifica, Sonnet
-implementa e commita, Opus revisa, commita a correção em cima e abre o PR. O Fable
-só volta ao código num passe pré-release no repo inteiro. Validação: revisão cega do
-Fable high sobre o mesmo diff em `DATA-002`, `CONC-001` e `DL-002`; zero achado
-bloqueante além do Opus. Motivo original: Opus é muito mais barato,
-e tirar o Fable da revisão evita o viés de mesmo modelo entre spec e review.
+## Agent skills
 
-**Ciclo em adoção desde 2026-09-07 (`PROC-002`):** o Fable não escreve arquivo de
-teste. Ele entrega issue, critérios e, em prosa, o nome de cada teste com a
-asserção e os dublês. Um Sonnet expande isso em testes vermelhos e commita; outro
-modelo forte audita o spec cego (protocolo na `PROC-002`); um segundo Sonnet, em
-sessão limpa, faz passar; Opus revisa e abre o PR. Astra high foi testado como
-especificador em `DEV-001` e `PORTAL-001`: nenhum achado bloqueante, mas está
-indisponível. Conclusão da `PROC-002`: todo spec deixa buraco; o que segura é a
-auditoria cega por outro modelo.
+### Issue tracker
 
-Tarefa trivial vai direto, sem loop. Amarrações (gate, convenções de teste,
-commits, registro na issue): `docs/agents/orchestration.md`.
+Markdown local em `.scratch/`, IDs estilo Jira. See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Single-context (`CONTEXT.md` + `docs/adr/`, ainda inexistentes). See `docs/agents/domain.md`.
 
 ## Como trabalhar numa sessão
 
