@@ -22,7 +22,7 @@ do portal. Nenhum tem cookie, ViewState de sessão real, nome, matrícula ou CPF
 | `student-portal-empty.html` | STUDENT_PORTAL, 0 turmas | `.nome_usuario` sozinho já autentica o portal; `validateCourseListDocument()` aceita mesmo sem `idTurma`. |
 | `student-portal-populated.html` | STUDENT_PORTAL, N turmas | `idTurma` + link `turmaVirtual`; `validateCourseListDocument()` aceita. |
 | `course-home.html` | COURSE_HOME | Formulário AVA fora da URL `/ava/`. |
-| `access-denied.html` | não reconhecido | Página real de "Acesso Negado" do SIGAA. Hoje `classify()` devolve `UNKNOWN` e `validateCourseListDocument()` devolve `SELECTOR_DRIFT` — não existe detecção própria ainda. Ver `PORTAL-003`/`PORTAL-005`. |
+| `access-denied.html` | não reconhecido | Página sintética de "Acesso Negado". Hoje `classify()` devolve `UNKNOWN` e `validateCourseListDocument()` devolve `SELECTOR_DRIFT` — não existe detecção própria ainda. Ver `PORTAL-003`/`PORTAL-005`. |
 | `maintenance.html` | não reconhecido | Página de manutenção programada. Mesma lacuna do item acima. |
 
 `news` e `empty`/`populated files` já têm fixture e teste real em
