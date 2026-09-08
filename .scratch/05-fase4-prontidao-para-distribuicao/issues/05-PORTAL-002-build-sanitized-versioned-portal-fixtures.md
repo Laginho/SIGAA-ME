@@ -1,5 +1,5 @@
 # PORTAL-002 — Build sanitized, versioned portal fixtures
-Status: open
+Status: resolved
 Priority: P1
 Blocked by: ARCH-001
 Tracker status at migration: `NOT STARTED`
@@ -22,10 +22,76 @@ Tracker status at migration: `NOT STARTED`
 #### Verification
 
 ```text
-npm run test:integration -- portal
+npx vitest run tests/integration/portal-selector-resilience.test.ts tests/integration/parser-real.test.ts
 ```
 
 #### Implementation notes
 
-- Commit: —
-- Fixture version: —
+- Commit: eaf5da5 (sessão única, direto por pedido do usuário: sem separação
+  especificar/implementar/revisar desta vez)
+- Fixture version: `ufc-sigaa-2026.09-v1` (`PORTAL_ADAPTER_VERSION`)
+- Escopo confirmado com o usuário antes de escrever teste: só fixtures +
+  testes do comportamento atual. `NEWS_DETAIL` e `ACCESS_DENIED` existem como
+  tipo em `portal-contracts.ts` mas nada em `portal-state-classifier.ts` os
+  produz; `access-denied.html`/`maintenance.html` documentam isso (`classify()`
+  → `UNKNOWN`), reconhecimento de verdade fica para `PORTAL-003`/`PORTAL-005`.
+- `findCourseRow` e `httpScraper.getNewsDetail` seguem sem chamador em
+  produção (achado da auditoria do `PORTAL-001`); novas fixtures não os
+  exercitam, para não testar caminho morto como se fosse o real.
+- "Notícia" e "arquivos vazio/populado" já tinham fixture e teste real
+  (`course-page-with-news.html`, `course-page-with-files.html`,
+  `course-page-empty.html` em `parser-real.test.ts`); não duplicados.
+  `course-page-with-files.html` não serve para um teste de `classify()`
+  isolado — o fixture tem `idTurma`/`turmaVirtual` incidentais que o
+  classificam como `STUDENT_PORTAL` antes de chegar em `FILES_SECTION`.
+- Verificação: `npx tsc --noEmit` limpo; `npx vitest run` — 538 passed, 4
+  skipped, 0 falha; `npx eslint tests/integration/portal-selector-resilience.test.ts`
+  limpo.
+
+#### Resolution (2026-09-08)
+
+- Revisão independente, sem subagentes, dos commits `eaf5da5` e `9e489a2`
+  contra `c99113e`. Standards: nenhum achado bloqueante. Spec: nenhum
+  achado bloqueante no escopo confirmado acima.
+- Conferidos classifier, adapter, chamadores Playwright/HTTP e o parser real.
+  As oito fixtures novas são sintéticas e todas entram nos testes; arquivos
+  vazios/populados e notícias reaproveitam as fixtures e testes existentes.
+- Correções documentais: README não chama mais a fixture de acesso negado
+  de página real; comando de verificação substitui o script inexistente
+  `test:integration` pelos dois arquivos que cobrem os cenários.
+- Prova de sensibilidade: trocar temporariamente `user.login` por
+  `user.changed` em `login.html` produz 2 failed, 8 passed e 9 skipped
+  no filtro PORTAL-002, por divergência de LOGIN e SESSION_EXPIRED.
+  Fixture restaurada byte a byte em `finally`; testes focados: 26 passed (26).
+  Não houve correção de código de produção para reverter.
+- Gate `npm run quality` no Windows: typecheck limpo, lint com 0 erros e
+  67 warnings preexistentes; 45 arquivos passaram, 538 passed | 4 skipped
+  (542). Executado fora do sandbox após bloqueio de leitura do esbuild.
+- Mantido `resolved`. Sem login real, mudança de produção ou UI.
+
+#### Auditoria da revisão (2026-09-08)
+
+- Números da revisão reproduzidos: gate 45 arquivos / 538 passed | 4 skipped,
+  foco nos dois arquivos 26 passed, nenhuma mudança de produção. Cadeia de
+  `findCourseRow` reconferida: `enterCourseHTTP` só tem chamador em
+  `tests/integration/portal-adapter.test.ts`, então o caminho morto é real.
+- Achado que a revisão não pegou: as duas fixtures de portal não cobriam o
+  ramo que existiam para cobrir. Apagar o primeiro ramo de `isStudentPortal`
+  (`idTurma` + `turmaVirtual`) ou de `isStudentHome` (`menuDiscenteLink`)
+  deixava a suíte inteira verde, porque `student-portal-populated.html` tinha
+  `.nome_usuario` e `student-home.html` tinha o texto "Portal do Discente" —
+  cada uma classificava pelo atalho do fallback.
+- Correção: tirado `.nome_usuario` da fixture populada e o `<h1>Portal do
+  Discente</h1>` da `student-home.html`. As duas mutações agora matam um teste
+  cada. Removida também a cláusula "ou sua sessão expirou" de
+  `access-denied.html`, que misturava `ACCESS_DENIED` com expiração e
+  atrapalharia `PORTAL-003`.
+- Lição de método: a prova de sensibilidade da revisão mutou a *fixture*, o
+  que só prova que o teste lê o arquivo. Num PR de fixtures a mutação que vale
+  é em `selectors.ts`/classifier — é ela que prova que a fixture ancora
+  produção, e teria exposto os dois ramos sem cobertura.
+- Aberto como limitação conhecida, não corrigido aqui: as oito fixtures são
+  sintéticas, o mesmo buraco que `tests/fixtures/README.md` já documenta
+  ("a fixture concorda com o parser por construção"). O repo já tem uma
+  captura real limpa (`course-page-real-with-tasks.html`); gravar as demais
+  pede sessão no Windows com alguém olhando.
