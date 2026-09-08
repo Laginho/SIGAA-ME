@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { app } from 'electron';
 import { logger } from './logger.service';
+import { buildStructuralDiagnostic, diagnosticsService, shouldCaptureRawArtifact } from './diagnostics.service';
 import type { NewsDetail } from '../../shared/domain';
 import type { AppErrorCode } from '../../shared/errors';
 import { COURSE_HOME, FILES_MENU, LOGIN, NEWS, STUDENT_HOME, STUDENT_PORTAL, newsFormSelector } from '../sigaa/selectors';
@@ -12,7 +13,8 @@ import {
     describeMissingCourseListSelectors,
     isLoginDocument,
     validateCourseListDocument,
-    validateLoginStart
+    validateLoginStart,
+    PORTAL_ADAPTER_VERSION
 } from '../sigaa/portal-adapter';
 
 /**
@@ -354,6 +356,12 @@ export class PlaywrightLoginService {
 
             const { courses, selectorDiagnostics } = courseExtraction;
             if (selectorDiagnostics.courseIdInputs === 0 || selectorDiagnostics.virtualClassroomLinks === 0) {
+                diagnosticsService.record(buildStructuralDiagnostic(
+                    await page.content(),
+                    page.url(),
+                    PORTAL_ADAPTER_VERSION,
+                    selectorDiagnostics
+                ));
                 await this.close();
                 return {
                     success: false,
@@ -583,7 +591,9 @@ export class PlaywrightLoginService {
 
         } catch (error: any) {
             const html = this.page ? await this.page.content().catch(() => '') : '';
-            if (html && !app.isPackaged) {
+            // PORTAL-003: sem fonte de consentimento ainda, então `false` — comportamento
+            // idêntico a antes (`!app.isPackaged`) até uma configuração ligar o consentimento.
+            if (html && shouldCaptureRawArtifact(app.isPackaged, false)) {
                 const debugFullPath = path.join(app.getPath('userData'), `debug_playwright_fail_${courseId}.html`);
                 fs.writeFileSync(debugFullPath, html);
                 logger.error(`Playwright: Navigation failed. Saved HTML to ${debugFullPath}`);
