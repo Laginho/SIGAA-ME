@@ -21,13 +21,20 @@ vi.mock('electron', () => ({
     }
 }));
 vi.mock('../../electron/services/logger.service', () => ({ logger: runtime.logger }));
-vi.mock('fs', () => ({
-    createWriteStream: vi.fn(() => runtime.stream),
-    promises: { writeFile: vi.fn() }
-}));
+vi.mock('fs', async importOriginal => {
+    const actual = await importOriginal<typeof import('fs')>();
+    return {
+        ...actual,
+        createWriteStream: vi.fn(() => runtime.stream),
+        promises: { ...actual.promises, writeFile: vi.fn() }
+    };
+});
 
+import { readFileSync } from 'fs';
+import path from 'path';
 import { HttpScraperService } from '../../electron/services/http-scraper.service';
 import { PlaywrightLoginService } from '../../electron/services/playwright-login.service';
+import { PORTAL_ADAPTER_VERSION, classify, validateCourseListDocument, validateLoginStart } from '../../electron/sigaa/portal-adapter';
 
 function createLocator(options: { visible?: boolean; clickError?: Error; text?: string[] } = {}) {
     const locator: any = {
@@ -239,5 +246,85 @@ describe('HTTP scraper structural validation', () => {
         );
 
         expect(result).toMatchObject({ success: true, files: [], news: [] });
+    });
+});
+
+describe('PORTAL-002: sanitized versioned portal fixtures', () => {
+    const fixture = (name: string) =>
+        readFileSync(path.join(process.cwd(), 'tests/fixtures/sigaa', PORTAL_ADAPTER_VERSION, name), 'utf8');
+    const AVA_URL = 'https://si3.ufc.br/sigaa/ava/index.jsf';
+    const NON_AVA_URL = 'https://si3.ufc.br/sigaa/portais/discente/discente.jsf';
+
+    it('classifies the login fixture as LOGIN and accepts it as a login start document', () => {
+        const html = fixture('login.html');
+
+        expect(classify(html)).toBe('LOGIN');
+        expect(validateLoginStart(html)).toBeNull();
+    });
+
+    it('classifies the invalid-credentials fixture as LOGIN despite the visible error banner', () => {
+        const html = fixture('login-invalid-credentials.html');
+
+        expect(classify(html)).toBe('LOGIN');
+        expect(validateLoginStart(html)).toBeNull();
+    });
+
+    it('treats the login fixture reached instead of the student portal as an expired session', () => {
+        // Reaproveita login.html: a página é a mesma, o que muda é qual
+        // documento a operação esperava encontrar.
+        const html = fixture('login.html');
+
+        expect(validateCourseListDocument(html)).toEqual({
+            code: 'SESSION_EXPIRED',
+            message: 'Session expired: SIGAA returned the login page instead of the student portal.'
+        });
+    });
+
+    it('classifies the student-home fixture as STUDENT_HOME', () => {
+        expect(classify(fixture('student-home.html'))).toBe('STUDENT_HOME');
+    });
+
+    it('classifies and accepts an empty student portal (0 turmas) by .nome_usuario alone', () => {
+        const html = fixture('student-portal-empty.html');
+
+        expect(classify(html)).toBe('STUDENT_PORTAL');
+        expect(validateCourseListDocument(html)).toBeNull();
+    });
+
+    it('classifies and accepts a populated student portal (N turmas)', () => {
+        const html = fixture('student-portal-populated.html');
+
+        expect(classify(html)).toBe('STUDENT_PORTAL');
+        expect(validateCourseListDocument(html)).toBeNull();
+    });
+
+    it('classifies the course-home fixture as COURSE_HOME outside the /ava/ URL family', () => {
+        expect(classify(fixture('course-home.html'), NON_AVA_URL)).toBe('COURSE_HOME');
+    });
+
+    it('classifies a course page carrying news as FILES_SECTION, same as any other AVA form page', () => {
+        const html = readFileSync(path.join(process.cwd(), 'tests/fixtures', 'course-page-with-news.html'), 'utf8');
+
+        expect(classify(html, AVA_URL)).toBe('FILES_SECTION');
+    });
+
+    // access-denied.html e maintenance.html documentam uma lacuna, não um
+    // comportamento correto: nada em portal-state-classifier.ts reconhece
+    // "Acesso Negado" ou manutenção programada. Ambos caem em UNKNOWN e viram
+    // SELECTOR_DRIFT genérico. Reconhecer esses estados de verdade é
+    // PORTAL-003/PORTAL-005; se esta asserção quebrar porque alguém passou a
+    // classificar como ACCESS_DENIED, ótimo — atualize o teste, não a fixture.
+    it('does not yet recognize the access-denied fixture as its own state (documents the PORTAL-003/005 gap)', () => {
+        const html = fixture('access-denied.html');
+
+        expect(classify(html)).toBe('UNKNOWN');
+        expect(validateCourseListDocument(html)?.code).toBe('SELECTOR_DRIFT');
+    });
+
+    it('does not yet recognize the maintenance fixture as its own state (documents the PORTAL-003/005 gap)', () => {
+        const html = fixture('maintenance.html');
+
+        expect(classify(html)).toBe('UNKNOWN');
+        expect(validateCourseListDocument(html)?.code).toBe('SELECTOR_DRIFT');
     });
 });
