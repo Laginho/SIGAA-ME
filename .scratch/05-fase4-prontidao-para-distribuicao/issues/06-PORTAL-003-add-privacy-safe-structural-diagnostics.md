@@ -1,5 +1,5 @@
 # PORTAL-003 — Add privacy-safe structural diagnostics
-Status: open
+Status: resolved
 Priority: P1
 Blocked by: ARCH-001
 Tracker status at migration: `PARTIAL`
@@ -460,3 +460,53 @@ guarda) — `login()` rejeitava com o erro cru em vez de resolver com
 `5459962`), sem commit de código. Gate: `tsc --noEmit` limpo, `eslint .` 0
 erros/67 warnings legado, `vitest run` 46 arquivos, **574 passed | 4 skipped
 (578)**.
+
+#### Resolution (2026-09-08)
+
+Revisão de etapa 3 (Opus) dos commits `63e6ebc`, `a18346f`, `9b4dbf8`. Nenhum
+código de produção ou teste alterado nesta revisão — merge direto.
+
+**Os três bloqueantes do Codex, fechados.**
+
+- **Título (AC2).** `categorizeTitle()` mapeia os sete títulos reais do SIGAA
+  para categoria estável e devolve `'other'` para qualquer outro; o texto de
+  origem não tem canal para a saída. Truncar em 120 chars, sugerido na primeira
+  revisão, foi corretamente rejeitado: não remove nome nem nota. O comentário
+  de privacidade no topo do serviço passou a descrever o comportamento real.
+- **Sessão no pathname (AC2).** `urlFamily()` trunca cada segmento do pathname
+  no primeiro `;`, tratando o `;jsessionid=` como o path parameter que ele é.
+  `TEST_SESSION_SECRET` não sobrevive ao `JSON.stringify` do diagnóstico.
+- **Login sem diagnóstico (AC1).** `validateLoginStart()` rejeitando o
+  documento inicial e `classifyLoginException()` no `catch` agora gravam, antes
+  do `close()`, só quando o código é `SELECTOR_DRIFT`. `page` saiu de `const`
+  no `try` para `let` no método — mudança mínima para o `catch` alcançar a
+  página. `PORTAL_UNAVAILABLE` no mesmo `catch` não grava, e um teste fixa esse
+  limite.
+
+**Achado da revisão, devolvido à etapa 2 e fechado em `9b4dbf8`:** o `try`
+interno que guarda a captura de HTML no `catch` de `login()` não tinha teste —
+apagá-lo deixava a suíte verde, a mesma classe do A-3 que reabriu este ticket.
+Coberto agora; a prova vermelha faz `login()` rejeitar com o erro cru em vez de
+resolver com `SELECTOR_DRIFT`.
+
+**Arquivos:** `electron/services/diagnostics.service.ts`,
+`electron/services/playwright-login.service.ts`,
+`tests/unit/diagnostics-redaction.test.ts`,
+`tests/integration/portal-selector-resilience.test.ts`.
+
+**Prova vermelho-verde reproduzida na revisão.** `git checkout fa72252 --` sobre
+os dois serviços → os dois arquivos de teste dão **15 failed | 38 passed (53)**;
+fontes restauradas → **53 passed (53)**.
+
+**Gate reproduzido na revisão.** `npm run quality`: `tsc --noEmit` limpo;
+`eslint .` **0 erros, 67 warnings** legado (nenhum novo); `vitest run` 46
+arquivos, **574 passed | 4 skipped (578)** — eram 557 passed | 4 skipped (561)
+quando o ticket foi reaberto.
+
+**Ressalvas herdadas, não corrigidas aqui e sem ticket próprio:** AC3 segue com
+`!app.isPackaged` inline nos ~11 dumps de HTML cru e `shouldCaptureRawArtifact`
+segue sem call site que passe `consent=true`; AC4 segue sem limite de retenção
+para os `debug_*.html`. Menores em aberto: `NaN` no `prune()`, parses repetidos
+de cheerio em `buildStructuralDiagnostic`, `el.type === 'tag'` sempre verdadeiro
+dentro de `$('*')`, `existsSync` redundante em `clear()`. Nenhum é regressão
+desta rodada.
