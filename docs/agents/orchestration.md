@@ -22,6 +22,11 @@ diz:
 - A ordem das tarefas é a do `docs/PLANO.md`. Uma revisão que derruba uma issue
   fechada a devolve a `open`, marca qual critério caiu (❌ com o motivo) e
   remove a linha do ledger.
+- Fatiar é entrega da etapa 1: ao quebrar uma tarefa em tickets, a etapa 1
+  acrescenta os IDs novos ao `docs/PLANO.md` na posição do original, com a
+  ordem entre eles. Vale também para o refatiamento: ticket devolvido pela
+  etapa 2 por exigir mais de um seam volta à etapa 1, que o requebra e registra
+  os novos no PLANO do mesmo jeito. Fora disso, ninguém edita o PLANO.
 - Toda correção de bug precisa de um teste que falharia sem ela (`CLAUDE.md`,
   "Antes de commitar", item 5). Teste chama código de produção, não uma cópia
   (ver `tests/fixtures/README.md` e `QA-005`).
