@@ -16,7 +16,6 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { diagnosticsService } from '../../electron/services/diagnostics.service';
 
 // QA-006: o serviço faz mkdir de verdade antes de baixar. Sem este mock o teste
 // cria C:\mock\downloads no Windows (onde passa por acidente) e falha com
@@ -52,7 +51,6 @@ vi.mock('../../electron/services/http-scraper.service', () => {
             setCookies = vi.fn();
             setUserAgent = vi.fn();
             resetSession = vi.fn();
-            resetLog = vi.fn();
             getCourseFiles = vi.fn();
             downloadFile = vi.fn();
         }
@@ -60,11 +58,13 @@ vi.mock('../../electron/services/http-scraper.service', () => {
 });
 
 vi.mock('../../electron/services/logger.service', () => {
+    const scoped = () => ({ info: vi.fn(), error: vi.fn(), warn: vi.fn() });
     return {
         logger: {
             info: vi.fn(),
             error: vi.fn(),
             warn: vi.fn(),
+            scope: vi.fn(scoped),
         }
     };
 });
@@ -413,8 +413,8 @@ describe('SigaaService (Unit)', () => {
         });
     });
 
-    // ── DATA-002: logout esquece a sessão; diagnósticos são zeráveis ──
-    describe('logout() / clearDiagnostics() (DATA-002)', () => {
+    // ── DATA-002: logout esquece a sessão ──
+    describe('logout() (DATA-002)', () => {
         it('logout forgets the Playwright session (not just close), resets the HTTP session and the active account', async () => {
             setActiveAccount(deriveAccountId('user'));
 
@@ -423,21 +423,6 @@ describe('SigaaService (Unit)', () => {
             expect(mockPlaywright.logout).toHaveBeenCalledTimes(1);
             expect(mockHttp.resetSession).toHaveBeenCalledTimes(1);
             expect(getActiveAccount()).toBeNull();
-        });
-
-        it('clearDiagnostics resets the scraper log', () => {
-            service.clearDiagnostics();
-
-            expect(mockHttp.resetLog).toHaveBeenCalledTimes(1);
-        });
-
-        it('clearDiagnostics apaga os diagnósticos estruturais (PORTAL-003)', () => {
-            const clear = vi.spyOn(diagnosticsService, 'clear').mockImplementation(() => {});
-
-            service.clearDiagnostics();
-
-            expect(clear).toHaveBeenCalledTimes(1);
-            clear.mockRestore();
         });
     });
 

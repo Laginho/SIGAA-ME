@@ -94,7 +94,7 @@ vi.mock('../../electron/services/http-scraper.service', () => ({
 }));
 
 vi.mock('../../electron/services/logger.service', () => ({
-    logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+    logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), scope: vi.fn(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() })) },
 }));
 
 const cacheCalls = vi.hoisted(() => ({ updateCourseState: [] as unknown[][] }));

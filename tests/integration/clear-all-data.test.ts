@@ -113,7 +113,6 @@ function makeDeps(overrides: { settings?: Record<string, unknown> } = {}) {
             getNewsDetail: vi.fn(async () => ok({ title: 'T', date: 'D', notification: '', content: '' })),
             loadAllNews: vi.fn(async () => ok([])),
             logout: vi.fn(async () => { await tick(); record('sigaaService.logout'); }),
-            clearDiagnostics: vi.fn(() => { record('sigaaService.clearDiagnostics'); }),
         },
         persistence: {
             getSettings: vi.fn(() => ({ ...settings })),
@@ -151,7 +150,7 @@ async function invoke(channel: string, payload: unknown = undefined) {
 }
 
 const DESTRUCTIVE = [
-    'cache.clear', 'persistence.reset', 'logger.clear', 'sigaaService.clearDiagnostics',
+    'cache.clear', 'persistence.reset', 'logger.clear',
     'clearBrowserStorage',
 ] as const;
 
@@ -160,7 +159,6 @@ function destructiveCalls(deps: Deps) {
         'cache.clear': deps.cache.clear,
         'persistence.reset': deps.persistence.reset,
         'logger.clear': deps.logger.clear,
-        'sigaaService.clearDiagnostics': deps.sigaaService.clearDiagnostics,
         'clearBrowserStorage': deps.clearBrowserStorage,
     };
 }

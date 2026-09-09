@@ -51,7 +51,13 @@ vi.mock('../../electron/services/http-scraper.service', () => ({
     },
 }));
 
-const loggerMock = vi.hoisted(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() }));
+const loggerMock = vi.hoisted(() => {
+    const base: { info: any; warn: any; error: any; scope: any } = {
+        info: vi.fn(), warn: vi.fn(), error: vi.fn(), scope: vi.fn(),
+    };
+    base.scope.mockImplementation(() => base);
+    return base;
+});
 vi.mock('../../electron/services/logger.service', () => ({ logger: loggerMock }));
 
 vi.mock('electron', () => ({
