@@ -1,8 +1,9 @@
 /**
  * Diagnóstico estrutural de falha (PORTAL-003) — privacy-safe por construção:
- * a saída só carrega enum de estado, pathname, contagens e um hash de
- * esqueleto de tags. Texto de HTML (nome, ViewState, cookie, nota) nunca
- * atravessa para o diagnóstico gravado.
+ * a saída só carrega enum de estado, família de rota (pathname sem parâmetro
+ * de sessão), categoria de título (nunca o texto), contagens e um hash de
+ * esqueleto de tags. Texto livre de HTML (nome, ViewState, cookie, nota,
+ * título específico do aluno) nunca atravessa para o diagnóstico gravado.
  */
 import { createHash, randomUUID } from 'node:crypto';
 import * as fs from 'fs';
@@ -24,13 +25,42 @@ export interface StructuralDiagnostic {
 
 const MAX_RETAINED = 20;
 
-/** Só o pathname — query string e fragmento são onde sessão/id costumam morar. */
+/**
+ * Só o pathname, e sem parâmetro de caminho — query string, fragmento e o
+ * `;jsessionid=...` que o SIGAA anexa ao próprio segmento de path (não à
+ * query) são onde sessão/id costumam morar.
+ */
 export function urlFamily(url: string): string {
     try {
-        return new URL(url).pathname;
+        const { pathname } = new URL(url);
+        return pathname
+            .split('/')
+            .map((segment) => segment.split(';')[0])
+            .join('/');
     } catch {
         return '';
     }
+}
+
+/**
+ * Allowlist dos títulos reais do SIGAA (`grep -rhoi "<title>[^<]*</title>"
+ * tests/fixtures/`), cada um mapeado para uma categoria estável. Título fora
+ * da allowlist vira `'other'` — nunca o texto original, que pode carregar
+ * nome de aluno ou nota (ex.: "Aluno Teste Privado - Calculo I - Media 9.4").
+ */
+const TITLE_CATEGORIES: ReadonlyArray<readonly [RegExp, string]> = [
+    [/acesso\s*negado/i, 'access-denied'],
+    [/manuten/i, 'maintenance'],
+    [/login/i, 'login'],
+    [/portal\s+do\s+discente/i, 'student-portal'],
+    [/turma/i, 'course-class'],
+    [/^ava\b/i, 'ava'],
+    [/portal/i, 'portal'],
+];
+
+export function categorizeTitle(title: string): string {
+    const match = TITLE_CATEGORIES.find(([pattern]) => pattern.test(title));
+    return match ? match[1] : 'other';
 }
 
 /** Nomes de tag em ordem de documento, sem texto nem atributo: muda só quando a estrutura muda. */
@@ -59,7 +89,7 @@ export function buildStructuralDiagnostic(
         timestamp: Date.now(),
         state: classify(html, url),
         urlFamily: urlFamily(url),
-        title: $('title').first().text().trim(),
+        title: categorizeTitle($('title').first().text().trim()),
         selectorCounts,
         adapterVersion,
         domFingerprint: domFingerprint(html),
