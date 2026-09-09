@@ -135,6 +135,7 @@ afterAll(() => {
 });
 
 beforeEach(async () => {
+    expect(typeof logger.scope).toBe('function');
     vi.mocked(axios.get).mockReset();
     vi.mocked(axios.post).mockReset();
     cacheState.baselines.clear();

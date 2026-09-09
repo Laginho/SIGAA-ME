@@ -1,6 +1,6 @@
 # OBS-004 — Migrate the scraping pipeline to the logger
 Status: open
-Stage: to-implement
+Stage: implementing
 Priority: P2
 Blocked by: OBS-001
 
