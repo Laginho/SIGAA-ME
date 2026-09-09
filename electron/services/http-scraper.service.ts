@@ -3,6 +3,7 @@ import * as cheerio from 'cheerio';
 import * as fs from 'fs';
 import * as path from 'path';
 import { app } from 'electron';
+import { logger } from './logger.service';
 import { sanitizeSegment, isInsideRoot } from './download-path';
 import { MAX_DOWNLOAD_BYTES, fileNameFromContentDisposition, finalizeDownload } from './file-validation.service';
 import type { AppErrorCode } from '../../shared/errors';
@@ -17,6 +18,8 @@ import {
     validateCourseEntryEnd,
     validateCourseListDocument
 } from '../sigaa/portal-adapter';
+
+const log = logger.scope('HttpScraper');
 
 /**
  * Arquivo como o parser o vê, com o que o main precisa para baixar. `script` e
@@ -55,32 +58,7 @@ interface Cookie {
 export class HttpScraperService {
     private cookies: Cookie[] = [];
     private baseUrl: string = 'https://si3.ufc.br';
-    // Use userData path (writable in production) instead of process.cwd() (may be inside app.asar)
-    private logPath = path.join(app.getPath('userData'), 'scraper.log');
     private courseData: Map<string, { viewState: string; action: string; formName: string; inputs: Record<string, string> }> = new Map();
-
-    private logStream: fs.WriteStream;
-
-    constructor() {
-        // Create/Clear log file on startup using WriteStream
-        this.logStream = fs.createWriteStream(this.logPath, { flags: 'w' });
-
-        // Handle stream errors
-        this.logStream.on('error', (err) => {
-            console.error('Log stream error:', err);
-        });
-    }
-
-    private log(message: string) {
-        const timestamp = new Date().toISOString();
-        const logMessage = `[${timestamp}] ${message}\n`;
-        console.log(message);
-
-        // Non-blocking write
-        if (this.logStream.writable) {
-            this.logStream.write(logMessage);
-        }
-    }
 
     setCookies(cookies: Array<{ name: string; value: string; domain?: string; path?: string }>) {
         this.cookies = cookies.map(c => ({
@@ -89,7 +67,7 @@ export class HttpScraperService {
             domain: c.domain || new URL(this.baseUrl).hostname,
             path: c.path || '/'
         }));
-        this.log(`[HttpScraper] Cookies set. Count: ${this.cookies.length}`);
+        log.info(`Cookies set. Count: ${this.cookies.length}`);
     }
 
     /**
@@ -101,23 +79,7 @@ export class HttpScraperService {
     resetSession() {
         this.cookies = [];
         this.courseData.clear();
-        this.log('[HttpScraper] Session reset (cookies and course ViewStates cleared).');
-    }
-
-    /**
-     * Zera o diagnóstico em disco (DATA-002): mesmo estado do primeiro boot.
-     *
-     * O `end()` precisa ser aguardado. Sem isso o stream antigo continua
-     * descarregando o buffer **depois** de o handle novo truncar, e no offset
-     * antigo: medido em 2026-09-06, um `scraper.log` de 6 MB voltava a 6 MB com
-     * o conteúdo velho intacto — "limpar tudo" devolvendo ok() e deixando o log.
-     */
-    async resetLog(): Promise<void> {
-        await new Promise<void>((resolve) => { this.logStream.end(() => resolve()); });
-        this.logStream = fs.createWriteStream(this.logPath, { flags: 'w' });
-        this.logStream.on('error', (err) => {
-            console.error('Log stream error:', err);
-        });
+        log.info('Session reset (cookies and course ViewStates cleared).');
     }
 
     private getCookieHeader(url: string): string {
@@ -186,7 +148,7 @@ export class HttpScraperService {
 
     setUserAgent(ua: string) {
         this.userAgent = ua;
-        this.log(`[HttpScraper] User-Agent set to: ${ua}`);
+        log.info('User-Agent set.');
     }
 
     /**
@@ -207,7 +169,7 @@ export class HttpScraperService {
 
     async enterCourseHTTP(courseId: string): Promise<{ success: boolean; html?: string; error?: string; errorCode?: AppErrorCode }> {
         try {
-            this.log(`[HttpScraper] Entering course ${courseId} via HTTP...`);
+            log.info(`Entering course ${courseId} via HTTP.`);
 
             // 1. Get Portal Page to find the form
             const portalUrl = `${this.baseUrl}/sigaa/verPortalDiscente.do`;
@@ -225,14 +187,14 @@ export class HttpScraperService {
             // 2. Validate the document actually is the student portal before trusting anything in it.
             const listCheck = validateCourseListDocument(portalResponse.data);
             if (listCheck) {
-                this.log(`[HttpScraper] Portal document rejected: ${listCheck.code} ${listCheck.message}`);
+                log.warn(`Portal document rejected: ${listCheck.code}`);
                 return { success: false, error: listCheck.message, errorCode: listCheck.code };
             }
 
             // 3. Find the course row and its JSF link parameters.
             const lookup = findCourseRow(portalResponse.data, courseId);
             if (lookup.status === 'not_found') {
-                this.log(`[HttpScraper] Error: Course ID ${courseId} not found in recognized portal.`);
+                log.warn(`Course ${courseId} not found in recognized portal.`);
                 if (!app.isPackaged) {
                     try {
                         const safeId = String(courseId).replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -240,7 +202,7 @@ export class HttpScraperService {
                             path.join(app.getPath('userData'), `debug_portal_fail_${safeId}.html`),
                             portalResponse.data
                         );
-                    } catch (e) { console.error('Failed to save debug file', e); }
+                    } catch (e) { log.warn('Failed to save debug file.', { error: e }); }
                 }
                 return { success: false, error: `Course ${courseId} not found in portal`, errorCode: 'NOT_FOUND' };
             }
@@ -262,7 +224,7 @@ export class HttpScraperService {
 
             // 5. Post to enter course
             const actionUrl = `${this.baseUrl}${lookup.formAction}`;
-            this.log(`[HttpScraper] Posting to ${actionUrl} to enter course...`);
+            log.info('Posting to enter course.');
 
             const enterResponse = await axios.post(actionUrl, formData.toString(), {
                 headers: {
@@ -279,7 +241,7 @@ export class HttpScraperService {
             // 6. Validate the end state — a generic `id="conteudo"` alone is not proof of entry.
             const entryCheck = validateCourseEntryEnd(enterResponse.data);
             if (entryCheck) {
-                this.log(`[HttpScraper] Course entry response rejected: ${entryCheck.code} ${entryCheck.message}`);
+                log.warn(`Course entry response rejected: ${entryCheck.code}`);
                 if (!app.isPackaged) {
                     try {
                         const safeId = String(courseId).replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -292,11 +254,11 @@ export class HttpScraperService {
                 return { success: false, error: entryCheck.message, errorCode: entryCheck.code };
             }
 
-            this.log('[HttpScraper] Successfully entered course via HTTP!');
+            log.info('Successfully entered course via HTTP.');
             return { success: true, html: enterResponse.data };
 
         } catch (error: any) {
-            this.log(`[HttpScraper] HTTP Entry Error: ${error.message}`);
+            log.error('HTTP entry failed.', { error });
             return { success: false, error: error.message };
         }
     }
@@ -309,19 +271,19 @@ export class HttpScraperService {
                 return this.failCourse(courseId, 'SESSION_EXPIRED', 'No session cookies. Please login first.');
             }
 
-            this.log(`[HttpScraper] Fetching course page for ${courseName || courseId}...`);
+            log.info(`Fetching course page for course ${courseId}.`, { courseName });
 
             let coursePageData = '';
             const currentUrl = `${this.baseUrl}/sigaa/ava/index.jsf`;
 
             if (preFetchedHtml) {
-                this.log(`[HttpScraper] Using pre-fetched HTML from Playwright. Length: ${preFetchedHtml.length}`);
+                log.info(`Using pre-fetched HTML from Playwright. Length: ${preFetchedHtml.length}`);
                 coursePageData = preFetchedHtml;
 
                 const $debug = cheerio.load(coursePageData);
-                this.log(`[HttpScraper] Pre-fetched page title: "${$debug('title').text().trim()}"`);
+                log.info('Pre-fetched page title.', { title: $debug('title').text().trim() });
             } else {
-                this.log('[HttpScraper] WARNING: No pre-fetched HTML provided. Falling back to HTTP entry.');
+                log.warn('No pre-fetched HTML provided. Falling back to HTTP entry.');
 
                 const dashboardUrl = `${this.baseUrl}/sigaa/portais/discente/discente.jsf`;
                 const dashboardResponse = await axios.get(dashboardUrl, {
@@ -357,18 +319,18 @@ export class HttpScraperService {
                             path.join(app.getPath('userData'), `debug_playwright_${safeId}.html`),
                             preFetchedHtml
                         );
-                        this.log('[HttpScraper] Saved Playwright HTML debug dump');
+                        log.info('Saved Playwright HTML debug dump.');
                     } catch (e) {
-                        this.log('[HttpScraper] Failed to save debug file');
+                        log.warn('Failed to save debug file.', { error: e });
                     }
                 }
-                this.log('[HttpScraper] Using Playwright HTML directly.');
+                log.info('Using Playwright HTML directly.');
             } else {
                 // Strategy 1: Look for "Conteúdo" in menu
                 $(FILES_MENU.itemMenu).each((_, el) => {
                     const text = $(el).text().trim();
                     if (text.includes(' Conte') || text.includes('nteudo')) {
-                        this.log(`[HttpScraper] Found potential link: "${text}"`);
+                        log.info('Found potential link.');
                         conteudoLink = $(el).parent('a');
                         return false;
                     }
@@ -376,20 +338,20 @@ export class HttpScraperService {
 
                 // Strategy 2: Look for "Materiais" header
                 if (!conteudoLink) {
-                    this.log('[HttpScraper] Strategy 1 failed. Trying Strategy 2 (Materiais header)...');
+                    log.info('Strategy 1 failed. Trying Strategy 2 (Materiais header).');
                     const materiaisHeader = $(FILES_MENU.itemMenuHeaderMateriais);
                     if (materiaisHeader.length > 0) {
                         const contentExterior = materiaisHeader.parent().find('.rich-panelbar-content-exterior');
                         const firstLink = contentExterior.find('a').first();
                         if (firstLink.length > 0) {
-                            this.log('[HttpScraper] Found first link under Materiais.');
+                            log.info('Found first link under Materiais.');
                             conteudoLink = firstLink;
                         }
                     }
                 }
 
                 if (conteudoLink) {
-                    this.log('[HttpScraper] Found "Conteúdo" link in sidebar. Navigating to files...');
+                    log.info('Found "Conteúdo" link in sidebar. Navigating to files.');
                     const onclick = conteudoLink.attr('onclick');
                     const match = onclick?.match(JSF.linkPattern);
 
@@ -425,7 +387,7 @@ export class HttpScraperService {
                             }
                         }
 
-                        this.log(`[HttpScraper] Sending POST to open files. Form: ${formName}`);
+                        log.info('Sending POST to open files.');
 
                         const filesResponse = await axios.post(`${this.baseUrl}/sigaa/ava/index.jsf`, formData.toString(), {
                             headers: {
@@ -446,10 +408,10 @@ export class HttpScraperService {
                             return this.failCourse(courseId, 'SESSION_EXPIRED', COURSE_FILES_SESSION_EXPIRED_MESSAGE);
                         }
                     } else {
-                        this.log('[HttpScraper] Could not parse onclick for "Conteúdo" link.');
+                        log.warn('Could not parse onclick for "Conteúdo" link.');
                     }
                 } else {
-                    this.log('[HttpScraper] "Conteúdo" link not found in sidebar. Scanning current page...');
+                    log.info('"Conteúdo" link not found in sidebar. Scanning current page.');
                 }
             }
 
@@ -464,12 +426,12 @@ export class HttpScraperService {
             }
 
             this.courseData.set(courseId, avaForm);
-            this.log(`[HttpScraper] Stored ViewState and ${Object.keys(avaForm.inputs).length} inputs for course ${courseId}`);
+            log.info(`Stored ViewState and ${Object.keys(avaForm.inputs).length} inputs for course ${courseId}.`);
 
             const files: ParsedFile[] = [];
             const news: ParsedNews[] = [];
 
-            this.log('[HttpScraper] Scanning for files...');
+            log.info('Scanning for files.');
             $files('a').each((_, el) => {
                 const link = $files(el);
                 const text = link.text().trim();
@@ -506,7 +468,6 @@ export class HttpScraperService {
                             });
                         }
 
-                        // this.log(`[HttpScraper] Found file: "${fileName}" (ID: ${id})`);
                         files.push({
                             name: fileName,
                             type: 'file',
@@ -658,7 +619,7 @@ export class HttpScraperService {
                 }
             });
 
-            this.log(`[HttpScraper] Found ${fileEvents.length} file events in timeline.`);
+            log.info(`Found ${fileEvents.length} file events in timeline.`);
 
             // Map dates to files
             files.forEach(file => {
@@ -672,18 +633,15 @@ export class HttpScraperService {
 
                 if (event) {
                     file.date = event.date;
-                    // this.log(`[HttpScraper] Matched date ${event.date} for file ${file.name}`);
                 }
             });
 
-            this.log(`[HttpScraper] Found ${files.length} files and ${news.length} news items.`);
-            this.log(`[HttpScraper] Found ${files.length} files and ${news.length} news items for course ${courseId}`);
+            log.info(`Found ${files.length} files and ${news.length} news items for course ${courseId}.`);
 
             return { success: true, files, news };
 
         } catch (error: any) {
-            console.error('[HttpScraper] Error fetching course files:', error);
-            this.log(`[HttpScraper] Error fetching course files: ${error.message}`);
+            log.error('Error fetching course files.', { error });
             // Exceção também é falha de atualização: o ViewState anterior desta
             // turma não pode sobreviver para o próximo download (ver failCourse).
             // Sem `errorCode`, para `failFromResult` ainda classificar timeout de
@@ -695,7 +653,7 @@ export class HttpScraperService {
 
     async getNewsDetail(courseId: string, newsId: string, script?: string): Promise<{ success: boolean; news?: any; error?: string; errorCode?: AppErrorCode }> {
         try {
-            this.log(`[HttpScraper] Fetching news detail ${newsId} for course ${courseId}`);
+            log.info(`Fetching news detail ${newsId} for course ${courseId}.`);
 
             // 1. Check if we have session data for this course
             const courseInfo = this.courseData.get(courseId);
@@ -724,7 +682,7 @@ export class HttpScraperService {
             // 3. Parse Script (Onclick) to get specific parameters
             // Example: jsfcljs(document.forms['formAva'],'formAva:noticias:0:visualizar,formAva:noticias:0:visualizar,id,12345','');
             if (script) {
-                this.log(`[HttpScraper] Using provided script: ${script}`);
+                log.info('Using provided script.', { script });
                 const match = script.match(JSF.scriptParamsPattern);
                 if (match) {
                     const paramsStr = match[1];
@@ -741,11 +699,11 @@ export class HttpScraperService {
                 }
             } else {
                 // Fallback (guessing parameter names - risky)
-                this.log(`[HttpScraper] No script provided. Attempting generic fetch.`);
+                log.warn('No script provided. Attempting generic fetch.');
                 formData.append('id', newsId);
             }
 
-            this.log(`[HttpScraper] Posting to ${courseInfo.action} to fetch news...`);
+            log.info('Posting to fetch news.');
 
             const newsResponse = await axios.post(`${this.baseUrl}${courseInfo.action}`, formData.toString(), {
                 headers: {
@@ -768,8 +726,8 @@ export class HttpScraperService {
                         path.join(app.getPath('userData'), `debug_news_content_${safeId}.html`),
                         newsResponse.data
                     );
-                    this.log(`[HttpScraper] Saved debug_news_content_${safeId}.html`);
-                } catch (e) { console.error(e); }
+                    log.info('Saved debug news content dump.');
+                } catch (e) { log.warn('Failed to save debug news content dump.', { error: e }); }
             }
 
             const $news = cheerio.load(newsResponse.data);
@@ -817,7 +775,7 @@ export class HttpScraperService {
             const date = getTextAfterLabel('Data') || getTextAfterLabel('Data de Cadastro');
             const content = getContent();
 
-            this.log(`[HttpScraper] Parsed News: Title="${title}", Date="${date}", ContentLength=${content.length}`);
+            log.info(`Parsed news. ContentLength=${content.length}.`, { title });
 
             if (!content) {
                 return { success: false, error: 'Could not extract news content from response' };
@@ -833,7 +791,7 @@ export class HttpScraperService {
             return { success: true, news: newsDetail };
 
         } catch (error: any) {
-            this.log(`[HttpScraper] News Fetch Error: ${error.message}`);
+            log.error('News fetch failed.', { error });
             return { success: false, error: error.message };
         }
     }
@@ -847,7 +805,7 @@ export class HttpScraperService {
         onProgress?: (progress: number) => void
     ): Promise<{ success: boolean; filePath?: string; error?: string; errorCode?: AppErrorCode }> {
         try {
-            this.log(`[HttpScraper] Downloading file "${fileName}" (ID: ${fileId}) for course ${courseId}`);
+            log.info(`Downloading file ${fileId} for course ${courseId}.`, { fileName });
 
             const courseInfo = this.courseData.get(courseId);
             if (!courseInfo) {
@@ -892,7 +850,7 @@ export class HttpScraperService {
                 }
             }
 
-            this.log(`[HttpScraper] Sending download request. ComponentID: ${componentId}`);
+            log.info(`Sending download request. ComponentID: ${componentId}.`);
 
             const response = await axios.post(`${this.baseUrl}${courseInfo.action}`, formData.toString(), {
                 headers: {
@@ -912,13 +870,13 @@ export class HttpScraperService {
             const contentLength = parseInt(response.headers['content-length'] || '0', 10);
             const hintFileName = fileNameFromContentDisposition(response.headers['content-disposition']);
 
-            this.log(`[HttpScraper] Response headers: Content-Type=${contentType}, Content-Length=${response.headers['content-length']}`);
+            log.info(`Response headers. Content-Type=${contentType}, Content-Length=${response.headers['content-length']}.`);
 
             // DL-002: teto antes de tocar disco. Um Content-Length maior que o
             // limite é recusado sem criar o `.part`, e o stream é destruído para
             // não continuar puxando dados que não vamos usar.
             if (contentLength > MAX_DOWNLOAD_BYTES) {
-                this.log(`[HttpScraper] Rejecting download: Content-Length ${contentLength} exceeds ${MAX_DOWNLOAD_BYTES}`);
+                log.warn(`Rejecting download: Content-Length ${contentLength} exceeds ${MAX_DOWNLOAD_BYTES}.`);
                 response.data.destroy();
                 return { success: false, error: `Arquivo excede o limite de ${MAX_DOWNLOAD_BYTES} bytes` };
             }
@@ -943,9 +901,9 @@ export class HttpScraperService {
             const descartarParcial = async (motivo: string) => {
                 try {
                     await fs.promises.unlink(partPath);
-                    this.log(`[HttpScraper] Discarded partial file (${motivo}): ${partPath}`);
+                    log.info(`Discarded partial file (${motivo}).`, { path: partPath });
                 } catch (unlinkErr) {
-                    this.log(`[HttpScraper] Failed to discard partial file: ${String(unlinkErr)}`);
+                    log.warn('Failed to discard partial file.', { error: unlinkErr });
                 }
             };
 
@@ -958,7 +916,7 @@ export class HttpScraperService {
                 // vigiado durante o streaming — um corpo sem fim encheria o disco.
                 if (!tooLarge && downloadedLength > MAX_DOWNLOAD_BYTES) {
                     tooLarge = true;
-                    this.log(`[HttpScraper] Aborting download: streamed bytes exceeded ${MAX_DOWNLOAD_BYTES}`);
+                    log.warn(`Aborting download: streamed bytes exceeded ${MAX_DOWNLOAD_BYTES}.`);
                     response.data.destroy(new Error(`Arquivo excede o limite de ${MAX_DOWNLOAD_BYTES} bytes`));
                 }
             });
@@ -978,22 +936,22 @@ export class HttpScraperService {
                         });
 
                         if (result.ok) {
-                            this.log(`[HttpScraper] Download complete: ${result.filePath}`);
+                            log.info('Download complete.', { filePath: result.filePath });
                             resolve({ success: true, filePath: result.filePath });
                         } else {
-                            this.log(`[HttpScraper] Validation failed (${result.reason}): ${result.error}`);
+                            log.warn(`Validation failed (${result.reason}).`, { error: result.error });
                             resolve({ success: false, error: result.error });
                         }
                     } catch (err) {
                         // Falha ao ler, validar ou renomear. O parcial não pode
                         // ficar para trás se apresentando como download bom.
                         const message = err instanceof Error ? err.message : String(err);
-                        this.log(`[HttpScraper] Post-download error: ${message}`);
+                        log.error('Post-download error.', { error: err });
                         resolve({ success: false, error: message });
                     }
                 });
                 writer.on('error', async (err) => {
-                    this.log(`[HttpScraper] File write error: ${err.message}`);
+                    log.error('File write error.', { error: err });
                     await descartarParcial('erro de escrita');
                     reject({ success: false, error: err.message });
                 });
@@ -1002,7 +960,7 @@ export class HttpScraperService {
                 // esta Promise nunca resolve. `pipe()` não propaga erro do source
                 // para o destino.
                 response.data.on('error', (err: Error) => {
-                    this.log(`[HttpScraper] Download stream error: ${err.message}`);
+                    log.error('Download stream error.', { error: err });
                     writer.destroy();
                     writer.once('close', async () => {
                         await descartarParcial('conexão interrompida');
@@ -1012,7 +970,7 @@ export class HttpScraperService {
             });
 
         } catch (error: any) {
-            this.log(`[HttpScraper] Download error: ${error.message}`);
+            log.error('Download error.', { error });
             return { success: false, error: error.message };
         }
     }

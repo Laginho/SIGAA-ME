@@ -3,11 +3,14 @@ import { SigaaService } from './sigaa.service';
 import { persistenceService } from './persistence.service';
 import { cacheService } from './cache.service';
 import { getActiveAccount } from './account-context.service';
+import { logger } from './logger.service';
 import * as path from 'path';
 import type { CourseSnapshot, CourseSummary, NotificationItem } from '../../shared/domain';
 import type { BackgroundSyncUpdate } from '../../shared/ipc';
 import { isRetryable } from '../../shared/errors';
 import type { AppSettings } from '../../shared/ipc';
+
+const log = logger.scope('BackgroundSync');
 
 export class BackgroundSyncService {
     private sigaaService: SigaaService;
@@ -26,7 +29,7 @@ export class BackgroundSyncService {
         if (!settings.runInBackground) return;
 
         const intervalMs = settings.syncInterval * 60 * 1000;
-        console.log(`[BackgroundSync] Starting sync scheduler every ${settings.syncInterval} minutes`);
+        log.info(`Starting sync scheduler every ${settings.syncInterval} minutes.`);
         this.intervalId = setInterval(() => this.syncNow(), intervalMs);
     }
 
@@ -34,7 +37,7 @@ export class BackgroundSyncService {
         if (this.intervalId) {
             clearInterval(this.intervalId);
             this.intervalId = null;
-            console.log('[BackgroundSync] Stopped sync scheduler');
+            log.info('Stopped sync scheduler.');
         }
     }
 
@@ -53,7 +56,7 @@ export class BackgroundSyncService {
 
     public syncNow(): Promise<void> {
         if (this.isSyncing) {
-            console.log('[BackgroundSync] Already syncing, skipping...');
+            log.info('Already syncing, skipping.');
             return Promise.resolve();
         }
 
@@ -61,7 +64,7 @@ export class BackgroundSyncService {
         if (!settings.runInBackground) return Promise.resolve();
 
         this.isSyncing = true;
-        console.log('[BackgroundSync] Triggering background sync...');
+        log.info('Triggering background sync.');
         return this.sigaaService.operations.run('background', signal => this.runSync(settings, signal));
     }
 
@@ -71,7 +74,7 @@ export class BackgroundSyncService {
             // 1. Ensure logged in
             const creds = persistenceService.loadCredentials();
             if (!creds) {
-                console.log('[BackgroundSync] No credentials found. Aborting sync.');
+                log.info('No credentials found. Aborting sync.');
                 return;
             }
 
@@ -84,26 +87,26 @@ export class BackgroundSyncService {
             if (coursesResult.success) {
                 courses = coursesResult.data.courses;
             } else if (coursesResult.error.code === 'SESSION_EXPIRED') {
-                console.log('[BackgroundSync] Session expired or invalid. Attempting re-login...');
+                log.info('Session expired or invalid. Attempting re-login.');
                 const loginResult = await this.sigaaService.login(creds.username, creds.password);
                 if (!loginResult.success) {
-                    console.error('[BackgroundSync] Re-login failed:', loginResult.error.message);
+                    log.error('Re-login failed.', { error: loginResult.error.message });
                     return;
                 }
                 const retryCourses = await this.sigaaService.getCourses();
                 if (!retryCourses.success) {
-                    console.error('[BackgroundSync] Retry after re-login failed:', retryCourses.error.message);
+                    log.error('Retry after re-login failed.', { error: retryCourses.error.message });
                     return;
                 }
                 courses = retryCourses.data.courses;
             } else if (isRetryable(coursesResult.error)) {
                 // Portal fora do ar: relogar não ajuda; o próximo ciclo tenta de novo.
-                console.warn('[BackgroundSync] Portal unavailable; will retry next cycle:', coursesResult.error.message);
+                log.warn('Portal unavailable; will retry next cycle.', { error: coursesResult.error.message });
                 return;
             } else {
                 // Deriva de seletor, pedido inválido ou erro desconhecido: um
                 // login automatizado não tem chance de resolver. Aborta sem relogar.
-                console.error(`[BackgroundSync] getCourses failed (${coursesResult.error.code}); aborting without re-login:`, coursesResult.error.message);
+                log.error(`getCourses failed (${coursesResult.error.code}); aborting without re-login.`, { error: coursesResult.error.message });
                 return;
             }
 
@@ -113,12 +116,12 @@ export class BackgroundSyncService {
             // linha de base (DATA-001).
             const accountId = getActiveAccount();
             if (!accountId) {
-                console.warn('[BackgroundSync] No active account; discarding this sync result instead of attributing it to nobody.');
+                log.warn('No active account; discarding this sync result instead of attributing it to nobody.');
                 return;
             }
 
             if (courses.length === 0) {
-                console.log('[BackgroundSync] No courses found to sync.');
+                log.info('No courses found to sync.');
                 return;
             }
 
@@ -131,7 +134,7 @@ export class BackgroundSyncService {
             const pendingCommits: { courseId: string; fileIds: string[]; newsIds: string[] }[] = [];
 
             for (const course of courses) {
-                console.log(`[BackgroundSync] Checking course: ${course.name}`);
+                log.info('Checking course.', { courseName: course.name });
 
                 // Wait briefly to avoid hammering the SIGAA server
                 await new Promise(resolve => setTimeout(resolve, 2000));
@@ -140,7 +143,7 @@ export class BackgroundSyncService {
                 // signal do coordenador desde o CONC-001): nenhuma disciplina a
                 // mais é buscada depois de um cancel().
                 if (signal.aborted) {
-                    console.log('[BackgroundSync] Cancelled; stopping before the next course.');
+                    log.info('Cancelled; stopping before the next course.');
                     return;
                 }
 
@@ -166,9 +169,12 @@ export class BackgroundSyncService {
                     pendingCommits.push({ courseId: course.id, fileIds: allFileIds, newsIds: allNewsIds });
 
                     if (isColdStart) {
-                        console.log(`[BackgroundSync] Cold start for ${course.name} — populating baseline (${currentFiles.length} files, ${currentNews.length} news). No notifications.`);
+                        log.info(
+                            `Cold start — populating baseline (${currentFiles.length} files, ${currentNews.length} news). No notifications.`,
+                            { courseName: course.name }
+                        );
                     } else if (diff.newFiles.length > 0 || diff.newNews.length > 0) {
-                        console.log(`[BackgroundSync] Found ${diff.newFiles.length} new files and ${diff.newNews.length} new news in ${course.name}`);
+                        log.info(`Found ${diff.newFiles.length} new files and ${diff.newNews.length} new news.`, { courseName: course.name });
 
                         totalNewFiles += diff.newFiles.length;
                         totalNewNews += diff.newNews.length;
@@ -203,7 +209,7 @@ export class BackgroundSyncService {
 
                         // Auto-download new files
                         if (settings.autoDownloadUpdates && diff.newFiles.length > 0 && settings.lastDownloadPath) {
-                            console.log('[BackgroundSync] Auto-downloading new files...');
+                            log.info('Auto-downloading new files.');
                             await this.sigaaService.downloadAllFiles(
                                 course.id,
                                 course.name,
@@ -214,7 +220,7 @@ export class BackgroundSyncService {
 
                         // Auto-fetch news content for offline access
                         if (settings.autoDownloadUpdates && diff.newNews.length > 0) {
-                            console.log(`[BackgroundSync] Auto-fetching content for ${diff.newNews.length} new news items...`);
+                            log.info(`Auto-fetching content for ${diff.newNews.length} new news items.`);
                             for (const newsItem of diff.newNews) {
                                 if (signal.aborted) return;
                                 try {
@@ -225,11 +231,11 @@ export class BackgroundSyncService {
                                         const target = currentNews.find(n => n.id === newsItem.id);
                                         if (target) {
                                             target.content = detail.data.content;
-                                            console.log(`[BackgroundSync] Cached content for news "${newsItem.title}"`);
+                                            log.info('Cached content for news.', { title: newsItem.title });
                                         }
                                     }
                                 } catch (e) {
-                                    console.warn(`[BackgroundSync] Failed to fetch content for news "${newsItem.title}":`, e);
+                                    log.warn('Failed to fetch content for news.', { title: newsItem.title, error: e });
                                 }
                             }
                         }
@@ -243,17 +249,17 @@ export class BackgroundSyncService {
                         fileCount: currentFiles.length
                     });
                 } else {
-                    console.warn(`[BackgroundSync] Failed to fetch content for ${course.name}: ${contentResult.error.message}`);
+                    log.warn('Failed to fetch content for course.', { courseName: course.name, error: contentResult.error.message });
                 }
             }
 
             // Cancelado depois da última disciplina: nada é publicado nem commitado.
             if (signal.aborted) {
-                console.log('[BackgroundSync] Cancelled; discarding this run before publish/commit.');
+                log.info('Cancelled; discarding this run before publish/commit.');
                 return;
             }
 
-            console.log(`[BackgroundSync] Sync complete.`);
+            log.info('Sync complete.');
             persistenceService.updateSetting('lastBackgroundSync', Date.now());
 
             // Push updated data to renderer
@@ -267,7 +273,7 @@ export class BackgroundSyncService {
                         timestamp: Date.now()
                     };
                     window.webContents.send('background-sync-update', update);
-                    console.log(`[BackgroundSync] Pushed ${allCoursesData.length} courses and ${newNotifications.length} notifications to renderer.`);
+                    log.info(`Pushed ${allCoursesData.length} courses and ${newNotifications.length} notifications to renderer.`);
                 }
             }
 
@@ -289,7 +295,7 @@ export class BackgroundSyncService {
                         icon: path.join(process.env.VITE_PUBLIC || path.join(app.getAppPath(), 'dist'), 'icon.png')
                     });
                     notification.show();
-                    console.log(`[BackgroundSync] Triggered generic notification for ${coursesWithUpdates} course(s).`);
+                    log.info(`Triggered generic notification for ${coursesWithUpdates} course(s).`);
                 }
             }
 
@@ -304,7 +310,7 @@ export class BackgroundSyncService {
             // Load-bearing: a throw here means the baseline flush above never ran,
             // so items involved in this sync stay un-committed and get re-diffed
             // (and re-notified) on the next sync instead of being silently marked seen.
-            console.error('[BackgroundSync] Error during sync:', error);
+            log.error('Error during sync.', { error });
         } finally {
             this.isSyncing = false;
         }

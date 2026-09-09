@@ -10,8 +10,11 @@
 import { Browser, Page } from 'playwright';
 import * as fs from 'fs';
 import * as path from 'path';
+import { logger } from './logger.service';
 import { resolveDownloadTarget, ensureDirInsideRoot } from './download-path';
 import { finalizeDownload, validateHead, MAX_DOWNLOAD_BYTES } from './file-validation.service';
+
+const log = logger.scope('Download');
 
 const CHECK_HEAD_SIZE = 4096;
 
@@ -72,12 +75,12 @@ export class DownloadService {
                     const ext = path.extname(p).toLowerCase();
                     const check = validateHead(head, ext);
                     if (!check.ok) {
-                        console.log(`Discovered invalid cached file at ${p} (${check.reason}). Deleting and forcing fresh download.`);
+                        log.info(`Discovered invalid cached file (${check.reason}). Deleting and forcing fresh download.`, { path: p });
                         fs.unlinkSync(p);
                         return false;
                     }
                 } catch (e) {
-                    console.error(`Error inspecting existing file at ${p}:`, e);
+                    log.error('Error inspecting existing file.', { path: p, error: e });
                 }
                 return true;
             };
@@ -85,7 +88,7 @@ export class DownloadService {
             if (checkAndClearCorruptFile(filePath)) existingFileToUse = filePath;
 
             if (existingFileToUse) {
-                console.log(`Valid file already exists: ${existingFileToUse}`);
+                log.info('Valid file already exists.', { path: existingFileToUse });
                 return { success: true, filePath: existingFileToUse };
             }
 
@@ -93,9 +96,9 @@ export class DownloadService {
                 throw new Error('Page lost context (about:blank)');
             }
 
-            console.log(`Starting download for "${fileName}"`);
-            console.log(`DownloadService: Script provided: ${!!script}`);
-            if (script) console.log(`DownloadService: Script content (start): ${script.substring(0, 50)}...`);
+            log.info('Starting download.', { fileName });
+            log.info(`Script provided: ${!!script}.`);
+            if (script) log.info('Script content (start).', { script: script.substring(0, 50) });
 
             // Intercept the response to detect the REAL Content-Type from the server.
             // JSF redirectors often serve PDFs but the "suggestedFilename" from the browser
@@ -116,21 +119,21 @@ export class DownloadService {
             const popupPromise = page.waitForEvent('popup', { timeout: 60000 });
 
             // Trigger action
-            console.log(`Looking for fresh download script for: "${fileName}"`);
-            
+            log.info('Looking for fresh download script.', { fileName });
+
             const freshAction = await page.evaluate((fname) => {
                 const rows = Array.from(document.querySelectorAll('.item,.item-impar,.item-par, .form-baixar-arquivo'));
                 for (const row of rows) {
                     const link = row.tagName.toLowerCase() === 'a' ? row : row.querySelector('.form-baixar-arquivo, a[href]');
                     if (!link) continue;
-                    
+
                     const desc = link.querySelector('.descricao-form-disciplina') || link;
                     const text = (desc.textContent || '').trim().replace(/[\n\r]/g, '').trim();
-                    
+
                     if (text === fname || text.includes(fname) || fname.includes(text)) {
                         const onclick = link.getAttribute('onclick');
                         if (onclick) return { type: 'script', value: onclick };
-                        
+
                         const href = link.getAttribute('href');
                         if (href) return { type: 'href', value: href };
                     }
@@ -140,17 +143,17 @@ export class DownloadService {
 
             if (freshAction) {
                 if (freshAction.type === 'script') {
-                    console.log('Executing completely fresh JSF script from current DOM...');
+                    log.info('Executing completely fresh JSF script from current DOM.');
                     await page.evaluate((scriptStr: string) => {
                         const func = new Function(scriptStr.replace('return false', ''));
                         func();
                     }, freshAction.value);
                 } else if (freshAction.type === 'href') {
-                    console.log('Navigating to direct URL from current DOM...');
+                    log.info('Navigating to direct URL from current DOM.');
                     await page.goto(freshAction.value, { waitUntil: 'networkidle', timeout: 30000 });
                 }
             } else {
-                console.log('Failed to find fresh action. Fallback to cached original script...');
+                log.info('Failed to find fresh action. Fallback to cached original script.');
                 if (script) {
                     await page.evaluate((scriptStr: string) => {
                         const func = new Function(scriptStr.replace('return false', ''));
@@ -192,12 +195,12 @@ export class DownloadService {
                     return { success: false, error: outcome.error };
                 }
 
-                console.log(`Downloaded: ${outcome.filePath}`);
+                log.info('Downloaded.', { filePath: outcome.filePath });
                 return { success: true, filePath: outcome.filePath };
 
             } else if (result.type === 'popup') {
                 const popup = result.data;
-                console.log(`Popup opened: ${popup.url()}`);
+                log.info('Popup opened.', { url: popup.url() });
 
                 try {
                     const popupDownload = await popup.waitForEvent('download', { timeout: 10000 });
@@ -222,7 +225,7 @@ export class DownloadService {
                         return { success: false, error: outcome.error };
                     }
 
-                    console.log(`Downloaded from popup: ${outcome.filePath}`);
+                    log.info('Downloaded from popup.', { filePath: outcome.filePath });
                     await popup.close();
                     return { success: true, filePath: outcome.filePath };
                 } catch (e: any) {
@@ -230,7 +233,7 @@ export class DownloadService {
                         throw e; // BUBBLE IT UP! IT'S NOT A TIMEOUT!
                     }
                     // Try to intercept if download event didn't fire
-                    console.log('Popup download event timeout, trying interception...');
+                    log.info('Popup download event timeout, trying interception.');
                 }
 
                 // Interception logic for popup
@@ -246,7 +249,7 @@ export class DownloadService {
                             contentType.includes('application/vnd.openxmlformats') ||
                             contentType.includes('application/zip')) {
 
-                            console.log('Intercepted file in popup! Forcing download...');
+                            log.info('Intercepted file in popup. Forcing download.');
                             headers['content-type'] = 'application/octet-stream';
                             headers['content-disposition'] = 'attachment';
                             await route.fulfill({ response, headers });
@@ -282,14 +285,14 @@ export class DownloadService {
                         return { success: false, error: outcome.error };
                     }
 
-                    console.log(`Downloaded after popup reload: ${outcome.filePath}`);
+                    log.info('Downloaded after popup reload.', { filePath: outcome.filePath });
                     await popup.close();
                     return { success: true, filePath: outcome.filePath };
                 } catch (e: any) {
                     if (e.message === 'JSF_SESSION_EXPIRED') {
                         throw e; // BUBBLE IT UP!
                     }
-                    console.log(`Reload strategy failed: ${e}`);
+                    log.warn('Reload strategy failed.', { error: e });
                     await popup.close();
                     return { success: false, error: 'Could not force download from popup' };
                 }
@@ -299,7 +302,7 @@ export class DownloadService {
             }
 
         } catch (error: any) {
-            console.error(`Download failed for ${fileName}:`, error);
+            log.error('Download failed.', { fileName, error });
             if (error.message === 'JSF_SESSION_EXPIRED') {
                 throw error;
             }
@@ -332,7 +335,7 @@ export class DownloadService {
             if (courseDownloads[file.name]) {
                 const existingPath = courseDownloads[file.name].path;
                 if (fs.existsSync(existingPath)) {
-                    console.log(`Skipping duplicate: ${file.name}`);
+                    log.info('Skipping duplicate.', { fileName: file.name });
                     skipped++;
                     results.push({ fileName: file.name, status: 'skipped', filePath: existingPath });
                     if (onProgress) onProgress(file.name, 'skipped');
@@ -342,7 +345,7 @@ export class DownloadService {
             return true;
         });
 
-        console.log(`Starting parallel download for ${queue.length} files with 3 workers...`);
+        log.info(`Starting parallel download for ${queue.length} files with 3 workers.`);
 
         const courseUrl = page.url();
         const CONCURRENCY = 3;
@@ -355,7 +358,7 @@ export class DownloadService {
             try {
                 // If new page, navigate to course
                 if (workerId !== 0) {
-                    console.log(`[Worker ${workerId}] Navigating to course...`);
+                    log.info(`Worker ${workerId} navigating to course.`);
                     await workerPage.goto(courseUrl, { waitUntil: 'domcontentloaded' });
                 }
 
@@ -364,11 +367,11 @@ export class DownloadService {
                     if (!file) break;
 
                     if (globalError) {
-                        console.log(`[Worker ${workerId}] Aborting nicely due to global error.`);
+                        log.info(`Worker ${workerId} aborting nicely due to global error.`);
                         break;
                     }
 
-                    console.log(`[Worker ${workerId}] Processing ${file.name}...`);
+                    log.info(`Worker ${workerId} processing file.`, { fileName: file.name });
 
                     // Ensure we are on the right page
                     if (workerPage.url() !== courseUrl) {
@@ -392,7 +395,7 @@ export class DownloadService {
                             globalError = 'JSF_SESSION_EXPIRED';
                             // Put file back in queue so it can be retried by the upper layer if needed
                             queue.unshift(file);
-                            console.log(`[Worker ${workerId}] Detected session expiration! Aborting queue.`);
+                            log.info(`Worker ${workerId} detected session expiration. Aborting queue.`);
                             break;
                         } else {
                             failed++;
@@ -402,7 +405,7 @@ export class DownloadService {
                     }
                 }
             } catch (e) {
-                console.error(`[Worker ${workerId}] Error:`, e);
+                log.error(`Worker ${workerId} error.`, { error: e });
             } finally {
                 // Close extra pages
                 if (workerId !== 0) {
