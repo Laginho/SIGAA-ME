@@ -510,7 +510,10 @@ describe('Diagnóstico estrutural nos pontos de falha (PORTAL-003)', () => {
         expect(result.error).toContain('username field');
         expect(result.error).toContain('input[name="user.login"]');
         expect(recordSpy).not.toHaveBeenCalled();
-        expect(runtime.logger.error).toHaveBeenCalledWith(expect.stringContaining('failed to capture diagnostic HTML after login exception'));
+        expect(runtime.logger.error).toHaveBeenCalledWith(
+            expect.stringContaining('failed to capture diagnostic HTML after login exception'),
+            { error: expect.any(Error) },
+        );
         expect(browser.close).toHaveBeenCalledOnce();
     });
 
