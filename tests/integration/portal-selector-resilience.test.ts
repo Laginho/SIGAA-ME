@@ -488,6 +488,26 @@ describe('Diagnóstico estrutural nos pontos de falha (PORTAL-003)', () => {
         expect(browser.close).toHaveBeenCalledOnce();
     });
 
+    it('preserva o SELECTOR_DRIFT quando a captura do HTML de diagnóstico falha dentro do catch do login', async () => {
+        const { browser, page } = createNavigationHarness();
+        page.fill.mockRejectedValueOnce(new Error('locator.fill: Timeout 5000ms exceeded for input[name="user.login"]'));
+        page.content
+            .mockResolvedValueOnce(LOGIN_DOCUMENT)
+            .mockRejectedValueOnce(new Error('Target page, context or browser has been closed'));
+        const service = new PlaywrightLoginService();
+
+        const result = await service.login('student', 'password');
+
+        expect(result.success).toBe(false);
+        expect(result.errorCode).toBe('SELECTOR_DRIFT');
+        expect(result.error).toContain('SIGAA login selector drift');
+        expect(result.error).toContain('username field');
+        expect(result.error).toContain('input[name="user.login"]');
+        expect(recordSpy).not.toHaveBeenCalled();
+        expect(runtime.logger.error).toHaveBeenCalledWith(expect.stringContaining('failed to capture diagnostic HTML after login exception'));
+        expect(browser.close).toHaveBeenCalledOnce();
+    });
+
     it('não grava diagnóstico quando a exceção de login é indisponibilidade de portal, não drift', async () => {
         const { page } = createNavigationHarness();
         page.waitForLoadState.mockRejectedValueOnce(new Error('Timeout 30000ms exceeded waiting for navigation'));
