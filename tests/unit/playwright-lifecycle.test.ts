@@ -64,7 +64,10 @@ vi.mock('electron', () => ({
 }));
 
 vi.mock('../../electron/services/logger.service', () => ({
-    logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+    logger: {
+        info: vi.fn(), warn: vi.fn(), error: vi.fn(),
+        scope: vi.fn(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() })),
+    }
 }));
 
 import { PlaywrightLoginService } from '../../electron/services/playwright-login.service';

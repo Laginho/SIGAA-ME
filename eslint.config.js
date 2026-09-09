@@ -142,6 +142,22 @@ export default tseslint.config(
     },
   },
 
+  /**
+   * `electron/**` inteiro: nenhum `console.*`, em qualquer forma, exceto o
+   * próprio logger (OBS-005 fecha a catraca por arquivo de OBS-001/OBS-004 —
+   * o resto do diretório já tinha migrado). Antes da ZONA DE FRONTEIRA: em
+   * flat config a regra do bloco que vem depois substitui a de antes por
+   * inteiro, e a fronteira precisa do `noAsAny` além disto.
+   */
+  {
+    files: ['electron/**/*.ts'],
+    ignores: ['electron/services/logger.service.ts'],
+    rules: {
+      'no-restricted-syntax': ['error', noCredentialFallback, noConsoleAnyForm],
+      'no-console': 'error',
+    },
+  },
+
   // ------------------------------------------------------- ZONA DE FRONTEIRA
   // Código que atravessa renderer <-> main. Aqui é estrito de verdade.
   {
@@ -157,26 +173,6 @@ export default tseslint.config(
       'no-restricted-syntax': ['error', noCredentialFallback, noAsAny, noConsoleAnyForm],
       '@typescript-eslint/no-unsafe-function-type': 'error',
       'no-empty': 'error',
-      'no-console': 'error',
-    },
-  },
-
-  /**
-   * Sem console (OBS-001, OBS-004): os serviços que esses tickets migram, fora
-   * da fronteira mas com a mesma catraca. `updater` é `setupAutoUpdater` dentro
-   * de `main.ts`, já coberto acima. `electron/**` inteiro entra em OBS-005.
-   */
-  {
-    files: [
-      'electron/services/persistence.service.ts',
-      'electron/services/cache.service.ts',
-      'electron/services/http-scraper.service.ts',
-      'electron/services/sigaa.service.ts',
-      'electron/services/download.service.ts',
-      'electron/services/background-sync.service.ts',
-    ],
-    rules: {
-      'no-restricted-syntax': ['error', noCredentialFallback, noConsoleAnyForm],
       'no-console': 'error',
     },
   },
