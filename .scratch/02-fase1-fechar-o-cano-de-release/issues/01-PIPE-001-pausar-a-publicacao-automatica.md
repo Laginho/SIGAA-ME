@@ -1,5 +1,6 @@
 # PIPE-001 — Pausar a publicação automática
 Status: resolved
+Stage: done
 Priority: P0
 Tracker status at migration: `DONE` — implementado na sessão 2026-08-05
 

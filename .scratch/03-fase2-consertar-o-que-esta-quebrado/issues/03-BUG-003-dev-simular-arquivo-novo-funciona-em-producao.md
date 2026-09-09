@@ -1,5 +1,6 @@
 # BUG-003 — `[Dev] Simular Arquivo Novo` funciona em produção
 Status: resolved
+Stage: done
 Priority: P1
 Tracker status at migration: `DONE` — ciclo PTMR 01 validado pelo master dev; Bruno confirmou no build empacotado 1.2.0 (2026-09-01) que o tray não tem `[Dev] Simular Arquivo Novo`
 

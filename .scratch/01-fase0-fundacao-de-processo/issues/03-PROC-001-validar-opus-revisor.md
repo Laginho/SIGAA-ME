@@ -1,5 +1,6 @@
 # PROC-001 — Validar Opus como revisor (e Sonnet como implementador)
 Status: resolved
+Stage: done
 Closed: 2026-09-07
 Priority: P2
 Started: 2026-09-06

@@ -1,5 +1,6 @@
 # DEV-002 — Resolve userData paths after the dev isolation `setPath`
 Status: resolved
+Stage: done
 Priority: P2
 Dependencies: none (OBS-001 fixes the same defect for `logger.service.ts`)
 

@@ -1,5 +1,6 @@
 # PORTAL-001 — Centralize the SIGAA compatibility adapter
 Status: resolved
+Stage: done
 Priority: P1
 Blocked by: ARCH-001
 Tracker status at migration: `NOT STARTED`

@@ -1,5 +1,6 @@
 # BUG-001 — Download apaga arquivos válidos
 Status: resolved
+Stage: done
 Priority: P0
 Tracker status at migration: `DONE` — 2026-08-09, commit `700de9a`
 

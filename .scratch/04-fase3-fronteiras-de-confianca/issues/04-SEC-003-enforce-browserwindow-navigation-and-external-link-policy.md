@@ -1,5 +1,6 @@
 # SEC-003 — Enforce BrowserWindow navigation and external-link policy
 Status: resolved
+Stage: done
 Priority: P0
 Blocked by: SEC-002
 Tracker status at migration: `NOT STARTED`

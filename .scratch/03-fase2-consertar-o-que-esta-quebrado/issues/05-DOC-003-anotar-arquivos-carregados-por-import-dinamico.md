@@ -1,5 +1,6 @@
 # DOC-003 — Anotar arquivos carregados por import dinâmico
 Status: resolved
+Stage: done
 Priority: P3
 Tracker status at migration: `DONE` — sessão 2026-09-02
 

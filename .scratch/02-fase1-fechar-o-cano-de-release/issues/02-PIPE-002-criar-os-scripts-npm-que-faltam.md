@@ -1,5 +1,6 @@
 # PIPE-002 — Criar os scripts npm que faltam
 Status: resolved
+Stage: done
 Priority: P0
 Tracker status at migration: `DONE` — `npm run quality` verde no Windows em 2026-08-04 (68 passed, 4 skipped). Ver o `QA-003` para o que isso **não** prova.
 

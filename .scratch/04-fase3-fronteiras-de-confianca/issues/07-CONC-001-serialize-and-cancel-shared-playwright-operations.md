@@ -1,5 +1,6 @@
 # CONC-001 — Serialize and cancel shared Playwright operations
 Status: resolved
+Stage: done
 Priority: P1
 Blocked by: DATA-002 (resolved 2026-09-06)
 Tracker status at migration: `NOT STARTED`

@@ -1,5 +1,6 @@
 # DOC-002 — Escrever `CLAUDE.md`
 Status: resolved
+Stage: done
 Priority: P1
 Tracker status at migration: `DONE` — `CLAUDE.md` existe na raiz (sessão 2026-08-02)
 

@@ -1,5 +1,6 @@
 # BUG-008 — `getSettings` declarado, com handler, e sem ponte no preload
 Status: resolved
+Stage: done
 Priority: P1
 Tracker status at migration: `DONE` — corrigido na sessão 2026-08-05
 

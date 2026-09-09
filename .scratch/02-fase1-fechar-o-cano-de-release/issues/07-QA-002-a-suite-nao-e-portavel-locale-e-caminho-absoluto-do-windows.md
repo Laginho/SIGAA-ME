@@ -1,5 +1,6 @@
 # QA-002 — A suíte não é portável: locale e caminho absoluto do Windows
 Status: resolved
+Stage: done
 Priority: P1
 Tracker status at migration: `DONE` — corrigido na sessão 2026-08-05
 

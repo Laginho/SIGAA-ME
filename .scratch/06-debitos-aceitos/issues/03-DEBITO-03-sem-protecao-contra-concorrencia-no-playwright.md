@@ -1,5 +1,6 @@
 # DÉBITO-03 — Sem proteção contra concorrência no Playwright
 Status: resolved
+Stage: done
 Priority: —
 Tracker status at migration: (sem linha de status — débito aceito conscientemente)
 

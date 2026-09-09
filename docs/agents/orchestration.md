@@ -1,9 +1,11 @@
 # Loop de trabalho — amarrações deste repositório
 
-Etapas, modelos e skills: `AGENTS.md`. Aqui ficam as amarrações que valem para
-qualquer etapa. A regra que sustenta tudo: **os testes entram num commit próprio,
-vermelhos, antes de qualquer código** — foi assim que 14 testes verdes ficaram em
-cima de um parser quebrado (`tests/unit/parser.test.ts` testava uma cópia).
+Etapas, transições de `Stage` e as regras do loop: a skill `ticket-flow`. Gate,
+branch base e modelo por etapa: o bloco `## Bindings do fluxo` do `AGENTS.md`.
+Aqui ficam as amarrações que valem para qualquer etapa. A regra que sustenta
+tudo: **os testes entram num commit próprio, vermelhos, antes de qualquer
+código** — foi assim que 14 testes verdes ficaram em cima de um parser
+quebrado (`tests/unit/parser.test.ts` testava uma cópia).
 
 ## Regras que valem para todo papel
 
@@ -20,7 +22,8 @@ Layout, IDs e estados: `docs/agents/issue-tracker.md`. Regras que o layout não
 diz:
 
 - A ordem das tarefas é a do `docs/PLANO.md`. Uma revisão que derruba uma issue
-  fechada a devolve a `open`, marca qual critério caiu (❌ com o motivo) e
+  fechada a devolve a `Status: open` + `Stage: to-implement`, marca qual
+  critério caiu (❌ com o motivo) e
   remove a linha do ledger.
 - Fatiar é entrega da etapa 1: ao quebrar uma tarefa em tickets, a etapa 1
   acrescenta os IDs novos ao `docs/PLANO.md` na posição do original, com a
@@ -40,7 +43,8 @@ diz:
 
 ## Branch base
 
-`master`. Cada tarefa num branch próprio, criado a partir de `master`.
+Cada tarefa num branch próprio, nomeado pelo ID. A base está no bloco
+`## Bindings do fluxo` do `AGENTS.md`.
 
 ## Gate
 

@@ -1,5 +1,6 @@
 # BUG-002 — Remover o `pauseSync()` morto
 Status: resolved
+Stage: done
 Priority: P1
 Tracker status at migration: `DONE` — fechado na sessão 2026-09-01
 

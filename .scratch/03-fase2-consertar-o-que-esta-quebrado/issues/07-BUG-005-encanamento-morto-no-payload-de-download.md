@@ -1,5 +1,6 @@
 # BUG-005 — Encanamento morto no payload de download
 Status: resolved
+Stage: done
 Priority: P3
 Tracker status at migration: `IN REVIEW` — implementado na sessão 2026-09-01; falta a verificação de download manual no app (Bruno)
 

@@ -1,5 +1,6 @@
 # QA-001 — Add deterministic test, lint, coverage, and audit gates
 Status: open
+Stage: to-implement
 Priority: P1
 Blocked by: DEP-001
 Tracker status at migration: `PARTIAL`

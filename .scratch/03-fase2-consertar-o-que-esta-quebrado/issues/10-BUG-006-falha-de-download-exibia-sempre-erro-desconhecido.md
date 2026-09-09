@@ -1,5 +1,6 @@
 # BUG-006 — Falha de download exibia sempre "Erro desconhecido"
 Status: resolved
+Stage: done
 Priority: P2
 Tracker status at migration: `DONE` — corrigido na sessão 2026-08-04
 

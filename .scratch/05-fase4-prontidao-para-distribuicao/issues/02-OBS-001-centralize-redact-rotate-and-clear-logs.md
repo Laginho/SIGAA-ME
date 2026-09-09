@@ -1,5 +1,6 @@
 # OBS-001 — Centralize, redact, rotate, and clear logs
 Status: resolved
+Stage: done
 Priority: P2
 Blocked by: nenhum (DL-002 fechada em 2026-09-07)
 Tracker status at migration: `NOT STARTED`

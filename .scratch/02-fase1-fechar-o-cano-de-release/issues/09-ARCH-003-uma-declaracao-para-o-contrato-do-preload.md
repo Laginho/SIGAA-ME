@@ -1,5 +1,6 @@
 # ARCH-003 — Uma declaração para o contrato do preload
 Status: resolved
+Stage: done
 Priority: P1
 Tracker status at migration: `DONE` — implementado na sessão 2026-08-05
 

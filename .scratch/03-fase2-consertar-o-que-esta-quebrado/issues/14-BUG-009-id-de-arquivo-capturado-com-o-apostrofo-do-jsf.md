@@ -1,5 +1,6 @@
 # BUG-009 — Id de arquivo capturado com o apóstrofo do JSF
 Status: resolved
+Stage: done
 Priority: P2
 Tracker status at migration: `IN REVIEW` — código e testes prontos (sessão 2026-09-01); falta uma sincronização real com o `cache.json` antigo confirmando zero "arquivo novo", que é do Bruno
 
