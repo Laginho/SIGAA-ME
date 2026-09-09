@@ -1,8 +1,8 @@
 # OBS-005 — Migrate playwright-login and enforce `no-console` in electron/**
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P2
-Blocked by: OBS-004
+Blocked by: OBS-004 (fechado)
 
 - Owner: —
 - Dependencies: `OBS-001`, `OBS-004`
@@ -81,3 +81,45 @@ Não há arquivo novo. O vermelho vem de dois lugares:
 - `OBS-003` — dumps de HTML cru via `DiagnosticsService` e limpeza de legado;
   depende deste ticket porque edita o mesmo arquivo.
 - `OBS-002` — `[op:<id>]`.
+
+## Comments
+
+Branch: `OBS-005` (commits em cima de `59aabca`, `master` não tocado).
+
+**Achado sobre o critério 1 (para o revisor decidir, não decidi sozinho):**
+`tsconfig.json` tem `"include": ["src", "electron", "shared"]` — `tests/` não
+entra. `npx tsc --noEmit --listFiles` confirma: zero arquivos de `tests/` no
+programa. O `@ts-expect-error` plantado em `logger-redaction.test.ts` nunca é
+visto por `npm run typecheck` (nem pelo `vitest run`, que não faz type-check).
+O mecanismo de prova que o critério 1 descreve ("a diretiva vira unused e o
+typecheck falha") não roda no gate — plantei o teste do jeito que o ticket
+pede porque é a assinatura, mas a prova real de que a assinatura estreitou é
+que `electron/services/logger.service.ts` e
+`electron/services/playwright-login.service.ts` (que estão em `include`)
+typecham limpos com `meta?: LogMeta`, e isso o gate cobre de verdade.
+
+**Red confirmado antes do código (via `git stash` das duas mudanças de
+produção):** `npx eslint electron/services/playwright-login.service.ts` com o
+`eslint.config.js` do commit de testes deu 170 erros (85 `console.*` × 2
+regras). Depois do código: 0 erros, mesma suíte.
+
+**Ajuste em teste fora da lista de Primary files:**
+`tests/integration/portal-selector-resilience.test.ts:513` fazia
+`toHaveBeenCalledWith(expect.stringContaining(...))` sobre a mensagem antiga
+(string única, interpolada) de um dos 24 `logger.error(...)` migrados. Depois
+da migração a chamada é `(mensagem, { error })` — dois argumentos — e o
+critério 3 proíbe voltar a interpolar. Ajustei a asserção para casar com a
+nova forma (mensagem + `{ error: expect.any(Error) }`); não é seam nova, é o
+mesmo contrato do ticket batendo num teste que não estava na lista.
+
+**Achado não relacionado, não mexido:** `tests/unit/sync-selection.test.ts`
+("preserves first course snapshot and saves second course when first fails
+and second succeeds") falha `expect(window.location.hash).not.toBe('#/dashboard')`
+quando a suíte inteira roda, e passa isolado. Confirmei que é pré-existente
+rodando a suíte inteira num worktree do commit `59aabca` (antes deste
+ticket) — mesma falha lá. Não é do OBS-005; fica para quem for mexer em
+`sync-selection.test.ts`/isolamento de `jsdom` entre arquivos.
+
+**Gate no HEAD da branch:** `npx tsc --noEmit` limpo; `npx eslint .` → 0 erros,
+62 warnings (pré-existentes, `no-explicit-any`); `npx vitest run` → 602
+passed, 1 failed (o flake acima, não relacionado), 4 skipped.
