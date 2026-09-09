@@ -74,3 +74,14 @@ primeira linha da operação, como `meta`.
   aceito; o teste não deve exigir id ali.
 - Nenhum parâmetro `operationId` novo em assinatura de método: se apareceu, o
   `AsyncLocalStorage` não está sendo usado.
+
+## Comments
+
+**Da revisão do `OBS-005` (2026-09-09).** Depois da migração,
+`playwright-login.service.ts` ainda tem ~12 chamadas que interpolam valor no
+texto da mensagem em vez de passar em `meta`: `currentUrl`, `page.url()`,
+`newsId`, `courses.length`. Nenhum é dos cinco valores não confiáveis que o
+`OBS-005` nomeia, e todos passam o grep do critério 3 daquele ticket, então
+ficaram. Se este ticket for mexer nessas linhas para pendurar `[op:<id>]`, é a
+hora barata de mover o valor para `meta` junto — `url` já está em
+`CONTENT_KEYS`, `newsId` não precisa estar.
