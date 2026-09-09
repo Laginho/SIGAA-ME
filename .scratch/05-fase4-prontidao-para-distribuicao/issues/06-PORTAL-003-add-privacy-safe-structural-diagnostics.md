@@ -369,3 +369,81 @@ nos dumps existentes; a abstração de consentimento e a retenção dos HTMLs
 seguem como ressalvas já registradas, sem correção nesta revisão. O
 `clear-all-data` existente já remove `debug_*` na raiz do `userData`.
 Sem linha no ledger, pois a issue continua aberta. Sem push ou PR.
+
+## Terceira rodada (2026-09-08) — os três bloqueantes
+
+Testes vermelhos em `63e6ebc`, implementação em `a18346f`. Ordem mantida: os
+testes entraram sozinhos, vermelhos, antes de qualquer código de produção.
+
+#### B-1 — título sem redação
+
+Decisão: allowlist por regex, não por texto exato. Os sete títulos reais do
+SIGAA (`grep -rhoi "<title>[^<]*</title>" tests/fixtures/`) viram sete
+categorias estáveis:
+
+| Título real | Categoria |
+|---|---|
+| `AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas` | `ava` |
+| `SIGAA - Acesso Negado` | `access-denied` |
+| `SIGAA - Login` | `login` |
+| `SIGAA - Manutenção` | `maintenance` |
+| `SIGAA - Portal do Discente` | `student-portal` |
+| `SIGAA - Portal` | `portal` |
+| `SIGAA - Turma` | `course-class` |
+
+`categorizeTitle()` casa contra padrões (`/acesso\s*negado/i`, `/manuten/i`,
+`/login/i`, `/portal\s+do\s+discente/i`, `/turma/i`, `/^ava\b/i`, `/portal/i`,
+nessa ordem) e devolve `'other'` para qualquer título fora da allowlist —
+nunca o texto de origem. Truncar (a sugestão da primeira revisão) não
+resolvia: `Aluno Teste Privado - Calculo I - Media 9.4` truncado em 120
+caracteres ainda é `Aluno Teste Privado - Calculo I - Media 9.4`. Com a
+allowlist, esse título vira `other` e nome/nota nunca aparecem no JSON. O
+comentário de privacidade no topo de `diagnostics.service.ts` foi corrigido
+para citar título como categoria, não texto livre.
+
+#### B-2 — sessão no pathname
+
+`urlFamily()` cortava só query string e fragmento; `;jsessionid=...` é
+parâmetro de caminho (RFC 3986), mora no próprio segmento de path, não na
+query. Correção: cada segmento do pathname é truncado no primeiro `;` antes
+do join. `/sigaa/paginaInicial.do;jsessionid=TEST_SESSION_SECRET?foo=1` agora
+vira `/sigaa/paginaInicial.do`.
+
+#### B-3 — dois caminhos de falha de login sem diagnóstico
+
+`page` saiu de `const` dentro do `try` para `let page: Page | null = null`
+antes dele, para o `catch` alcançar a página. Dois pontos passaram a gravar:
+
+| Local | Guarda |
+|---|---|
+| `validateLoginStart(startHtml)` retornando `SELECTOR_DRIFT` (~linha 106) | grava antes de `close()`, só quando `startCheck.code === 'SELECTOR_DRIFT'` |
+| `catch` de `login()`, `classifyLoginException(error)` (~linha 191) | grava antes de `close()`, só quando `classified.errorCode === 'SELECTOR_DRIFT'`, com a própria captura (`page.content()`/`page.url()`) dentro de um `try/catch` que não deixa uma falha de captura escapar do `login()` nem apagar o `errorCode` já classificado |
+
+`SESSION_EXPIRED` (ainda na tela de login) e `PORTAL_UNAVAILABLE` (timeout
+genérico sem seletor específico) não gravam — não são mudança de layout. Um
+teste por código fixa esse limite.
+
+#### Prova vermelho-verde
+
+- `git checkout 63e6ebc -- electron/services/diagnostics.service.ts
+  electron/services/playwright-login.service.ts` (volta à segunda rodada):
+  `npx vitest run tests/unit/diagnostics-redaction.test.ts
+  tests/integration/portal-selector-resilience.test.ts` → **14 failed | 38
+  passed (52)**, as 14 falhas exatamente as dos três bloqueantes (allowlist
+  de título, sessão no pathname, os dois pontos de login).
+- `git checkout a18346f -- <mesmos arquivos>` (implementação atual): mesmos
+  dois arquivos de teste → **52 passed (52)**.
+
+#### Gate
+
+`tsc --noEmit` limpo; `eslint .` 0 erros, 67 warnings legado (mesma contagem
+de antes, nenhum novo); `vitest run` 46 arquivos, **573 passed | 4 skipped
+(577)** — eram 557 passed | 4 skipped (561).
+
+#### Não tocado
+
+AC3 (os ~11 dumps crus com `!app.isPackaged` inline e a decisão sobre
+`shouldCaptureRawArtifact`) e a ressalva de retenção dos HTMLs em AC4 seguem
+como registrado na rodada anterior. `prune()` com `NaN` para nome de arquivo
+estranho e os parses repetidos de cheerio em `buildStructuralDiagnostic`
+seguem como itens menores, fora do escopo dos três bloqueantes desta rodada.
