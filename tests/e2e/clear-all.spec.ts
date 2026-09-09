@@ -2,7 +2,7 @@
  * DATA-002 — clear-all no app de verdade, sem credencial.
  *
  * O que os testes unitários não conseguem provar: que os arquivos do `userData`
- * somem **no Windows**, onde o `logs/app_*.log` e o `scraper.log` estão com
+ * somem **no Windows**, onde o `logs/app.log` e o `scraper.log` estão com
  * stream aberto e um `unlink` ingênuo falha; que o `settings.json` que o app
  * escreveu de verdade volta ao default no processo vivo; e que o storage do
  * renderer fica vazio depois de o main limpar a partição.
@@ -57,7 +57,8 @@ test.describe.serial('DATA-002: clear-all no app', () => {
         oldLog: path.join(userData, 'logs', 'app_old.log'),
         debugLogin: path.join(userData, 'debug_login_page.html'),
         debugPortal: path.join(userData, 'debug_portal_fail_540316.html'),
-        appLog: path.join(userData, 'sigaa-me.log'),
+        // `sigaa-me.log` saiu em OBS-001 junto com o logger antigo; sobra do
+        // legado em disco é limpeza de boot, em OBS-003.
         scraperLog: path.join(userData, 'scraper.log'),
     });
 
@@ -68,7 +69,6 @@ test.describe.serial('DATA-002: clear-all no app', () => {
         fs.writeFileSync(p.oldLog, `${MARKER}\n`);
         fs.writeFileSync(p.debugLogin, '<html></html>');
         fs.writeFileSync(p.debugPortal, '<html></html>');
-        fs.appendFileSync(p.appLog, `${MARKER}\n`);
         fs.appendFileSync(p.scraperLog, `${MARKER}\n`);
     }
 
@@ -144,9 +144,8 @@ test.describe.serial('DATA-002: clear-all no app', () => {
             expect(fs.existsSync(file), `${path.relative(userData, file)} ainda existe`).toBe(false);
         }
         expect(fs.existsSync(path.join(userData, 'credentials.json'))).toBe(false);
-        // Os dois logs com stream aberto: podem existir vazios (reabertos), mas
-        // o que estava neles se foi.
-        expect(contains(p.appLog)).toBe(false);
+        // O log com stream aberto: pode existir vazio (reaberto), mas o que
+        // estava nele se foi.
         expect(contains(p.scraperLog)).toBe(false);
 
         const storage = await launched.page.evaluate((key) => ({

@@ -153,7 +153,7 @@ app.on('before-quit', async (e) => {
         }, 5000))
       ]);
     } catch (err) {
-      log.error('Cleanup error', err);
+      log.error('Cleanup error', { err });
     }
     // O logger é do app, não da conta: nada de conteúdo a perder aqui, então
     // um `flush` que nunca rejeita não bloqueia o quit de verdade.
@@ -210,7 +210,7 @@ app.whenReady().then(() => {
       );
     }
   } catch (e) {
-    log.error('Failed to check for Chrome', e);
+    log.error('Failed to check for Chrome', { err: e });
   }
 
   createWindow();
@@ -256,16 +256,16 @@ export function setupAutoUpdater(): void {
     }).then(result => {
       if (result.response === 0) {
         autoUpdater.downloadUpdate().catch(err => {
-          updaterLog.error('Download failed', err);
+          updaterLog.error('Download failed', { err });
         });
       }
-    }).catch(err => updaterLog.error('Dialog failed', err));
+    }).catch(err => updaterLog.error('Dialog failed', { err }));
   });
   autoUpdater.on('update-not-available', () => {
     updaterLog.info('App is up to date.');
   });
   autoUpdater.on('error', (err) => {
-    updaterLog.error('Update error', err);
+    updaterLog.error('Update error', { err });
   });
   autoUpdater.on('update-downloaded', () => {
     updaterLog.info('Update downloaded. Preparing to install...');
@@ -279,10 +279,10 @@ export function setupAutoUpdater(): void {
         // Force the app to quit and install using our graceful before-quit logic
         autoUpdater.quitAndInstall();
       }
-    }).catch(err => updaterLog.error('Dialog failed', err));
+    }).catch(err => updaterLog.error('Dialog failed', { err }));
   });
 
   autoUpdater.checkForUpdates().catch(err => {
-    updaterLog.error('Failed to check for updates', err);
+    updaterLog.error('Failed to check for updates', { err });
   });
 }

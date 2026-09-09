@@ -227,6 +227,19 @@ describe('LoggerService', () => {
         expect(total).toBeLessThanOrEqual(3 * 300);
     });
 
+    it('linha cortada em 4 KiB continua uma linha só: o registro seguinte não cola nela', async () => {
+        const logger = makeLogger();
+        logger.info('x'.repeat(6000));
+        logger.info('SEGUNDA-LINHA');
+
+        await logger.flush();
+
+        const lines = readLog(dir).split('\n').filter(Boolean);
+        expect(lines).toHaveLength(2);
+        expect(lines[1]).toContain('SEGUNDA-LINHA');
+        expect(lines[0].length).toBeLessThan(4200);
+    });
+
     it('flush() resolve só depois de tudo estar no disco', async () => {
         const logger = makeLogger();
         logger.info('linha única');
@@ -265,6 +278,26 @@ describe('LoggerService', () => {
         const content = readLog(dir);
         expect(content).toContain('depois do clear');
         expect(content).not.toContain('antes do clear');
+    });
+
+    it('clear() apaga o que ainda estava no buffer, sem flush explícito (DATA-002)', async () => {
+        const logger = makeLogger();
+        logger.info('linha da conta anterior');   // sem flush: a escrita está pendente
+
+        await logger.clear();
+
+        expect(fs.existsSync(path.join(dir, 'logs', 'app.log'))).toBe(false);
+        expect(readLog(dir)).not.toContain('conta anterior');
+    });
+
+    it('clear() apaga o log do boot anterior mesmo antes do primeiro write', async () => {
+        fs.mkdirSync(path.join(dir, 'logs'), { recursive: true });
+        fs.writeFileSync(path.join(dir, 'logs', 'app.log'), 'linha de um boot anterior\n');
+        const logger = makeLogger();
+
+        await logger.clear();
+
+        expect(fs.existsSync(path.join(dir, 'logs', 'app.log'))).toBe(false);
     });
 
     it('clear() rejeita quando a exclusão falha, e app.log continua no disco', async () => {

@@ -78,7 +78,7 @@ async function attempt(step: () => void | Promise<void>, failures: string[], lab
   } catch (error) {
     const message = errorMessage(error);
     failures.push(message);
-    log.error(`${label} falhou`, message);
+    log.error(`${label} falhou`, { error: message });
   }
 }
 
@@ -116,7 +116,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
           deps.persistence.saveCredentials(req.username, req.password);
         } catch (error) {
           const message = errorMessage(error);
-          log.error('Failed to save remembered credentials', message);
+          log.error('Failed to save remembered credentials', { error: message });
           return fail('STORAGE', `Login succeeded, but the session could not be remembered: ${message}`);
         }
       } else {
@@ -126,7 +126,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
           deps.persistence.clearCredentials();
         } catch (error) {
           const message = errorMessage(error);
-          log.error('Failed to clear credentials', message);
+          log.error('Failed to clear credentials', { error: message });
           return fail('STORAGE', message);
         }
       }

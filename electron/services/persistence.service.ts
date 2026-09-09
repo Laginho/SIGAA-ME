@@ -87,7 +87,7 @@ export class PersistenceService {
                 else log.warn('Ignoring a stored setting with the wrong type', { key });
             }
         } catch (error) {
-            log.error('Failed to load settings', error);
+            log.error('Failed to load settings', { error });
         }
         return settings;
     }
@@ -161,7 +161,7 @@ export class PersistenceService {
                 password: safeStorage.decryptString(Buffer.from(data.password, 'base64'))
             };
         } catch (error) {
-            log.error('Failed to load encrypted credentials', error);
+            log.error('Failed to load encrypted credentials', { error });
             return null;
         }
     }
@@ -189,7 +189,7 @@ export class PersistenceService {
         try {
             fs.writeFileSync(this.settingsPath, JSON.stringify({ schemaVersion: SETTINGS_SCHEMA_VERSION, ...this.settings }, null, 2));
         } catch (error) {
-            log.error('Failed to save settings', error);
+            log.error('Failed to save settings', { error });
         }
     }
 }
