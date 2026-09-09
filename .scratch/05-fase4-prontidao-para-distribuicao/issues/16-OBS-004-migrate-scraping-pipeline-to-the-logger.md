@@ -7,6 +7,7 @@ Blocked by: OBS-001
 - Owner: —
 - Dependencies: `OBS-001`
 - Primary files:
+  - `electron/services/logger.service.ts` (só o `clear()`, pelo critério 5)
   - `electron/services/http-scraper.service.ts`
   - `electron/services/sigaa.service.ts`
   - `electron/services/download.service.ts`
@@ -81,6 +82,14 @@ não os repete.
    conta própria.
 3. **Lint.** `npm run lint` verde com `no-console: error` nos quatro arquivos.
 4. Nenhum `try/catch` novo que só chame `logger.error` (regra 3).
+5. **Write durante o `clear()` não se perde.** O `clear()` de
+   `logger.service.ts` entra na mesma `chain` dos writes
+   (`const p = this.chain.then(doClear); this.chain = p.catch(() => {}); return p;`).
+   Teste que enfileira um write sem `await` e chama `clear()` no mesmo tick
+   exige a linha no arquivo novo e nenhum `console.error` de sink desligado.
+   Vem do bullet herdado da revisão do `OBS-001`, acima; dobrado em critério na
+   reabertura de 2026-09-09 porque a etapa 2 lê a lista de arquivos e os
+   critérios, não a prosa.
 
 #### Verification
 
@@ -99,6 +108,8 @@ npm run quality
   `background-sync.test.ts`, com timers reais (o ciclo dorme 2 s por
   disciplina). Um `beforeEach` (não `beforeAll`) confere que o singleton expõe
   `scope`, pelo motivo registrado em `OBS-001`.
+- `tests/unit/logger-redaction.test.ts` — write enfileirado durante o `clear()`
+  (critério 5), em commit vermelho antes da correção do `clear()`.
 - Vermelho pelo motivo certo: antes da migração, os serviços escrevem em
   `console` e em `scraper.log`, e o arquivo `logs/app.log` do teste fica sem
   linha no escopo esperado. O positivo falha; é ele que prova a migração.
