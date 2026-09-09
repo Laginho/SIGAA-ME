@@ -17,6 +17,8 @@ import {
     PORTAL_ADAPTER_VERSION
 } from '../sigaa/portal-adapter';
 
+const log = logger.scope('PlaywrightLogin');
+
 /**
  * Linha da lista de turmas como o portal a entrega. `href`/`onclick` são
  * internos do JSF e **não** atravessam o IPC: `SigaaService` reduz isto a
@@ -72,7 +74,7 @@ export class PlaywrightLoginService {
         try {
             diagnosticsService.record(buildStructuralDiagnostic(html, url, PORTAL_ADAPTER_VERSION, selectorCounts));
         } catch (error) {
-            logger.error(`Playwright: failed to record structural diagnostic: ${String(error)}`);
+            log.error('Playwright: failed to record structural diagnostic.', { error });
         }
     }
 
@@ -82,7 +84,7 @@ export class PlaywrightLoginService {
         // uma `const` dentro do try não alcança o catch.
         let page: Page | null = null;
         try {
-            console.log('Playwright: Launching browser...');
+            log.info('Playwright: Launching browser...');
 
             // A previous browser may still be running (earlier sync or login).
             // Launching over it leaks the whole Chrome process tree.
@@ -98,7 +100,7 @@ export class PlaywrightLoginService {
             });
             page = await context.newPage();
 
-            console.log('Playwright: Navigating to login page...');
+            log.info('Playwright: Navigating to login page...');
             await page.goto(LOGIN.url);
 
             // Validar o documento inicial antes de preencher qualquer campo — o
@@ -113,19 +115,19 @@ export class PlaywrightLoginService {
                 return { success: false, error: startCheck.message, errorCode: startCheck.code };
             }
 
-            console.log('Playwright: Filling in credentials...');
+            log.info('Playwright: Filling in credentials...');
             await page.fill(LOGIN.username, username);
             await page.fill(LOGIN.password, password);
 
-            console.log('Playwright: Clicking login button...');
+            log.info('Playwright: Clicking login button...');
             await page.click(LOGIN.submit);
 
             // Wait for navigation after login
-            console.log('Playwright: Waiting for navigation...');
+            log.info('Playwright: Waiting for navigation...');
             await page.waitForLoadState('networkidle');
 
             const currentUrl = page.url();
-            console.log('Playwright: Current URL after login:', currentUrl);
+            log.info(`Playwright: Current URL after login: ${currentUrl}`);
 
             // Validar o documento final: só um pouso reconhecido (home ou portal)
             // autentica. Nem a URL ter deixado de ser a de login, nem um
@@ -151,16 +153,16 @@ export class PlaywrightLoginService {
             }
 
             // Login successful! Extract user data from the page
-            console.log('Playwright: Login successful! Extracting user data...');
+            log.info('Playwright: Login successful! Extracting user data...');
 
             // DEBUG: Save login page HTML for selector inspection (dev only)
             if (!app.isPackaged) {
                 try {
                     const debugPath = path.join(app.getPath('userData'), 'debug_login_page.html');
                     fs.writeFileSync(debugPath, endHtml);
-                    console.log('Playwright: Saved debug_login_page.html for inspection');
+                    log.info('Playwright: Saved debug_login_page.html for inspection.');
                 } catch (e) {
-                    console.warn('Playwright: Failed to save debug HTML:', e);
+                    log.warn('Playwright: Failed to save debug HTML.', { error: e });
                 }
             }
 
@@ -172,12 +174,12 @@ export class PlaywrightLoginService {
             // Will extract it during getCourses instead
             const photoUrl: string | null = null;
 
-            console.log('Playwright: Extracted user name:', userName);
-            console.log('Playwright: Photo will be extracted from portal page during sync');
+            log.info('Playwright: Extracted user name.', { name: userName });
+            log.info('Playwright: Photo will be extracted from portal page during sync.');
 
             // Extract cookies
             const cookies = await context.cookies();
-            console.log(`Playwright: Found ${cookies.length} cookies:`, cookies.map(c => `${c.name} (${c.domain})`).join(', '));
+            log.info('Playwright: Found cookies.', { count: cookies.length, cookies });
 
             // Store cookies and credentials for future use
             this.storedCookies = cookies;
@@ -186,7 +188,7 @@ export class PlaywrightLoginService {
 
             this.context = context;
             this.page = page;
-            console.log('Playwright: Keeping session alive for cookie refresh');
+            log.info('Playwright: Keeping session alive for cookie refresh.');
 
             return {
                 success: true,
@@ -196,7 +198,7 @@ export class PlaywrightLoginService {
             };
 
         } catch (error: any) {
-            console.error('Playwright: Error during login:', error);
+            log.error('Playwright: Error during login.', { error });
             const classified = classifyLoginException(error);
             // Sessão vencida (SESSION_EXPIRED) e portal fora do ar
             // (PORTAL_UNAVAILABLE) não são mudança de layout — só drift real
@@ -208,7 +210,7 @@ export class PlaywrightLoginService {
                     const html = await page.content();
                     this.recordDiagnostic(html, page.url(), {});
                 } catch (captureError) {
-                    logger.error(`Playwright: failed to capture diagnostic HTML after login exception: ${String(captureError)}`);
+                    log.error('Playwright: failed to capture diagnostic HTML after login exception.', { error: captureError });
                 }
             }
             await this.close();
@@ -218,11 +220,11 @@ export class PlaywrightLoginService {
 
     async forceReset() {
         if (this.context) {
-            console.log('Playwright: Force resetting context (Abort Navigation)...');
+            log.info('Playwright: Force resetting context (Abort Navigation)...');
             try {
                 await this.context.close();
             } catch (e) {
-                console.error('Playwright: Error closing context during reset:', e);
+                log.error('Playwright: Error closing context during reset.', { error: e });
             }
             this.context = null;
             this.page = null;
@@ -237,7 +239,7 @@ export class PlaywrightLoginService {
             return { success: false, error: 'No stored credentials available' };
         }
 
-        console.log('Playwright: Attempting re-login with stored credentials...');
+        log.info('Playwright: Attempting re-login with stored credentials...');
 
         // Close existing browser to start fresh
         await this.close();
@@ -257,23 +259,23 @@ export class PlaywrightLoginService {
  */
     async getCookies(): Promise<any[]> {
         if (!this.context) {
-            console.warn('Playwright: No active context, returning stored cookies');
+            log.warn('Playwright: No active context, returning stored cookies.');
             return this.storedCookies || [];
         }
         try {
             const cookies = await this.context.cookies();
             this.storedCookies = cookies;
-            console.log('Playwright: Refreshed cookies');
+            log.info('Playwright: Refreshed cookies.');
             return cookies;
         } catch (error) {
-            console.error('Playwright: Error getting cookies:', error);
+            log.error('Playwright: Error getting cookies.', { error });
             return this.storedCookies || [];
         }
     }
 
     async getCourses(): Promise<{ success: boolean; courses?: ParsedCourse[]; photoUrl?: string; error?: string; errorCode?: AppErrorCode }> {
         try {
-            logger.info('Playwright: Launching browser to fetch courses...');
+            log.info('Playwright: Launching browser to fetch courses...');
 
             // Check if we have stored cookies
             if (!this.storedCookies || this.storedCookies.length === 0) {
@@ -292,16 +294,16 @@ export class PlaywrightLoginService {
             const context = await this.browser.newContext();
 
             // Inject stored cookies
-            logger.info('Playwright: Injecting stored session cookies...');
+            log.info('Playwright: Injecting stored session cookies...');
             await context.addCookies(this.storedCookies);
 
             const page = await context.newPage();
 
             // Enable console logs from the browser to Node.js
-            page.on('console', msg => console.log('Playwright Browser Log:', msg.text()));
+            page.on('console', msg => log.info('Playwright: Browser console message.', { body: msg.text() }));
 
             // Start at home page
-            logger.info('Playwright: Navigating to home page...');
+            log.info('Playwright: Navigating to home page...');
             await page.goto('https://si3.ufc.br/sigaa/paginaInicial.do');
             await page.waitForLoadState('networkidle');
 
@@ -313,18 +315,18 @@ export class PlaywrightLoginService {
             }
 
             // Click on student portal link
-            console.log('Playwright: Looking for "Menu Discente" link...');
+            log.info('Playwright: Looking for "Menu Discente" link...');
             try {
                 // Click on "Menu Discente" link using exact href - use .first() to avoid strict mode error
                 const studentLink = page.locator(STUDENT_HOME.menuDiscenteLink).first();
                 await studentLink.click({ timeout: 5000 });
                 await page.waitForLoadState('networkidle');
-                console.log('Playwright: Clicked Menu Discente, current URL:', page.url());
+                log.info(`Playwright: Clicked Menu Discente. Current URL: ${page.url()}`);
             } catch (clickError) {
-                console.log('Playwright: Auto-click failed:', clickError);
-                console.log('Playwright: Current URL:', page.url());
+                log.warn('Playwright: Auto-click failed.', { error: clickError });
+                log.info(`Playwright: Current URL: ${page.url()}`);
                 // Try to navigate directly as fallback
-                console.log('Playwright: Trying direct navigation to verPortalDiscente.do...');
+                log.info('Playwright: Trying direct navigation to verPortalDiscente.do...');
                 await page.goto('https://si3.ufc.br/sigaa/verPortalDiscente.do');
                 await page.waitForLoadState('networkidle');
             }
@@ -338,14 +340,14 @@ export class PlaywrightLoginService {
                     const portalHtml = await page.content();
                     const debugPath = path.join(app.getPath('userData'), 'debug_portal_page.html');
                     fs.writeFileSync(debugPath, portalHtml);
-                    console.log('Playwright: Saved debug_portal_page.html for inspection');
+                    log.info('Playwright: Saved debug_portal_page.html for inspection.');
                 } catch (e) {
-                    console.warn('Playwright: Failed to save debug HTML:', e);
+                    log.warn('Playwright: Failed to save debug HTML.', { error: e });
                 }
             }
 
             // Extract courses with robust selector-based logic
-            console.log('Playwright: Extracting courses from page...');
+            log.info('Playwright: Extracting courses from page...');
             const courseExtraction = await page.evaluate((sel) => {
                 const results: ParsedCourse[] = [];
                 // Find all rows that might contain courses
@@ -360,7 +362,6 @@ export class PlaywrightLoginService {
                     if (idInput && nameLink && nameLink.textContent) {
                         const fullText = nameLink.textContent.trim();
                         const id = idInput.value;
-                        console.log(`[Debug] Course ${fullText} Link: href="${nameLink.getAttribute('href')}", onclick="${nameLink.getAttribute('onclick')}"`);
 
                         // Course codes follow pattern: 2 letters + 4 digits (e.g., CB0699, CK0181)
                         // Format usually: "CODE - NAME"
@@ -404,21 +405,21 @@ export class PlaywrightLoginService {
                 };
             }
 
-            console.log('Playwright: Found courses:', courses.length);
+            log.info(`Playwright: Found ${courses.length} courses.`);
 
             // Save to debug file for analysis (dev only)
             if (!app.isPackaged) {
                 try {
                     const debugPath = path.join(app.getPath('userData'), 'debug_courses.json');
                     fs.writeFileSync(debugPath, JSON.stringify(courses, null, 2));
-                    console.log(`Playwright: Saved course debug info to ${debugPath}`);
+                    log.info('Playwright: Saved course debug info.', { path: debugPath });
                 } catch (err) {
-                    console.error('Playwright: Failed to save debug info:', err);
+                    log.error('Playwright: Failed to save debug info.', { error: err });
                 }
             }
 
             if (courses.length > 0) {
-                console.log('Playwright: Sample courses:', courses.slice(0, 3));
+                log.info('Playwright: Sample courses.', { courses: courses.slice(0, 3) });
             }
 
             // Extract user photo from portal page
@@ -427,7 +428,7 @@ export class PlaywrightLoginService {
             if (photoUrl && !photoUrl.startsWith('http')) {
                 photoUrl = `https://si3.ufc.br${photoUrl}`;
             }
-            console.log('Playwright: Extracted photo URL from portal:', photoUrl);
+            log.info('Playwright: Extracted photo URL from portal.', { url: photoUrl });
 
             // DO NOT CLOSE BROWSER HERE - Keep it alive for course entry
             // await this.close(); 
@@ -439,7 +440,7 @@ export class PlaywrightLoginService {
             return { success: true, courses, photoUrl: photoUrl || undefined };
 
         } catch (error: any) {
-            console.error('Playwright: Error fetching courses:', error);
+            log.error('Playwright: Error fetching courses.', { error });
             await this.close();
             return { success: false, error: error.message };
         }
@@ -449,7 +450,7 @@ export class PlaywrightLoginService {
         try {
             if (!this.browser || !this.context) {
                 // If browser is closed, relaunch it
-                console.log('Playwright: Browser not active, relaunching...');
+                log.info('Playwright: Browser not active, relaunching...');
                 await this.getCourses(); // This will relaunch and set this.context
             }
 
@@ -457,14 +458,14 @@ export class PlaywrightLoginService {
             // Creating a new page causes "Acesso Negado" (Access Denied) errors
             // because the portal requires the same page/session state
             if (!this.page || this.page.isClosed()) {
-                console.log('Playwright: No existing page, creating new one from context...');
+                log.info('Playwright: No existing page, creating new one from context...');
                 this.page = await this.context!.newPage();
             }
 
             const page = this.page;
 
             // Always force navigation to portal to ensure clean state
-            console.log(`Playwright: Navigating to portal for ${courseName}...`);
+            log.info('Playwright: Navigating to portal for course.', { courseName });
 
             // Better navigation strategy: Go to Home -> Click Menu Discente
             // This mimics user behavior and avoids "Access Denied" errors
@@ -474,7 +475,7 @@ export class PlaywrightLoginService {
 
                 // Check if we were redirected to login
                 if (page.url().includes('verTelaLogin') || page.url().includes('logar.do')) {
-                    console.warn('Playwright: Redirected to login page. Session expired.');
+                    log.warn('Playwright: Redirected to login page. Session expired.');
                     // Don't close page - we might need to re-login and reuse it
                     this.page = null;
                     return { success: false, error: 'Session expired - please login again' };
@@ -487,12 +488,12 @@ export class PlaywrightLoginService {
                     await page.waitForLoadState('networkidle');
                 } else {
                     // Fallback to direct navigation if link not found
-                    console.log('Playwright: Menu Discente link not found, trying direct navigation...');
+                    log.info('Playwright: Menu Discente link not found, trying direct navigation...');
                     await page.goto('https://si3.ufc.br/sigaa/verPortalDiscente.do');
                     await page.waitForLoadState('networkidle');
                 }
             } catch (navError) {
-                console.error('Playwright: Navigation error:', navError);
+                log.error('Playwright: Navigation error.', { error: navError });
                 // Last resort fallback
                 await page.goto('https://si3.ufc.br/sigaa/verPortalDiscente.do');
                 await page.waitForLoadState('networkidle');
@@ -507,13 +508,13 @@ export class PlaywrightLoginService {
             const portalHtml = await page.content();
             const portalCheck = validateCourseListDocument(portalHtml);
             if (portalCheck) {
-                logger.warn(`Playwright: Portal document rejected before course entry: ${portalCheck.code}`);
+                log.warn(`Playwright: Portal document rejected before course entry: ${portalCheck.code}`);
                 if (portalCheck.code === 'SELECTOR_DRIFT') this.recordDiagnostic(portalHtml, page.url(), {});
                 if (portalCheck.code === 'SESSION_EXPIRED') this.page = null;
                 return { success: false, error: portalCheck.message, errorCode: portalCheck.code };
             }
 
-            console.log(`Playwright: Entering course ${courseId} (${courseName})...`);
+            log.info('Playwright: Entering course.', { courseId, courseName });
             const entered = await page.evaluate(({ id, sel }) => {
                 const inputs = Array.from(document.querySelectorAll(sel.courseIdInput));
                 const targetInput = inputs.find(input => (input as HTMLInputElement).value === id);
@@ -523,7 +524,6 @@ export class PlaywrightLoginService {
                     if (row) {
                         const link = row.querySelector(sel.virtualClassroomLink) as HTMLElement;
                         if (link) {
-                            console.log('Clicking course:', link.innerText);
                             link.click();
                             return { success: true };
                         }
@@ -543,9 +543,12 @@ export class PlaywrightLoginService {
                     };
                 }, STUDENT_PORTAL.courseIdInput);
 
-                console.error(`Playwright: Course ${courseId} not found in portal. Current URL: ${page.url()}`);
-                console.error(`Playwright: Available course IDs: ${debugInfo.courseIds.join(', ')}`);
-                console.error(`Playwright: Page title: ${debugInfo.pageTitle}`);
+                log.error('Playwright: Course not found in portal.', {
+                    courseId,
+                    url: page.url(),
+                    availableCourseIds: debugInfo.courseIds,
+                    pageTitle: debugInfo.pageTitle,
+                });
 
                 // Save debug HTML
                 const html = await page.content();
@@ -553,10 +556,10 @@ export class PlaywrightLoginService {
                     if (!app.isPackaged) {
                         const debugPath = path.join(app.getPath('userData'), `debug_portal_fail_${courseId}.html`);
                         fs.writeFileSync(debugPath, html);
-                        console.log(`Playwright: Saved debug HTML to ${debugPath}`);
+                        log.info('Playwright: Saved debug HTML.', { path: debugPath });
                     }
                 } catch (e) {
-                    console.error('Failed to save debug HTML:', e);
+                    log.error('Playwright: Failed to save debug HTML.', { error: e });
                 }
 
                 // Don't close page - keep it for potential retry
@@ -568,13 +571,13 @@ export class PlaywrightLoginService {
             }
 
             if (entered.success) {
-                logger.info('Playwright: Click processed, waiting for Course Page content...');
+                log.info('Playwright: Click processed, waiting for Course Page content...');
                 try {
                     // Crucial: Wait for specific text that ONLY appears on the course page
                     await page.waitForSelector('text=Menu Turma Virtual', { timeout: 15000 });
-                    logger.info('Playwright: Verified we are on Course Page (found "Menu Turma Virtual")');
+                    log.info('Playwright: Verified we are on Course Page (found "Menu Turma Virtual").');
                 } catch (e) {
-                    logger.warn('Playwright: Timeout waiting for "Menu Turma Virtual". Navigation may have failed or page is slow.');
+                    log.warn('Playwright: Timeout waiting for "Menu Turma Virtual". Navigation may have failed or page is slow.');
                     // Don't throw - let it proceed to check URL/content below, but this warns us
                 }
 
@@ -586,7 +589,7 @@ export class PlaywrightLoginService {
             // Navigate to AVA to ensure we are in the course context
             // Note: Clicking the link usually redirects to AVA, but we ensure it here
             if (!page.url().includes('ava/index.jsf')) {
-                console.log('Playwright: URL not AVA after click, forcing navigation...');
+                log.info('Playwright: URL not AVA after click, forcing navigation...');
                 await page.goto('https://si3.ufc.br/sigaa/ava/index.jsf');
                 await page.waitForLoadState('networkidle');
             }
@@ -600,19 +603,19 @@ export class PlaywrightLoginService {
             const nomeTurmaClean = nomeTurma.trim().replace(/\s+/g, ' ');
             if (!isExpectedCoursePage(nomeTurma, courseName)) {
                 const errorMsg = `Playwright: Course verification failed! Page header shows "${nomeTurmaClean}" instead of "${courseName}" — the JSF session is likely still on the previous course.`;
-                console.error(errorMsg);
+                log.error('Playwright: Course verification failed.', { courseName, header: nomeTurmaClean });
                 throw new Error(errorMsg);
             } else {
-                console.log(`Playwright: Verified we are in course "${courseName}" (header: "${nomeTurmaClean}")`);
+                log.info('Playwright: Verified course.', { courseName, header: nomeTurmaClean });
             }
 
 
             // Verify we are on the course page
             try {
                 await page.waitForSelector('text=Menu Turma Virtual', { timeout: 15000 });
-                logger.info('Playwright: Verified we are on Course Page (found "Menu Turma Virtual")');
+                log.info('Playwright: Verified we are on Course Page (found "Menu Turma Virtual").');
             } catch (e) {
-                logger.warn('Playwright: Could not verify "Menu Turma Virtual". We might be on the portal or a different page.');
+                log.warn('Playwright: Could not verify "Menu Turma Virtual". We might be on the portal or a different page.');
                 const content = await page.content();
                 if (content.includes(STUDENT_HOME.portalDiscenteText)) {
                     throw new Error('Still on Portal Page after clicking course.');
@@ -632,9 +635,9 @@ export class PlaywrightLoginService {
             if (html && shouldCaptureRawArtifact(app.isPackaged, false)) {
                 const debugFullPath = path.join(app.getPath('userData'), `debug_playwright_fail_${courseId}.html`);
                 fs.writeFileSync(debugFullPath, html);
-                logger.error(`Playwright: Navigation failed. Saved HTML to ${debugFullPath}`);
+                log.error('Playwright: Navigation failed. Saved HTML.', { path: debugFullPath });
             }
-            logger.error(`Playwright: Error entering course ${courseId}:`, error);
+            log.error('Playwright: Error entering course.', { courseId, error });
             // Don't close likely
             return { success: false, error: error.message };
         }
@@ -647,7 +650,7 @@ export class PlaywrightLoginService {
         const page = this.page;
 
         try {
-            logger.info('Playwright: Navigating to Files Section (Materiais > Conteúdo)...');
+            log.info('Playwright: Navigating to Files Section (Materiais > Conteúdo)...');
 
             // 1. First, check if Materiais accordion is closed and needs opening
             const materiaisMenu = page.locator(FILES_MENU.itemMenuHeaderMateriais).first();
@@ -655,7 +658,7 @@ export class PlaywrightLoginService {
                 // Check if the accordion content is visible yet
                 const contentContainer = materiaisMenu.locator('xpath=following-sibling::div').first();
                 if (!(await contentContainer.isVisible().catch(() => false))) {
-                    logger.info('Playwright: Opening Materiais accordion...');
+                    log.info('Playwright: Opening Materiais accordion...');
                     await materiaisMenu.click();
                     await page.waitForTimeout(500); // Wait for open animation
                 }
@@ -670,32 +673,32 @@ export class PlaywrightLoginService {
 
             // 2. Use native Playwright locators with regex to bypass encoding issues
             // This natively simulates a real mouse click which ensures JSF form submission triggers correctly
-            logger.info('Playwright: Looking for Conteúdo link...');
+            log.info('Playwright: Looking for Conteúdo link...');
             const conteudoLocator = page.locator(FILES_MENU.conteudoLinkSelector).filter({ hasText: FILES_MENU.conteudoTextPattern }).first();
 
             if (await conteudoLocator.isVisible().catch(() => false)) {
-                logger.info('Playwright: Found Conteúdo link, clicking natively...');
+                log.info('Playwright: Found Conteúdo link, clicking natively...');
                 await conteudoLocator.click();
             } else {
-                logger.warn('Playwright: Could not find Conteúdo link via locators!');
+                log.warn('Playwright: Could not find Conteúdo link via locators!');
                 // Log page state for debugging
                 const allMenuText = await page.locator(FILES_MENU.conteudoLinkSelector).allTextContents();
-                logger.warn(`Playwright: Available text contents: (truncated) ${allMenuText.join(', ').substring(0, 300)}`);
+                log.warn('Playwright: Available text contents (truncated).', { body: allMenuText.join(', ').substring(0, 300) });
                 return { success: false, error: 'SIGAA selector drift: the "Conteúdo" files navigation link was not found. Open the saved portal diagnostics and update the portal selectors.' };
             }
 
             // 3. JSF uses AJAX partial updates. networkidle fires too early.
             // Wait for the file download links to appear.
-            logger.info('Playwright: Waiting for files content to render...');
+            log.info('Playwright: Waiting for files content to render...');
             try {
                 await page.waitForFunction((selector) => {
                     const links = document.querySelectorAll(selector);
                     return links.length > 0;
                 }, FILES_MENU.fileLinkReadySelector, { timeout: 8000 });
-                logger.info('Playwright: Files content detected (found jsfcljs links).');
+                log.info('Playwright: Files content detected (found jsfcljs links).');
             } catch (error) {
                 const message = error instanceof Error ? error.message : String(error);
-                logger.warn(`Playwright: Files content selector timed out: ${message}`);
+                log.warn('Playwright: Files content selector timed out.', { error: message });
                 return {
                     success: false,
                     error: `SIGAA selector drift: the files section did not render ${FILES_MENU.fileLinkReadySelector} before the timeout. The course layout may have changed. Playwright: ${message}`
@@ -704,12 +707,12 @@ export class PlaywrightLoginService {
 
             const html = await page.content();
             const title = html.match(/<title>(.*?)<\/title>/i)?.[1] || 'unknown';
-            logger.info(`Playwright: Captured files page HTML. Title: "${title}", Length: ${html.length}`);
+            log.info('Playwright: Captured files page HTML.', { title, length: html.length });
 
             return { success: true, html };
 
         } catch (error: any) {
-            logger.error('Playwright: Error navigating to Files Section:', error);
+            log.error('Playwright: Error navigating to Files Section.', { error });
             return { success: false, error: error.message };
         }
     }
@@ -723,7 +726,7 @@ export class PlaywrightLoginService {
             await page.waitForLoadState('networkidle');
 
             // Enter the course
-            console.log(`Playwright: Entering course ${courseId}...`);
+            log.info('Playwright: Entering course.', { courseId });
             const entered = await page.evaluate(({ id, sel }: { id: string; sel: { courseIdInput: string; virtualClassroomLink: string } }) => {
                 const inputs = Array.from(document.querySelectorAll(sel.courseIdInput));
                 const targetInput = inputs.find(input => (input as HTMLInputElement).value === id);
@@ -733,7 +736,6 @@ export class PlaywrightLoginService {
                     if (row) {
                         const link = row.querySelector(sel.virtualClassroomLink) as HTMLElement;
                         if (link) {
-                            console.log('Clicking course:', link.innerText);
                             link.click();
                             return { success: true };
                         }
@@ -743,7 +745,7 @@ export class PlaywrightLoginService {
             }, { id: courseId, sel: { courseIdInput: STUDENT_PORTAL.courseIdInput, virtualClassroomLink: STUDENT_PORTAL.virtualClassroomLink } });
 
             if (!entered.success) {
-                console.error('Playwright: Course not found in portal');
+                log.error('Playwright: Course not found in portal.');
                 return false;
             }
 
@@ -758,7 +760,7 @@ export class PlaywrightLoginService {
 
             return true;
         } catch (error) {
-            console.error('Playwright: Navigation error:', error);
+            log.error('Playwright: Navigation error.', { error });
             return false;
         }
     }
@@ -794,7 +796,7 @@ export class PlaywrightLoginService {
 
                 // If this is a retry due to session timeout, we must force a fresh entry to the course
                 if (attempt > 0) {
-                    console.log(`Playwright: Single download retry attempt ${attempt}. Forcing course re-entry...`);
+                    log.info(`Playwright: Single download retry attempt ${attempt}. Forcing course re-entry...`);
                     const enterResult = await this.enterCourseAndGetHTML(courseId, courseName);
                     if (!enterResult.success) {
                         await localBrowser.close();
@@ -814,7 +816,7 @@ export class PlaywrightLoginService {
                 // CRITICAL: Navigate to the files/materials section (Materiais > Conteúdo)
                 // The AVA homepage (ava/index.jsf) does NOT contain the file download links!
                 // They live in the "Conteúdo" sub-page accessible via the sidebar menu.
-                console.log('Playwright: Navigating to files section (Conteúdo)...');
+                log.info('Playwright: Navigating to files section (Conteúdo)...');
                 const filesNavSuccess = await page.evaluate(async (itemMenuSelector) => {
                     const menuItems = Array.from(document.querySelectorAll(itemMenuSelector));
                     const contentItem = menuItems.find(item => item.textContent?.trim() === 'Conteúdo');
@@ -827,7 +829,7 @@ export class PlaywrightLoginService {
 
                 if (!filesNavSuccess) {
                     // Try clicking "Materiais" first if it's an accordion
-                    console.log('Playwright: "Conteúdo" not found directly, trying "Materiais" accordion...');
+                    log.info('Playwright: "Conteúdo" not found directly, trying "Materiais" accordion...');
                     const materiaisVisible = await page.isVisible('text=Materiais');
                     if (materiaisVisible) {
                         await page.click('text=Materiais');
@@ -847,8 +849,8 @@ export class PlaywrightLoginService {
                 await page.waitForLoadState('networkidle');
                 await page.waitForTimeout(2000); // Wait for JSF to settle
 
-                console.log(`Playwright: Now on files page. Downloading file ${fileName} `);
-                console.log(`Playwright: Script present: ${!!script} `);
+                log.info('Playwright: Now on files page. Downloading file.', { fileName });
+                log.info(`Playwright: Script present: ${!!script}`);
 
                 const result = await downloadService.downloadFile(
                     page,
@@ -867,12 +869,12 @@ export class PlaywrightLoginService {
                 }
 
                 if (error.message === 'JSF_SESSION_EXPIRED' && attempt < maxRetries) {
-                    console.log(`Playwright: Session expired during single download. Restarting...`);
+                    log.info('Playwright: Session expired during single download. Restarting...');
                     attempt++;
                     continue;
                 }
 
-                console.error('Playwright: Download error:', error);
+                log.error('Playwright: Download error.', { error });
                 return { success: false, error: error.message };
             }
         }
@@ -914,7 +916,7 @@ export class PlaywrightLoginService {
 
                 // If this is a retry due to session timeout, we must force a fresh entry to the course
                 if (attempt > 0) {
-                    console.log(`Playwright: Download retry attempt ${attempt}. Forcing course re-entry...`);
+                    log.info(`Playwright: Download retry attempt ${attempt}. Forcing course re-entry...`);
                     // Perform the robust course entry login process
                     const enterResult = await this.enterCourseAndGetHTML(courseId, courseName);
                     if (!enterResult.success) {
@@ -935,7 +937,7 @@ export class PlaywrightLoginService {
                 }
 
                 // CRITICAL: Navigate to the files/materials section (Materiais > Conteúdo)
-                console.log('Playwright: Navigating to files section for batch download...');
+                log.info('Playwright: Navigating to files section for batch download...');
                 const batchFilesNavSuccess = await page.evaluate(async (itemMenuSelector) => {
                     const menuItems = Array.from(document.querySelectorAll(itemMenuSelector));
                     const contentItem = menuItems.find(item => item.textContent?.trim() === 'Conteúdo');
@@ -947,7 +949,7 @@ export class PlaywrightLoginService {
                 }, FILES_MENU.itemMenu);
 
                 if (!batchFilesNavSuccess) {
-                    console.log('Playwright: "Conteúdo" not found directly, trying "Materiais" accordion...');
+                    log.info('Playwright: "Conteúdo" not found directly, trying "Materiais" accordion...');
                     const materiaisVisible = await page.isVisible('text=Materiais');
                     if (materiaisVisible) {
                         await page.click('text=Materiais');
@@ -985,12 +987,12 @@ export class PlaywrightLoginService {
                 }
 
                 if (error.message === 'JSF_SESSION_EXPIRED' && attempt < maxRetries) {
-                    console.log(`Playwright: Session expired during download batch. Restarting batch...`);
+                    log.info('Playwright: Session expired during download batch. Restarting batch...');
                     attempt++;
                     continue;
                 }
 
-                console.error('Playwright: Download all error:', error);
+                log.error('Playwright: Download all error.', { error });
                 return { downloaded: 0, skipped: 0, failed: files.length, results: [] };
             }
         }
@@ -999,10 +1001,10 @@ export class PlaywrightLoginService {
 
     async getNewsDetail(courseId: string, courseName: string, newsId: string): Promise<{ success: boolean; news?: NewsDetail; error?: string }> {
         try {
-            console.log(`Playwright: Fetching news ${newsId} for course ${courseName}...`);
+            log.info('Playwright: Fetching news for course.', { newsId, courseName });
 
             if (!this.browser || !this.context || !this.page || this.page.isClosed()) {
-                console.log('Playwright: Browser not active, relaunching...');
+                log.info('Playwright: Browser not active, relaunching...');
                 await this.getCourses();
             }
 
@@ -1014,7 +1016,7 @@ export class PlaywrightLoginService {
 
             // 1. Navigate to course AVA page if not already there
             if (!page.url().includes('ava/index.jsf')) {
-                console.log('Playwright: Navigating to AVA...');
+                log.info('Playwright: Navigating to AVA...');
                 // We need to enter the course first
                 const enterResult = await this.enterCourseAndGetHTML(courseId, courseName);
                 if (!enterResult.success) {
@@ -1025,7 +1027,7 @@ export class PlaywrightLoginService {
             // 2. Find and click the news link
             // News links are inside forms that contain a hidden input with name="id" and value=newsId
             // Structure: <form><input name="id" value="newsId"><a href="#" onclick="...">(Visualizar)</a></form>
-            console.log(`Playwright: Looking for news link with ID ${newsId}...`);
+            log.info(`Playwright: Looking for news link with ID ${newsId}...`);
 
             let found = false;
 
@@ -1034,10 +1036,10 @@ export class PlaywrightLoginService {
             const newsForm = await page.$(formSelector);
 
             if (newsForm) {
-                console.log(`Playwright: Found form containing news ID ${newsId}`);
+                log.info(`Playwright: Found form containing news ID ${newsId}.`);
                 const linkInForm = await newsForm.$('a');
                 if (linkInForm) {
-                    console.log(`Playwright: Clicking link inside form...`);
+                    log.info('Playwright: Clicking link inside form...');
                     await linkInForm.click();
                     found = true;
                 }
@@ -1045,7 +1047,7 @@ export class PlaywrightLoginService {
 
             // Strategy 2: Fallback - look in page.evaluate for more complex DOM traversal
             if (!found) {
-                console.log(`Playwright: Form selector failed, using page.evaluate...`);
+                log.info('Playwright: Form selector failed, using page.evaluate...');
                 found = await page.evaluate(({ id, idInputSelector }) => {
                     const inputs = document.querySelectorAll(idInputSelector);
                     for (const input of inputs) {
@@ -1068,13 +1070,13 @@ export class PlaywrightLoginService {
             // If the element wasn't found, the JSF session might have expired in the background 
             // while keeping the 'ava/index.jsf' URL. We must force a refresh/re-entry.
             if (!found) {
-                console.log(`Playwright: News ID ${newsId} not found. Session may have expired. Forcing course re-entry...`);
+                log.info(`Playwright: News ID ${newsId} not found. Session may have expired. Forcing course re-entry...`);
                 await this.enterCourseAndGetHTML(courseId, courseName);
-                
+
                 // Try finding it one more time
                 const retryNewsForm = await page.$(formSelector);
                 if (retryNewsForm) {
-                    console.log(`Playwright: Found form after forcing course refresh!`);
+                    log.info('Playwright: Found form after forcing course refresh!');
                     const linkInForm = await retryNewsForm.$('a');
                     if (linkInForm) {
                         await linkInForm.click();
@@ -1089,12 +1091,12 @@ export class PlaywrightLoginService {
                     const safeId = String(newsId).replace(/[^a-zA-Z0-9_-]/g, '_');
                     const debugPath = path.join(app.getPath('userData'), `debug_playwright_news_fail_${safeId}.html`);
                     fs.writeFileSync(debugPath, html);
-                    console.log(`Playwright: Saved debug HTML to ${debugPath}`);
+                    log.info('Playwright: Saved debug HTML.', { path: debugPath });
                 }
                 return { success: false, error: `News link with ID ${newsId} not found` };
             }
 
-            console.log(`Playwright: Successfully clicked news link for ${newsId}`);
+            log.info(`Playwright: Successfully clicked news link for ${newsId}.`);
 
             // 3. Wait for page to load
             await page.waitForLoadState('networkidle');
@@ -1106,7 +1108,7 @@ export class PlaywrightLoginService {
                 const safeId = String(newsId).replace(/[^a-zA-Z0-9_-]/g, '_');
                 const debugNewsPath = path.join(app.getPath('userData'), `debug_news_detail_${safeId}.html`);
                 fs.writeFileSync(debugNewsPath, newsDetailHtml);
-                console.log(`Playwright: Saved news detail page to ${debugNewsPath}`);
+                log.info('Playwright: Saved news detail page.', { path: debugNewsPath });
             }
 
             // 4. Parse the news content
@@ -1212,7 +1214,7 @@ export class PlaywrightLoginService {
                 };
             });
 
-            console.log(`Playwright: Parsed news - Title: "${newsData.title}", ContentLength: ${newsData.content.length}`);
+            log.info('Playwright: Parsed news.', { title: newsData.title, contentLength: newsData.content.length });
 
             // 5. Navigate back to AVA if needed (for subsequent operations)
             // Not strictly necessary but keeps state clean
@@ -1223,7 +1225,7 @@ export class PlaywrightLoginService {
                     const html = await page.content();
                     const debugPath = path.join(app.getPath('userData'), `debug_playwright_news_${newsId}.html`);
                     fs.writeFileSync(debugPath, html);
-                    console.log(`Playwright: Saved debug HTML to ${debugPath}`);
+                    log.info('Playwright: Saved debug HTML.', { path: debugPath });
                 }
                 return { success: false, error: 'Could not parse news content from page' };
             }
@@ -1231,7 +1233,7 @@ export class PlaywrightLoginService {
             return { success: true, news: newsData };
 
         } catch (error: any) {
-            console.error('Playwright: Error fetching news:', error);
+            log.error('Playwright: Error fetching news.', { error });
             return { success: false, error: error.message };
         }
     }
@@ -1251,13 +1253,13 @@ export class PlaywrightLoginService {
 
     async close() {
         if (this.browser) {
-            console.log('Playwright: Closing browser...');
+            log.info('Playwright: Closing browser...');
             try {
                 await this.browser.close();
             } catch (err) {
                 // Teardown only: the browser may already be dead; the goal
                 // (releasing the handles) is achieved either way.
-                console.warn('Playwright: browser.close() failed during teardown:', err);
+                log.warn('Playwright: browser.close() failed during teardown.', { error: err });
             }
             this.browser = null;
         }
