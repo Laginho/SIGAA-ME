@@ -54,19 +54,22 @@ test.describe.serial('DATA-002: clear-all no app', () => {
     const planted = () => ({
         cache: path.join(userData, 'cache.json'),
         settings: path.join(userData, 'settings.json'),
-        oldLog: path.join(userData, 'logs', 'app_old.log'),
+        log: path.join(userData, 'logs', 'app.log'),
+        rotatedLog: path.join(userData, 'logs', 'app.1.log'),
         debugLogin: path.join(userData, 'debug_login_page.html'),
         debugPortal: path.join(userData, 'debug_portal_fail_540316.html'),
         // `sigaa-me.log` saiu em OBS-001, `scraper.log` em OBS-004, junto com
         // os loggers antigos; sobra do legado em disco é limpeza de boot, em
-        // OBS-003.
+        // OBS-003. `app.log`/`app.1.log` são o que o LoggerService (OBS-001)
+        // escreve de verdade (OBS-005).
     });
 
     function plantUserData() {
         const p = planted();
-        fs.mkdirSync(path.dirname(p.oldLog), { recursive: true });
+        fs.mkdirSync(path.dirname(p.log), { recursive: true });
         fs.writeFileSync(p.cache, JSON.stringify({ schemaVersion: 2, accounts: { [ACCOUNT.id]: { courses: { c1: { files: ['1'], news: [] } }, updatedAt: 1 } } }));
-        fs.writeFileSync(p.oldLog, `${MARKER}\n`);
+        fs.writeFileSync(p.log, `${MARKER}\n`);
+        fs.writeFileSync(p.rotatedLog, `${MARKER}\n`);
         fs.writeFileSync(p.debugLogin, '<html></html>');
         fs.writeFileSync(p.debugPortal, '<html></html>');
     }
@@ -122,7 +125,8 @@ test.describe.serial('DATA-002: clear-all no app', () => {
         await launched.page.waitForTimeout(500);
         const p = planted();
         expect(fs.existsSync(p.cache)).toBe(true);
-        expect(fs.existsSync(p.oldLog)).toBe(true);
+        expect(fs.existsSync(p.log)).toBe(true);
+        expect(fs.existsSync(p.rotatedLog)).toBe(true);
         expect(fs.existsSync(p.debugLogin)).toBe(true);
         expect(fs.existsSync(p.settings)).toBe(true);
         await expect(launched.page.locator('#clearDataBtn')).toBeVisible();
@@ -137,7 +141,7 @@ test.describe.serial('DATA-002: clear-all no app', () => {
         await expect(launched.page.locator('h1.login-title')).toBeVisible({ timeout: 15_000 });
 
         const p = planted();
-        for (const file of [p.cache, p.settings, p.oldLog, p.debugLogin, p.debugPortal]) {
+        for (const file of [p.cache, p.settings, p.log, p.rotatedLog, p.debugLogin, p.debugPortal]) {
             expect(fs.existsSync(file), `${path.relative(userData, file)} ainda existe`).toBe(false);
         }
         expect(fs.existsSync(path.join(userData, 'credentials.json'))).toBe(false);
