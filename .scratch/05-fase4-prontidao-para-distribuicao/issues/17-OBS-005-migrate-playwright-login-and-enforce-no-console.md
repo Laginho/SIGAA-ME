@@ -1,6 +1,6 @@
 # OBS-005 — Migrate playwright-login and enforce `no-console` in electron/**
-Status: open
-Stage: to-merge
+Status: resolved
+Stage: done
 Priority: P2
 Blocked by: OBS-004 (fechado)
 
@@ -189,3 +189,40 @@ pôr `tests/` sob type-check — escopo próprio, não deste ticket.
     tsc --noEmit   limpo
     eslint .       0 erros, 62 warnings (pré-existentes, no-explicit-any)
     vitest run     601 passed, 4 skipped, 0 failed
+
+#### Resolution (2026-09-09)
+
+**Decisão.** Fechado com os quatro critérios aceitos, dois achados corrigidos na
+própria etapa 3 e a ressalva do critério 1 registrada acima. Nenhuma reabertura:
+os dois achados couberam nos Primary files e não pediram teste novo.
+
+**Arquivos.**
+
+- `electron/services/logger.service.ts` — `ScopedLogger`/`LoggerService` de
+  `...args: unknown[]` para `meta?: LogMeta`; `enqueue`/`formatLine`/`formatArg`
+  acompanham.
+- `electron/services/playwright-login.service.ts` — 85 `console.*` + 24 chamadas
+  ao logger antigo → 104 `log.*` em `logger.scope('PlaywrightLogin')`. Zero
+  `console.*` restantes. Chaves de meta corrigidas na revisão (`header`,
+  `pageTitle` → `title`).
+- `eslint.config.js` — a lista por arquivo de `OBS-001`/`OBS-004` saiu; entrou um
+  bloco só, `no-console: error` em `electron/**/*.ts` com
+  `ignores: ['electron/services/logger.service.ts']`.
+- `tests/` — mock de `logger` em `playwright-lifecycle` ganhou `scope()`;
+  `clear-all.spec.ts` planta `app.log`/`app.1.log`; asserção de
+  `portal-selector-resilience.test.ts:513` ajustada à forma `(mensagem, meta)`;
+  teste sem asserção removido de `logger-redaction.test.ts`.
+
+**Prova red-green.** Registrada pela etapa 2 e conferida: com o
+`eslint.config.js` do commit de testes e as duas mudanças de produção em
+`git stash`, `npx eslint electron/services/playwright-login.service.ts` deu
+**170 erros** (85 `console.*` × 2 regras); depois do código, **0**. O critério 1
+não tem prova executável neste repositório — ver a ressalva.
+
+**Gate (depois das correções da revisão).**
+
+    tsc --noEmit   limpo
+    eslint .       0 erros, 62 warnings (pré-existentes, no-explicit-any)
+    vitest run     601 passed | 4 skipped (605), 0 failed
+
+Critério 4 não roda no loop: `clear-all.spec.ts` é Playwright, passe pré-release.
