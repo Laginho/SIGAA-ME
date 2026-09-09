@@ -184,3 +184,24 @@ diagnostics: Pick<DiagnosticsService, 'clear'>;
   `removeLegacyLogs` o erro é tratado por decisão (seguir sem o artefato),
   não engolido; o comentário no código diz isso.
 - `record()` e a redação por construção do `PORTAL-003` intocados.
+
+## Correção da releitura, vinda da revisão do `OBS-004` (2026-09-09)
+
+O item 2 da "Releitura (2026-09-08)" está **errado** nos dois pontos, e a lição
+do `CLAUDE.md` ("suba a cadeia, não confie no documento") vale contra ele:
+
+- `DiagnosticsService.clear()` **tinha** chamador. Em `master` (`d1d2f4e`),
+  `sigaa.service.ts` fazia `clearDiagnostics() { diagnosticsService.clear();
+  return this.httpScraper.resetLog(); }` — não "só reseta `scraper.log`".
+- `diagnostics/` **era** apagado pelo clear-all, por esse caminho, e havia teste
+  provando: `tests/unit/sigaa-service.test.ts`, `clearDiagnostics apaga os
+  diagnósticos estruturais (PORTAL-003)`.
+
+O `OBS-004` removeu `clearDiagnostics` como o ticket dele mandava e apagou esse
+teste junto. Consequência: **de agora até este ticket, "limpar tudo" deixa
+`userData/diagnostics/` em disco** (até 20 JSONs estruturais). Não é regressão
+de escopo do `OBS-004` — é este ticket que religa o `clear()` —, mas é
+regressão real na janela entre os dois, e a cobertura que a provava não existe
+mais. O critério "Clear-all apaga `diagnostics/`" vira reparo, não melhoria, e
+o teste em `clear-all-data.test.ts` precisa cobrir `deps.diagnostics.clear()`
+com a mesma força do que foi apagado.

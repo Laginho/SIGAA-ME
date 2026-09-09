@@ -1,5 +1,5 @@
 # OBS-004 — Migrate the scraping pipeline to the logger
-Status: claimed
+Status: open
 Stage: to-implement
 Priority: P2
 Blocked by: OBS-001
@@ -120,3 +120,81 @@ npm run quality
 - `OBS-005` — `playwright-login` e o contract.
 - `OBS-003` — dumps de HTML cru e limpeza de legado.
 - `OBS-002` — `[op:<id>]`.
+
+## Revisão da etapa 3 (Opus, 2026-09-09) — reaberta
+
+Base `master` (`d1d2f4e`), HEAD revisado `3995ee9`, worktree
+`.claude/worktrees/obs-004-scraping-logger`. Nenhum código de produção ou teste
+alterado nesta revisão. Sem PR: um achado bloqueante.
+
+Gate no Windows: `npm run quality` verde — 0 erros de lint, 62 warnings
+`no-explicit-any` (caiu de 77), `47 arquivos | 601 passed | 4 skipped (605)`.
+
+Prova de vermelho: `git checkout master -- electron/services electron/ipc` e
+`npx vitest run tests/integration/logging-boundary.test.ts` → **6 failed (6)**,
+cada um na asserção positiva (`expected '' to contain '[HttpScraper]'`,
+`'[Download]'`, `'[BackgroundSync]'`). Sem a migração o `logs/app.log` fica
+vazio. Vermelho pelo motivo certo, verde com a correção.
+
+Separação de commits respeitada: `0be0c17` só `tests/`, `3995ee9` só
+`electron/` + `eslint.config.js`.
+
+### Confirmado
+
+- Os quatro serviços sem nenhum `console.*`; os quatro na zona `no-console:
+  error` do `eslint.config.js` (AC3).
+- Greps do "Para o revisor": zero interpolação de `.name`/`.title`/`fileName`/
+  `courseName`/`basePath`/`filePath`/`Path` em chamada de log nos quatro
+  arquivos; zero erro posicional ou interpolado — sempre `{ error }`; zero
+  vararg novo. O único posicional que sobra é
+  `playwright-login.service.ts:637`, escopo do `OBS-005`.
+- `AxiosError` reduzido a `{ name, message, code }` por `sanitizeError`: o
+  `config.headers.Cookie` não alcança o disco, provado pelo cenário de falha
+  de rede.
+- `scraper.log`, `resetLog()` e `clearDiagnostics()` não existem mais; nenhum
+  caminho de log é tocado pelo handler por conta própria (AC2).
+- Nenhum `try/catch` novo que só loga (AC4). Os que só logam
+  (`download.service.ts:83`) são pré-existentes e não foram criados aqui.
+- Cada cenário do AC1 presente, com a asserção positiva que um logger mudo
+  reprovaria, e o `expect(getNewsDetail).toHaveBeenCalledTimes(1)` do ciclo com
+  notícia.
+
+### Spec
+
+- ❌ **"What to build", último item — a corrida do `clear()` não foi
+  corrigida.** `git diff master...HEAD -- electron/services/logger.service.ts`
+  é **vazio**. `clear()` continua fazendo `await this.flush()` e depois zerando
+  `this.stream` **fora** da `chain`: um `enqueue` nessa janela encadeia em uma
+  `chain` já resolvida, `ensureInit()` retorna de imediato porque `initialized`
+  ainda é `true`, e `this.stream!.write` estoura em `TypeError` → a linha se
+  perde e o `console.error` de "sink desligado" dispara. Exatamente o bug que
+  o ticket herdou da revisão do `OBS-001` e mandou fechar aqui, com o
+  encadeamento `const p = this.chain.then(doClear); this.chain = p.catch(() => {}); return p;`
+  e **teste que enfileira um write durante o `clear()`**. Não há código nem
+  teste. O `await logger.clear()` do `beforeEach` de
+  `logging-boundary.test.ts` é reset sequencial entre testes, não a corrida.
+
+  Contexto para quem retomar: o handler `clear-all-data` continua drenando
+  antes de limpar (`operations.cancel('background')` aguarda
+  `runningOfKind.done`), então o caminho do clear-all em si segue seguro. O que
+  a migração abriu foi todo o resto do pipeline logando no mesmo singleton —
+  qualquer operação interativa concorrente com o clear-all agora cai na janela.
+
+- ❌ **`logging-boundary.test.ts` sem a asserção de contrato no `beforeEach`.**
+  O ticket pede, em "Testes que a etapa 2 escreve": "Um `beforeEach` (não
+  `beforeAll`) confere que o singleton expõe `scope`, pelo motivo registrado em
+  `OBS-001`" (`OBS-001`, releitura: "Um `beforeEach` em cada arquivo novo faz
+  asserção sobre a existência dos membros do contrato... um `beforeAll` que
+  falha marca a suíte inteira"). Não existe nenhuma asserção sobre
+  `logger.scope` no arquivo.
+
+### Standards
+
+- **Sobra morta.** `tests/integration/background-sync-serialization.test.ts:45`
+  e `:89` ainda declaram e criam `resetLog` no `HttpFake`, método que não existe
+  mais em `HttpScraperService`. Inofensivo (é fake), mas é sobra da remoção.
+- **Nit, regra de call site.** `http-scraper.service.ts:873` interpola
+  `contentType` na mensagem; a regra do `OBS-001` (decisão 6, repetida no
+  "What to build" daqui) admite na mensagem só id, contagem, código de erro e
+  duração. Não é conteúdo do SIGAA nem dado sensível — só desvio literal da
+  regra.
