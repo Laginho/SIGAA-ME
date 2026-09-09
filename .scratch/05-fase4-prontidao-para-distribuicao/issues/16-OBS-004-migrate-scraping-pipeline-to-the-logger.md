@@ -45,6 +45,17 @@ não os repete.
   código de erro e duração podem ir na mensagem; nome de disciplina, arquivo
   ou notícia, caminho, usuário, HTML e script JSF vão em `meta` ou não vão.
 - `eslint.config.js`: os quatro arquivos entram na zona `no-console: error`.
+- **Herdado da revisão do `OBS-001` (2026-09-09):** um write enfileirado
+  *durante* `logger.clear()` se perde e dispara o `console.error` de "sink
+  desligado" — `clear()` zera `this.stream` enquanto `initialized` segue
+  `true`, e o `writeLine` pendente cai num `TypeError`. Reproduzido por sonda:
+  linha "durante" não chega ao disco, a seguinte chega, o sink é religado pelo
+  `finally`. Hoje não dispara porque o handler `clear-all-data` aguarda cada
+  passo e nada loga em paralelo; quando o pipeline passar a logar pelo mesmo
+  objeto, corrigir encadeando o `clear()` na mesma `chain` dos writes
+  (`const p = this.chain.then(doClear); this.chain = p.catch(() => {}); return p;`)
+  em vez de só aguardar o `flush()`, com teste que enfileira um write durante
+  o `clear()` e exige a linha no arquivo novo.
 
 #### Acceptance criteria
 
