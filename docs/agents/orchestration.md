@@ -27,6 +27,13 @@ diz:
   ordem entre eles. Vale também para o refatiamento: ticket devolvido pela
   etapa 2 por exigir mais de um seam volta à etapa 1, que o requebra e registra
   os novos no PLANO do mesmo jeito. Fora disso, ninguém edita o PLANO.
+- Achado que pertence a **outro** ticket entra como bloco ao fim do ticket-alvo,
+  sob `## Comments` — nunca no corpo. Só a etapa 1 move um Comment para o corpo,
+  e ao mover acrescenta o arquivo aos **Primary files** e um critério de aceite
+  numerado. Comment não dobrado é nota, não requisito. Isso existe porque a
+  revisão do `OBS-001` escreveu o conserto da corrida do `clear()` direto no
+  "What to build" do `OBS-004` (`bc44d15`), sem arquivo e sem critério: a etapa 2
+  entregou gate verde e todos os critérios atendidos, sem o conserto.
 - Toda correção de bug precisa de um teste que falharia sem ela (`CLAUDE.md`,
   "Antes de commitar", item 5). Teste chama código de produção, não uma cópia
   (ver `tests/fixtures/README.md` e `QA-005`).
