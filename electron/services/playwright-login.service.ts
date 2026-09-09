@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { app } from 'electron';
 import { logger } from './logger.service';
+import { buildStructuralDiagnostic, diagnosticsService, shouldCaptureRawArtifact } from './diagnostics.service';
 import type { NewsDetail } from '../../shared/domain';
 import type { AppErrorCode } from '../../shared/errors';
 import { COURSE_HOME, FILES_MENU, LOGIN, NEWS, STUDENT_HOME, STUDENT_PORTAL, newsFormSelector } from '../sigaa/selectors';
@@ -12,7 +13,8 @@ import {
     describeMissingCourseListSelectors,
     isLoginDocument,
     validateCourseListDocument,
-    validateLoginStart
+    validateLoginStart,
+    PORTAL_ADAPTER_VERSION
 } from '../sigaa/portal-adapter';
 
 /**
@@ -60,7 +62,25 @@ export class PlaywrightLoginService {
     private storedUsername: string | null = null;
     private storedPassword: string | null = null;
 
+    /**
+     * Best-effort (PORTAL-003): um diagnóstico que falha não pode alterar o
+     * erro que ele descreve. Sem a guarda, um EPERM aqui cai no `catch`
+     * genérico do método chamador, que devolve o erro sem `errorCode` — e o
+     * `SELECTOR_DRIFT` que o diagnóstico existe para explicar desaparece.
+     */
+    private recordDiagnostic(html: string, url: string, selectorCounts: Record<string, number>): void {
+        try {
+            diagnosticsService.record(buildStructuralDiagnostic(html, url, PORTAL_ADAPTER_VERSION, selectorCounts));
+        } catch (error) {
+            logger.error(`Playwright: failed to record structural diagnostic: ${String(error)}`);
+        }
+    }
+
     async login(username: string, password: string): Promise<{ success: boolean; cookies?: any[]; userName?: string; photoUrl?: string; error?: string; errorCode?: AppErrorCode }> {
+        // Declarado fora do try (PORTAL-003): o catch precisa da página para
+        // capturar HTML/URL best-effort quando a exceção é SELECTOR_DRIFT, e
+        // uma `const` dentro do try não alcança o catch.
+        let page: Page | null = null;
         try {
             console.log('Playwright: Launching browser...');
 
@@ -76,7 +96,7 @@ export class PlaywrightLoginService {
             const context = await this.browser.newContext({
                 userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
             });
-            const page = await context.newPage();
+            page = await context.newPage();
 
             console.log('Playwright: Navigating to login page...');
             await page.goto(LOGIN.url);
@@ -86,6 +106,9 @@ export class PlaywrightLoginService {
             const startHtml = await page.content();
             const startCheck = validateLoginStart(startHtml);
             if (startCheck) {
+                if (startCheck.code === 'SELECTOR_DRIFT') {
+                    this.recordDiagnostic(startHtml, page.url(), {});
+                }
                 await this.close();
                 return { success: false, error: startCheck.message, errorCode: startCheck.code };
             }
@@ -118,6 +141,7 @@ export class PlaywrightLoginService {
                 return { success: false, error: errorMessage || 'Login failed - still on login page', errorCode: 'SESSION_EXPIRED' };
             }
             if (endState === 'unrecognized') {
+                this.recordDiagnostic(endHtml, currentUrl, {});
                 await this.close();
                 return {
                     success: false,
@@ -173,8 +197,21 @@ export class PlaywrightLoginService {
 
         } catch (error: any) {
             console.error('Playwright: Error during login:', error);
-            await this.close();
             const classified = classifyLoginException(error);
+            // Sessão vencida (SESSION_EXPIRED) e portal fora do ar
+            // (PORTAL_UNAVAILABLE) não são mudança de layout — só drift real
+            // grava. A própria captura de HTML/URL pode lançar (página já
+            // fechada); isso não pode escapar do login() nem apagar o
+            // errorCode classificado.
+            if (classified.errorCode === 'SELECTOR_DRIFT' && page) {
+                try {
+                    const html = await page.content();
+                    this.recordDiagnostic(html, page.url(), {});
+                } catch (captureError) {
+                    logger.error(`Playwright: failed to capture diagnostic HTML after login exception: ${String(captureError)}`);
+                }
+            }
+            await this.close();
             return { success: false, error: classified.message, errorCode: classified.errorCode };
         }
     }
@@ -354,6 +391,11 @@ export class PlaywrightLoginService {
 
             const { courses, selectorDiagnostics } = courseExtraction;
             if (selectorDiagnostics.courseIdInputs === 0 || selectorDiagnostics.virtualClassroomLinks === 0) {
+                this.recordDiagnostic(
+                    await page.content().catch(() => ''),
+                    page.url(),
+                    selectorDiagnostics
+                );
                 await this.close();
                 return {
                     success: false,
@@ -462,9 +504,11 @@ export class PlaywrightLoginService {
             // paginaInicial.do. Sem esta checagem, sessão expirada saía daqui como
             // "Course link not found in portal", que `classifyMessage` lê como
             // NOT_FOUND, e ninguém tenta relogar.
-            const portalCheck = validateCourseListDocument(await page.content());
+            const portalHtml = await page.content();
+            const portalCheck = validateCourseListDocument(portalHtml);
             if (portalCheck) {
                 logger.warn(`Playwright: Portal document rejected before course entry: ${portalCheck.code}`);
+                if (portalCheck.code === 'SELECTOR_DRIFT') this.recordDiagnostic(portalHtml, page.url(), {});
                 if (portalCheck.code === 'SESSION_EXPIRED') this.page = null;
                 return { success: false, error: portalCheck.message, errorCode: portalCheck.code };
             }
@@ -583,7 +627,9 @@ export class PlaywrightLoginService {
 
         } catch (error: any) {
             const html = this.page ? await this.page.content().catch(() => '') : '';
-            if (html && !app.isPackaged) {
+            // PORTAL-003: sem fonte de consentimento ainda, então `false` — comportamento
+            // idêntico a antes (`!app.isPackaged`) até uma configuração ligar o consentimento.
+            if (html && shouldCaptureRawArtifact(app.isPackaged, false)) {
                 const debugFullPath = path.join(app.getPath('userData'), `debug_playwright_fail_${courseId}.html`);
                 fs.writeFileSync(debugFullPath, html);
                 logger.error(`Playwright: Navigation failed. Saved HTML to ${debugFullPath}`);

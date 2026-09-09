@@ -1,6 +1,7 @@
 import { HttpScraperService, type ParsedFile, type ParsedNews } from './http-scraper.service';
 import { PlaywrightLoginService, type ParsedCourse } from './playwright-login.service';
 import { logger } from './logger.service';
+import { diagnosticsService } from './diagnostics.service';
 import { deriveAccountId, getActiveAccount, setActiveAccount } from './account-context.service';
 import { SessionOperationCoordinator } from './session-operation-coordinator.service';
 import * as fs from 'fs';
@@ -118,8 +119,9 @@ export class SigaaService {
         });
     }
 
-    /** Zera diagnósticos em disco (DATA-002), sem tocar na sessão. */
+    /** Zera diagnósticos em disco (DATA-002, PORTAL-003), sem tocar na sessão. */
     clearDiagnostics(): Promise<void> {
+        diagnosticsService.clear();
         return this.httpScraper.resetLog();
     }
 
