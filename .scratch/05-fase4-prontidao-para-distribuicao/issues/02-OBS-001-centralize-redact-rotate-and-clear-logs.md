@@ -1,5 +1,5 @@
 # OBS-001 — Centralize, redact, rotate, and clear logs
-Status: open
+Status: resolved
 Priority: P2
 Blocked by: nenhum (DL-002 fechada em 2026-09-07)
 Tracker status at migration: `NOT STARTED`
@@ -469,3 +469,83 @@ serviço passa a usá-lo.
   migrate (`OBS-004`, `OBS-005`) → contract (dentro de `OBS-005`), com a
   assinatura de transição da decisão 15. `OBS-003` passa a depender de
   `OBS-005`; `OBS-002`, de `OBS-004`.
+
+---
+
+#### Resolution (2026-09-09)
+
+Revisão de etapa 3 (Opus) dos commits `d60d3a1` (testes, vermelhos) e `e08dd3d`
+(código). Os oito critérios detalhados foram medidos; cinco achados foram
+corrigidos nesta revisão, então o PR espera o Bruno.
+
+**O que estava certo.** Redação (a) e (b), com o `AxiosError` real provando que
+`config.headers.Cookie` não chega ao disco; `sanitizeMeta` reconstrói o objeto
+até profundidade 4, o que também torna meta circular inofensiva (`JSON.stringify`
+não vê ciclo — verificado por sonda: `logger.error` com objeto cíclico não
+lança); caminho preguiçoso por injeção; eco só fora de produção; rotação com teto
+de `maxFiles × maxFileBytes`; sink impossível com um único `console.error` e
+writes que não lançam; `before-quit` aguardando `logger.flush()`;
+`no-console: error` na zona de fronteira mais `persistence` e `cache`, com o
+seletor `MemberExpression[object.name="console"]` pegando também
+`console.log = ...`. `monkeypatch`, `logsDir`, `resetAppLog`, `sigaa-me.log` e
+`getLogPath` não existem mais. Grep de interpolação de conteúdo em chamada de
+log: zero. `http-scraper`, `sigaa`, `download`, `background-sync` e
+`playwright-login` intocados.
+
+**A-1 — linha cortada em 4 KiB engolia a quebra de linha.** `formatLine` montava
+a linha **com** o `\n` e passava tudo por `redact()`; acima de `MAX_LINE_CHARS` o
+`slice` cortava justamente o `\n` e o registro seguinte colava no mesmo registro
+físico — o oposto do critério 2 ("linha ≤ 4 KiB"). Corrigido movendo o `\n` para
+depois do `redact()`. Teste novo: `linha cortada em 4 KiB continua uma linha só`.
+
+**A-2 — `clear()` resolvia sem apagar nada se o processo ainda não tivesse
+escrito.** A exclusão estava sob `if (this.initialized)`, e `this.dir` só existe
+depois do primeiro write. Com o sink desligado por falha no boot, ou num
+`clear()` seguido de outro, o clear-all devolvia `ok()` com o log do boot
+anterior intacto — o padrão de sucesso mentiroso que o `DATA-002` fechou.
+Corrigido recalculando o caminho quando `initialized` é falso. Teste novo:
+`clear() apaga o log do boot anterior mesmo antes do primeiro write`.
+
+**A-3 — `tests/e2e/clear-all.spec.ts` plantava `sigaa-me.log` e exigia a
+exclusão dele.** O arquivo deixou de existir neste ticket e ninguém mais o apaga,
+então o spec passou a falhar — invisível no gate, que não roda Playwright. A
+asserção saiu (sobra de legado em disco é limpeza de boot, `OBS-003`); o
+`scraper.log` continua coberto. **Não reproduzido por execução:** E2E é manual,
+antes de release; a correção é por leitura.
+
+**A-4 — critério 3 tinha uma cláusula sem teste.** "Apaga inclusive o que ainda
+estava no buffer" era o caso migrado do `log-reset.test.ts`, mas o teste de
+`clear()` dava `flush()` antes. O comportamento já estava correto; o caso entrou
+como teste (`clear() apaga o que ainda estava no buffer, sem flush explícito`)
+para que remover o `await this.flush()` do `clear()` fique vermelho.
+
+**A-5 — vararg posicional em chamada nova.** A checklist do revisor pede `meta`
+ou nada nas chamadas deste ticket; 14 delas passavam o erro posicionalmente
+(`log.error('Failed to load cache', error)`). Sem efeito na redação, mas a
+catraca de tipos do `OBS-005` teria de voltar a estes arquivos. Convertidas para
+`{ error }` / `{ err }`; duas asserções de `updater-consent.test.ts` acompanham.
+
+**Não corrigido, sem ticket próprio:** `HttpScraperService.resetLog` perdeu o
+teste de ordenação de I/O do `DATA-002` quando o `log-reset.test.ts` foi apagado,
+e `resetLog` segue vivo até o `OBS-004` — que o apaga junto com o `scraper.log`.
+Reescrever esse teste para morrer no ticket seguinte não se paga. Menor: com
+`maxFiles: 1` a rotação nunca renomeia e `app.log` cresceria sem teto; nenhum
+call site usa esse valor.
+
+**Arquivos desta revisão:** `electron/services/logger.service.ts`,
+`electron/main.ts`, `electron/ipc/register-handlers.ts`,
+`electron/services/cache.service.ts`, `electron/services/persistence.service.ts`,
+`tests/unit/logger-redaction.test.ts`, `tests/unit/updater-consent.test.ts`,
+`tests/integration/clear-all-data.test.ts`, `tests/e2e/clear-all.spec.ts`.
+
+**Prova vermelho-verde reproduzida na revisão.** `git checkout master -- electron
+eslint.config.js` → `logger-redaction.test.ts` + `clear-all-data.test.ts` dão
+**25 failed | 10 passed (35)**; fontes restauradas → verde. Para A-1/A-2:
+`git stash push -- electron/services/logger.service.ts` →
+**2 failed | 23 passed (25)**, exatamente os dois testes novos; `stash pop` →
+25 passed.
+
+**Gate reproduzido na revisão.** `npm run quality`: `tsc --noEmit` limpo;
+`eslint .` **0 erros, 63 warnings** legado (63 também antes das correções,
+nenhum novo); `vitest run` 46 arquivos, **597 passed | 4 skipped (601)** — eram
+594 passed | 4 skipped (598) no `e08dd3d`.

@@ -68,7 +68,9 @@ vi.mock('child_process', () => ({ execSync: vi.fn() }));
 vi.mock('electron-updater', () => ({
     autoUpdater: { on: vi.fn(), checkForUpdates: vi.fn(async () => {}) },
 }));
-vi.mock('../../electron/services/logger.service', () => ({ logger: { clear: vi.fn() } }));
+vi.mock('../../electron/services/logger.service', () => ({
+    logger: { clear: vi.fn(), scope: vi.fn(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() })) },
+}));
 vi.mock('../../electron/services/persistence.service', () => ({
     persistenceService: { getSettings: vi.fn(() => ({ runInBackground: false })) },
 }));

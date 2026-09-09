@@ -54,6 +54,9 @@ vi.mock('electron', () => ({
     app: electronMock.app,
     dialog: electronMock.dialog,
 }));
+vi.mock('../../electron/services/logger.service', () => ({
+    logger: { scope: vi.fn(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() })) },
+}));
 
 // ── 1. Validadores puros ─────────────────────────────────────
 describe('validadores puros do IPC', () => {

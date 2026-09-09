@@ -22,6 +22,21 @@ const harness = vi.hoisted(() => {
   return { handlers, autoUpdater, dialog };
 });
 
+const loggerHarness = vi.hoisted(() => {
+  const scopes = new Map<string, { info: any; warn: any; error: any }>();
+  const makeScope = () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() });
+  return {
+    scopes,
+    logger: {
+      scope: vi.fn((name: string) => {
+        if (!scopes.has(name)) scopes.set(name, makeScope());
+        return scopes.get(name)!;
+      }),
+    },
+  };
+});
+vi.mock('../../electron/services/logger.service', () => ({ logger: loggerHarness.logger }));
+
 vi.mock('electron', () => ({
   app: {
     getPath: vi.fn(() => os.tmpdir()),
@@ -118,10 +133,10 @@ describe('updater consent', () => {
   });
 
   it('does not produce unhandled rejection when showMessageBox rejects', async () => {
-    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     setupAutoUpdater();
     harness.dialog.showMessageBox.mockRejectedValue(new Error('dialog fail'));
     const handler = getHandler('update-available');
+    const updaterLog = loggerHarness.scopes.get('Updater');
 
     // Should not throw / reject
     let threw = false;
@@ -134,12 +149,10 @@ describe('updater consent', () => {
     }
     expect(threw).toBe(false);
     // Unhandled rejection would cause vitest to fail; also assert catch logged
-    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('[Updater] Dialog failed:'), expect.any(Error));
-    errSpy.mockRestore();
+    expect(updaterLog?.error).toHaveBeenCalledWith('Dialog failed', { err: expect.any(Error) });
 
     // Also pin second dialog chain
-    errSpy.mockImplementation(() => {});
-    const errSpy2 = vi.spyOn(console, 'error').mockImplementation(() => {});
+    updaterLog?.error.mockClear();
     harness.dialog.showMessageBox.mockRejectedValue(new Error('dialog fail 2'));
     const handler2 = getHandler('update-downloaded');
     expect(handler2).toBeDefined();
@@ -149,7 +162,6 @@ describe('updater consent', () => {
       await new Promise((r) => setTimeout(r, 10));
     } catch { threw = true; }
     expect(threw).toBe(false);
-    expect(errSpy2).toHaveBeenCalledWith(expect.stringContaining('[Updater] Dialog failed:'), expect.any(Error));
-    errSpy2.mockRestore();
+    expect(updaterLog?.error).toHaveBeenCalledWith('Dialog failed', { err: expect.any(Error) });
   });
 });
