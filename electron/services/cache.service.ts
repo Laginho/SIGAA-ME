@@ -2,6 +2,9 @@ import { app } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 import type { AccountId, CourseId } from '../../shared/domain';
+import { logger } from './logger.service';
+
+const log = logger.scope('Cache');
 
 export interface CourseState {
     files: string[]; // List of file IDs
@@ -85,15 +88,15 @@ export class CacheService {
                         for (const [accountId, raw] of Object.entries(stored)) {
                             const bucket = parseBucket(raw);
                             if (bucket) accounts[accountId] = bucket;
-                            else console.warn(`CacheService: Dropping malformed cache entry for one account.`);
+                            else log.warn('Dropping malformed cache entry for one account.');
                         }
                     }
                     return { schemaVersion: 2, accounts };
                 }
-                console.warn('CacheService: Discarding a pre-DATA-001 cache — its baseline cannot be attributed to an account.');
+                log.warn('Discarding a pre-DATA-001 cache — its baseline cannot be attributed to an account.');
             }
         } catch (error) {
-            console.error('CacheService: Failed to load cache:', error);
+            log.error('Failed to load cache', error);
         }
         return { schemaVersion: 2, accounts: {} };
     }
@@ -102,7 +105,7 @@ export class CacheService {
         try {
             fs.writeFileSync(this.cachePath, JSON.stringify(this.cache, null, 2));
         } catch (error) {
-            console.error('CacheService: Failed to save cache:', error);
+            log.error('Failed to save cache', error);
         }
     }
 

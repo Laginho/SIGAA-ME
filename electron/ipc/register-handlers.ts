@@ -17,6 +17,7 @@ import type { PersistenceService } from '../services/persistence.service';
 import type { BackgroundSyncService } from '../services/background-sync.service';
 import type { CacheService } from '../services/cache.service';
 import type { LoggerService } from '../services/logger.service';
+import { logger } from '../services/logger.service';
 import type { DownloadProgress } from '../../shared/ipc';
 import type { DownloadStatus } from '../../shared/domain';
 import { errorMessage, fail, ok } from '../../shared/errors';
@@ -59,7 +60,6 @@ export interface IpcDeps {
   logger: Pick<LoggerService, 'clear'>;
   /** `app.getPath('userData')`: onde os `debug_*` a apagar vivem. */
   userDataPath: string;
-  resetAppLog: () => Promise<void>;
   clearBrowserStorage: () => Promise<void>;
   getWindow: () => BrowserWindow | null;
   allowedOrigin: string;
@@ -69,6 +69,7 @@ export interface IpcDeps {
 }
 
 const noPayload = (): Record<string, never> => ({});
+const log = logger.scope('Ipc');
 
 /** Roda `step`; uma falha vira texto em `failures` (e log), sem impedir o próximo passo. */
 async function attempt(step: () => void | Promise<void>, failures: string[], label: string): Promise<void> {
@@ -77,7 +78,7 @@ async function attempt(step: () => void | Promise<void>, failures: string[], lab
   } catch (error) {
     const message = errorMessage(error);
     failures.push(message);
-    console.error(`${label} falhou:`, message);
+    log.error(`${label} falhou`, message);
   }
 }
 
@@ -115,7 +116,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
           deps.persistence.saveCredentials(req.username, req.password);
         } catch (error) {
           const message = errorMessage(error);
-          console.error('Failed to save remembered credentials:', message);
+          log.error('Failed to save remembered credentials', message);
           return fail('STORAGE', `Login succeeded, but the session could not be remembered: ${message}`);
         }
       } else {
@@ -125,7 +126,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
           deps.persistence.clearCredentials();
         } catch (error) {
           const message = errorMessage(error);
-          console.error('Failed to clear credentials:', message);
+          log.error('Failed to clear credentials', message);
           return fail('STORAGE', message);
         }
       }
@@ -137,7 +138,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
   handle('try-auto-login', noPayload, async () => {
     const creds = deps.persistence.loadCredentials();
     if (creds) {
-      console.log('Auto-login: stored credentials found');
+      log.info('Auto-login: stored credentials found');
       return await deps.sigaaService.login(creds.username, creds.password);
     }
     return fail('SESSION_EXPIRED', 'Nenhuma credencial salva.');
@@ -263,7 +264,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
   // que um anterior tenha falhado — a sessão precisa terminar de fechar de
   // qualquer forma, mas o resultado avisa que a credencial pode ter sobrado.
   handle('logout', noPayload, async () => {
-    console.log('Logout: Clearing credentials and closing session...');
+    log.info('Logout: clearing credentials and closing session...');
     const failures: string[] = [];
     await attempt(() => deps.persistence.clearCredentials(), failures, 'Limpar credencial');
     await attempt(() => deps.backgroundSync.cancel(), failures, 'Encerrar sincronização');
@@ -288,7 +289,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
     });
     if (response !== 0) return fail('CANCELLED', 'Limpeza cancelada.');
 
-    console.log('Clear all data: closing session before destructive cleanup...');
+    log.info('Clear all data: closing session before destructive cleanup...');
     const failures: string[] = [];
 
     // 1. Fecha a sessão — nada destrutivo antes disto.
@@ -305,7 +306,6 @@ export function registerIpcHandlers(deps: IpcDeps): void {
     await attempt(() => deps.persistence.reset(), failures, 'Limpar configurações');
     await attempt(() => deps.logger.clear(), failures, 'Limpar log');
     await attempt(() => deps.sigaaService.clearDiagnostics(), failures, 'Limpar diagnósticos');
-    await attempt(() => deps.resetAppLog(), failures, 'Reiniciar log do app');
     await attempt(() => {
       for (const entry of fs.readdirSync(deps.userDataPath)) {
         if (entry.startsWith('debug_')) fs.unlinkSync(path.join(deps.userDataPath, entry));

@@ -10,6 +10,9 @@
  * `.scratch/04-fase3-fronteiras-de-confianca/issues/04-SEC-003-*.md`.
  */
 import type { WebContents } from 'electron'
+import { logger } from '../services/logger.service'
+
+const log = logger.scope('NavigationPolicy')
 
 export type NavigationVerdict =
   | { kind: 'in-app' }
@@ -72,7 +75,7 @@ async function openOutside(url: string, trusted: boolean, deps: NavigationGuardD
     await deps.openExternal(url)
   } catch (err) {
     // Handler de evento não tem chamador para quem propagar (o updater faz igual).
-    console.error(`[nav] falha ao abrir link externo ${url}:`, err)
+    log.error('falha ao abrir link externo', { url, err })
   }
 }
 
@@ -86,7 +89,7 @@ export function installNavigationGuard(
 
     details.preventDefault()
     if (verdict.kind === 'blocked') {
-      console.warn(`[nav] navegação bloqueada (${verdict.reason}): ${details.url}`)
+      log.warn('navegação bloqueada', { reason: verdict.reason, url: details.url })
       return
     }
     void openOutside(details.url, verdict.trusted, deps)
@@ -95,7 +98,7 @@ export function installNavigationGuard(
   // Sempre negado, inclusive para URL confiável: o sanitizador nunca emite
   // `target`, então um popup só pode vir de algo que não deveria estar rodando.
   contents.setWindowOpenHandler(({ url }) => {
-    console.warn(`[nav] window.open negado: ${url}`)
+    log.warn('window.open negado', { url })
     return { action: 'deny' }
   })
 }
