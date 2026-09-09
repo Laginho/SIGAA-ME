@@ -132,16 +132,12 @@ describe('LoggerService', () => {
         expect(content).toContain('outra mensagem');
     });
 
-    it('assinatura de transição: argumento primitivo vira String() redigido', async () => {
+    it('assinatura estreita: vararg extra não compila (contrato OBS-005, meta? é objeto único)', async () => {
         const logger = makeLogger();
+        // @ts-expect-error — meta é um objeto único (LogMeta), não varargs; ver OBS-005.
         logger.info('contagem', 42, 'C:\\Users\\aluno\\a.txt');
 
         await logger.flush();
-
-        const content = readLog(dir);
-        expect(content).toContain('42');
-        expect(content).toContain('[path]');
-        expect(content).not.toContain('Users\\aluno');
     });
 
     it('assinatura de transição: objeto plano em produção redige chave de conteúdo e de segredo', async () => {
