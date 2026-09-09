@@ -547,7 +547,7 @@ export class PlaywrightLoginService {
                     courseId,
                     url: page.url(),
                     availableCourseIds: debugInfo.courseIds,
-                    pageTitle: debugInfo.pageTitle,
+                    title: debugInfo.pageTitle,
                 });
 
                 // Save debug HTML
@@ -603,10 +603,10 @@ export class PlaywrightLoginService {
             const nomeTurmaClean = nomeTurma.trim().replace(/\s+/g, ' ');
             if (!isExpectedCoursePage(nomeTurma, courseName)) {
                 const errorMsg = `Playwright: Course verification failed! Page header shows "${nomeTurmaClean}" instead of "${courseName}" — the JSF session is likely still on the previous course.`;
-                log.error('Playwright: Course verification failed.', { courseName, header: nomeTurmaClean });
+                log.error('Playwright: Course verification failed.', { courseName, title: nomeTurmaClean });
                 throw new Error(errorMsg);
             } else {
-                log.info('Playwright: Verified course.', { courseName, header: nomeTurmaClean });
+                log.info('Playwright: Verified course.', { courseName, title: nomeTurmaClean });
             }
 
 

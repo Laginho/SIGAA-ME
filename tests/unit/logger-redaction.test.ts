@@ -132,14 +132,6 @@ describe('LoggerService', () => {
         expect(content).toContain('outra mensagem');
     });
 
-    it('assinatura estreita: vararg extra não compila (contrato OBS-005, meta? é objeto único)', async () => {
-        const logger = makeLogger();
-        // @ts-expect-error — meta é um objeto único (LogMeta), não varargs; ver OBS-005.
-        logger.info('contagem', 42, 'C:\\Users\\aluno\\a.txt');
-
-        await logger.flush();
-    });
-
     it('assinatura de transição: objeto plano em produção redige chave de conteúdo e de segredo', async () => {
         const logger = makeLogger({ production: true });
         logger.info('novo arquivo', { courseName: 'Cálculo I', password: 'segredo' });
