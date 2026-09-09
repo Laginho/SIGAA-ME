@@ -26,6 +26,11 @@ const storage = vi.hoisted(() => {
     return { files, state, safeStorage };
 });
 
+const loggerMock = vi.hoisted(() => {
+    const persistenceScope = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    return { persistenceScope, logger: { scope: vi.fn(() => persistenceScope) } };
+});
+
 vi.mock('electron', () => ({
     app: { getPath: vi.fn(() => 'sigaa-me-persistence-tests') },
     safeStorage: storage.safeStorage
@@ -36,6 +41,7 @@ vi.mock('fs', () => ({
     writeFileSync: vi.fn((file: string, content: string) => storage.files.set(file, String(content))),
     unlinkSync: vi.fn((file: string) => storage.files.delete(file))
 }));
+vi.mock('../../electron/services/logger.service', () => ({ logger: loggerMock.logger }));
 
 import { PersistenceService } from '../../electron/services/persistence.service';
 
@@ -70,11 +76,10 @@ describe('PersistenceService remembered-login recovery', () => {
         const service = new PersistenceService();
         service.updateSetting('theme', 'dark');
         storage.files.set(credentialsFile, '{not-json');
-        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
         expect(service.loadCredentials()).toBeNull();
         expect(service.getSettings().theme).toBe('dark');
-        expect(errorSpy).toHaveBeenCalled();
+        expect(loggerMock.persistenceScope.error).toHaveBeenCalled();
     });
 
     it('fails explicitly when OS encryption is unavailable and never writes plaintext credentials', () => {
