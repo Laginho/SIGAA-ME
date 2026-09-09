@@ -76,6 +76,18 @@ const noOtherHtmlSinks = {
   message: 'Sink de HTML fora do padrão do projeto. Ver SEC-001.',
 }
 
+/**
+ * Nenhum `console.*`, em qualquer forma — não só a chamada. `no-console`
+ * sozinho não pega `console.log = ...` (o monkeypatch que este ticket
+ * removeu) nem `const x = console.log`; este seletor pega as três. OBS-001.
+ */
+const noConsoleAnyForm = {
+  selector: 'MemberExpression[object.name="console"]',
+  message:
+    'Nenhum `console.*` nesta zona — use `logger.scope(...)` '
+    + '(`electron/services/logger.service.ts`). Ver OBS-001.',
+}
+
 export default tseslint.config(
   {
     ignores: [
@@ -142,9 +154,26 @@ export default tseslint.config(
     ],
     rules: {
       '@typescript-eslint/no-explicit-any': 'error',
-      'no-restricted-syntax': ['error', noCredentialFallback, noAsAny],
+      'no-restricted-syntax': ['error', noCredentialFallback, noAsAny, noConsoleAnyForm],
       '@typescript-eslint/no-unsafe-function-type': 'error',
       'no-empty': 'error',
+      'no-console': 'error',
+    },
+  },
+
+  /**
+   * Sem console (OBS-001): os dois serviços que este ticket migra, fora da
+   * fronteira mas com a mesma catraca. `updater` é `setupAutoUpdater` dentro
+   * de `main.ts`, já coberto acima. `electron/**` inteiro entra em OBS-005.
+   */
+  {
+    files: [
+      'electron/services/persistence.service.ts',
+      'electron/services/cache.service.ts',
+    ],
+    rules: {
+      'no-restricted-syntax': ['error', noCredentialFallback, noConsoleAnyForm],
+      'no-console': 'error',
     },
   },
 

@@ -24,68 +24,10 @@ if (!app.isPackaged) {
   }
 }
 
-// ===== FILE LOGGER SETUP =====
-const logsDir = path.join(app.getPath('userData'), 'logs');
-if (!fs.existsSync(logsDir)) {
-  fs.mkdirSync(logsDir, { recursive: true });
-}
+const log = logger.scope('main');
+const updaterLog = logger.scope('Updater');
 
-function openLogStream(): fs.WriteStream {
-  const logFilePath = path.join(logsDir, `app_${new Date().toISOString().replace(/[:.]/g, '-')}.log`);
-  return fs.createWriteStream(logFilePath, { flags: 'a' });
-}
-
-// `let`, não `const`: `resetAppLog` (DATA-002) troca o stream em uso, e os
-// wrappers de `console.*` abaixo fecham sobre esta variável — nunca sobre o
-// stream que existia quando foram definidos.
-let logStream = openLogStream();
-
-const originalConsoleLog = console.log;
-const originalConsoleError = console.error;
-const originalConsoleWarn = console.warn;
-
-const formatLog = (level: string, args: unknown[]) => {
-  const timestamp = new Date().toISOString();
-  const message = args.map(arg =>
-    typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
-  ).join(' ');
-  return `[${timestamp}] [${level}] ${message}\n`;
-};
-
-console.log = (...args: unknown[]) => {
-  originalConsoleLog.apply(console, args);
-  if (logStream.writable) logStream.write(formatLog('INFO', args));
-};
-
-console.error = (...args: unknown[]) => {
-  originalConsoleError.apply(console, args);
-  if (logStream.writable) logStream.write(formatLog('ERROR', args));
-};
-
-console.warn = (...args: unknown[]) => {
-  originalConsoleWarn.apply(console, args);
-  if (logStream.writable) logStream.write(formatLog('WARN', args));
-};
-
-console.log('=== SIGAA-ME App Started ===');
-
-/**
- * Clear-all-data (DATA-002): fecha o stream, apaga `logs/` inteiro e reabre
- * com nome novo. É o que torna a exclusão segura no Windows, onde um handle
- * aberto faz um `unlink` ingênuo falhar.
- */
-async function resetAppLog(): Promise<void> {
-  await new Promise<void>((resolve) => { logStream.end(() => resolve()); });
-  try {
-    fs.rmSync(logsDir, { recursive: true, force: true });
-  } finally {
-    // Mesmo se o rmSync falhar (EBUSY/EPERM num arquivo travado), o main
-    // precisa voltar a ter um stream aberto; senão fica sem log até reiniciar.
-    fs.mkdirSync(logsDir, { recursive: true });
-    logStream = openLogStream();
-  }
-}
-// ===== END FILE LOGGER SETUP =====
+log.info('=== SIGAA-ME App Started ===');
 
 process.env.APP_ROOT = path.join(__dirname, '..')
 
@@ -103,15 +45,15 @@ const backgroundSyncService = new BackgroundSyncService(sigaaService, () => win)
 async function simulateNewFile(): Promise<boolean> {
   const accountId = getActiveAccount();
   if (!accountId) {
-    console.log('[Dev] Nenhuma conta ativa para simular.');
+    log.info('[Dev] Nenhuma conta ativa para simular.');
     return false;
   }
   const forgotten = cacheService.forgetLastFile(accountId);
   if (!forgotten) {
-    console.log('[Dev] Nenhum arquivo em cache para simular.');
+    log.info('[Dev] Nenhum arquivo em cache para simular.');
     return false;
   }
-  console.log(`[Dev] Esquecido ${forgotten.fileId} de ${forgotten.courseId}. Sincronizando...`);
+  log.info(`[Dev] Esquecido ${forgotten.fileId} de ${forgotten.courseId}. Sincronizando...`);
   await backgroundSyncService.syncNow();
   return true;
 }
@@ -123,7 +65,6 @@ registerIpcHandlers({
   cache: cacheService,
   logger,
   userDataPath: app.getPath('userData'),
-  resetAppLog,
   clearBrowserStorage: () => session.defaultSession.clearStorageData(),
   getWindow: () => win,
   allowedOrigin: VITE_DEV_SERVER_URL ? new URL(VITE_DEV_SERVER_URL).origin : 'file:',
@@ -199,7 +140,7 @@ let isQuitting = false;
 app.on('before-quit', async (e) => {
   if (!isQuitting) {
     e.preventDefault();
-    console.log('App is closing. Cleaning up background processes...');
+    log.info('App is closing. Cleaning up background processes...');
     isQuitting = true;
     try {
       // A wedged Chrome can make browser.close() hang forever; quitting must
@@ -207,13 +148,16 @@ app.on('before-quit', async (e) => {
       await Promise.race([
         sigaaService.logout(),
         new Promise<void>((resolve) => setTimeout(() => {
-          console.warn('Cleanup timed out after 5s; quitting anyway.');
+          log.warn('Cleanup timed out after 5s; quitting anyway.');
           resolve();
         }, 5000))
       ]);
     } catch (err) {
-      console.error('Cleanup error:', err);
+      log.error('Cleanup error', err);
     }
+    // O logger é do app, não da conta: nada de conteúdo a perder aqui, então
+    // um `flush` que nunca rejeita não bloqueia o quit de verdade.
+    await logger.flush();
     app.quit();
   }
 });
@@ -266,7 +210,7 @@ app.whenReady().then(() => {
       );
     }
   } catch (e) {
-    console.error('Failed to check for Chrome:', e);
+    log.error('Failed to check for Chrome', e);
   }
 
   createWindow();
@@ -301,7 +245,7 @@ export function setupAutoUpdater(): void {
 
   // Update Management
   autoUpdater.on('update-available', (info) => {
-    console.log('[Updater] Update available:', info.version);
+    updaterLog.info('Update available', { version: info.version });
     dialog.showMessageBox({
       type: 'info',
       title: 'Atualização Disponível',
@@ -312,19 +256,19 @@ export function setupAutoUpdater(): void {
     }).then(result => {
       if (result.response === 0) {
         autoUpdater.downloadUpdate().catch(err => {
-          console.error('[Updater] Download failed:', err);
+          updaterLog.error('Download failed', err);
         });
       }
-    }).catch(err => console.error('[Updater] Dialog failed:', err));
+    }).catch(err => updaterLog.error('Dialog failed', err));
   });
   autoUpdater.on('update-not-available', () => {
-    console.log('[Updater] App is up to date.');
+    updaterLog.info('App is up to date.');
   });
   autoUpdater.on('error', (err) => {
-    console.error('[Updater] Update error:', err);
+    updaterLog.error('Update error', err);
   });
   autoUpdater.on('update-downloaded', () => {
-    console.log('[Updater] Update downloaded. Preparing to install...');
+    updaterLog.info('Update downloaded. Preparing to install...');
     dialog.showMessageBox({
       type: 'info',
       title: 'Atualização Disponível',
@@ -335,10 +279,10 @@ export function setupAutoUpdater(): void {
         // Force the app to quit and install using our graceful before-quit logic
         autoUpdater.quitAndInstall();
       }
-    }).catch(err => console.error('[Updater] Dialog failed:', err));
+    }).catch(err => updaterLog.error('Dialog failed', err));
   });
 
   autoUpdater.checkForUpdates().catch(err => {
-    console.error('Failed to check for updates:', err);
+    updaterLog.error('Failed to check for updates', err);
   });
 }

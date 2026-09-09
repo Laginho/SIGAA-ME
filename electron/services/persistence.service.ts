@@ -1,6 +1,9 @@
 import { app, safeStorage } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
+import { logger } from './logger.service';
+
+const log = logger.scope('Persistence');
 
 // AppSettings vive em shared/ipc.ts porque atravessa o IPC (o renderer lê via
 // getSettings e escreve via updateSetting). Reexportado aqui para não quebrar
@@ -81,10 +84,10 @@ export class PersistenceService {
             for (const key of Object.keys(VALIDATORS) as (keyof Required<AppSettings>)[]) {
                 if (!(key in stored)) continue;
                 if (VALIDATORS[key](stored[key])) Object.assign(settings, { [key]: stored[key] });
-                else console.warn(`PersistenceService: Ignoring "${key}" — stored value has the wrong type.`);
+                else log.warn('Ignoring a stored setting with the wrong type', { key });
             }
         } catch (error) {
-            console.error('PersistenceService: Failed to load settings:', error);
+            log.error('Failed to load settings', error);
         }
         return settings;
     }
@@ -143,7 +146,7 @@ export class PersistenceService {
         }
 
         if (!safeStorage.isEncryptionAvailable()) {
-            console.warn('PersistenceService: Secure credential storage is unavailable. Skipping auto-login.');
+            log.warn('Secure credential storage is unavailable. Skipping auto-login.');
             return null;
         }
 
@@ -158,7 +161,7 @@ export class PersistenceService {
                 password: safeStorage.decryptString(Buffer.from(data.password, 'base64'))
             };
         } catch (error) {
-            console.error('PersistenceService: Failed to load encrypted credentials:', error);
+            log.error('Failed to load encrypted credentials', error);
             return null;
         }
     }
@@ -186,7 +189,7 @@ export class PersistenceService {
         try {
             fs.writeFileSync(this.settingsPath, JSON.stringify({ schemaVersion: SETTINGS_SCHEMA_VERSION, ...this.settings }, null, 2));
         } catch (error) {
-            console.error('PersistenceService: Failed to save settings:', error);
+            log.error('Failed to save settings', error);
         }
     }
 }
