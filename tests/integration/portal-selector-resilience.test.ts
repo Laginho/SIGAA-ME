@@ -3,7 +3,7 @@
  * of SIGAA itself, so they are safe to run in CI without user credentials.
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const runtime = vi.hoisted(() => ({
     chromium: { launch: vi.fn() },
@@ -35,6 +35,17 @@ import path from 'path';
 import { HttpScraperService } from '../../electron/services/http-scraper.service';
 import { PlaywrightLoginService } from '../../electron/services/playwright-login.service';
 import { PORTAL_ADAPTER_VERSION, classify, validateCourseListDocument, validateLoginStart } from '../../electron/sigaa/portal-adapter';
+import { diagnosticsService } from '../../electron/services/diagnostics.service';
+
+const LOGIN_DOCUMENT = '<form action="/sigaa/logar.do"><input name="user.login"><input name="user.senha"><input name="entrar" type="submit"></form>';
+
+/**
+ * PORTAL-003: o diagnóstico grava em disco. O espião mantém os testes fora do
+ * `userData` e deixa a asserção ser o payload, não o arquivo.
+ */
+let recordSpy: ReturnType<typeof vi.spyOn>;
+beforeEach(() => { recordSpy = vi.spyOn(diagnosticsService, 'record').mockImplementation(() => {}); });
+afterEach(() => { recordSpy.mockRestore(); });
 
 function createLocator(options: { visible?: boolean; clickError?: Error; text?: string[] } = {}) {
     const locator: any = {
@@ -50,7 +61,7 @@ function createLocator(options: { visible?: boolean; clickError?: Error; text?: 
 
 function createNavigationHarness(url = 'https://si3.ufc.br/sigaa/paginaInicial.do') {
     const studentPortal = createLocator({ visible: true });
-    const loginDocument = '<form action="/sigaa/logar.do"><input name="user.login"><input name="user.senha"><input name="entrar" type="submit"></form>';
+    const loginDocument = LOGIN_DOCUMENT;
     const portalDocument = '<h1>Portal do Discente</h1><a href="/sigaa/verPortalDiscente.do">Menu Discente</a><span class="nome_usuario">User</span>';
     let currentDocument = url.includes('verTelaLogin') ? loginDocument : portalDocument;
     let currentUrl = url;
@@ -326,5 +337,185 @@ describe('PORTAL-002: sanitized versioned portal fixtures', () => {
 
         expect(classify(html)).toBe('UNKNOWN');
         expect(validateCourseListDocument(html)?.code).toBe('SELECTOR_DRIFT');
+    });
+});
+
+describe('Diagnóstico estrutural nos pontos de falha (PORTAL-003)', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    function driftingCourseList() {
+        const harness = createNavigationHarness();
+        harness.page.evaluate.mockResolvedValue({
+            courses: [],
+            selectorDiagnostics: { courseIdInputs: 0, virtualClassroomLinks: 0 }
+        });
+        const service = new PlaywrightLoginService();
+        (service as any).storedCookies = [{ name: 'JSESSIONID', value: 'valid', domain: 'si3.ufc.br' }];
+        return { ...harness, service };
+    }
+
+    function pageEnteringCourse(portalDocument: string) {
+        const { page } = createNavigationHarness();
+        page.content.mockResolvedValue(portalDocument);
+        const service = new PlaywrightLoginService();
+        (service as any).browser = {};
+        (service as any).context = { newPage: vi.fn() };
+        (service as any).page = page;
+        return { page, service };
+    }
+
+    it('grava o diagnóstico quando os seletores da lista de turmas somem', async () => {
+        const { service } = driftingCourseList();
+
+        const result = await service.getCourses();
+
+        expect(result.errorCode).toBe('SELECTOR_DRIFT');
+        expect(recordSpy).toHaveBeenCalledTimes(1);
+        const diagnostic = recordSpy.mock.calls[0][0] as any;
+        expect(diagnostic).toMatchObject({
+            state: 'STUDENT_PORTAL',
+            urlFamily: '/sigaa/paginaInicial.do',
+            adapterVersion: PORTAL_ADAPTER_VERSION,
+            selectorCounts: { courseIdInputs: 0, virtualClassroomLinks: 0 }
+        });
+        expect(diagnostic.domFingerprint).toMatch(/^[0-9a-f]{64}$/);
+        expect(JSON.stringify(diagnostic)).not.toContain('nome_usuario');
+    });
+
+    it('preserva o SELECTOR_DRIFT quando a gravação do diagnóstico falha', async () => {
+        const { service } = driftingCourseList();
+        recordSpy.mockImplementation(() => { throw new Error('EPERM: operation not permitted'); });
+
+        const result = await service.getCourses();
+
+        expect(result.errorCode).toBe('SELECTOR_DRIFT');
+        expect(result.error).toContain('SIGAA portal selector drift');
+        expect(runtime.logger.error).toHaveBeenCalled();
+    });
+
+    it('preserva o SELECTOR_DRIFT quando nem o HTML da página pode ser lido', async () => {
+        const { page, service } = driftingCourseList();
+        const document = await page.content();
+        page.content
+            .mockResolvedValueOnce(document)
+            .mockRejectedValueOnce(new Error('Target page, context or browser has been closed'));
+
+        const result = await service.getCourses();
+
+        expect(result.errorCode).toBe('SELECTOR_DRIFT');
+        expect(recordSpy).toHaveBeenCalledTimes(1);
+        expect(recordSpy.mock.calls[0][0]).toMatchObject({ state: 'UNKNOWN' });
+    });
+
+    it('grava o diagnóstico quando o pouso pós-login não é reconhecido', async () => {
+        const { page } = createNavigationHarness();
+        page.content
+            .mockResolvedValueOnce(LOGIN_DOCUMENT)
+            .mockResolvedValue('<main>Layout inesperado</main>');
+        const service = new PlaywrightLoginService();
+
+        const result = await service.login('student', 'password');
+
+        expect(result.errorCode).toBe('SELECTOR_DRIFT');
+        expect(recordSpy).toHaveBeenCalledTimes(1);
+        expect(recordSpy.mock.calls[0][0]).toMatchObject({
+            state: 'UNKNOWN',
+            urlFamily: '/sigaa/paginaInicial.do',
+            adapterVersion: PORTAL_ADAPTER_VERSION,
+            selectorCounts: {}
+        });
+    });
+
+    it('grava o diagnóstico quando o portal é rejeitado antes da entrada na turma', async () => {
+        const { service } = pageEnteringCourse('<main>Layout inesperado</main>');
+
+        const result = await service.enterCourseAndGetHTML('111', 'Cálculo I');
+
+        expect(result.errorCode).toBe('SELECTOR_DRIFT');
+        expect(recordSpy).toHaveBeenCalledTimes(1);
+        expect(recordSpy.mock.calls[0][0]).toMatchObject({
+            state: 'UNKNOWN',
+            urlFamily: '/sigaa/paginaInicial.do',
+            adapterVersion: PORTAL_ADAPTER_VERSION
+        });
+    });
+
+    it('não grava diagnóstico quando a rejeição é sessão expirada, não drift', async () => {
+        const { service } = pageEnteringCourse(LOGIN_DOCUMENT);
+
+        const result = await service.enterCourseAndGetHTML('111', 'Cálculo I');
+
+        expect(result.errorCode).toBe('SESSION_EXPIRED');
+        expect(recordSpy).not.toHaveBeenCalled();
+    });
+
+    it('grava o diagnóstico quando o HTML inicial do login não tem o formulário esperado', async () => {
+        const { browser, page } = createNavigationHarness();
+        page.content.mockResolvedValueOnce('<main>Layout novo sem formulario</main>');
+        const service = new PlaywrightLoginService();
+
+        const result = await service.login('student', 'password');
+
+        expect(result.errorCode).toBe('SELECTOR_DRIFT');
+        expect(recordSpy).toHaveBeenCalledTimes(1);
+        expect(recordSpy.mock.calls[0][0]).toMatchObject({
+            state: 'UNKNOWN',
+            urlFamily: '/sigaa/verTelaLogin.do',
+            adapterVersion: PORTAL_ADAPTER_VERSION,
+            selectorCounts: {}
+        });
+        expect(browser.close).toHaveBeenCalledOnce();
+    });
+
+    it('grava o diagnóstico quando o preenchimento do campo de login estoura por timeout de seletor', async () => {
+        const { browser, page } = createNavigationHarness();
+        page.fill.mockRejectedValueOnce(new Error('locator.fill: Timeout 5000ms exceeded for input[name="user.login"]'));
+        const service = new PlaywrightLoginService();
+
+        const result = await service.login('student', 'password');
+
+        expect(result.errorCode).toBe('SELECTOR_DRIFT');
+        expect(recordSpy).toHaveBeenCalledTimes(1);
+        expect(recordSpy.mock.calls[0][0]).toMatchObject({
+            state: 'LOGIN',
+            urlFamily: '/sigaa/verTelaLogin.do',
+            adapterVersion: PORTAL_ADAPTER_VERSION,
+            selectorCounts: {}
+        });
+        expect(page.content).toHaveBeenCalled();
+        expect(browser.close).toHaveBeenCalledOnce();
+    });
+
+    it('preserva o SELECTOR_DRIFT quando a captura do HTML de diagnóstico falha dentro do catch do login', async () => {
+        const { browser, page } = createNavigationHarness();
+        page.fill.mockRejectedValueOnce(new Error('locator.fill: Timeout 5000ms exceeded for input[name="user.login"]'));
+        page.content
+            .mockResolvedValueOnce(LOGIN_DOCUMENT)
+            .mockRejectedValueOnce(new Error('Target page, context or browser has been closed'));
+        const service = new PlaywrightLoginService();
+
+        const result = await service.login('student', 'password');
+
+        expect(result.success).toBe(false);
+        expect(result.errorCode).toBe('SELECTOR_DRIFT');
+        expect(result.error).toContain('SIGAA login selector drift');
+        expect(result.error).toContain('username field');
+        expect(result.error).toContain('input[name="user.login"]');
+        expect(recordSpy).not.toHaveBeenCalled();
+        expect(runtime.logger.error).toHaveBeenCalledWith(expect.stringContaining('failed to capture diagnostic HTML after login exception'));
+        expect(browser.close).toHaveBeenCalledOnce();
+    });
+
+    it('não grava diagnóstico quando a exceção de login é indisponibilidade de portal, não drift', async () => {
+        const { page } = createNavigationHarness();
+        page.waitForLoadState.mockRejectedValueOnce(new Error('Timeout 30000ms exceeded waiting for navigation'));
+        const service = new PlaywrightLoginService();
+
+        const result = await service.login('student', 'password');
+
+        expect(result.errorCode).toBe('PORTAL_UNAVAILABLE');
+        expect(recordSpy).not.toHaveBeenCalled();
     });
 });
