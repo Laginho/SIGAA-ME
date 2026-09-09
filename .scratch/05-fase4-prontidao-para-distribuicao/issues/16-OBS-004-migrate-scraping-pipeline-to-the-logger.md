@@ -1,6 +1,6 @@
 # OBS-004 — Migrate the scraping pipeline to the logger
-Status: open
-Stage: to-review
+Status: resolved
+Stage: done
 Priority: P2
 Blocked by: OBS-001
 
@@ -209,3 +209,59 @@ Separação de commits respeitada: `0be0c17` só `tests/`, `3995ee9` só
   "What to build" daqui) admite na mensagem só id, contagem, código de erro e
   duração. Não é conteúdo do SIGAA nem dado sensível — só desvio literal da
   regra.
+
+## Revisão da etapa 3 (Opus, 2026-09-09) — segunda passada, fechada
+
+Base `master` (`8eeeb4f`), HEAD revisado `adb193c`. Escopo: o delta da
+reabertura (`90eb58d..adb193c`), mais os dois ❌ e os dois itens de Standards da
+primeira passada. Nenhum código de produção ou teste alterado nesta revisão.
+
+#### Resolution (2026-09-09)
+
+Os quatro itens da primeira passada estão fechados.
+
+- ✅ **Critério 5, a corrida do `clear()`.** `logger.service.ts:172-198`:
+  `clear()` deixou de ser `async` com `await this.flush()` e passou a
+  encadear na fila — `const p = this.chain.then(doClear); this.chain =
+  p.catch(() => undefined); return p;`. Um `enqueue` chamado durante o clear
+  lê a `chain` já apontando para `p`, então o `writeLine` roda **depois** do
+  `doClear`, com `initialized` já `false`, e re-inicializa em vez de achar
+  `this.stream` nulo. `p` continua rejeitando com o erro do `rm` (o `catch` só
+  protege a `chain`), e `flush()` segue sem rejeitar.
+  Verificado que nada mais escapa da fila: `rotate()` só é alcançável de dentro
+  de `writeLine`, que roda na `chain`; `openStream()` só de `ensureInit`/`rotate`.
+- ✅ **Critério 5, o teste.** `tests/unit/logger-redaction.test.ts:319-337`
+  enfileira `logger.info('durante o clear')` sem `await`, no mesmo tick de
+  `logger.clear()`, e exige a linha no arquivo novo, a ausência da anterior e
+  zero `console.error`.
+- ✅ **`beforeEach` de contrato.** `logging-boundary.test.ts:138`,
+  `expect(typeof logger.scope).toBe('function')` — `beforeEach`, não
+  `beforeAll`, como o `OBS-001` pede.
+- ✅ **Sobra morta.** `resetLog` saiu do `HttpFake` e do mock em
+  `background-sync-serialization.test.ts`. Grep por
+  `resetLog|clearDiagnostics|scraper.log` em `electron/`, `src/` e `tests/`:
+  só dois comentários históricos em `tests/e2e/clear-all.spec.ts`.
+- ✅ **Nit do call site.** `http-scraper.service.ts:873` passou `contentType`
+  para `meta`; na mensagem sobrou `Content-Length`, que é contagem e a regra
+  admite.
+
+Prova de vermelho: `git checkout master -- electron/services/logger.service.ts`
+e `npx vitest run tests/unit/logger-redaction.test.ts` → **1 failed | 25
+passed (26)**, com
+`TypeError: Cannot read properties of null (reading 'write')` dentro do
+`[Logger] falha ao gravar log, sink desligado:`. É exatamente o bug descrito no
+bullet herdado do `OBS-001`. Com a correção restaurada, os quatro arquivos de
+verificação do ticket: **4 passed | 72 passed (72)**.
+
+Separação de commits respeitada: `e404135` só `tests/`, `adb193c` só
+`electron/`.
+
+Gate: `npm run quality` verde — typecheck limpo, `eslint` com 0 erros e 62
+warnings `no-explicit-any` (caiu de 77 antes do ticket), `47 arquivos | 602
+passed | 4 skipped (606)`. O +1 sobre os 601 da primeira passada é o teste da
+corrida.
+
+Greps do "Para o revisor" refeitos no HEAD final: zero `console.*` nos quatro
+serviços, zero interpolação de conteúdo em chamada de log, zero vararg novo.
+
+Merge direto: a etapa 3 não mudou código.
