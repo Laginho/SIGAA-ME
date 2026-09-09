@@ -131,9 +131,8 @@ function makeDeps(overrides: { settings?: Record<string, unknown> } = {}) {
             cancel: vi.fn(async () => { await tick(); record('backgroundSync.cancel'); }),
         },
         cache: { clear: vi.fn(() => { record('cache.clear'); }) },
-        logger: { clear: vi.fn(() => { record('logger.clear'); }) },
+        logger: { clear: vi.fn(async () => { await tick(); record('logger.clear'); }) },
         userDataPath: USER_DATA,
-        resetAppLog: vi.fn(async () => { await tick(); record('resetAppLog'); }),
         clearBrowserStorage: vi.fn(async () => { await tick(); record('clearBrowserStorage'); }),
         getWindow: () => WIN,
         allowedOrigin: 'http://localhost:5173',
@@ -153,7 +152,7 @@ async function invoke(channel: string, payload: unknown = undefined) {
 
 const DESTRUCTIVE = [
     'cache.clear', 'persistence.reset', 'logger.clear', 'sigaaService.clearDiagnostics',
-    'resetAppLog', 'clearBrowserStorage',
+    'clearBrowserStorage',
 ] as const;
 
 function destructiveCalls(deps: Deps) {
@@ -162,7 +161,6 @@ function destructiveCalls(deps: Deps) {
         'persistence.reset': deps.persistence.reset,
         'logger.clear': deps.logger.clear,
         'sigaaService.clearDiagnostics': deps.sigaaService.clearDiagnostics,
-        'resetAppLog': deps.resetAppLog,
         'clearBrowserStorage': deps.clearBrowserStorage,
     };
 }
@@ -332,7 +330,7 @@ describe('clear-all-data', () => {
 
         it('collects more than one failure in the same message', async () => {
             deps.persistence.reset.mockImplementation(() => { throw new Error('settings.json: EACCES'); });
-            deps.resetAppLog.mockImplementation(async () => { throw new Error('logs/: EBUSY'); });
+            deps.logger.clear.mockImplementation(async () => { throw new Error('logs/: EBUSY'); });
 
             const result = await invoke('clear-all-data');
 
