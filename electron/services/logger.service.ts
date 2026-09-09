@@ -6,9 +6,9 @@ export type LogLevel = 'info' | 'warn' | 'error';
 export type LogMeta = Record<string, unknown>;
 
 export interface ScopedLogger {
-    info(message: string, ...args: unknown[]): void;
-    warn(message: string, ...args: unknown[]): void;
-    error(message: string, ...args: unknown[]): void;
+    info(message: string, meta?: LogMeta): void;
+    warn(message: string, meta?: LogMeta): void;
+    error(message: string, meta?: LogMeta): void;
 }
 
 export interface LoggerOptions {
@@ -145,22 +145,22 @@ export class LoggerService implements ScopedLogger {
 
     scope(component: string): ScopedLogger {
         return {
-            info: (message, ...args) => this.enqueue('INFO', component, message, args),
-            warn: (message, ...args) => this.enqueue('WARN', component, message, args),
-            error: (message, ...args) => this.enqueue('ERROR', component, message, args),
+            info: (message, meta) => this.enqueue('INFO', component, message, meta),
+            warn: (message, meta) => this.enqueue('WARN', component, message, meta),
+            error: (message, meta) => this.enqueue('ERROR', component, message, meta),
         };
     }
 
-    info(message: string, ...args: unknown[]): void {
-        this.enqueue('INFO', 'main', message, args);
+    info(message: string, meta?: LogMeta): void {
+        this.enqueue('INFO', 'main', message, meta);
     }
 
-    warn(message: string, ...args: unknown[]): void {
-        this.enqueue('WARN', 'main', message, args);
+    warn(message: string, meta?: LogMeta): void {
+        this.enqueue('WARN', 'main', message, meta);
     }
 
-    error(message: string, ...args: unknown[]): void {
-        this.enqueue('ERROR', 'main', message, args);
+    error(message: string, meta?: LogMeta): void {
+        this.enqueue('ERROR', 'main', message, meta);
     }
 
     /** Resolve com tudo no disco. Nunca rejeita. */
@@ -197,9 +197,9 @@ export class LoggerService implements ScopedLogger {
         return p;
     }
 
-    private enqueue(level: 'INFO' | 'WARN' | 'ERROR', scope: string, message: string, args: unknown[]): void {
+    private enqueue(level: 'INFO' | 'WARN' | 'ERROR', scope: string, message: string, meta?: LogMeta): void {
         if (this.sinkDisabled) return;
-        const line = this.formatLine(level, scope, message, args);
+        const line = this.formatLine(level, scope, message, meta);
         if (!this.production()) this.echo(level, line);
         this.chain = this.chain.then(() => this.writeLine(line)).catch((err) => this.onSinkFailure(err));
     }
@@ -212,9 +212,9 @@ export class LoggerService implements ScopedLogger {
         return redact(String(arg));
     }
 
-    private formatLine(level: 'INFO' | 'WARN' | 'ERROR', scope: string, message: string, args: unknown[]): string {
+    private formatLine(level: 'INFO' | 'WARN' | 'ERROR', scope: string, message: string, meta?: LogMeta): string {
         const ts = new Date().toISOString();
-        const metaPart = args.length ? ` ${args.map((a) => this.formatArg(a)).join(' ')}` : '';
+        const metaPart = meta !== undefined ? ` ${this.formatArg(meta)}` : '';
         // A quebra de linha entra depois do `redact`: o corte em MAX_LINE_CHARS
         // comeria o `\n` e colaria o registro seguinte na mesma linha.
         const line = `${ts} ${level} [${scope}] ${redact(message)}${metaPart}`;
