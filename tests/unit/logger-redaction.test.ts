@@ -316,6 +316,26 @@ describe('LoggerService', () => {
         expect(readLog(dir)).toContain('ainda funciona depois da falha');
     });
 
+    it('write enfileirado durante o clear() não se perde nem dispara sink desligado (OBS-004, critério 5)', async () => {
+        const logger = makeLogger();
+        logger.info('antes do clear');
+        await logger.flush();
+
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+        const clearPromise = logger.clear();
+        logger.info('durante o clear');   // sem await, mesmo tick da chamada acima
+
+        await clearPromise;
+        await logger.flush();
+
+        expect(errorSpy).not.toHaveBeenCalled();
+        errorSpy.mockRestore();
+
+        const content = readLog(dir);
+        expect(content).toContain('durante o clear');
+        expect(content).not.toContain('antes do clear');
+    });
+
     it('ecoa no console só fora de produção', async () => {
         const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
         const devLogger = makeLogger({ production: false });

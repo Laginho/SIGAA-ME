@@ -42,7 +42,7 @@ type PlaywrightFake = Record<
     | 'downloadFile' | 'getNewsDetail' | 'getUserAgent' | 'getCookies',
     Fn
 >;
-type HttpFake = Record<'setCookies' | 'setUserAgent' | 'resetSession' | 'resetLog' | 'getCourseFiles' | 'downloadFile', Fn>;
+type HttpFake = Record<'setCookies' | 'setUserAgent' | 'resetSession' | 'getCourseFiles' | 'downloadFile', Fn>;
 
 const harness = vi.hoisted(() => {
     const inFlight = { current: 0, max: 0 };
@@ -86,7 +86,6 @@ vi.mock('../../electron/services/http-scraper.service', () => ({
         setCookies = vi.fn();
         setUserAgent = vi.fn();
         resetSession = vi.fn();
-        resetLog = vi.fn(async () => {});
         getCourseFiles = vi.fn();
         downloadFile = vi.fn();
         constructor() { harness.http = this as unknown as HttpFake; }
