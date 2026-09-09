@@ -22,8 +22,10 @@ vi.mock('electron', async () => {
 
 import {
     buildStructuralDiagnostic,
+    categorizeTitle,
     domFingerprint,
     shouldCaptureRawArtifact,
+    urlFamily,
     DiagnosticsService,
     type StructuralDiagnostic,
 } from '../../electron/services/diagnostics.service';
@@ -67,8 +69,38 @@ describe('buildStructuralDiagnostic', () => {
         expect(diagnostic.urlFamily).toBe('/sigaa/verPortalDiscente.do');
         expect(diagnostic.adapterVersion).toBe('ufc-sigaa-2026.09-v1');
         expect(diagnostic.selectorCounts).toEqual({ courseIdInputs: 2, virtualClassroomLinks: 1 });
-        expect(diagnostic.title).toBe('Portal do Discente');
+        expect(diagnostic.title).toBe('student-portal');
         expect(diagnostic.domFingerprint).toMatch(/^[0-9a-f]{64}$/);
+    });
+
+    it('título fora da allowlist vira categoria genérica — nome do aluno e nota nunca sobrevivem', () => {
+        const sensitiveTitleHtml =
+            '<html><head><title>Aluno Teste Privado - Calculo I - Media 9.4</title></head><body></body></html>';
+
+        const diagnostic = buildStructuralDiagnostic(
+            sensitiveTitleHtml,
+            STUDENT_PORTAL_URL,
+            'ufc-sigaa-2026.09-v1',
+            {},
+        );
+
+        expect(diagnostic.title).toBe('other');
+        const serialized = JSON.stringify(diagnostic);
+        expect(serialized).not.toContain('Aluno Teste Privado');
+        expect(serialized).not.toContain('Calculo I');
+        expect(serialized).not.toContain('9.4');
+    });
+
+    it('família de rota remove parâmetro de caminho (;jsessionid=...), não só query string', () => {
+        const diagnostic = buildStructuralDiagnostic(
+            STUDENT_PORTAL_HTML,
+            'https://si3.ufc.br/sigaa/paginaInicial.do;jsessionid=TEST_SESSION_SECRET?foo=1',
+            'ufc-sigaa-2026.09-v1',
+            {},
+        );
+
+        expect(diagnostic.urlFamily).toBe('/sigaa/paginaInicial.do');
+        expect(JSON.stringify(diagnostic)).not.toContain('TEST_SESSION_SECRET');
     });
 
     it('nunca inclui texto pessoal, ViewState, cookie ou conteúdo acadêmico do HTML de origem', () => {
@@ -111,6 +143,45 @@ describe('domFingerprint', () => {
         const b = '<html><body><section><p>x</p></section></body></html>';
 
         expect(domFingerprint(a)).not.toBe(domFingerprint(b));
+    });
+});
+
+describe('urlFamily', () => {
+    it('descarta query string e fragmento', () => {
+        expect(urlFamily('https://si3.ufc.br/sigaa/ava/index.jsf?idTurma=999&jsessionid=SECRET')).toBe(
+            '/sigaa/ava/index.jsf',
+        );
+    });
+
+    it('remove parâmetro de caminho (;jsessionid=...) — o segredo mora no pathname, não na query', () => {
+        expect(
+            urlFamily('https://si3.ufc.br/sigaa/paginaInicial.do;jsessionid=TEST_SESSION_SECRET?foo=1'),
+        ).toBe('/sigaa/paginaInicial.do');
+    });
+
+    it('URL inválida devolve string vazia', () => {
+        expect(urlFamily('not a url')).toBe('');
+    });
+});
+
+describe('categorizeTitle', () => {
+    // Os sete títulos reais do SIGAA — `grep -rhoi "<title>[^<]*</title>" tests/fixtures/`.
+    const KNOWN_TITLES: ReadonlyArray<readonly [string, string]> = [
+        ['AVA - SIGAA - Sistema Integrado de Gestão de Atividades Acadêmicas', 'ava'],
+        ['SIGAA - Acesso Negado', 'access-denied'],
+        ['SIGAA - Login', 'login'],
+        ['SIGAA - Manutenção', 'maintenance'],
+        ['SIGAA - Portal do Discente', 'student-portal'],
+        ['SIGAA - Portal', 'portal'],
+        ['SIGAA - Turma', 'course-class'],
+    ];
+
+    it.each(KNOWN_TITLES)('categoriza "%s" como %s', (title, expected) => {
+        expect(categorizeTitle(title)).toBe(expected);
+    });
+
+    it('título fora da allowlist vira "other", nunca o texto', () => {
+        expect(categorizeTitle('Aluno Teste Privado - Calculo I - Media 9.4')).toBe('other');
     });
 });
 

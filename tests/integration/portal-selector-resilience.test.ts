@@ -450,4 +450,52 @@ describe('Diagnóstico estrutural nos pontos de falha (PORTAL-003)', () => {
         expect(result.errorCode).toBe('SESSION_EXPIRED');
         expect(recordSpy).not.toHaveBeenCalled();
     });
+
+    it('grava o diagnóstico quando o HTML inicial do login não tem o formulário esperado', async () => {
+        const { browser, page } = createNavigationHarness();
+        page.content.mockResolvedValueOnce('<main>Layout novo sem formulario</main>');
+        const service = new PlaywrightLoginService();
+
+        const result = await service.login('student', 'password');
+
+        expect(result.errorCode).toBe('SELECTOR_DRIFT');
+        expect(recordSpy).toHaveBeenCalledTimes(1);
+        expect(recordSpy.mock.calls[0][0]).toMatchObject({
+            state: 'UNKNOWN',
+            urlFamily: '/sigaa/verTelaLogin.do',
+            adapterVersion: PORTAL_ADAPTER_VERSION,
+            selectorCounts: {}
+        });
+        expect(browser.close).toHaveBeenCalledOnce();
+    });
+
+    it('grava o diagnóstico quando o preenchimento do campo de login estoura por timeout de seletor', async () => {
+        const { browser, page } = createNavigationHarness();
+        page.fill.mockRejectedValueOnce(new Error('locator.fill: Timeout 5000ms exceeded for input[name="user.login"]'));
+        const service = new PlaywrightLoginService();
+
+        const result = await service.login('student', 'password');
+
+        expect(result.errorCode).toBe('SELECTOR_DRIFT');
+        expect(recordSpy).toHaveBeenCalledTimes(1);
+        expect(recordSpy.mock.calls[0][0]).toMatchObject({
+            state: 'LOGIN',
+            urlFamily: '/sigaa/verTelaLogin.do',
+            adapterVersion: PORTAL_ADAPTER_VERSION,
+            selectorCounts: {}
+        });
+        expect(page.content).toHaveBeenCalled();
+        expect(browser.close).toHaveBeenCalledOnce();
+    });
+
+    it('não grava diagnóstico quando a exceção de login é indisponibilidade de portal, não drift', async () => {
+        const { page } = createNavigationHarness();
+        page.waitForLoadState.mockRejectedValueOnce(new Error('Timeout 30000ms exceeded waiting for navigation'));
+        const service = new PlaywrightLoginService();
+
+        const result = await service.login('student', 'password');
+
+        expect(result.errorCode).toBe('PORTAL_UNAVAILABLE');
+        expect(recordSpy).not.toHaveBeenCalled();
+    });
 });
