@@ -164,10 +164,16 @@ diagnostics: Pick<DiagnosticsService, 'clear'>;
    nenhum `app.isPackaged` inline ao lado de dump sobrou em
    `playwright-login.service.ts` e `http-scraper.service.ts`. Prova do
    revisor; esses métodos lançam Chromium.
+7. **`prune()` robusto a nome fora do padrão.** `Number(name.split('-')[0])`
+   dá `NaN` para qualquer arquivo estranho na pasta, e `NaN` na comparação
+   deixa a ordem arbitrária — pode apagar o arquivo errado. Filtrar por
+   `Number.isFinite` antes do `sort`. Teste: 20 arquivos válidos mais
+   `sujeira.json` deixam os 20 válidos, não 19 válidos e o intruso. Menor
+   herdado do `PORTAL-003`.
 
 ## Testes que a etapa 2 escreve
 
-- `tests/unit/diagnostics-raw.test.ts` — critérios 1 a 3 e a falha de
+- `tests/unit/diagnostics-raw.test.ts` — critérios 1 a 3, 7 e a falha de
   `clear()`, `fs` real em pasta temporária, `electron` mockado só para
   `app.getPath`/`app.isPackaged`.
 - `tests/unit/legacy-log-cleanup.test.ts` — critério 5.
@@ -205,3 +211,28 @@ regressão real na janela entre os dois, e a cobertura que a provava não existe
 mais. O critério "Clear-all apaga `diagnostics/`" vira reparo, não melhoria, e
 o teste em `clear-all-data.test.ts` precisa cobrir `deps.diagnostics.clear()`
 com a mesma força do que foi apagado.
+
+## Ressalvas herdadas do `PORTAL-003` (2026-09-09)
+
+O `PORTAL-003` fechou com AC3 e AC4 parciais e cinco menores em aberto, sem
+ticket próprio. Este ticket é o dono deles; nada ficou solto:
+
+| Ressalva do `PORTAL-003` | Onde fecha aqui |
+|---|---|
+| AC3 — ~11 dumps com `!app.isPackaged` inline | itens 1 e 2 do "What to build", critério 6 |
+| AC3 — `shouldCaptureRawArtifact` sem call site com `consent=true` | decisão 4: fica dev-only e o gate passa a ter 11 call sites reais, então deixa de ser abstração para zero casos (regra 7) |
+| AC4 — `debug_*.html` sem limite de retenção | decisão 1 e critério 2, teto de 20 compartilhado |
+| Menor — `existsSync` redundante em `clear()`, moldado pelo mock de `fs` | decisão 7, já registrada: sai junto com a passagem para `fs.promises`; o conserto do mock é `rm: vi.fn()` |
+| Menor — `NaN` no `prune()` | critério 7 |
+
+Dois menores decididos como **não corrigir**, em 2026-09-09, para não voltarem
+a cada revisão:
+
+- **Três parses de cheerio em `buildStructuralDiagnostic`.** Passar o `$`
+  adiante obrigaria a mudar a assinatura de `classify()`, que é API pública do
+  `PORTAL-001`, por um caminho que só roda quando o scraping já falhou.
+- **`el.type === 'tag'` dentro de `$('*')` não é sempre verdadeiro.** O
+  `domhandler` tipa `<script>` e `<style>` como `ElementType` próprios, então a
+  guarda exclui os dois do fingerprint — corpo de script muda sem a estrutura
+  mudar, e excluir é o comportamento desejado. A etapa 2 confirma com `tsc` e
+  troca a linha por um comentário dizendo isso, não por correção.

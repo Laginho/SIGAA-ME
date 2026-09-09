@@ -41,4 +41,19 @@ Registrados no formato da seção 6: o quê, por quê, e o que faz voltar.
   imediatamente se aparecer qualquer bug de sincronização corrompendo dados.
 - **Mitigação:** nenhuma. O risco existe hoje e é conhecido.
 
+#### DÉBITO-04 — Fixtures de portal sintéticas
+
+- **O quê:** as oito fixtures de `tests/fixtures/sigaa/ufc-sigaa-2026.09-v1/`
+  (`PORTAL-002`) são escritas à mão, não capturadas do `si3.ufc.br` — a fixture
+  concorda com o parser por construção.
+- **Por quê adiado:** captura real pede sessão logada na conta do autor, no
+  Windows, com alguém olhando, mais sanitização manual de cada arquivo.
+- **Gatilho de reavaliação:** `PORTAL-004` (canary contra o portal real) é a
+  mitigação planejada; sobe de prioridade se o canary pegar um drift que as
+  fixtures deixaram passar, ou antes de distribuição pública ampla.
+- **Mitigação:** uma captura real limpa já existe
+  (`course-page-real-with-tasks.html`, usada por `parser-real.test.ts`), e a
+  auditoria do `PORTAL-002` fixou o método — a mutação que prova uma fixture é
+  em `selectors.ts`/classifier, não na fixture.
+
 ---
