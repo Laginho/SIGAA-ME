@@ -447,3 +447,16 @@ AC3 (os ~11 dumps crus com `!app.isPackaged` inline e a decisão sobre
 como registrado na rodada anterior. `prune()` com `NaN` para nome de arquivo
 estranho e os parses repetidos de cheerio em `buildStructuralDiagnostic`
 seguem como itens menores, fora do escopo dos três bloqueantes desta rodada.
+
+#### Lacuna de cobertura fechada (2026-09-08, `9b4dbf8`)
+
+A revisão da etapa 3 achou o `try/catch` interno do `catch` de `login()`
+(captura de `page.content()`/`page.url()` best-effort, B-3 acima) sem teste
+próprio. Novo teste em `portal-selector-resilience.test.ts` faz `page.fill`
+estourar por timeout de seletor **e** `page.content` rejeitar na chamada do
+`catch`; prova vermelha removendo o `try` interno (`await page.content()` sem
+guarda) — `login()` rejeitava com o erro cru em vez de resolver com
+`SELECTOR_DRIFT`. Restaurado byte a byte (`git diff --stat` limpo contra
+`5459962`), sem commit de código. Gate: `tsc --noEmit` limpo, `eslint .` 0
+erros/67 warnings legado, `vitest run` 46 arquivos, **574 passed | 4 skipped
+(578)**.
