@@ -870,7 +870,7 @@ export class HttpScraperService {
             const contentLength = parseInt(response.headers['content-length'] || '0', 10);
             const hintFileName = fileNameFromContentDisposition(response.headers['content-disposition']);
 
-            log.info(`Response headers. Content-Type=${contentType}, Content-Length=${response.headers['content-length']}.`);
+            log.info(`Response headers. Content-Length=${response.headers['content-length']}.`, { contentType });
 
             // DL-002: teto antes de tocar disco. Um Content-Length maior que o
             // limite é recusado sem criar o `.part`, e o stream é destruído para

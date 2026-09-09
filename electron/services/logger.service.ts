@@ -169,24 +169,32 @@ export class LoggerService implements ScopedLogger {
     }
 
     /** flush + fecha + apaga `logs/` via `fs.promises` + reabre no próximo write. Rejeita com o erro da exclusão. */
-    async clear(): Promise<void> {
-        await this.flush();
-        const stream = this.stream;
-        this.stream = null;
-        if (stream) {
-            await new Promise<void>((resolve) => stream.end(() => resolve()));
-        }
-        // Sem `initialized` o `this.dir` está vazio: recalcular o caminho faz um
-        // `clear()` antes do primeiro write apagar o log do boot anterior, em vez
-        // de resolver com o arquivo intacto (DATA-002).
-        const dir = this.initialized ? this.dir : path.join(this.userDataPath(), 'logs');
-        try {
-            await fs.promises.rm(dir, { recursive: true, force: true });
-        } finally {
-            this.initialized = false;
-            this.bytes = 0;
-            this.sinkDisabled = false;
-        }
+    clear(): Promise<void> {
+        // Entra na mesma `chain` dos writes em vez de só aguardar `flush()`: um
+        // `enqueue` chamado durante o clear() encadeia depois deste `doClear`, não
+        // ao lado dele, então nunca vê `this.stream` nulo com `initialized` ainda
+        // `true` (a corrida herdada da revisão do OBS-001).
+        const doClear = async (): Promise<void> => {
+            const stream = this.stream;
+            this.stream = null;
+            if (stream) {
+                await new Promise<void>((resolve) => stream.end(() => resolve()));
+            }
+            // Sem `initialized` o `this.dir` está vazio: recalcular o caminho faz um
+            // `clear()` antes do primeiro write apagar o log do boot anterior, em vez
+            // de resolver com o arquivo intacto (DATA-002).
+            const dir = this.initialized ? this.dir : path.join(this.userDataPath(), 'logs');
+            try {
+                await fs.promises.rm(dir, { recursive: true, force: true });
+            } finally {
+                this.initialized = false;
+                this.bytes = 0;
+                this.sinkDisabled = false;
+            }
+        };
+        const p = this.chain.then(doClear);
+        this.chain = p.catch(() => undefined);
+        return p;
     }
 
     private enqueue(level: 'INFO' | 'WARN' | 'ERROR', scope: string, message: string, args: unknown[]): void {
