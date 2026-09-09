@@ -43,7 +43,6 @@ export interface IpcDeps {
     | 'getNewsDetail'
     | 'loadAllNews'
     | 'logout'
-    | 'clearDiagnostics'
   >;
   persistence: Pick<
     PersistenceService,
@@ -305,7 +304,6 @@ export function registerIpcHandlers(deps: IpcDeps): void {
     await attempt(() => deps.cache.clear(), failures, 'Limpar cache');
     await attempt(() => deps.persistence.reset(), failures, 'Limpar configurações');
     await attempt(() => deps.logger.clear(), failures, 'Limpar log');
-    await attempt(() => deps.sigaaService.clearDiagnostics(), failures, 'Limpar diagnósticos');
     await attempt(() => {
       for (const entry of fs.readdirSync(deps.userDataPath)) {
         if (entry.startsWith('debug_')) fs.unlinkSync(path.join(deps.userDataPath, entry));

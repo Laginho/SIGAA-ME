@@ -1,7 +1,6 @@
 import { HttpScraperService, type ParsedFile, type ParsedNews } from './http-scraper.service';
 import { PlaywrightLoginService, type ParsedCourse } from './playwright-login.service';
 import { logger } from './logger.service';
-import { diagnosticsService } from './diagnostics.service';
 import { deriveAccountId, getActiveAccount, setActiveAccount } from './account-context.service';
 import { SessionOperationCoordinator } from './session-operation-coordinator.service';
 import * as fs from 'fs';
@@ -19,6 +18,8 @@ import type {
 } from '../../shared/domain';
 import type { DownloadFileRef } from '../../shared/ipc';
 import { type AppResult, errorMessage, fail, failFromMessage, failFromResult, ok } from '../../shared/errors';
+
+const log = logger.scope('Sigaa');
 
 // ---------------------------------------------------------------------------
 // Redução parser -> domínio (ARCH-001).
@@ -77,11 +78,11 @@ export class SigaaService {
             if (signal.aborted) return CANCELLED;
             try {
                 const accountId = deriveAccountId(username);
-                logger.info('SIGAA: Attempting login...');
+                log.info('Attempting login.');
                 const result = await this.playwrightLogin.login(username, password);
 
                 if (!result.success) {
-                    logger.error('SIGAA: Login failed', result.error);
+                    log.error('Login failed.', { error: result.error });
                     return failFromResult(result, 'Falha no login');
                 }
 
@@ -90,19 +91,19 @@ export class SigaaService {
                 // instalar os cookies novos.
                 const previous = getActiveAccount();
                 if (previous !== null && previous !== accountId) {
-                    logger.info('SIGAA: Different account signed in; resetting the HTTP scraper session.');
+                    log.info('Different account signed in; resetting the HTTP scraper session.');
                     this.httpScraper.resetSession();
                 }
                 setActiveAccount(accountId);
 
                 if (result.cookies) {
-                    logger.info('SIGAA: Login successful, setting cookies for HTTP scraper');
+                    log.info('Login successful, setting cookies for HTTP scraper.');
                     this.httpScraper.setCookies(result.cookies);
                 }
                 // A foto só existe na página do portal; `getCourses` a devolve.
                 return ok({ id: accountId, name: result.userName || 'User' });
             } catch (error) {
-                logger.error('SIGAA: Login error', error);
+                log.error('Login error.', { error });
                 return failFromMessage(errorMessage(error));
             }
         });
@@ -110,7 +111,7 @@ export class SigaaService {
 
     async logout(): Promise<void> {
         return this.operations.run('shutdown', async () => {
-            logger.info('SIGAA: Logging out, closing Playwright session...');
+            log.info('Logging out, closing Playwright session.');
             this.httpScraper.resetSession();
             setActiveAccount(null);
             // logout(), não close(): close() guarda cookies/credencial de propósito
@@ -119,27 +120,21 @@ export class SigaaService {
         });
     }
 
-    /** Zera diagnósticos em disco (DATA-002, PORTAL-003), sem tocar na sessão. */
-    clearDiagnostics(): Promise<void> {
-        diagnosticsService.clear();
-        return this.httpScraper.resetLog();
-    }
-
     async getCourses(): Promise<AppResult<{ courses: CourseSummary[]; photoUrl?: string }>> {
         return this.operations.run('interactive', async (signal) => {
             if (signal.aborted) return CANCELLED;
             try {
-                logger.info('SIGAA: Fetching courses using Playwright...');
+                log.info('Fetching courses using Playwright.');
                 const result = await this.playwrightLogin.getCourses();
 
                 if (!result.success || !result.courses) {
-                    logger.error('SIGAA: Failed to fetch courses', result.error);
+                    log.error('Failed to fetch courses.', { error: result.error });
                     return failFromResult(result, 'Failed to fetch courses');
                 }
-                logger.info(`SIGAA: Found ${result.courses.length} courses`);
+                log.info(`Found ${result.courses.length} courses.`);
                 return ok({ courses: result.courses.map(toCourseSummary), photoUrl: result.photoUrl });
             } catch (error) {
-                logger.error('SIGAA: Error fetching courses', error);
+                log.error('Error fetching courses.', { error });
                 return failFromMessage(errorMessage(error), 'Failed to fetch courses');
             }
         });
@@ -150,7 +145,7 @@ export class SigaaService {
             if (signal.aborted) return CANCELLED;
             try {
                 // 1. Enter course (Lands on Dashboard/Portal)
-                logger.info('SIGAA: entering course via Full Browser (Dashboard)...');
+                log.info('Entering course via Full Browser (Dashboard).');
                 const entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
 
                 if (!entryResult.success || !entryResult.html) {
@@ -165,7 +160,7 @@ export class SigaaService {
 
                 // 2. Parse Dashboard for BOTH files and news
                 // Files with download links (jsfcljs...id...) are on the Dashboard, not the Conteúdo page
-                logger.info('SIGAA: Parsing Dashboard for files and news...');
+                log.info('Parsing Dashboard for files and news.');
                 const dashboardParse = await this.httpScraper.getCourseFiles(courseId, courseName, entryResult.html);
                 // Antes, falha de parse (sessão expirada, deriva de seletor) virava
                 // `success: true` com listas vazias — e uma disciplina vazia no cache.
@@ -174,11 +169,11 @@ export class SigaaService {
                 }
                 const files = (dashboardParse.files ?? []).map(toCourseFile);
                 const news = (dashboardParse.news ?? []).map(toNewsSummary);
-                logger.info(`SIGAA: Found ${files.length} files and ${news.length} news items on Dashboard.`);
+                log.info(`Found ${files.length} files and ${news.length} news items on Dashboard.`);
 
                 return ok({ files, news });
             } catch (error) {
-                logger.error('SIGAA: Error fetching files:', error);
+                log.error('Error fetching files.', { error });
                 return failFromMessage(errorMessage(error), 'Failed to fetch files');
             }
         });
@@ -228,10 +223,10 @@ export class SigaaService {
         }
 
         try {
-            console.log(`SIGAA: Downloading file ${file.name}...`);
+            log.info('Downloading file.', { fileName: file.name });
 
             // 1. Enter course via Full Browser (Dashboard) - Headless API skips valid ViewState for files
-            logger.info('SIGAA: Entering course via Full Browser for download (State reliability)...');
+            log.info('Entering course via Full Browser for download (state reliability).');
             const entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
             if (!entryResult.success || !entryResult.html) {
                 return failFromResult(entryResult, 'Failed to enter course');
@@ -241,18 +236,21 @@ export class SigaaService {
             }
 
             // 2. Navigate to Files Section (Essential for ViewState)
-            logger.info('SIGAA: Navigating to Files Section for download state...');
+            log.info('Navigating to files section for download state.');
             const filesNavResult = await this.playwrightLogin.navigateToFilesSection();
 
-            logger.info(`SIGAA: filesNavResult.success=${filesNavResult.success}, hasHtml=${!!filesNavResult.html}, htmlLength=${filesNavResult.html?.length || 0}, error=${filesNavResult.error || 'none'}`);
+            log.info(
+                `Files nav result: success=${filesNavResult.success}, hasHtml=${!!filesNavResult.html}, htmlLength=${filesNavResult.html?.length || 0}.`,
+                filesNavResult.error ? { error: filesNavResult.error } : undefined
+            );
             if (filesNavResult.html) {
                 const titleMatch = filesNavResult.html.match(/<title>(.*?)<\/title>/i);
-                logger.info(`SIGAA: filesNavResult page title: "${titleMatch?.[1] || 'unknown'}"`);
+                log.info('Files nav result page title.', { title: titleMatch?.[1] || 'unknown' });
             }
 
             const filesSectionHtml = filesNavResult.success && filesNavResult.html ? filesNavResult.html : null;
             if (!filesSectionHtml) {
-                logger.warn('SIGAA: Failed to navigate to files section. Proceeding with Dashboard HTML (likely to fail)...');
+                log.warn('Failed to navigate to files section. Proceeding with Dashboard HTML (likely to fail).');
             }
             let parseResult = await this.httpScraper.getCourseFiles(courseId, courseName, filesSectionHtml ?? entryResult.html);
             let targetScript = findScript(parseResult.files, file);
@@ -262,30 +260,30 @@ export class SigaaService {
             // esse caso — agora ele não atravessa o IPC, então olhamos a mesma
             // página de onde a lista saiu.
             if (!targetScript && filesSectionHtml) {
-                logger.info(`SIGAA: ${file.name} not in files section; scanning Dashboard HTML...`);
+                log.info('File not in files section; scanning Dashboard HTML.', { fileName: file.name });
                 parseResult = await this.httpScraper.getCourseFiles(courseId, courseName, entryResult.html);
                 targetScript = findScript(parseResult.files, file);
             }
             if (!targetScript) {
                 if (signal.aborted) return CANCELLED;
-                logger.warn(`SIGAA: ${file.name} not in static parses; trying Playwright live-DOM lookup...`);
+                log.warn('File not in static parses; trying Playwright live-DOM lookup.', { fileName: file.name });
                 return await this.downloadViaPlaywright(courseId, courseName, file.name, basePath, undefined);
             }
 
             // 3. Use HTTP Scraper for fast download
-            console.log(`SIGAA: Attempting fast HTTP download for file ${file.id}...`);
+            log.info(`Attempting fast HTTP download for file ${file.id}.`);
             const httpResult = await this.httpScraper.downloadFile(courseId, file.id, file.name, targetDir, targetScript);
 
             if (httpResult.success && httpResult.filePath) {
-                console.log('SIGAA: HTTP download successful!');
+                log.info('HTTP download successful.');
                 return ok({ filePath: httpResult.filePath });
             }
 
-            console.warn('SIGAA: HTTP download failed. Refreshing session and retrying HTTP download...', httpResult.error);
+            log.warn('HTTP download failed. Refreshing session and retrying HTTP download.', { error: httpResult.error });
 
             // 4. Refresh Session and Retry (HTTP Only)
             if (signal.aborted) return CANCELLED;
-            console.log(`SIGAA: Re-entering course ${courseId} to refresh session (Retry Attempt)...`);
+            log.info(`Re-entering course ${courseId} to refresh session (retry attempt).`);
             const retryEntryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
 
             if (!retryEntryResult.success || !retryEntryResult.html) {
@@ -301,19 +299,19 @@ export class SigaaService {
             const retryScript = findScript(retryParseResult.files, file) ?? targetScript;
 
             // Retry HTTP Download
-            console.log(`SIGAA: Retrying HTTP download for file ${file.name}...`);
+            log.info('Retrying HTTP download for file.', { fileName: file.name });
             const retryHttpResult = await this.httpScraper.downloadFile(courseId, file.id, file.name, targetDir, retryScript);
 
             if (retryHttpResult.success && retryHttpResult.filePath) {
-                console.log('SIGAA: HTTP retry successful!');
+                log.info('HTTP retry successful.');
                 return ok({ filePath: retryHttpResult.filePath });
             }
-            logger.warn(`SIGAA: HTTP download failed twice for ${file.name}. Falling back to Playwright...`);
+            log.warn('HTTP download failed twice. Falling back to Playwright.', { fileName: file.name });
             if (signal.aborted) return CANCELLED;
             return await this.downloadViaPlaywright(courseId, courseName, file.name, basePath, retryScript);
 
         } catch (error) {
-            console.error('SIGAA: Error downloading file:', error);
+            log.error('Error downloading file.', { error });
             return failFromMessage(errorMessage(error), 'Download failed');
         }
     }
@@ -340,10 +338,10 @@ export class SigaaService {
         onProgress?: (fileName: string, status: DownloadStatus) => void
     ): Promise<AppResult<DownloadResult>> {
         try {
-            logger.info(`SIGAA: =====================================`);
-            logger.info(`SIGAA: downloadAllFiles called for course ${courseName}`);
-            logger.info(`SIGAA: Files received: ${files.length}`);
-            logger.info(`SIGAA: basePath: ${basePath}`);
+            log.info('=====================================');
+            log.info('downloadAllFiles called.', { courseName });
+            log.info(`Files received: ${files.length}.`);
+            log.info('Base path set.', { basePath });
 
             // Create course subdirectory — single path policy (DL-001)
             const courseSegment = sanitizeSegment(courseName || 'Unknown Course', 100);
@@ -367,7 +365,7 @@ export class SigaaService {
                     return true;
                 }
                 if (fs.existsSync(targetFilePath)) {
-                    console.log(`Skipping duplicate (exists on disk): ${file.name}`);
+                    log.info('Skipping duplicate (exists on disk).', { fileName: file.name });
                     skipped++;
                     results.push({ fileName: file.name, status: 'skipped' });
                     if (onProgress) onProgress(file.name, 'skipped');
@@ -376,25 +374,25 @@ export class SigaaService {
                 return true;
             });
 
-            logger.info(`SIGAA: Queue after filtering: ${queue.length} files to download`);
+            log.info(`Queue after filtering: ${queue.length} files to download.`);
 
             // 1. Ensure httpScraper has course session data (viewState, form inputs, etc.)
             // This is REQUIRED for downloads to work - without it, downloadFile returns
             // "Course session data not found" error
-            logger.info(`SIGAA: Refreshing course session for batch download...`);
+            log.info('Refreshing course session for batch download.');
 
             // Enter course via Playwright to get fresh HTML
             let entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
 
             // If course not found, try re-login and retry
             if (!entryResult.success && entryResult.error?.includes('not found in portal')) {
-                logger.warn(`SIGAA: Course not found in portal. Attempting re-login...`);
+                log.warn('Course not found in portal. Attempting re-login.');
 
                 // Try to get stored credentials and re-login
                 const reloginResult = await this.playwrightLogin.reloginWithStoredCredentials();
 
                 if (reloginResult.success) {
-                    logger.info(`SIGAA: Re-login successful. Retrying course entry...`);
+                    log.info('Re-login successful. Retrying course entry.');
                     if (reloginResult.cookies) {
                         this.httpScraper.setCookies(reloginResult.cookies);
                     }
@@ -402,18 +400,18 @@ export class SigaaService {
                     // Retry entering the course
                     entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
                 } else {
-                    logger.error(`SIGAA: Re-login failed: ${reloginResult.error}`);
+                    log.error('Re-login failed.', { error: reloginResult.error });
                 }
             }
 
             if (!entryResult.success || !entryResult.html) {
-                logger.error(`SIGAA: Failed to enter course for batch download: ${entryResult.error}`);
+                log.error('Failed to enter course for batch download.', { error: entryResult.error });
                 return failFromResult(entryResult, 'Failed to enter course for download');
             }
 
             // Set cookies from Playwright session
             if (entryResult.cookies && entryResult.cookies.length > 0) {
-                logger.info(`SIGAA: Got ${entryResult.cookies.length} cookies from Playwright`);
+                log.info(`Got ${entryResult.cookies.length} cookies from Playwright.`);
                 this.httpScraper.setCookies(entryResult.cookies);
             }
 
@@ -422,7 +420,7 @@ export class SigaaService {
             const parseResult = await this.httpScraper.getCourseFiles(courseId, courseName, entryResult.html);
 
             if (!parseResult.success) {
-                logger.error(`SIGAA: Failed to parse course files: ${parseResult.error}`);
+                log.error('Failed to parse course files.', { error: parseResult.error });
                 return failFromResult(parseResult, 'Failed to parse course for download');
             }
 
@@ -439,50 +437,50 @@ export class SigaaService {
                     if (sectionParse.success) {
                         filesSectionFiles = sectionParse.files ?? [];
                     } else {
-                        logger.warn('SIGAA: Failed to parse files section; proceeding with Dashboard files only.');
+                        log.warn('Failed to parse files section; proceeding with Dashboard files only.');
                     }
                 } else {
-                    logger.warn('SIGAA: Failed to navigate to files section; proceeding with Dashboard files only.');
+                    log.warn('Failed to navigate to files section; proceeding with Dashboard files only.');
                 }
             }
             let retryParsedFiles: ParsedFile[] | undefined;
-            logger.info(`SIGAA: Course session ready. Found ${parsedFiles.length} files on page.`);
+            log.info(`Course session ready. Found ${parsedFiles.length} files on page.`);
 
-            logger.info(`SIGAA: Starting download loop for ${queue.length} files...`);
+            log.info(`Starting download loop for ${queue.length} files.`);
             for (const file of queue) {
                 if (signal.aborted) return CANCELLED;
-                logger.info(`SIGAA: Processing file: ${file.name}`);
+                log.info('Processing file.', { fileName: file.name });
 
                 const targetScript = findScript(parsedFiles, file) ?? findScript(filesSectionFiles, file);
                 if (!targetScript) {
-                    logger.warn(`SIGAA: Skipping ${file.name} - not found on course page`);
+                    log.warn('Skipping file - not found on course page.', { fileName: file.name });
                     failed++;
                     results.push({ fileName: file.name, status: 'failed' });
                     if (onProgress) onProgress(file.name, 'failed');
                     continue;
                 }
 
-                logger.info(`SIGAA: Downloading ${file.name} (ID: ${file.id})...`);
+                log.info(`Downloading file ${file.id}.`, { fileName: file.name });
                 const result = await this.httpScraper.downloadFile(courseId, file.id, file.name, targetDir, targetScript);
 
                 if (result.success && result.filePath) {
-                    logger.info(`SIGAA: Downloaded ${file.name} successfully`);
+                    log.info(`Downloaded file ${file.id} successfully.`);
                     downloaded++;
                     results.push({ fileName: file.name, status: 'downloaded', filePath: result.filePath });
                     if (onProgress) onProgress(file.name, 'downloaded');
                 } else {
-                    logger.error(`SIGAA: Failed to download ${file.name}: ${result.error}`);
+                    log.error(`Failed to download file ${file.id}.`, { error: result.error });
                     failed++;
                     results.push({ fileName: file.name, status: 'failed' });
                     if (onProgress) onProgress(file.name, 'failed');
                 }
             }
 
-            logger.info(`SIGAA: Download loop complete. Downloaded: ${downloaded}, Failed: ${failed}, Skipped: ${skipped}`);
+            log.info(`Download loop complete. Downloaded: ${downloaded}, Failed: ${failed}, Skipped: ${skipped}.`);
 
             // Retry failed files with HTTP (after session refresh)
             if (failed > 0) {
-                console.log(`SIGAA: ${failed} files failed HTTP download. Refreshing session and retrying...`);
+                log.info(`${failed} files failed HTTP download. Refreshing session and retrying.`);
 
                 // 1. Refresh Session
                 const retryEntryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
@@ -502,7 +500,7 @@ export class SigaaService {
 
                     for (const file of failedFiles) {
                         if (signal.aborted) return CANCELLED;
-                        console.log(`SIGAA: Retrying HTTP download for ${file.name} (Attempt 1/3)...`);
+                        log.info(`Retrying HTTP download for file ${file.id} (attempt 1/3).`);
 
                         // HTTP sem script não tem como funcionar: segue pulando.
                         let retryScript = findScript(retryParsedFiles, file)
@@ -514,7 +512,7 @@ export class SigaaService {
                         let retrySuccess = false;
                         for (let attempt = 1; attempt <= 3; attempt++) {
                             if (signal.aborted) return CANCELLED;
-                            if (attempt > 1) console.log(`SIGAA: Retry attempt ${attempt}/3 for ${file.name}...`);
+                            if (attempt > 1) log.info(`Retry attempt ${attempt}/3 for file ${file.id}.`);
 
                             const retryResult = await this.httpScraper.downloadFile(courseId, file.id, file.name, targetDir, retryScript);
 
@@ -530,7 +528,7 @@ export class SigaaService {
                                 retrySuccess = true;
                                 break; // Success!
                             } else {
-                                console.warn(`SIGAA: Retry ${attempt} failed for ${file.name}: ${retryResult.error}`);
+                                log.warn(`Retry ${attempt} failed for file ${file.id}.`, { error: retryResult.error });
                                 // Refresh session before next attempt if not last attempt
                                 if (attempt < 3) {
                                     const refreshResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
@@ -547,11 +545,11 @@ export class SigaaService {
                         }
 
                         if (!retrySuccess) {
-                            console.error(`SIGAA: All retry attempts failed for ${file.name}`);
+                            log.error(`All retry attempts failed for file ${file.id}.`);
                         }
                     }
                 } else {
-                    console.error('SIGAA: Failed to refresh session for batch retry');
+                    log.error('Failed to refresh session for batch retry.');
                 }
             }
 
@@ -577,7 +575,7 @@ export class SigaaService {
 
             return ok({ downloaded, skipped, failed, results });
         } catch (error) {
-            console.error('SIGAA: Error downloading files:', error);
+            log.error('Error downloading files.', { error });
             return failFromMessage(errorMessage(error), 'Download failed');
         }
     }
@@ -586,7 +584,7 @@ export class SigaaService {
         return this.operations.run('interactive', async (signal) => {
             if (signal.aborted) return CANCELLED;
             try {
-                console.log(`SIGAA: Fetching news detail ${newsId} using Playwright...`);
+                log.info(`Fetching news detail ${newsId} using Playwright.`);
                 // Use Playwright for reliable JSF session handling
                 const result = await this.playwrightLogin.getNewsDetail(courseId, courseName, newsId);
 
@@ -595,7 +593,7 @@ export class SigaaService {
                 }
                 return ok(result.news);
             } catch (error) {
-                console.error('SIGAA: Error fetching news detail:', error);
+                log.error('Error fetching news detail.', { error });
                 return failFromMessage(errorMessage(error), 'Failed to fetch news detail');
             }
         });
@@ -605,7 +603,7 @@ export class SigaaService {
         return this.operations.run('interactive', async (signal) => {
             if (signal.aborted) return CANCELLED;
             try {
-                logger.info(`SIGAA: Loading all news for course ${courseName} (${courseId})...`);
+                log.info(`Loading all news for course ${courseId}.`, { courseName });
 
                 // 1. Enter Course to get fresh News List (and ViewState)
                 const entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName);
@@ -624,13 +622,13 @@ export class SigaaService {
                 }
                 const newsItems = parseResult.news ?? [];
 
-                logger.info(`SIGAA: Found ${newsItems.length} news items. Fetching content for all...`);
+                log.info(`Found ${newsItems.length} news items. Fetching content for all.`);
 
                 // 3. Fetch detail for each news item using Playwright (HTTP scraper fails due to session issues)
                 const enrichedNews: NewsSummary[] = [];
                 for (const item of newsItems) {
                     if (signal.aborted) return CANCELLED;
-                    logger.info(`SIGAA: Fetching content for news "${item.title}"...`);
+                    log.info(`Fetching content for news ${item.id}.`, { title: item.title });
 
                     // Use Playwright for reliable JSF session handling instead of HTTP scraper
                     // The HTTP approach fails because sessions become stale between requests
@@ -640,7 +638,7 @@ export class SigaaService {
                     if (detail.success && detail.news) {
                         enrichedNews.push({ ...summary, content: detail.news.content });
                     } else {
-                        logger.warn(`SIGAA: Failed to fetch news "${item.title}": ${detail.error}`);
+                        log.warn(`Failed to fetch news ${item.id}.`, { title: item.title, error: detail.error });
                         enrichedNews.push(summary); // Keep header at least
                     }
                 }
@@ -648,7 +646,7 @@ export class SigaaService {
                 return ok(enrichedNews);
 
             } catch (error) {
-                logger.error('SIGAA: Error loading all news:', error);
+                log.error('Error loading all news.', { error });
                 return failFromMessage(errorMessage(error));
             }
         });

@@ -162,14 +162,18 @@ export default tseslint.config(
   },
 
   /**
-   * Sem console (OBS-001): os dois serviços que este ticket migra, fora da
-   * fronteira mas com a mesma catraca. `updater` é `setupAutoUpdater` dentro
+   * Sem console (OBS-001, OBS-004): os serviços que esses tickets migram, fora
+   * da fronteira mas com a mesma catraca. `updater` é `setupAutoUpdater` dentro
    * de `main.ts`, já coberto acima. `electron/**` inteiro entra em OBS-005.
    */
   {
     files: [
       'electron/services/persistence.service.ts',
       'electron/services/cache.service.ts',
+      'electron/services/http-scraper.service.ts',
+      'electron/services/sigaa.service.ts',
+      'electron/services/download.service.ts',
+      'electron/services/background-sync.service.ts',
     ],
     rules: {
       'no-restricted-syntax': ['error', noCredentialFallback, noConsoleAnyForm],
