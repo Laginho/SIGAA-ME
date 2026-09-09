@@ -10,8 +10,9 @@ tarefas; layout, IDs e estados em `docs/agents/issue-tracker.md`). O
 
 ## Loop de trabalho
 
-A tabela de etapas, modelos e skills está no `AGENTS.md`; as amarrações (gate,
-convenções de teste, commits, registro na issue) em `docs/agents/orchestration.md`.
+O loop é a skill `ticket-flow` (única cópia); gate, branch base e modelo por
+etapa no bloco `## Bindings do fluxo` do `AGENTS.md`; convenções de teste,
+commits e registro na issue em `docs/agents/orchestration.md`.
 
 Histórico, para não repetir experimento: o PTMR (PLAN/TEST/MAKE/READ) deixou um
 plano errado atravessar TEST e MAKE (`DL-001`) e foi removido. `PROC-001`

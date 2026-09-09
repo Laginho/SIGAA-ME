@@ -1,5 +1,6 @@
 # DATA-002 — Implement complete logout and clear-all transactions
 Status: resolved
+Stage: done
 Priority: P1
 Blocked by: DATA-001
 Tracker status at migration: `NOT STARTED`

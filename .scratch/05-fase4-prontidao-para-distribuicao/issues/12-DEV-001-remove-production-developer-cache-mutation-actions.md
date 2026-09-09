@@ -1,5 +1,6 @@
 # DEV-001 — Remove production developer cache mutation actions
 Status: resolved
+Stage: done
 Priority: P2
 Tracker status at migration: `PARTIAL`
 

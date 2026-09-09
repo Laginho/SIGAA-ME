@@ -1,5 +1,6 @@
 # DOC-001 — Corrigir os documentos de auditoria
 Status: resolved
+Stage: done
 Priority: P1
 Tracker status at migration: `DONE`
 

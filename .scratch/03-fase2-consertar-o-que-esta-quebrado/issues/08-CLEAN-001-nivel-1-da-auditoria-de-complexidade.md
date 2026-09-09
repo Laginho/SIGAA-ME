@@ -1,5 +1,6 @@
 # CLEAN-001 — Nível 1 da auditoria de complexidade
 Status: resolved
+Stage: done
 Priority: P3
 Tracker status at migration: `DONE` — 2026-08-09, commit `700de9a`
 

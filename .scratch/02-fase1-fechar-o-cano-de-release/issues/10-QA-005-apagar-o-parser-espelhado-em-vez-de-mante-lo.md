@@ -1,5 +1,6 @@
 # QA-005 — Apagar o parser espelhado em vez de mantê-lo
 Status: resolved
+Stage: done
 Priority: P1
 Tracker status at migration: `DONE` — implementado na sessão 2026-08-05
 

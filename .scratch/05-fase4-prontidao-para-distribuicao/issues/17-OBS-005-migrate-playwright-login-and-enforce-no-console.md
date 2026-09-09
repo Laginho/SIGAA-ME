@@ -1,5 +1,6 @@
 # OBS-005 — Migrate playwright-login and enforce `no-console` in electron/**
 Status: open
+Stage: to-implement
 Priority: P2
 Blocked by: OBS-004
 

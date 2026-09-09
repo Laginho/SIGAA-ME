@@ -1,5 +1,6 @@
 # PORTAL-004 — Add an opt-in scheduled live compatibility canary
 Status: open
+Stage: to-implement
 Priority: P1
 Blocked by: ARCH-001
 Tracker status at migration: `PARTIAL`

@@ -7,16 +7,12 @@ na issue em `docs/agents/orchestration.md`.
 
 ## Fluxo de trabalho
 
-Um ticket por vez. O humano dispara cada etapa à mão, em sessão limpa, e aprova
-entre a 1 e a 2. O ticket é o contrato; o commit é o handoff — nada de documento
-intermediário. Tarefa trivial vai direto, sem loop.
+O loop de build é a skill `ticket-flow`, e ela é a única cópia: etapas,
+entregas, transições de `Stage` e as regras que as sustentam estão lá, não
+aqui. Sessão que recebe só um ID acha o ticket e despacha pelo `Stage:` dele.
 
-| # | Modelo | Skill | Entrega | Para e reporta se |
-|---|---|---|---|---|
-| 1 | Fable | `grill-me` → `to-spec` → `to-tickets` | `spec.md` + um `issues/NN-ID-slug.md` por ticket, `Status: open` | o humano não aprovar seams ou fatiamento |
-| 2 | Sonnet | `tdd` | branch `ID`, `Status: claimed`; **commit só de testes, vermelhos pelo motivo certo**; depois commits de código sem tocar `tests/`; gate verde | o ticket exigir mais de um seam (volta à etapa 1) ou o teste se provar errado depois de commitado (`Status: blocked` + motivo) |
-| 3 | Opus | `code-review` (Standards + Spec) | correções pequenas; `Status: resolved` + linha no `ledger.md` **no mesmo commit**; PR | achado grande → ticket reaberto, volta à etapa 2 |
-| ↩ | quem achou | — | achado que pertence a **outro** ticket: bloco ao fim do ticket-alvo, sob `## Comments` | nunca no corpo do ticket-alvo; dobrar Comment em requisito é da etapa 1 |
+## Bindings do fluxo (skill `ticket-flow`)
 
-Merge: direto se a etapa 3 não alterou código; se alterou, o PR espera o humano.
-Refactor fora do que o ticket tocou vira ticket `CLEAN-*`.
+- Gate: `npm run quality`
+- Base branch: `master`
+- Models: stage 1 Fable, stage 2 Sonnet, stage 3 Opus

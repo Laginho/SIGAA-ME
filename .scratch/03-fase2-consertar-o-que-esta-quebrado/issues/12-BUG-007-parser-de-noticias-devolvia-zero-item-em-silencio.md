@@ -1,5 +1,6 @@
 # BUG-007 — Parser de notícias devolvia zero item, em silêncio
 Status: resolved
+Stage: done
 Priority: P1
 Tracker status at migration: `DONE` — corrigido na sessão 2026-08-05
 

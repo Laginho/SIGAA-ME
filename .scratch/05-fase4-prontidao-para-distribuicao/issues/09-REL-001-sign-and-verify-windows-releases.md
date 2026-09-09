@@ -1,5 +1,6 @@
 # REL-001 — Sign and verify Windows releases
 Status: open
+Stage: to-implement
 Priority: P1
 Blocked by: QA-001
 Tracker status at migration: `NOT STARTED` — **ESCOPO ALTERADO 2026-08-02**

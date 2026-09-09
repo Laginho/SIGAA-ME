@@ -1,5 +1,6 @@
 # PORTAL-002 — Build sanitized, versioned portal fixtures
 Status: resolved
+Stage: done
 Priority: P1
 Blocked by: ARCH-001
 Tracker status at migration: `NOT STARTED`

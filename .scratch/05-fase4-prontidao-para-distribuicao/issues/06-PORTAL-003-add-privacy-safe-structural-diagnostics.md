@@ -1,5 +1,6 @@
 # PORTAL-003 — Add privacy-safe structural diagnostics
 Status: resolved
+Stage: done
 Priority: P1
 Blocked by: ARCH-001
 Tracker status at migration: `PARTIAL`

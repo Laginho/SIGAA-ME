@@ -1,5 +1,6 @@
 # A11Y-001 — Fix document, controls, and modal accessibility
 Status: open
+Stage: to-implement
 Priority: P2
 Blocked by: OBS-001
 Tracker status at migration: `NOT STARTED`

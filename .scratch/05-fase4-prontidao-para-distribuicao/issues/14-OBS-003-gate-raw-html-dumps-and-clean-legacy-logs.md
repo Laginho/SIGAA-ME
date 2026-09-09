@@ -1,5 +1,6 @@
 # OBS-003 — Gate raw HTML dumps, wire diagnostics clear, clean legacy logs
 Status: open
+Stage: to-implement
 Priority: P2
 Blocked by: OBS-005
 

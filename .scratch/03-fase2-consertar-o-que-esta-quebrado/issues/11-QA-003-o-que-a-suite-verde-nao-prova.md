@@ -1,5 +1,6 @@
 # QA-003 — O que a suíte verde **não** prova
 Status: resolved
+Stage: done
 Priority: P2
 Tracker status at migration: `DONE` — os dois testes existem e cada um falha com a proteção correspondente revertida (sessão 2026-09-01)
 

@@ -1,5 +1,6 @@
 # DL-002 — Correct content-type detection and file validation
 Status: resolved
+Stage: done
 Priority: P2
 Blocked by: —
 Tracker status at migration: `NOT STARTED`

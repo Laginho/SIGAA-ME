@@ -1,5 +1,6 @@
 # PORTAL-005 — Add compatibility degradation and kill-switch behavior
 Status: open
+Stage: to-implement
 Priority: P1
 Blocked by: ARCH-001
 Tracker status at migration: `NOT STARTED`

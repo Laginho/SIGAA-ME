@@ -1,5 +1,6 @@
 # OBS-002 — Stamp operation IDs on log lines
 Status: open
+Stage: to-implement
 Priority: P3
 Blocked by: OBS-004
 

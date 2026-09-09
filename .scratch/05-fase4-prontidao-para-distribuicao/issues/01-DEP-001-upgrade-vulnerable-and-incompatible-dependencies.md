@@ -1,5 +1,6 @@
 # DEP-001 — Upgrade vulnerable and incompatible dependencies
 Status: open
+Stage: to-implement
 Priority: P1
 Blocked by: A11Y-001
 Tracker status at migration: `NOT STARTED`

@@ -1,5 +1,6 @@
 # DÉBITO-01 — Electron 30 fora de suporte
 Status: open
+Stage: blocked
 Priority: —
 Tracker status at migration: (sem linha de status — débito aceito conscientemente)
 
@@ -14,3 +15,9 @@ Tracker status at migration: (sem linha de status — débito aceito conscientem
   entregar Chromium sem patch a terceiros.
 - **Mitigação:** superfície reduzida enquanto é uso pessoal e o app navega apenas
   para `si3.ufc.br`. Cai mais depois do `SEC-003`.
+
+## Comments
+
+- `Stage: blocked` porque o débito foi aceito conscientemente, não porque
+  alguém parou no meio. O motivo e o gatilho de desbloqueio estão no corpo,
+  em "Por quê adiado" e "Gatilho".

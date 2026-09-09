@@ -1,5 +1,6 @@
 # DEP-002 — `npm ci` não rodava: lock fora de sincronia com o `package.json`
 Status: resolved
+Stage: done
 Priority: P1
 Tracker status at migration: `DONE` — implementado e verificado no Windows em 2026-08-09
 

@@ -1,5 +1,6 @@
 # PIPE-006 — Bloquear novos segredos no CI
 Status: resolved
+Stage: done
 Priority: P1
 Tracker status at migration: `DONE` — implementado e verificado em 2026-08-09
 

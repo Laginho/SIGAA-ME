@@ -1,5 +1,6 @@
 # BUG-010 — O User-Agent real do navegador é buscado e descartado
 Status: resolved
+Stage: done
 Priority: P2
 Tracker status at migration: `IN REVIEW` — código e testes prontos (sessão 2026-09-01); falta só a medição de taxa de falha em uso real, que é do Bruno
 

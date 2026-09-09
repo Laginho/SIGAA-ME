@@ -1,5 +1,6 @@
 # PROC-002 — Validar Astra high como especificador
 Status: resolved
+Stage: done
 Priority: P2
 Started: 2026-09-07
 

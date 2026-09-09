@@ -1,5 +1,6 @@
 # DATA-001 — Bind all persisted state to a stable account identity
 Status: resolved
+Stage: done
 Priority: P1
 Blocked by: SEC-003
 Tracker status at migration: `NOT STARTED`

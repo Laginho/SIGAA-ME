@@ -1,5 +1,6 @@
 # SEC-000 — Credenciais reais expostas em repositório público
 Status: resolved
+Stage: done
 Priority: P0
 Tracker status at migration: `IN PROGRESS` — risco neutralizado; limpeza de histórico pendente
 

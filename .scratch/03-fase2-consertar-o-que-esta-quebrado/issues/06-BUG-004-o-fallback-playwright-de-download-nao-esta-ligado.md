@@ -1,5 +1,6 @@
 # BUG-004 — O fallback Playwright de download não está ligado
 Status: resolved
+Stage: done
 Priority: P1
 Tracker status at migration: `DONE` — ciclo PTMR 01 validado pelo master dev; smoke do Bruno em 2026-09-01: o fallback disparou de verdade nos itens de tarefa (`BUG-011`), abriu Chrome dedicado e o log mostrou "Falling back to Playwright"
 
