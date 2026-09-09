@@ -149,7 +149,7 @@ describe('updater consent', () => {
     }
     expect(threw).toBe(false);
     // Unhandled rejection would cause vitest to fail; also assert catch logged
-    expect(updaterLog?.error).toHaveBeenCalledWith('Dialog failed', expect.any(Error));
+    expect(updaterLog?.error).toHaveBeenCalledWith('Dialog failed', { err: expect.any(Error) });
 
     // Also pin second dialog chain
     updaterLog?.error.mockClear();
@@ -162,6 +162,6 @@ describe('updater consent', () => {
       await new Promise((r) => setTimeout(r, 10));
     } catch { threw = true; }
     expect(threw).toBe(false);
-    expect(updaterLog?.error).toHaveBeenCalledWith('Dialog failed', expect.any(Error));
+    expect(updaterLog?.error).toHaveBeenCalledWith('Dialog failed', { err: expect.any(Error) });
   });
 });

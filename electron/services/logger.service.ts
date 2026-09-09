@@ -176,10 +176,12 @@ export class LoggerService implements ScopedLogger {
         if (stream) {
             await new Promise<void>((resolve) => stream.end(() => resolve()));
         }
+        // Sem `initialized` o `this.dir` está vazio: recalcular o caminho faz um
+        // `clear()` antes do primeiro write apagar o log do boot anterior, em vez
+        // de resolver com o arquivo intacto (DATA-002).
+        const dir = this.initialized ? this.dir : path.join(this.userDataPath(), 'logs');
         try {
-            if (this.initialized) {
-                await fs.promises.rm(this.dir, { recursive: true, force: true });
-            }
+            await fs.promises.rm(dir, { recursive: true, force: true });
         } finally {
             this.initialized = false;
             this.bytes = 0;
@@ -205,8 +207,10 @@ export class LoggerService implements ScopedLogger {
     private formatLine(level: 'INFO' | 'WARN' | 'ERROR', scope: string, message: string, args: unknown[]): string {
         const ts = new Date().toISOString();
         const metaPart = args.length ? ` ${args.map((a) => this.formatArg(a)).join(' ')}` : '';
-        const line = `${ts} ${level} [${scope}] ${redact(message)}${metaPart}\n`;
-        return redact(line);
+        // A quebra de linha entra depois do `redact`: o corte em MAX_LINE_CHARS
+        // comeria o `\n` e colaria o registro seguinte na mesma linha.
+        const line = `${ts} ${level} [${scope}] ${redact(message)}${metaPart}`;
+        return `${redact(line)}\n`;
     }
 
     private echo(level: 'INFO' | 'WARN' | 'ERROR', line: string): void {

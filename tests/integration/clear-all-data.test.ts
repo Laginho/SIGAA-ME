@@ -13,7 +13,7 @@
  *
  * Vermelho hoje pelo motivo certo: os dois handlers só chamam
  * `clearCredentials` + `sigaaService.logout`, não abrem dialog, e `IpcDeps` não
- * tem `cache`, `logger`, `userDataPath`, `resetAppLog`, `clearBrowserStorage`
+ * tem `cache`, `logger`, `userDataPath`, `clearBrowserStorage`
  * nem `backgroundSync.cancel`.
  *
  * Contrato e decisões: `.scratch/04-fase3-fronteiras-de-confianca/issues/06-DATA-002-*.md`.

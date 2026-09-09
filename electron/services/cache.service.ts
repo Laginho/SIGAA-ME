@@ -96,7 +96,7 @@ export class CacheService {
                 log.warn('Discarding a pre-DATA-001 cache — its baseline cannot be attributed to an account.');
             }
         } catch (error) {
-            log.error('Failed to load cache', error);
+            log.error('Failed to load cache', { error });
         }
         return { schemaVersion: 2, accounts: {} };
     }
@@ -105,7 +105,7 @@ export class CacheService {
         try {
             fs.writeFileSync(this.cachePath, JSON.stringify(this.cache, null, 2));
         } catch (error) {
-            log.error('Failed to save cache', error);
+            log.error('Failed to save cache', { error });
         }
     }
 
