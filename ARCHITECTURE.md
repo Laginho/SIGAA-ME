@@ -104,3 +104,25 @@ electron/services/
 ├── http-scraper.service.ts     # HTTP requests (~950 lines)
 └── logger.service.ts           # Logging utility
 ```
+
+## Logging and diagnostics
+
+Target state, specified in `OBS-001` → `OBS-004` → `OBS-005` → `OBS-003` →
+`OBS-002` (2026-09-08). The migration is expand–contract: `OBS-001` ships the
+logger and removes the `console` monkeypatch, `OBS-004`/`OBS-005` move the
+services over, `OBS-005` narrows the signature and turns `no-console` on for
+all of `electron/**`. Until `OBS-005` closes, services not yet migrated write
+to stdout only.
+
+- One logger (`logger.service.ts`), `userData/logs/app.log`, rotated 1 MiB × 5.
+  `no-console` is a lint error in `electron/**`; the renderer's `console.*`
+  never reaches disk.
+- Redaction in every mode for secrets (password, cookie, `Authorization`,
+  ViewState, JSF script, HTML, absolute path); in packaged builds also for
+  academic content passed as `meta` (course, file, title, user). Messages are
+  literal; content goes in `meta` or does not go.
+- Raw HTML dumps live in `userData/diagnostics/` through `DiagnosticsService`,
+  dev-only, 20 files shared with the structural JSON diagnostics.
+- **Logout does not touch logs.** Logs belong to the app, not the account, and
+  carry no account content in production. Clear-all removes `logs/` and
+  `diagnostics/` and reports a failed deletion instead of swallowing it.
