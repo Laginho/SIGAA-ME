@@ -63,6 +63,21 @@ const harness = vi.hoisted(() => {
     return { windows, BrowserWindow, shell, dialog };
 });
 
+const loggerHarness = vi.hoisted(() => {
+    const scopes = new Map<string, { info: any; warn: any; error: any }>();
+    const makeScope = () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() });
+    return {
+        scopes,
+        logger: {
+            scope: vi.fn((name: string) => {
+                if (!scopes.has(name)) scopes.set(name, makeScope());
+                return scopes.get(name)!;
+            }),
+        },
+    };
+});
+vi.mock('../../electron/services/logger.service', () => ({ logger: loggerHarness.logger }));
+
 vi.mock('electron', async () => {
     const os = await import('node:os');
     return {
@@ -337,7 +352,6 @@ describe('installNavigationGuard', () => {
         'http://si3.ufc.br/sigaa',
         'https://aluno:senha@si3.ufc.br/sigaa',
     ])('blocked %s: previne e nem pergunta nem abre', async (url) => {
-        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
         const fake = fakeContents();
         const deps = fakeDeps();
         installNavigationGuard(fake.contents, deps);
@@ -348,7 +362,6 @@ describe('installNavigationGuard', () => {
         expect(event.preventDefault).toHaveBeenCalledTimes(1);
         expect(deps.confirmExternal).not.toHaveBeenCalled();
         expect(deps.openExternal).not.toHaveBeenCalled();
-        warn.mockRestore();
     });
 
     it.each([
@@ -358,7 +371,6 @@ describe('installNavigationGuard', () => {
         'javascript:alert(1)',
         'about:blank',
     ])('window.open(%s) é negado e nunca vai ao SO', async (url) => {
-        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
         const fake = fakeContents();
         const deps = fakeDeps();
         installNavigationGuard(fake.contents, deps);
@@ -367,11 +379,9 @@ describe('installNavigationGuard', () => {
         await flush();
         expect(deps.openExternal).not.toHaveBeenCalled();
         expect(deps.confirmExternal).not.toHaveBeenCalled();
-        warn.mockRestore();
     });
 
     it('openExternal rejeitando não vira unhandled rejection: é logado', async () => {
-        const error = vi.spyOn(console, 'error').mockImplementation(() => {});
         const fake = fakeContents();
         const deps = fakeDeps();
         deps.openExternal.mockRejectedValue(new Error('sem navegador'));
@@ -381,12 +391,10 @@ describe('installNavigationGuard', () => {
         await flush();
         await flush();
 
-        expect(error).toHaveBeenCalled();
-        error.mockRestore();
+        expect(loggerHarness.scopes.get('NavigationPolicy')?.error).toHaveBeenCalled();
     });
 
     it('confirmExternal rejeitando não vira unhandled rejection e não abre', async () => {
-        const error = vi.spyOn(console, 'error').mockImplementation(() => {});
         const fake = fakeContents();
         const deps = fakeDeps();
         deps.confirmExternal.mockRejectedValue(new Error('dialog fechado'));
@@ -397,8 +405,7 @@ describe('installNavigationGuard', () => {
         await flush();
 
         expect(deps.openExternal).not.toHaveBeenCalled();
-        expect(error).toHaveBeenCalled();
-        error.mockRestore();
+        expect(loggerHarness.scopes.get('NavigationPolicy')?.error).toHaveBeenCalled();
     });
 });
 
@@ -487,14 +494,12 @@ describe('main.ts: createWindow instala a política', () => {
         'file:///C:/Windows/System32/calc.exe',
         'data:text/html,<b>x</b>',
     ])('%s: previne, sem dialog e sem openExternal', async (url) => {
-        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
         const event = navigate(url);
         await flush();
 
         expect(event.preventDefault).toHaveBeenCalledTimes(1);
         expect(harness.dialog.showMessageBox).not.toHaveBeenCalled();
         expect(harness.shell.openExternal).not.toHaveBeenCalled();
-        warn.mockRestore();
     });
 });
 

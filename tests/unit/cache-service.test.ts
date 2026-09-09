@@ -12,6 +12,11 @@ const storage = vi.hoisted(() => {
     return { files };
 });
 
+const loggerMock = vi.hoisted(() => {
+    const cacheScope = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    return { cacheScope, logger: { scope: vi.fn(() => cacheScope) } };
+});
+
 vi.mock('electron', () => ({
     app: { getPath: vi.fn(() => 'sigaa-me-cache-tests') }
 }));
@@ -20,6 +25,7 @@ vi.mock('fs', () => ({
     readFileSync: vi.fn((file: string) => storage.files.get(file) ?? ''),
     writeFileSync: vi.fn((file: string, content: string) => storage.files.set(file, String(content)))
 }));
+vi.mock('../../electron/services/logger.service', () => ({ logger: loggerMock.logger }));
 
 import { CacheService } from '../../electron/services/cache.service';
 
@@ -102,10 +108,9 @@ describe('CacheService', () => {
         vi.mocked(fs.writeFileSync).mockImplementationOnce(() => {
             throw new Error('disk full');
         });
-        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
         expect(() => service.updateCourseState(ACC, 'c1', ['1'], [])).not.toThrow();
-        expect(errorSpy).toHaveBeenCalled();
+        expect(loggerMock.cacheScope.error).toHaveBeenCalled();
     });
 
     describe('forgetLastFile', () => {
