@@ -27,7 +27,7 @@ vi.mock('electron', () => {
     return { app: { isPackaged: true, getPath: () => userData } };
 });
 vi.mock('../../electron/services/logger.service', () => ({
-    logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+    logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), scope: vi.fn(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() })) }
 }));
 vi.mock('axios', () => ({
     default: { get: vi.fn(), post: vi.fn() }

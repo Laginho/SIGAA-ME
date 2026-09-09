@@ -26,6 +26,10 @@ vi.mock('electron', () => ({
     }
 }));
 
+vi.mock('../../electron/services/logger.service', () => ({
+    logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), scope: vi.fn(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() })) }
+}));
+
 const cacheState = vi.hoisted(() => {
     const baselines = new Map<string, { files: string[]; news: string[] }>();
     const callLog: string[] = [];

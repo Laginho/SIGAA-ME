@@ -5,12 +5,18 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const runtime = vi.hoisted(() => ({
-    chromium: { launch: vi.fn() },
-    axios: { get: vi.fn(), post: vi.fn() },
-    logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
-    stream: { writable: true, on: vi.fn(), write: vi.fn() }
-}));
+const runtime = vi.hoisted(() => {
+    const logger: { info: any; warn: any; error: any; scope: any } = {
+        info: vi.fn(), warn: vi.fn(), error: vi.fn(), scope: vi.fn(),
+    };
+    logger.scope.mockImplementation(() => logger);
+    return {
+        chromium: { launch: vi.fn() },
+        axios: { get: vi.fn(), post: vi.fn() },
+        logger,
+        stream: { writable: true, on: vi.fn(), write: vi.fn() }
+    };
+});
 
 vi.mock('playwright', () => ({ chromium: runtime.chromium }));
 vi.mock('axios', () => ({ default: runtime.axios }));

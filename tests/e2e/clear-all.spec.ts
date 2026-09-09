@@ -57,9 +57,9 @@ test.describe.serial('DATA-002: clear-all no app', () => {
         oldLog: path.join(userData, 'logs', 'app_old.log'),
         debugLogin: path.join(userData, 'debug_login_page.html'),
         debugPortal: path.join(userData, 'debug_portal_fail_540316.html'),
-        // `sigaa-me.log` saiu em OBS-001 junto com o logger antigo; sobra do
-        // legado em disco é limpeza de boot, em OBS-003.
-        scraperLog: path.join(userData, 'scraper.log'),
+        // `sigaa-me.log` saiu em OBS-001, `scraper.log` em OBS-004, junto com
+        // os loggers antigos; sobra do legado em disco é limpeza de boot, em
+        // OBS-003.
     });
 
     function plantUserData() {
@@ -69,10 +69,7 @@ test.describe.serial('DATA-002: clear-all no app', () => {
         fs.writeFileSync(p.oldLog, `${MARKER}\n`);
         fs.writeFileSync(p.debugLogin, '<html></html>');
         fs.writeFileSync(p.debugPortal, '<html></html>');
-        fs.appendFileSync(p.scraperLog, `${MARKER}\n`);
     }
-
-    const contains = (file: string) => fs.existsSync(file) && fs.readFileSync(file, 'utf8').includes(MARKER);
 
     async function openDashboard() {
         const { page } = launched;
@@ -144,9 +141,6 @@ test.describe.serial('DATA-002: clear-all no app', () => {
             expect(fs.existsSync(file), `${path.relative(userData, file)} ainda existe`).toBe(false);
         }
         expect(fs.existsSync(path.join(userData, 'credentials.json'))).toBe(false);
-        // O log com stream aberto: pode existir vazio (reaberto), mas o que
-        // estava nele se foi.
-        expect(contains(p.scraperLog)).toBe(false);
 
         const storage = await launched.page.evaluate((key) => ({
             local: localStorage.length,

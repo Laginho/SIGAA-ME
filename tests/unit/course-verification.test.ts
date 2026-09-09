@@ -19,7 +19,7 @@ vi.mock('electron', () => ({
     app: { isPackaged: true, getPath: vi.fn(() => '/tmp/sigaa-me-test') }
 }));
 vi.mock('../../electron/services/logger.service', () => ({
-    logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+    logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), scope: vi.fn(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() })) }
 }));
 
 import { isExpectedCoursePage } from '../../electron/services/playwright-login.service';

@@ -1,11 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const runtime = vi.hoisted(() => ({
-    axios: { get: vi.fn(), post: vi.fn() },
-    chromium: { launch: vi.fn() },
-    stream: { writable: true, on: vi.fn(), write: vi.fn() },
-    logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
-}));
+const runtime = vi.hoisted(() => {
+    const logger: { info: any; warn: any; error: any; scope: any } = {
+        info: vi.fn(), warn: vi.fn(), error: vi.fn(), scope: vi.fn(),
+    };
+    logger.scope.mockImplementation(() => logger);
+    return {
+        axios: { get: vi.fn(), post: vi.fn() },
+        chromium: { launch: vi.fn() },
+        stream: { writable: true, on: vi.fn(), write: vi.fn() },
+        logger,
+    };
+});
 
 vi.mock('axios', () => ({ default: runtime.axios }));
 vi.mock('playwright', () => ({ chromium: runtime.chromium }));
