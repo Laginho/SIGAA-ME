@@ -507,15 +507,19 @@ async function openNewsModal(courseId: string, courseName: string, newsId: strin
     modal.close()
   }
 
-  closeBtn?.addEventListener('click', close, { once: true })
-  // Listener removido no `close` nativo do dialog (Escape, botão ou fundo) —
-  // sem isso, cada abertura empilhava mais um listener de clique no fundo
-  // (A11Y-001).
+  // Nenhum listener usa `{ once: true }`: só dispara quando o próprio caminho
+  // é usado, e fechar por outro (Escape, fundo, botão) deixava os demais
+  // pendurados para a abertura seguinte empilhar mais um (A11Y-001). Ambos
+  // removidos juntos no `close` nativo do dialog, que cobre os três caminhos.
+  closeBtn?.addEventListener('click', close)
   const onBackdropClick = (e: MouseEvent) => {
     if (e.target === modal) close()
   }
   modal.addEventListener('click', onBackdropClick)
-  modal.addEventListener('close', () => modal.removeEventListener('click', onBackdropClick), { once: true })
+  modal.addEventListener('close', () => {
+    modal.removeEventListener('click', onBackdropClick)
+    closeBtn?.removeEventListener('click', close)
+  }, { once: true })
 
   try {
     // Check cache first
