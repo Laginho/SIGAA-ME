@@ -126,6 +126,33 @@ describe('course-detail: modal de notícia é um <dialog> nativo', () => {
         modal.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         expect(closeSpy).toHaveBeenCalledTimes(2);
     });
+
+    it('não acumula listener do botão de fechar ao fechar pelo fundo (retrabalho 2)', async () => {
+        // `closeBtn` usa `{ once: true }`, que só se resolve quando o botão é
+        // clicado. Fechar por outro caminho (fundo, aqui — Escape na prática)
+        // deixa o listener pendurado, e a abertura seguinte registra mais um.
+        // Reabrir duas vezes fechando pelo fundo e então fechar pelo botão
+        // expõe o empilhamento: `close()` dispararia mais de uma vez.
+        const container = await mount();
+        const modal = document.getElementById('newsModal') as HTMLDialogElement;
+        const closeSpy = vi.spyOn(modal, 'close');
+        const item = container.querySelector<HTMLButtonElement>('.news-item')!;
+
+        item.click();
+        await flushAll();
+        modal.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        expect(closeSpy).toHaveBeenCalledTimes(1);
+
+        item.click();
+        await flushAll();
+        modal.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        expect(closeSpy).toHaveBeenCalledTimes(2);
+
+        item.click();
+        await flushAll();
+        document.querySelector<HTMLButtonElement>('#newsModal .modal-close')!.click();
+        expect(closeSpy).toHaveBeenCalledTimes(3);
+    });
 });
 
 describe('course-detail: nome acessível do modal antes do conteúdo carregar', () => {

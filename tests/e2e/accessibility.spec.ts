@@ -179,6 +179,10 @@ test.describe('Acessibilidade', () => {
                     await page.emulateMedia({ reducedMotion: 'reduce' });
                     await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme);
                     await goto(hash);
+                    // Sem isto o teste só prova que o atributo foi escrito antes
+                    // da navegação, não que sobreviveu a ela — um render que
+                    // resetasse `data-theme` passaria em branco (A11Y-001).
+                    expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe(theme);
                     // `legacyMode`: o modo padrão roda a análise final numa página em
                     // branco à parte (`context.newPage()`) para escapar do CSP do
                     // app — e o Electron não suporta criar um novo target por CDP
