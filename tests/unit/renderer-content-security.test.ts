@@ -6,7 +6,7 @@
  *   1. ESLint `no-restricted-syntax` rule (noUnsafeInnerHtml / noOtherHtmlSinks)
  *   2. CSP meta in index.html
  *   3. Inline handler alarm (textual)
- *   4. Dashboard: no executable nodes, literal textContent, listener navigation
+ *   4. Dashboard: no executable nodes, literal textContent, literal `href`
  *   5. Course-detail: no executable nodes, literal text, round-trip fileName,
  *      sanitized-on-write and sanitized-on-read news modal
  *
@@ -197,10 +197,13 @@ describe('dashboard: conteúdo do SIGAA não cria nó executável', () => {
         const cardTitle = app.querySelector('.course-card h3');
         expect(cardTitle?.textContent).toBe('<b>Cálculo</b><script>alert(1)</script>');
 
-        const card = app.querySelector('.course-card') as HTMLElement;
-        card?.click();
-        // jsdom percent-encode espaço no hash (%20); decode compara o id literal.
-        expect(decodeURI(window.location.hash)).toBe(`#/course/${"c1' onclick='alert(1)"}`);
+        // A11Y-001: o cartão virou <a href> semântico (era div + onClick). A
+        // prova de "id literal, nunca interpretado" agora é o atributo — não
+        // dá pra clicar e ler `window.location.hash` como antes, porque jsdom
+        // não navega por um fragmento com aspas no href (browser real navega
+        // normalmente; é limitação da navegação simulada, não do app).
+        const card = app.querySelector('.course-card') as HTMLAnchorElement;
+        expect(card.getAttribute('href')).toBe(`#/course/${"c1' onclick='alert(1)"}`);
     });
 
     it('permite a foto do perfil quando a URL vem do allowlist si3.ufc.br', async () => {
