@@ -1,6 +1,6 @@
 # A11Y-001 — Fix document, controls, and modal accessibility
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P2
 Blocked by: nenhum
 Tracker status at migration: `NOT STARTED`
@@ -179,3 +179,25 @@ Follow-up, não retrabalho desta branch:
 - Os follow-ups da primeira revisão continuam abertos, incluindo o
   `:focus-visible` do `main.css:107` perdendo para `login.css:63` numa tela que
   o scan não cobre.
+
+### 2026-09-10 — retrabalho 2 fechado
+
+Os dois itens do handoff
+(`.scratch/05-fase4-prontidao-para-distribuicao/handoffs/A11Y-001-rework-2.md`):
+
+1. `closeBtn` não usa mais `{ once: true }` — o listener saía sozinho só
+   quando o próprio botão disparava o `close()`; fechar pelo fundo ou Escape
+   deixava-o pendurado, e a reabertura seguinte empilhava outro. Removido
+   junto com o listener de fundo no `close` nativo do dialog, que dispara nos
+   três caminhos. Teste novo fecha pelo fundo duas vezes e pelo botão na
+   terceira; contra o código velho falhava em 5 chamadas de `close()` em vez
+   de 3.
+2. `accessibility.spec.ts` agora confere `data-theme` depois do `goto(hash)`,
+   não só antes — hoje já passa (o atributo sobrevive à navegação), a
+   asserção só existia para o dia em que parar de sobreviver.
+
+Vermelho antes da correção: `npx vitest run tests/unit/course-detail-a11y.test.ts`
+com o teste novo falhando sozinho (9 passed, 1 failed), commit de teste
+isolado. Depois da correção: gate (`npm run quality`) verde — 627 passed, 4
+skipped, 0 erro de lint — e `npm run test:e2e -- accessibility` verde, 14
+passed.
