@@ -1,6 +1,6 @@
 # A11Y-001 — Fix document, controls, and modal accessibility
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P2
 Blocked by: nenhum
 Tracker status at migration: `NOT STARTED`
@@ -89,3 +89,33 @@ Decisão em aberto, do autor: o scan do axe entra no `npm run quality` ou fica s
 no `test:e2e`. Entrar põe Playwright no gate (~16s, e não roda no Linux montado).
 A recomendação da revisão foi deixar fora e registrar no `AGENTS.md` que mudança
 de cor exige o scan manual.
+
+### 2026-09-10 — retrabalho dos 5 itens
+
+Decisão em aberto resolvida como recomendado: scan fica fora do
+`npm run quality`, nota adicionada no `AGENTS.md` (bloco de bindings do
+`ticket-flow`).
+
+1. `sync-selection.css` volta a usar `var(--color-text-muted)` (escurecido em
+   `main.css`, #6b7280 → #4b5563) e `var(--color-text-main)` nas 3 linhas
+   sinalizadas. O scan em tema escuro (item 3) achou mais dois pontos que o
+   arquivo nunca cobriu — `.card-title`/`.card-subtitle` sem regra
+   `[data-theme="dark"]`, e `.sync-card.disabled`/`:hover` com fundo claro
+   fixo — os quatro corrigidos junto, senão o scan novo não fecha verde.
+   `dashboard.css` (`.course-code`/`.course-files-count`) e `course-detail.css`
+   (`.file-meta`) tinham o mesmo tipo de furo, só que pré-existente; ambos
+   também corrigidos.
+2. Asserção do teste de foco trocada por comparação de `data-id` — sem
+   optional chaining que mascare `activeElement` nulo como "restaurado".
+3. Scan do axe roda em tema claro e escuro nas 4 rotas (8 testes agora).
+4. `openNewsModal` guarda o listener de clique no fundo numa variável e
+   remove no evento `close` nativo do dialog.
+5. `#modalTitle`/`#modalMeta` saíram de `modalBody` para o template estático
+   do `<dialog>` — sempre existem; `openNewsModal`/`renderNewsIntoModal`
+   atualizam o texto em vez de recriar o elemento.
+
+Vermelho antes de qualquer mudança de produção: commit de teste isolado
+(`diff --stat` só em `tests/`), rodado contra o código não corrigido antes do
+commit de correção. `npx tsc --noEmit`, `npx vitest run` (626 passed, 4
+skipped) e `npx playwright test accessibility` (14 passed, tema claro e
+escuro) verdes depois.

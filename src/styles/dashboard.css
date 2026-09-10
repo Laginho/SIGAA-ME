@@ -245,6 +245,11 @@
    nativa do <button> — o widget continua branco. O fundo explícito desliga. */
 [data-theme="dark"] .btn-logout { background: var(--color-surface); border-color: var(--color-border); color: var(--color-text-main); }
 [data-theme="dark"] .btn-logout:hover { background: #334155; border-color: #475569; }
+/* A11Y-001: --color-primary (#3b82f6) dava 3.97:1 sobre --color-surface
+   (#1e293b) do card — passa em cima do fundo da página, não do card. Reusa
+   --color-primary-hover, que já tem contraste de sobra sobre o card. */
+[data-theme="dark"] .course-code,
+[data-theme="dark"] .course-files-count { color: var(--color-primary-hover); }
 
 .btn-refresh, .btn-settings, .btn-clear-data {
     padding: 0.5rem 0.75rem;

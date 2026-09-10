@@ -43,9 +43,16 @@ export function renderCourseDetailPage(container: HTMLDivElement, courseId: stri
       </div>
       
       <!-- News Modal: <dialog> nativo (A11Y-001) — Escape, focus trap e
-           inertness do fundo vêm do navegador, não de JS nosso. -->
+           inertness do fundo vêm do navegador, não de JS nosso. modalTitle
+           fica fora de modalBody e sempre existe, para que
+           aria-labelledby nunca aponte pra um elemento ausente enquanto
+           carrega ou dá erro (A11Y-001). -->
       <dialog id="newsModal" class="modal-content" aria-labelledby="modalTitle">
         <button class="modal-close" aria-label="Fechar notícia">&times;</button>
+        <div class="modal-header">
+          <h3 id="modalTitle" class="modal-title"></h3>
+          <div id="modalMeta" class="modal-meta"></div>
+        </div>
         <div id="modalBody">
           <!-- Content injected here -->
         </div>
@@ -480,10 +487,14 @@ async function testDownloadAll(courseId: string) {
 async function openNewsModal(courseId: string, courseName: string, newsId: string) {
   const modal = document.getElementById('newsModal') as HTMLDialogElement | null
   const modalBody = document.getElementById('modalBody')
+  const modalTitle = document.getElementById('modalTitle')
   const closeBtn = modal?.querySelector('.modal-close')
 
   if (!modal || !modalBody) return
 
+  // Título de carregamento: sobrescrito de imediato se vier do cache, ou
+  // depois do fetch — nunca fica sem nome acessível (A11Y-001).
+  if (modalTitle) modalTitle.textContent = 'Carregando notícia...'
   // Only show the loading spinner if content isn't already cached
   if (!isNewsCached(courseId, newsId)) {
     modalBody.innerHTML = '<div class="loading">Carregando detalhes da notícia...</div>';
@@ -497,9 +508,14 @@ async function openNewsModal(courseId: string, courseName: string, newsId: strin
   }
 
   closeBtn?.addEventListener('click', close, { once: true })
-  modal.addEventListener('click', (e) => {
+  // Listener removido no `close` nativo do dialog (Escape, botão ou fundo) —
+  // sem isso, cada abertura empilhava mais um listener de clique no fundo
+  // (A11Y-001).
+  const onBackdropClick = (e: MouseEvent) => {
     if (e.target === modal) close()
-  })
+  }
+  modal.addEventListener('click', onBackdropClick)
+  modal.addEventListener('close', () => modal.removeEventListener('click', onBackdropClick), { once: true })
 
   try {
     // Check cache first
@@ -563,11 +579,13 @@ async function openNewsModal(courseId: string, courseName: string, newsId: strin
 
       renderNewsIntoModal(modalBody, news.title, news.date, news.notification, news.content)
     } else {
+      if (modalTitle) modalTitle.textContent = 'Erro ao carregar notícia'
       modalBody.replaceChildren(
         h('div', { className: 'error-message' }, 'Erro ao carregar notícia: ' + result.error.message),
       )
     }
   } catch (error: any) {
+    if (modalTitle) modalTitle.textContent = 'Erro ao carregar notícia'
     modalBody.replaceChildren(
       h('div', { className: 'error-message' }, 'Erro ao carregar notícia: ' + error.message),
     )
@@ -582,15 +600,18 @@ async function openNewsModal(courseId: string, courseName: string, newsId: strin
  * sanitizador allowlist — todo outro dado desta tela vira nó/texto.
  */
 function renderNewsIntoModal(modalBody: HTMLElement, title: string, date: string, notification: string, content: string) {
-  const header = h('div', { className: 'modal-header' });
-  header.append(h('h3', { id: 'modalTitle', className: 'modal-title' }, title ?? ''));
-  const meta = h('div', { className: 'modal-meta' });
-  meta.append(h('span', undefined, `📅 ${date ?? ''}`));
-  if (notification === 'Sim') {
-    meta.append(h('span', undefined, '🔔 Notificação enviada'));
+  // `modalTitle`/`modalMeta` são fixos no template (A11Y-001) — nunca
+  // recriados, pra `aria-labelledby="modalTitle"` do dialog nunca apontar
+  // pra um elemento que ainda não existe.
+  const modalTitle = document.getElementById('modalTitle')
+  if (modalTitle) modalTitle.textContent = title ?? ''
+  const modalMeta = document.getElementById('modalMeta')
+  if (modalMeta) {
+    const metaSpans = [h('span', undefined, `📅 ${date ?? ''}`)];
+    if (notification === 'Sim') metaSpans.push(h('span', undefined, '🔔 Notificação enviada'));
+    modalMeta.replaceChildren(...metaSpans);
   }
-  header.append(meta);
   const body = h('div', { className: 'modal-body' });
   body.innerHTML = sanitizeNewsHtml(content);
-  modalBody.replaceChildren(header, body);
+  modalBody.replaceChildren(body);
 }
