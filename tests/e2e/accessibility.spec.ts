@@ -90,9 +90,13 @@ test.describe('Acessibilidade', () => {
                 .locator('#notificationDropdown')
                 .evaluate((el) => getComputedStyle(el).transitionDuration);
             // `.notification-dropdown` transiciona 3 propriedades: a lista vem
-            // separada por vírgula (`0.01ms, 0.01ms, 0.01ms`), nunca um valor só.
-            for (const part of duration.split(',')) {
-                expect(part.trim()).toMatch(/^0s$|^0\.01ms$/);
+            // separada por vírgula. O Chromium normaliza 0.01ms como
+            // segundos e pode usar notação científica ("1e-05s") — em vez de
+            // casar a string, converte pra segundos e confere que é ínfimo
+            // (a duração original era 0.2s).
+            for (const part of duration.split(',').map(p => p.trim())) {
+                const seconds = part.endsWith('ms') ? parseFloat(part) / 1000 : parseFloat(part);
+                expect(seconds).toBeLessThan(0.001);
             }
         } finally {
             await page.emulateMedia({ reducedMotion: null });
@@ -145,6 +149,10 @@ test.describe('Acessibilidade', () => {
     });
 
     test.describe('Scan automático (axe-core)', () => {
+        test.afterAll(async () => {
+            await launched.page.emulateMedia({ reducedMotion: null });
+        });
+
         const ROUTES: [string, string][] = [
             ['#/dashboard', 'dashboard'],
             ['#/sync-selection', 'sync-selection'],
@@ -154,8 +162,19 @@ test.describe('Acessibilidade', () => {
 
         for (const [hash, label] of ROUTES) {
             test(`${label} sem violação crítica/séria`, async () => {
+                const { page } = launched;
+                // Sem isso o axe pode amostrar a página no meio do fade-in de
+                // 0.8s (`.sync-selection-container`) — cor real, leitura errada
+                // porque a opacidade ainda não chegou a 1. `reduced-motion`
+                // zera a duração (main.css, A11Y-001) e garante estado final.
+                await page.emulateMedia({ reducedMotion: 'reduce' });
                 await goto(hash);
-                const results = await new AxeBuilder({ page: launched.page }).analyze();
+                // `legacyMode`: o modo padrão roda a análise final numa página em
+                // branco à parte (`context.newPage()`) para escapar do CSP do
+                // app — e o Electron não suporta criar um novo target por CDP
+                // pra essa contexto (`Target.createTarget: Not supported`).
+                // Legacy roda tudo direto na própria página.
+                const results = await new AxeBuilder({ page: launched.page }).setLegacyMode(true).analyze();
                 const severe = results.violations.filter(v => v.impact === 'critical' || v.impact === 'serious');
                 expect(severe, JSON.stringify(severe, null, 2)).toEqual([]);
             });
