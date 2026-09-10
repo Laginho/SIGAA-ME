@@ -263,6 +263,9 @@
 }
 
 .news-item {
+    display: block;
+    width: 100%;
+    text-align: left;
     background: white;
     border: 1px solid #dc3545;
     border-radius: 4px;
@@ -299,29 +302,10 @@
     border-radius: 12px;
 }
 
-/* ── News Modal ─────────────────────────────────────────── */
-.modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    opacity: 0;
-    visibility: hidden;
-    transition: all 0.3s;
-}
-
-.modal-overlay.active {
-    opacity: 1;
-    visibility: visible;
-}
-
-.modal-content {
+/* ── News Modal ─────────────────────────────────────────────
+   `<dialog>` nativo (A11Y-001): o browser cuida do overlay via
+   `::backdrop`, da centralização e de mostrar/esconder com `[open]`. */
+dialog.modal-content {
     background: white;
     border-radius: 8px;
     width: 90%;
@@ -329,14 +313,12 @@
     max-height: 80vh;
     overflow-y: auto;
     padding: 2rem;
-    position: relative;
-    transform: translateY(20px);
-    transition: transform 0.3s;
+    border: none;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
 }
 
-.modal-overlay.active .modal-content {
-    transform: translateY(0);
+dialog.modal-content::backdrop {
+    background: rgba(0, 0, 0, 0.5);
 }
 
 .modal-close {

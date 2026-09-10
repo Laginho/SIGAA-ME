@@ -42,15 +42,14 @@ export function renderCourseDetailPage(container: HTMLDivElement, courseId: stri
         </section>
       </div>
       
-      <!-- News Modal -->
-      <div id="newsModal" class="modal-overlay">
-        <div class="modal-content">
-          <button class="modal-close">&times;</button>
-          <div id="modalBody">
-            <!-- Content injected here -->
-          </div>
+      <!-- News Modal: <dialog> nativo (A11Y-001) — Escape, focus trap e
+           inertness do fundo vêm do navegador, não de JS nosso. -->
+      <dialog id="newsModal" class="modal-content" aria-labelledby="modalTitle">
+        <button class="modal-close" aria-label="Fechar notícia">&times;</button>
+        <div id="modalBody">
+          <!-- Content injected here -->
         </div>
-      </div>
+      </dialog>
     </div>
   `
 
@@ -192,10 +191,11 @@ async function fetchCourseFiles(courseId: string) {
       newsListElement.replaceChildren()
       for (const item of course.news) {
         const unread = !isItemRead('news', courseId, item.id);
-        const row = h('div', {
+        const row = h('button', {
           className: `news-item${unread ? ' news-item--unread' : ''}`,
           dataset: { id: String(item.id) },
         });
+        row.type = 'button';
         if (unread) row.append(h('span', { className: 'item-unread-dot' }));
         row.append(h('div', { className: 'news-title' }, item.title ?? ''));
         row.append(h('div', { className: 'news-date' }, item.date ?? ''));
@@ -286,6 +286,7 @@ async function fetchCourseFiles(courseId: string) {
           action.append(h('button', {
             className: 'btn-download-file',
             title: 'Baixar arquivo',
+            ariaLabel: `Baixar ${file.name ?? 'arquivo'}`,
             dataset: { fileName: String(file.name ?? ''), fileId: String(file.id ?? '') },
           }, '⬇️'));
         }
@@ -477,7 +478,7 @@ async function testDownloadAll(courseId: string) {
 
 
 async function openNewsModal(courseId: string, courseName: string, newsId: string) {
-  const modal = document.getElementById('newsModal')
+  const modal = document.getElementById('newsModal') as HTMLDialogElement | null
   const modalBody = document.getElementById('modalBody')
   const closeBtn = modal?.querySelector('.modal-close')
 
@@ -487,11 +488,12 @@ async function openNewsModal(courseId: string, courseName: string, newsId: strin
   if (!isNewsCached(courseId, newsId)) {
     modalBody.innerHTML = '<div class="loading">Carregando detalhes da notícia...</div>';
   }
-  modal.classList.add('active')
+  // `<dialog>` nativo (A11Y-001): Escape, foco preso dentro do modal e
+  // restauração do foco a quem abriu vêm do navegador com `showModal()`.
+  modal.showModal()
 
-  // Close handler
   const close = () => {
-    modal.classList.remove('active')
+    modal.close()
   }
 
   closeBtn?.addEventListener('click', close, { once: true })
@@ -581,7 +583,7 @@ async function openNewsModal(courseId: string, courseName: string, newsId: strin
  */
 function renderNewsIntoModal(modalBody: HTMLElement, title: string, date: string, notification: string, content: string) {
   const header = h('div', { className: 'modal-header' });
-  header.append(h('h3', { className: 'modal-title' }, title ?? ''));
+  header.append(h('h3', { id: 'modalTitle', className: 'modal-title' }, title ?? ''));
   const meta = h('div', { className: 'modal-meta' });
   meta.append(h('span', undefined, `📅 ${date ?? ''}`));
   if (notification === 'Sim') {
