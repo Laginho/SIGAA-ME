@@ -1,6 +1,6 @@
 # A11Y-001 — Fix document, controls, and modal accessibility
 Status: open
-Stage: to-review
+Stage: to-implement
 Priority: P2
 Blocked by: nenhum
 Tracker status at migration: `NOT STARTED`
@@ -119,3 +119,63 @@ Vermelho antes de qualquer mudança de produção: commit de teste isolado
 commit de correção. `npx tsc --noEmit`, `npx vitest run` (626 passed, 4
 skipped) e `npx playwright test accessibility` (14 passed, tema claro e
 escuro) verdes depois.
+
+### 2026-09-10 — segunda revisão: 4 de 5 fechados, item 4 volta
+
+Branch `a11y-001`, 6 commits sobre `40a0d01` (+842/-100), revisada nos dois
+eixos. `npm run quality` verde (626 passed, 4 skipped, 0 erro de lint) e
+`npm run test:e2e -- accessibility` verde (14 passed, 4 rotas × claro/escuro),
+ambos rodados nesta revisão.
+
+Itens 1, 2, 3 e 5 do retrabalho: fechados, verificados no código, não na
+descrição. O contraste no escuro usa token de novo e o bloco
+`[data-theme="dark"]` que faltava existe; a asserção de foco compara `data-id`
+e falha com `activeElement` nulo; o scan cobre os dois temas; `#modalTitle` e
+`#modalMeta` são estáticos e recebem texto nos quatro caminhos (loading, dois
+de erro, sucesso).
+
+Dois itens seguram o merge:
+
+1. **Item 4 fechou o listener errado** — `src/pages/course-detail.ts:510`:
+   `closeBtn?.addEventListener('click', close, { once: true })`. O `once` só
+   dispara no clique: fechar por Escape ou pelo fundo deixa o listener
+   pendurado, e a abertura seguinte empilha mais um. É exatamente a acumulação
+   que o item 4 apontava, agora no listener que o próprio item citava como o
+   exemplo certo. `dialog.close()` é idempotente, então não quebra nada hoje —
+   mas a causa raiz ficou pela metade. O teste que cobre o item 4
+   (`tests/unit/course-detail-a11y.test.ts:121`) fecha pelo botão, o único
+   caminho que não vaza; precisa de um que feche por Escape ou pelo fundo.
+
+2. **Os 4 testes de tema escuro não conferem que o tema pegou** —
+   `tests/e2e/accessibility.spec.ts:180` escreve `data-theme` **antes** do
+   `goto(hash)` e nada verifica depois. Hoje o atributo sobrevive à navegação,
+   então os testes são reais; no dia em que um render resetar, os 4 viram
+   cópias silenciosas do tema claro sem falhar. Mesma classe do item 2 desta
+   lista, que já voltou uma vez. Uma linha:
+   `expect(document.documentElement.dataset.theme).toBe(theme)` depois do
+   `goto`.
+
+Fora do retrabalho, para o autor decidir:
+
+- `AGENTS.md:20-27` fecha a decisão em aberto (scan fora do gate) como a
+  revisão recomendou. Conteúdo certo, mas é arquivo fora dos Primary files e a
+  decisão era do autor — confirme ou reverta.
+- `tests/unit/renderer-content-security.test.ts:200` teve um teste de `SEC-001`
+  reescrito pelo implementador (clique → leitura de atributo). A troca de
+  `<div onClick>` por `<a href>` obrigava a algo, mas a asserção nova é mais
+  fraca: prova o valor do atributo, não que ele não é interpretado na
+  navegação.
+- `9a83c26` é commit de código que edita `tests/e2e/accessibility.spec.ts` —
+  quebra a separação teste/código. Os outros cinco commits estão limpos.
+
+Follow-up, não retrabalho desta branch:
+
+- `src/utils/dom.ts:35` aceita `href` sem checar esquema, no arquivo cujo
+  contrato é ser seguro por construção (`SEC-001`). Os dois chamadores atuais
+  prefixam `#/course/`; um `href: sigaaUrl` futuro torna `javascript:`
+  executável.
+- `.btn-section-action--success` duplicado em `sync-selection.css:291` e
+  `course-detail.css:88`, mantido em sincronia por comentário — vira `CLEAN-*`.
+- Os follow-ups da primeira revisão continuam abertos, incluindo o
+  `:focus-visible` do `main.css:107` perdendo para `login.css:63` numa tela que
+  o scan não cobre.
