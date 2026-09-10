@@ -450,7 +450,9 @@ dialog.modal-content::backdrop {
 [data-theme="dark"] .file-item { background: #1a2848; }
 [data-theme="dark"] .file-item:hover { background: #223257; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4); }
 [data-theme="dark"] .file-name { color: #e2e8f0; }
-[data-theme="dark"] .file-meta { color: #7d8db1; }
+/* A11Y-001: #7d8db1 dava 4.38:1 sobre #1a2848 (fundo "meia-noite" do card) —
+   mesmo tom, um pouco mais claro. */
+[data-theme="dark"] .file-meta { color: #8b9bc0; }
 [data-theme="dark"] .btn-download-file {
     background: transparent;
     border-color: #3b82f6;

@@ -16,3 +16,12 @@ aqui. Sessão que recebe só um ID acha o ticket e despacha pelo `Stage:` dele.
 - Gate: `npm run quality`
 - Base branch: `master`
 - Models: stage 1 Fable, stage 2 Sonnet, stage 3 Opus
+
+## Contraste de cor
+
+O scan de axe (`tests/e2e/accessibility.spec.ts`, tema claro e escuro) fica
+fora do `npm run quality` — é Playwright, ~16s, e não roda no Linux montado
+(ver CLAUDE.md). Mudança que toca cor de texto/fundo em `src/styles/*.css`
+roda `npm run test:e2e -- accessibility` manualmente antes do merge (`A11Y-001`,
+2026-09-10): o scan em tema claro sozinho já deixou passar uma regressão de
+contraste que só aparecia no escuro.
