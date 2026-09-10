@@ -16,6 +16,10 @@ interface HProps {
   /** Vai para `el.dataset[k]`: atributo seguro por construção. */
   dataset?: Record<string, string>
   onClick?: (e: MouseEvent) => void
+  /** Nome acessível para controle sem texto visível (A11Y-001). */
+  ariaLabel?: string
+  /** Só faz sentido em `<a>`; outras tags ignoram o atributo. */
+  href?: string
 }
 
 /** Nó com filhos; string vira Text (nunca HTML). `null`/`undefined`/`false` é ignorado. */
@@ -28,6 +32,8 @@ export function h<K extends keyof HTMLElementTagNameMap>(
   if (props?.className !== undefined) el.className = props.className
   if (props?.id !== undefined) el.id = props.id
   if (props?.title !== undefined) el.title = props.title
+  if (props?.ariaLabel !== undefined) el.setAttribute('aria-label', props.ariaLabel)
+  if (props?.href !== undefined) el.setAttribute('href', props.href)
   if (props?.dataset) {
     for (const [k, v] of Object.entries(props.dataset)) el.dataset[k] = v
   }
