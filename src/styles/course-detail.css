@@ -11,7 +11,8 @@
 .back-button {
     background: transparent;
     border: none;
-    color: #007bff;
+    /* A11Y-001: #007bff dava 3.7:1 no scan do axe (WCAG AA exige 4.5:1). */
+    color: var(--color-primary);
     font-size: 1rem;
     cursor: pointer;
     padding: 0.5rem 0;
@@ -20,7 +21,7 @@
 }
 
 .back-button:hover {
-    color: #0056b3;
+    color: var(--color-primary-hover);
     text-decoration: underline;
 }
 
@@ -84,12 +85,16 @@
 }
 
 .btn-section-action--success {
-    background: #27ae60;
+    /* A11Y-001: #27ae60 dava 2.87:1 no scan do axe (WCAG AA exige 4.5:1
+       para o branco por cima); mesmo verde, mais escuro. */
+    background: #145c33;
     color: white;
 }
 
 .btn-section-action--warning {
-    background: #e67e22;
+    /* A11Y-001: #e67e22 dava 2.84:1 no scan do axe; mesmo laranja, mais
+       escuro. */
+    background: #7a4310;
     color: white;
 }
 
@@ -416,8 +421,8 @@ dialog.modal-content::backdrop {
    prototype/dark-schemes. */
 
 [data-theme="dark"] .course-header h1 { color: var(--color-text-main); }
-[data-theme="dark"] .back-button { color: var(--color-primary); }
-[data-theme="dark"] .back-button:hover { color: var(--color-primary-hover); }
+/* .back-button já usa var(--color-primary)/--color-primary-hover na regra
+   base (A11Y-001) — não precisa mais de override aqui. */
 [data-theme="dark"] .course-code-header { color: var(--color-text-muted); }
 
 [data-theme="dark"] .course-content {

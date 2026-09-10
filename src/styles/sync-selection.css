@@ -41,7 +41,8 @@
 
 .sync-subtitle {
     font-size: 1.1rem;
-    color: var(--color-text-muted);
+    /* A11Y-001: --color-text-muted (#6b7280) dava 2.8:1 no scan do axe. */
+    color: #333b4d;
     margin-top: 0.5rem;
     font-weight: 400;
 }
@@ -83,7 +84,10 @@
 }
 
 .sync-card.disabled {
-    opacity: 0.6;
+    /* A11Y-001: `opacity` diluía também o texto — pra manter 4.5:1 depois da
+       mistura com o fundo, a cor precisaria ficar quase preta e o cartão
+       deixaria de parecer "esmaecido". O fundo/borda mais claros e o cursor
+       já comunicam desabilitado sem depender de opacidade. */
     cursor: not-allowed;
     background: #f5f5f5;
     border-color: #eee;
@@ -112,9 +116,9 @@
 
 .card-subtitle {
     font-size: 0.9rem;
-    color: #d4af37;
-    /* Keep gold or maybe #b89528 for better contrast */
-    color: #b89528;
+    /* A11Y-001: #b89528 dava 2.11:1 no scan do axe (WCAG AA exige 4.5:1) —
+       mesmo tom, bem mais escuro. */
+    color: #5c4a10;
     margin-bottom: 2rem;
     font-style: italic;
     font-family: 'Georgia', serif;
@@ -123,14 +127,16 @@
 .card-description {
     font-size: 0.95rem;
     line-height: 1.6;
-    color: #555;
+    /* A11Y-001: #555 dava 3.92:1 no scan do axe. */
+    color: #303030;
     margin-bottom: auto;
 }
 
 .card-meta {
     margin-top: 2rem;
     font-size: 0.8rem;
-    color: #888;
+    /* A11Y-001: #888 dava 2.36:1 no scan do axe. */
+    color: #404040;
     padding-top: 1rem;
     border-top: 1px solid #eee;
     width: 100%;
@@ -285,4 +291,8 @@
 .btn-section-action:hover  { filter: brightness(0.9); }
 .btn-section-action:active { transform: scale(0.97); }
 .btn-section-action--primary { background: #0056a3; color: #fff; }
-.btn-section-action--success { background: #27ae60; color: #fff; }
+/* A11Y-001: mesmo valor de course-detail.css — os dois arquivos definem a
+   mesma classe (.btn-section-action--success) para componentes diferentes,
+   e o CSS final é a concatenação dos dois; se divergissem, quem carrega por
+   último decidiria a cor nas duas telas. #27ae60 dava 2.87:1 no axe. */
+.btn-section-action--success { background: #145c33; color: #fff; }
