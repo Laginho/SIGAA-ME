@@ -111,6 +111,7 @@ test.describe('Acessibilidade', () => {
         test('abrir por teclado foca dentro do dialog; Escape fecha e devolve o foco ao item que abriu', async () => {
             const { page } = launched;
             const item = page.locator('.news-item').first();
+            const itemId = await item.getAttribute('data-id');
             await item.focus();
             await item.press('Enter');
 
@@ -126,10 +127,12 @@ test.describe('Acessibilidade', () => {
             await page.keyboard.press('Escape');
             await expect(modal).toBeHidden();
 
-            const focusRestoredToTrigger = await page.evaluate(
-                () => document.activeElement?.closest('.news-item') !== null,
-            );
-            expect(focusRestoredToTrigger).toBe(true);
+            // Compara pelo `data-id` do item, não `!== null`: com optional
+            // chaining, `document.activeElement` ausente vira `undefined`, e
+            // `undefined !== null` é `true` — a asserção antiga passava sem
+            // nenhum foco restaurado.
+            const focusedId = await page.evaluate(() => document.activeElement?.getAttribute('data-id') ?? null);
+            expect(focusedId).toBe(itemId);
         });
 
         test('Tab não escapa do dialog enquanto ele está aberto (foco preso; fundo inerte)', async () => {
@@ -151,6 +154,7 @@ test.describe('Acessibilidade', () => {
     test.describe('Scan automático (axe-core)', () => {
         test.afterAll(async () => {
             await launched.page.emulateMedia({ reducedMotion: null });
+            await launched.page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'));
         });
 
         const ROUTES: [string, string][] = [
@@ -159,25 +163,32 @@ test.describe('Acessibilidade', () => {
             ['#/settings', 'settings'],
             ['#/course/c1', 'course-detail'],
         ];
+        // O tema escuro tem seus próprios tokens de cor (main.css) — sem
+        // escanear as duas, uma regressão de contraste só no tema escuro
+        // passa em branco (foi o que aconteceu com sync-selection.css).
+        const THEMES = ['light', 'dark'] as const;
 
-        for (const [hash, label] of ROUTES) {
-            test(`${label} sem violação crítica/séria`, async () => {
-                const { page } = launched;
-                // Sem isso o axe pode amostrar a página no meio do fade-in de
-                // 0.8s (`.sync-selection-container`) — cor real, leitura errada
-                // porque a opacidade ainda não chegou a 1. `reduced-motion`
-                // zera a duração (main.css, A11Y-001) e garante estado final.
-                await page.emulateMedia({ reducedMotion: 'reduce' });
-                await goto(hash);
-                // `legacyMode`: o modo padrão roda a análise final numa página em
-                // branco à parte (`context.newPage()`) para escapar do CSP do
-                // app — e o Electron não suporta criar um novo target por CDP
-                // pra essa contexto (`Target.createTarget: Not supported`).
-                // Legacy roda tudo direto na própria página.
-                const results = await new AxeBuilder({ page: launched.page }).setLegacyMode(true).analyze();
-                const severe = results.violations.filter(v => v.impact === 'critical' || v.impact === 'serious');
-                expect(severe, JSON.stringify(severe, null, 2)).toEqual([]);
-            });
+        for (const theme of THEMES) {
+            for (const [hash, label] of ROUTES) {
+                test(`${label} (tema ${theme}) sem violação crítica/séria`, async () => {
+                    const { page } = launched;
+                    // Sem isso o axe pode amostrar a página no meio do fade-in de
+                    // 0.8s (`.sync-selection-container`) — cor real, leitura errada
+                    // porque a opacidade ainda não chegou a 1. `reduced-motion`
+                    // zera a duração (main.css, A11Y-001) e garante estado final.
+                    await page.emulateMedia({ reducedMotion: 'reduce' });
+                    await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme);
+                    await goto(hash);
+                    // `legacyMode`: o modo padrão roda a análise final numa página em
+                    // branco à parte (`context.newPage()`) para escapar do CSP do
+                    // app — e o Electron não suporta criar um novo target por CDP
+                    // pra essa contexto (`Target.createTarget: Not supported`).
+                    // Legacy roda tudo direto na própria página.
+                    const results = await new AxeBuilder({ page: launched.page }).setLegacyMode(true).analyze();
+                    const severe = results.violations.filter(v => v.impact === 'critical' || v.impact === 'serious');
+                    expect(severe, JSON.stringify(severe, null, 2)).toEqual([]);
+                });
+            }
         }
     });
 });

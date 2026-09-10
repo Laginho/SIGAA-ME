@@ -104,4 +104,56 @@ describe('course-detail: modal de notícia é um <dialog> nativo', () => {
         document.querySelector<HTMLButtonElement>('#newsModal .modal-close')!.click();
         expect(modal.open).toBe(false);
     });
+
+    it('não acumula listener de clique no fundo a cada abertura (reabrir não fecha em dobro)', async () => {
+        // `openNewsModal` registra um listener de clique no `<dialog>` a cada
+        // chamada e nunca o remove — diferente do botão de fechar, que usa
+        // `{ once: true }`. Reabrir o modal várias vezes empilha um listener
+        // por abertura; um único clique no fundo então dispara `close()` uma
+        // vez por listener ainda pendurado.
+        const container = await mount();
+        const modal = document.getElementById('newsModal') as HTMLDialogElement;
+        const closeSpy = vi.spyOn(modal, 'close');
+        const item = container.querySelector<HTMLButtonElement>('.news-item')!;
+
+        item.click();
+        await flushAll();
+        document.querySelector<HTMLButtonElement>('#newsModal .modal-close')!.click();
+        expect(closeSpy).toHaveBeenCalledTimes(1);
+
+        item.click();
+        await flushAll();
+        modal.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        expect(closeSpy).toHaveBeenCalledTimes(2);
+    });
+});
+
+describe('course-detail: nome acessível do modal antes do conteúdo carregar', () => {
+    it('o alvo de aria-labelledby existe e tem texto durante o carregamento', async () => {
+        const container = await mount();
+        const item = container.querySelector<HTMLButtonElement>('.news-item')!;
+        item.click();
+        // Sem `await flushAll()`: o item não está em cache (fixture não tem
+        // `content`), então o dialog abre em estado de carregamento aqui.
+        const modal = document.getElementById('newsModal') as HTMLDialogElement;
+        expect(modal.open).toBe(true);
+        const labelledBy = modal.getAttribute('aria-labelledby');
+        const label = labelledBy && document.getElementById(labelledBy);
+        expect(label?.textContent).toBeTruthy();
+    });
+
+    it('o alvo de aria-labelledby continua existindo e com texto quando a busca falha', async () => {
+        (window as any).api.getNewsDetail = vi.fn().mockResolvedValue({
+            success: false,
+            error: { message: 'falhou' },
+        });
+        const container = await mount();
+        const item = container.querySelector<HTMLButtonElement>('.news-item')!;
+        item.click();
+        await flushAll();
+        const modal = document.getElementById('newsModal') as HTMLDialogElement;
+        const labelledBy = modal.getAttribute('aria-labelledby');
+        const label = labelledBy && document.getElementById(labelledBy);
+        expect(label?.textContent).toBeTruthy();
+    });
 });
