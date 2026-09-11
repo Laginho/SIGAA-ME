@@ -92,7 +92,7 @@ export function renderDashboardPage(app: HTMLDivElement, account: AccountProfile
             <span id="syncStatusAuto" class="sync-status" style="margin: 0; line-height: 1.2;"></span>
           </div>
           <div class="notification-bell-wrapper">
-            <button id="notificationBellBtn" class="btn-notification-bell" title="Notificações">
+            <button id="notificationBellBtn" class="btn-notification-bell" title="Notificações" aria-label="Notificações" aria-expanded="false" aria-controls="notificationDropdown">
               🔔
             </button>
             <div id="notificationDropdown" class="notification-dropdown">
@@ -105,9 +105,9 @@ export function renderDashboardPage(app: HTMLDivElement, account: AccountProfile
               </div>
             </div>
           </div>
-          <button id="refreshBtn" class="btn-refresh" title="Sincronizar">🔄</button>
-          <button id="settingsBtn" class="btn-settings" title="Configurações">⚙️</button>
-          <button id="clearDataBtn" class="btn-clear-data" title="Limpar todos os dados locais">🗑️</button>
+          <button id="refreshBtn" class="btn-refresh" title="Sincronizar" aria-label="Sincronizar">🔄</button>
+          <button id="settingsBtn" class="btn-settings" title="Configurações" aria-label="Configurações">⚙️</button>
+          <button id="clearDataBtn" class="btn-clear-data" title="Limpar todos os dados locais" aria-label="Limpar todos os dados locais">🗑️</button>
           <button id="logoutBtn" class="btn-logout">Sair</button>
         </div>
       </header>
@@ -158,8 +158,9 @@ export function renderDashboardPage(app: HTMLDivElement, account: AccountProfile
 
   bellBtn?.addEventListener('click', (e) => {
     e.stopPropagation();
-    dropdown?.classList.toggle('open');
-    if (dropdown?.classList.contains('open')) {
+    const open = dropdown?.classList.toggle('open') ?? false;
+    bellBtn.setAttribute('aria-expanded', String(open));
+    if (open) {
       renderNotificationList();
     }
   });
@@ -168,6 +169,7 @@ export function renderDashboardPage(app: HTMLDivElement, account: AccountProfile
   document.addEventListener('click', (e) => {
     if (dropdown?.classList.contains('open') && !dropdown.contains(e.target as Node) && e.target !== bellBtn) {
       dropdown.classList.remove('open');
+      bellBtn?.setAttribute('aria-expanded', 'false');
     }
   });
 
@@ -258,8 +260,9 @@ function renderNotificationList() {
 
   listEl.replaceChildren();
   for (const n of notifications) {
-    const row = h('div', {
+    const row = h('a', {
       className: `notification-item${n.read ? '' : ' notification-item--unread'}`,
+      href: `#/course/${n.courseId}`,
       dataset: { type: n.type, courseId: n.courseId, itemId: n.itemId },
     });
     row.append(h('span', { className: 'notification-item-icon' }, n.type === 'file' ? '📄' : '📰'));
@@ -271,7 +274,8 @@ function renderNotificationList() {
     listEl.append(row);
   }
 
-  // Add click listeners for shortcuts
+  // Add click listeners for shortcuts. Navegação em si é o `href` do <a>
+  // (semântico, funciona com Enter/clique do meio); aqui só o efeito colateral.
   listEl.querySelectorAll('.notification-item').forEach(item => {
     item.addEventListener('click', () => {
       const type = item.getAttribute('data-type') as 'file' | 'news';
@@ -284,10 +288,9 @@ function renderNotificationList() {
       item.classList.remove('notification-item--unread');
       item.querySelector('.notification-unread-dot')?.remove();
 
-      // Navigate to the course detail page
       const dropdown = document.getElementById('notificationDropdown');
       dropdown?.classList.remove('open');
-      window.location.hash = `#/course/${courseId}`;
+      document.getElementById('notificationBellBtn')?.setAttribute('aria-expanded', 'false');
     });
   });
 }
@@ -341,11 +344,11 @@ function displayCourses(coursesWithFiles: any[], coursesListElement: HTMLElement
     coursesListElement.replaceChildren();
     for (const course of coursesWithFiles) {
       const hasUnread = courseHasUnread(course.id);
-      // O `id` entra numa string JS do listener, nunca em HTML (SEC-001):
-      // fim da rota dentro de handler inline.
-      const card = h('div', {
+      // O `id` entra num atributo `href` normal, nunca em HTML (SEC-001):
+      // link semântico em vez de div com onClick (A11Y-001).
+      const card = h('a', {
         className: 'course-card',
-        onClick: () => { window.location.hash = '#/course/' + course.id; },
+        href: '#/course/' + course.id,
       });
       const header = h('div', { className: 'course-card-header' });
       header.append(h('h3', undefined, course.name ?? ''));

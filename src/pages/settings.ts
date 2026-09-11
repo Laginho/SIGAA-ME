@@ -23,7 +23,7 @@ export async function renderSettingsPage(container: HTMLDivElement) {
             </div>
             <div class="setting-control">
               <label class="switch">
-                <input type="checkbox" id="themeToggle">
+                <input type="checkbox" id="themeToggle" aria-label="Modo Escuro">
                 <span class="slider"></span>
               </label>
             </div>
@@ -33,7 +33,7 @@ export async function renderSettingsPage(container: HTMLDivElement) {
         <!-- Sync -->
         <section class="settings-section">
           <h2>Sincronização em Segundo Plano</h2>
-          
+
           <div class="setting-item">
             <div class="setting-info">
               <span class="setting-label">Executar em Segundo Plano</span>
@@ -41,7 +41,7 @@ export async function renderSettingsPage(container: HTMLDivElement) {
             </div>
             <div class="setting-control">
               <label class="switch">
-                <input type="checkbox" id="runInBackgroundToggle">
+                <input type="checkbox" id="runInBackgroundToggle" aria-label="Executar em Segundo Plano">
                 <span class="slider"></span>
               </label>
             </div>
@@ -54,7 +54,7 @@ export async function renderSettingsPage(container: HTMLDivElement) {
             </div>
             <div class="setting-control">
               <label class="switch">
-                <input type="checkbox" id="openAtLoginToggle">
+                <input type="checkbox" id="openAtLoginToggle" aria-label="Iniciar com o Windows">
                 <span class="slider"></span>
               </label>
             </div>
@@ -66,7 +66,7 @@ export async function renderSettingsPage(container: HTMLDivElement) {
               <span class="setting-description">De quanto em quanto tempo verificar o SIGAA por novidades.</span>
             </div>
             <div class="setting-control">
-              <select id="syncIntervalSelect" class="form-select">
+              <select id="syncIntervalSelect" class="form-select" aria-label="Intervalo de Busca">
                 <option value="15">15 minutos</option>
                 <option value="30">30 minutos</option>
                 <option value="60">1 hora</option>
@@ -82,7 +82,7 @@ export async function renderSettingsPage(container: HTMLDivElement) {
             </div>
             <div class="setting-control">
               <label class="switch">
-                <input type="checkbox" id="autoDownloadToggle">
+                <input type="checkbox" id="autoDownloadToggle" aria-label="Download Automático">
                 <span class="slider"></span>
               </label>
             </div>
