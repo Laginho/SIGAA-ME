@@ -303,7 +303,6 @@ export function registerIpcHandlers(deps: IpcDeps): void {
     // 2. Só agora, os passos destrutivos.
     await attempt(() => deps.cache.clear(), failures, 'Limpar cache');
     await attempt(() => deps.persistence.reset(), failures, 'Limpar configurações');
-    await attempt(() => deps.logger.clear(), failures, 'Limpar log');
     await attempt(() => {
       for (const entry of fs.readdirSync(deps.userDataPath)) {
         if (entry.startsWith('debug_')) fs.unlinkSync(path.join(deps.userDataPath, entry));
@@ -321,6 +320,10 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 
     // 3. Estado de "primeiro launch": agendador de volta, sem credencial ele não-opera.
     deps.backgroundSync.start();
+    // O log por ultimo: `backgroundSync.start()` grava uma linha e o logger
+    // reabre `logs/app.log` no primeiro write depois de `clear()`. Limpar antes
+    // deixava o arquivo recriado no disco (clear-all.spec.ts, DATA-002).
+    await attempt(() => deps.logger.clear(), failures, 'Limpar log');
 
     if (failures.length > 0) {
       return fail(
