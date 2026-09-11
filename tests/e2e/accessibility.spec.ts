@@ -89,6 +89,11 @@ test.describe('Acessibilidade', () => {
         const { page } = launched;
         const refreshBtn = page.locator('#refreshBtn');
         await refreshBtn.focus();
+        // `.btn-refresh` tem `transition: all 0.2s` (dashboard.css): outline-width
+        // e outline-color são propriedades animáveis, então o valor computado
+        // logo após o foco ainda reflete o início da transição, não o alvo —
+        // espera estabilizar antes de ler.
+        await expect.poll(() => refreshBtn.evaluate((el) => getComputedStyle(el).outlineWidth)).toBe('2px');
         const { outlineStyle, outlineWidth } = await refreshBtn.evaluate((el) => {
             const s = getComputedStyle(el);
             return { outlineStyle: s.outlineStyle, outlineWidth: s.outlineWidth };
