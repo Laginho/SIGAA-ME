@@ -278,6 +278,11 @@
     cursor: pointer;
     transition: all 0.2s;
     position: relative;
+    /* A11Y-001: o reset global de `button` (main.css) só repõe
+       `font-family` — sem isto o `.news-title` herda do controle nativo
+       (13.3333px/normal), não do corpo (16px/24px). */
+    font-size: inherit;
+    line-height: inherit;
 }
 
 .news-item:hover {
@@ -286,12 +291,15 @@
 }
 
 .news-title {
+    /* A11Y-001: span, não div — `<button>` não aceita conteúdo de fluxo. */
+    display: block;
     color: #dc3545;
     font-weight: 500;
     margin-bottom: 0.5rem;
 }
 
 .news-date {
+    display: block;
     font-size: 0.85rem;
     color: #666;
 }

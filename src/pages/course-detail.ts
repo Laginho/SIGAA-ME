@@ -204,10 +204,13 @@ async function fetchCourseFiles(courseId: string) {
         });
         row.type = 'button';
         if (unread) row.append(h('span', { className: 'item-unread-dot' }));
-        row.append(h('div', { className: 'news-title' }, item.title ?? ''));
-        row.append(h('div', { className: 'news-date' }, item.date ?? ''));
+        // span, não div: <button> não pode ter conteúdo de fluxo como
+        // descendente (A11Y-001). `.news-title`/`.news-date` recebem
+        // `display: block` no CSS para a margem continuar valendo.
+        row.append(h('span', { className: 'news-title' }, item.title ?? ''));
+        row.append(h('span', { className: 'news-date' }, item.date ?? ''));
         if (item.notification === 'Sim') {
-          row.append(h('div', {
+          row.append(h('span', {
             className: 'news-notification',
             title: 'O professor enviou um email sobre esta notícia',
           }, '📧 Email Enviado'));
@@ -488,13 +491,16 @@ async function openNewsModal(courseId: string, courseName: string, newsId: strin
   const modal = document.getElementById('newsModal') as HTMLDialogElement | null
   const modalBody = document.getElementById('modalBody')
   const modalTitle = document.getElementById('modalTitle')
+  const modalMeta = document.getElementById('modalMeta')
   const closeBtn = modal?.querySelector('.modal-close')
 
   if (!modal || !modalBody) return
 
-  // Título de carregamento: sobrescrito de imediato se vier do cache, ou
-  // depois do fetch — nunca fica sem nome acessível (A11Y-001).
+  // Título e meta de carregamento: sobrescritos de imediato se vier do cache,
+  // ou depois do fetch — nunca ficam sem nome acessível nem com a data/
+  // notificação da notícia anterior ainda na tela (A11Y-001).
   if (modalTitle) modalTitle.textContent = 'Carregando notícia...'
+  if (modalMeta) modalMeta.replaceChildren()
   // Only show the loading spinner if content isn't already cached
   if (!isNewsCached(courseId, newsId)) {
     modalBody.innerHTML = '<div class="loading">Carregando detalhes da notícia...</div>';
