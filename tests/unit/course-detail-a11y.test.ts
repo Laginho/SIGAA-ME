@@ -22,7 +22,10 @@ const COURSE = {
     name: 'Cálculo I',
     code: 'CB0001',
     files: [{ name: 'Lista 3.pdf', type: 'file', id: '555' }],
-    news: [{ id: 'n1', title: 'Prova adiada', date: '01/01/2026', notification: '' }],
+    news: [
+        { id: 'n1', title: 'Prova adiada', date: '01/01/2026', notification: 'Sim' },
+        { id: 'n2', title: 'Aula cancelada', date: '02/02/2026', notification: '' },
+    ],
 };
 
 beforeEach(() => {
@@ -52,7 +55,7 @@ describe('course-detail: controles só-ícone têm nome acessível', () => {
     it('o botão de fechar do modal tem aria-label', async () => {
         await mount();
         const closeBtn = document.querySelector('#newsModal .modal-close');
-        expect(closeBtn?.getAttribute('aria-label')).toBeTruthy();
+        expect(closeBtn?.getAttribute('aria-label')).toBe('Fechar notícia');
     });
 
     it('o botão de download de um arquivo referencia o nome do arquivo no aria-label', async () => {
@@ -68,6 +71,39 @@ describe('course-detail: item de notícia é um controle semântico', () => {
         const item = container.querySelector('.news-item');
         expect(item?.tagName).toBe('BUTTON');
         expect((item as HTMLButtonElement).type).toBe('button');
+    });
+
+    it('não contém conteúdo de fluxo (div, p, heading) dentro do botão', async () => {
+        const container = await mount();
+        const item = container.querySelector('.news-item')!;
+        expect(item.querySelector('div, p, h1, h2, h3, h4, h5, h6')).toBeNull();
+    });
+});
+
+describe('course-detail: meta do modal não vaza entre notícias diferentes', () => {
+    it('#modalMeta não mantém a data/notificação da notícia anterior ao abrir outra que falha', async () => {
+        const container = await mount();
+        const items = container.querySelectorAll<HTMLButtonElement>('.news-item');
+
+        items[0].click();
+        await flushAll();
+        const modal = document.getElementById('newsModal') as HTMLDialogElement;
+        expect(modal.open).toBe(true);
+        const modalMeta = document.getElementById('modalMeta');
+        expect(modalMeta?.textContent).toContain('01/01/2026');
+        expect(modalMeta?.textContent).toContain('🔔 Notificação enviada');
+
+        modal.close();
+
+        (window as any).api.getNewsDetail = vi.fn().mockResolvedValue({
+            success: false,
+            error: { message: 'falhou' },
+        });
+        items[1].click();
+        await flushAll();
+
+        expect(modalMeta?.textContent).not.toContain('01/01/2026');
+        expect(modalMeta?.textContent).not.toContain('🔔 Notificação enviada');
     });
 });
 
@@ -166,10 +202,10 @@ describe('course-detail: nome acessível do modal antes do conteúdo carregar', 
         expect(modal.open).toBe(true);
         const labelledBy = modal.getAttribute('aria-labelledby');
         const label = labelledBy && document.getElementById(labelledBy);
-        expect(label?.textContent).toBeTruthy();
+        expect(label?.textContent).toBe('Carregando notícia...');
     });
 
-    it('o alvo de aria-labelledby continua existindo e com texto quando a busca falha', async () => {
+    it('o alvo de aria-labelledby mostra o erro quando a busca retorna success: false', async () => {
         (window as any).api.getNewsDetail = vi.fn().mockResolvedValue({
             success: false,
             error: { message: 'falhou' },
@@ -181,6 +217,18 @@ describe('course-detail: nome acessível do modal antes do conteúdo carregar', 
         const modal = document.getElementById('newsModal') as HTMLDialogElement;
         const labelledBy = modal.getAttribute('aria-labelledby');
         const label = labelledBy && document.getElementById(labelledBy);
-        expect(label?.textContent).toBeTruthy();
+        expect(label?.textContent).toBe('Erro ao carregar notícia');
+    });
+
+    it('o alvo de aria-labelledby mostra o erro quando a busca rejeita a promise', async () => {
+        (window as any).api.getNewsDetail = vi.fn().mockRejectedValue(new Error('falhou'));
+        const container = await mount();
+        const item = container.querySelector<HTMLButtonElement>('.news-item')!;
+        item.click();
+        await flushAll();
+        const modal = document.getElementById('newsModal') as HTMLDialogElement;
+        const labelledBy = modal.getAttribute('aria-labelledby');
+        const label = labelledBy && document.getElementById(labelledBy);
+        expect(label?.textContent).toBe('Erro ao carregar notícia');
     });
 });
