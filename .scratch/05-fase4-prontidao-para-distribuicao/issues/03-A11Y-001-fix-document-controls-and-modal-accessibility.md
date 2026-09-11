@@ -1,6 +1,6 @@
 # A11Y-001 — Fix document, controls, and modal accessibility
-Status: open
-Stage: to-review
+Status: resolved
+Stage: done
 Priority: P2
 Blocked by: nenhum
 Tracker status at migration: `NOT STARTED`
@@ -453,3 +453,98 @@ revisões anteriores (ver comentários acima): `AGENTS.md:20-27`, o teste de
 `login.css:63`, `markSeenOnHover` sem teclado, hierarquia de headings do
 `sync-selection`, `title` nos spans de status, e o defeito latente do
 `.sync-card` citado acima.
+
+### 2026-09-11 — quarta revisão: critérios 4–8 fechados, merge
+
+Branch `a11y-001`, 13 commits sobre `40a0d01`, revisada nos dois eixos.
+Rodados nesta revisão, não lidos do relatório: `npm run quality` verde (51
+arquivos, **633 passed, 4 skipped, 0 erro de lint**, 62 warnings de
+`no-explicit-any`, todos pré-existentes) e `npm run test:e2e -- accessibility`
+verde (**15 passed**, 4 rotas × claro/escuro + o teste novo de tipografia).
+
+Vermelho conferido de forma independente: `git revert --no-commit 375dcf6` na
+árvore de trabalho e re-execução — **4 failed / 43 passed** nos quatro arquivos
+de unidade (meta vazando, `.news-item` com `div`, os dois cartões com
+`div`/`p`) e **1 failed / 14 passed** no e2e (só o de tipografia). Árvore
+restaurada em seguida. Confere com o que a etapa 2 relatou.
+
+Separação teste/código limpa: `98af5a4` e `793f0ca` só `tests/`, `375dcf6` só
+`src/`, `749916d` só `.scratch/`. Nenhum arquivo fora dos Primary files.
+
+Critério a critério, verificado no código e no teste:
+
+- **4** — `course-detail.ts:503` reseta `#modalMeta` na linha seguinte ao
+  reset do título, **depois** do guard `if (!modal || !modalBody) return` e
+  **antes** de `showModal()` e de qualquer branch. Os quatro caminhos de saída
+  (cache, sucesso, `else` de erro, `catch`) saem cobertos por um único reset —
+  correção na origem, não por caminho. O `793f0ca` sobrescreve o mock de `n1`
+  para a meta ficar de fato populada antes da segunda abertura, senão a
+  asserção nunca pegaria a regressão.
+- **5** — `.news-item` ganha `font-size`/`line-height: inherit`; nenhum
+  ancestral (`.news-list`, `.news-section`, `#app`) declara os dois, então
+  `inherit` chega ao `body`. O e2e compara contra `getComputedStyle(body)`.
+- **6** — as duas asserções presentes (`outlineStyle !== 'none'` **e**
+  `parseFloat(outlineWidth) >= 1`); o teste do sino faz `body.focus()` e
+  `keyboard.press('Tab')` em laço de 20, sem `bell.focus()`.
+- **7a–e** — os cinco pares subiram à força do gêmeo forte: `it.each` nos dois
+  cartões; `toBe('Fechar notícia')`; três títulos exatos, erro por
+  `success: false` **e** `mockRejectedValue`; `href` literal com `courseId`
+  adversarial; `aria-expanded` de volta a `false` nos três caminhos.
+- **8** — os dois cartões e o `.news-item` só têm `span` (`<strong>` é
+  phrasing); `.news-title`/`.news-date` receberam `display: block`. Varredura
+  de irmãos confirmada de forma independente: nenhum seletor em
+  `src/styles/*.css` é qualificado por `div`/`p`/`span` — os únicos por tag são
+  `h1`/`h2`/`h3` descendentes — e os blocos `[data-theme="dark"]` são por
+  classe. `.sync-card.disabled` continua `div`, corretamente intocado.
+
+Nenhum achado que segure o merge. Registrado, sem retrabalho:
+
+1. **A causa raiz do critério 5 está um nível acima.** `main.css:99-102` reseta
+   só `font-family` no `button`. `button { font: inherit }` fecharia
+   `.news-item` e o defeito latente do `.sync-card` de uma vez e apagaria o
+   hunk do `course-detail.css`. Conferido antes de pedir: **nenhuma** classe de
+   botão do repo declara `font-size` própria, então a regra global mudaria o
+   tamanho de todo botão do app — incluindo login e settings, telas fora do
+   scan do axe. A correção por componente é o escopo certo aqui; a global vira
+   ticket próprio se alguém quiser.
+2. **O critério 5 só é protegido pelo tier e2e**, que está fora do
+   `npm run quality` por decisão registrada no `AGENTS.md`. Reverter
+   `course-detail.css:281-285` deixa o gate verde. É o motivo de a nota do
+   `AGENTS.md` existir; rodado à mão aqui.
+3. **O teste do critério 4 fixa só o caminho de erro.** Mover o reset para
+   dentro do branch de erro deixaria o caminho de carregamento vazando com o
+   teste verde. Resíduo pequeno — a correção está provada na origem por
+   leitura, e a forma do teste foi ditada pelo handoff.
+4. `expect.poll(...).toBe('2px')` fixa o valor do `main.css`, o que torna o
+   `>= 1` seguinte tautológico. Inofensivo: o poll estoura se a regra sumir.
+5. O mesmo racional de `span` vs `div` aparece quatro vezes
+   (`course-detail.ts:207`, `sync-selection.ts:32`, `course-detail.css:294`,
+   corpo do commit). Duas bastariam.
+
+Decisões do autor, agora pela quarta volta sem mudança — seguem para o merge
+como estão: `AGENTS.md:20-27` (nota do scan fora do gate, arquivo fora dos
+Primary files, conteúdo o que a primeira revisão recomendou), o teste de
+`SEC-001` reescrito de clique para leitura de atributo
+(`renderer-content-security.test.ts:200`), e o commit misto `9a83c26`
+(histórico, não corrigível sem reescrever a branch).
+
+Follow-ups abertos, nenhum desta branch: `href` sem checar esquema em
+`dom.ts:36`, `.btn-section-action--success` duplicado (`CLEAN-*`),
+`:focus-visible` do `main.css:107` perdendo para `login.css:63` numa tela fora
+do scan, `markSeenOnHover` sem caminho de teclado, hierarquia de headings do
+`sync-selection`, `title` nos spans de status, tipografia latente do
+`.sync-card`, e `A11Y-002`/`A11Y-003` já abertos.
+
+#### Resolution (2026-09-11)
+
+Quatro voltas de retrabalho, oito critérios. Fechada sem mudança de código na
+revisão — merge direto em `master`.
+
+- Commits: `fda43a2`, `1730807`, `9a83c26`, `9c7d4c7`, `442f1de`, `11e0918`,
+  `173a634`, `98af5a4`, `793f0ca`, `375dcf6` (mais os de documentação).
+- Arquivos de produção: `index.html`, `src/pages/{dashboard,course-detail,
+  sync-selection,settings}.ts`, `src/utils/dom.ts`,
+  `src/styles/{main,dashboard,course-detail,sync-selection}.css`.
+- Prova vermelho-verde desta volta: 4 failed / 43 passed (unidade) e 1 failed /
+  14 passed (e2e) contra o código não corrigido; 47/47 e 15/15 depois.
+- Gate: `npm run quality` verde, 633 passed / 4 skipped / 0 erro de lint.
