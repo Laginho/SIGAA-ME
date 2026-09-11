@@ -85,6 +85,9 @@ describe('course-detail: meta do modal não vaza entre notícias diferentes', ()
         const container = await mount();
         const items = container.querySelectorAll<HTMLButtonElement>('.news-item');
 
+        (window as any).api.getNewsDetail = vi.fn().mockResolvedValue(
+            ok({ title: 'Prova adiada', date: '01/01/2026', notification: 'Sim', content: '<p>ok</p>' }),
+        );
         items[0].click();
         await flushAll();
         const modal = document.getElementById('newsModal') as HTMLDialogElement;
