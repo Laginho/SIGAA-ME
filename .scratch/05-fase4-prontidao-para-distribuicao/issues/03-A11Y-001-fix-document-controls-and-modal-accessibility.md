@@ -18,6 +18,11 @@ Tracker status at migration: `NOT STARTED`
   - `src/styles/course-detail.css`
   - `src/styles/sync-selection.css`
   - New: `tests/e2e/accessibility.spec.ts`
+  - `tests/unit/sync-selection-a11y.test.ts`
+  - `tests/unit/course-detail-a11y.test.ts`
+  - `tests/unit/dashboard-a11y.test.ts`
+  - `tests/unit/renderer-content-security.test.ts` (só o bloco do dashboard,
+    `href` do link de notificação)
 
 #### Required behavior
 
@@ -31,16 +36,73 @@ Tracker status at migration: `NOT STARTED`
 
 #### Acceptance criteria
 
-- All primary flows work with keyboard only.
-- Modal focus cannot escape while open and returns to the trigger on close.
-- Automated accessibility checks have no critical/serious violations in the
-  tested screens.
+1. All primary flows work with keyboard only.
+2. Modal focus cannot escape while open and returns to the trigger on close.
+3. Automated accessibility checks have no critical/serious violations in the
+   tested screens.
+
+Critérios 4–8 desdobrados em 2026-09-11 dos achados da terceira revisão e da
+`QA-007` (comentários abaixo). Todos são regressão ou lacuna introduzida pela
+branch `a11y-001`.
+
+4. `#modalMeta` é esvaziado a cada `openNewsModal`, junto com o reset de
+   `#modalTitle`. Abrir uma notícia com sucesso, fechar, e abrir outra cuja
+   busca falha (ou ainda carrega) deixa `#modalMeta.textContent === ''` —
+   nunca a data ou o "🔔 Notificação enviada" da notícia anterior.
+5. O `.news-title` dentro do `<button class="news-item">` tem `font-size` e
+   `line-height` computados iguais aos do `body` (hoje `16px`/`24px`), não os
+   do controle nativo (`13.3333px`/`normal`). Provado no Chromium, em
+   `tests/e2e/accessibility.spec.ts`.
+6. O teste de `:focus-visible` exige `outline-width` computada ≥ `1px` além de
+   `outline-style !== 'none'` — sem a regra do `main.css` o Chromium devolve
+   `auto`/`0px` e o teste fica vermelho. O teste "Tab alcança o sino" chega ao
+   `#notificationBellBtn` por `keyboard.press('Tab')` a partir do `body`, com
+   limite de tentativas, sem `bell.focus()`.
+7. Asserções gêmeas com a mesma força, nos cinco pares:
+   a. a verificação "sem heading e sem conteúdo inválido" roda em `btnFastSync`
+      **e** `btnFullSync`;
+   b. `aria-label` do `.modal-close` é exatamente `Fechar notícia`, como o do
+      botão de download já é exato;
+   c. `#modalTitle` é exatamente `Carregando notícia...` durante o carregamento
+      e exatamente `Erro ao carregar notícia` nos dois caminhos de erro
+      (`success: false` e `getNewsDetail` rejeitando), não só truthy;
+   d. o `href` do `.notification-item` com `courseId` adversarial
+      (`c1' onclick='alert(1)`) fica literal, como já é provado para o
+      `.course-card` em `renderer-content-security.test.ts`;
+   e. `aria-expanded` do sino volta a `false` nos três caminhos de fechamento:
+      clique no sino, clique fora do painel, clique num item de notificação.
+8. Nenhum `<button>` criado pela branch contém conteúdo de fluxo:
+   `querySelector('div, p, h1, h2, h3, h4, h5, h6')` é `null` em
+   `#btnFastSync`, `#btnFullSync` e `.news-item`. O layout não muda: os
+   filhos viram `span` e o CSS repõe `display: block` onde a margem dependia
+   do bloco (`.news-title`, `.news-date`).
 
 #### Verification
 
 ```text
+npx vitest run tests/unit/sync-selection-a11y.test.ts tests/unit/course-detail-a11y.test.ts tests/unit/dashboard-a11y.test.ts tests/unit/renderer-content-security.test.ts
 npm run test:e2e -- accessibility
+npm run quality
 ```
+
+## Tests stage 2 writes (own commit, red)
+
+Seams já usados pelos testes existentes; nenhum novo.
+
+- `tests/unit/course-detail-a11y.test.ts`, seam `renderCourseDetailPage`:
+  critério 4 (segunda notícia no `COURSE`, a primeira com `notification: 'Sim'`),
+  7b e 7c. Vermelho: 4 porque a meta velha fica; 7b/7c passam hoje — são
+  endurecimento, e ficam vermelhos se o texto mudar.
+- `tests/unit/sync-selection-a11y.test.ts`, seam `renderSyncSelectionPage`:
+  critérios 7a e 8 (cartões). Vermelho: 8 porque os cartões contêm `div`/`p`.
+- `tests/unit/course-detail-a11y.test.ts`: critério 8 (`.news-item` contém
+  `div`). Vermelho hoje.
+- `tests/unit/dashboard-a11y.test.ts`, seam `renderDashboardPage`: critério 7e
+  (clique fora via `document.body.click()`, clique em `.notification-item`).
+- `tests/unit/renderer-content-security.test.ts`, bloco do dashboard: critério
+  7d.
+- `tests/e2e/accessibility.spec.ts`: critérios 5 (vermelho — `13.3333px`) e 6
+  (largura do contorno passa hoje; Tab real substitui o `focus()`).
 
 #### Implementation notes
 
@@ -309,3 +371,26 @@ itens introduzidos pela branch que pertencem ao retrabalho da `A11Y-001`:
 
 Os dois defeitos de cor pré-existentes encontrados na mesma varredura não são
 retrabalho desta branch. Foram publicados como `A11Y-002` e `A11Y-003`.
+
+### 2026-09-11 — etapa 1: achados desdobrados em critérios 4–8, handoff `rework-4`
+
+O `#modalMeta` stale da terceira revisão e os quatro achados da `QA-007`
+viraram critérios numerados no corpo (4 a 8), com os arquivos de teste
+correspondentes adicionados aos Primary files. Sem isso a etapa 2 fazia só o
+`modalMeta`: o handoff `rework-3` dizia "Um item" e comentário não desdobrado
+é nota, não requisito.
+
+Decisões desta etapa:
+
+- **Conteúdo inválido nos botões (critério 8) fica nesta volta.** É a única
+  regressão sem sintoma visível, mas a correção é `div`/`p` → `span` mais
+  duas linhas de `display: block`; abrir ticket próprio custa mais que isso.
+  Vai por último na ordem do handoff, para não segurar o critério 5.
+- **Scan do axe com o modal aberto não entra aqui.** Só fica verde depois da
+  cor do `.modal-meta` no escuro, que é pré-existente — continua no
+  `A11Y-002`, como a `QA-007` roteou.
+- O item "Tab alcança o sino" (achado 3 da `QA-007`, segunda metade) entrou
+  no critério 6 em vez de ganhar número próprio: mesmo arquivo, mesmo teste.
+
+Handoff: `.scratch/05-fase4-prontidao-para-distribuicao/handoffs/A11Y-001-rework-4.md`.
+O `rework-3` fica como histórico; o `rework-4` o substitui.
