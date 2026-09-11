@@ -1,30 +1,24 @@
-# DEP-005: Subir Electron e Playwright como um conjunto de runtime
+# DEP-005: Subir o Electron para fora da faixa vulnerável
 Status: open
 Stage: to-implement
 Priority: P1
-Blocked by: DEP-004
+Blocked by: DEP-004, DEP-007
 
 - Owner: —
-- Dependencies: `DEP-004` (suíte estável antes de trocar o runtime). Filho de
-  `DEP-001`.
+- Dependencies: `DEP-004` (suíte estável antes de trocar o runtime),
+  `DEP-007` (Playwright já alinhado, para o live smoke isolar o Electron).
+  Filho de `DEP-001`.
 - Primary files:
   - `package.json`
   - `package-lock.json`
-  - `playwright.config.ts`
   - `electron/main.ts` (só se a API do Electron novo exigir)
 
 #### What to build
 
 `electron@^30.0.1` está na faixa `<=40.10.2` (high). Suba para a menor
 versão fora de toda a faixa listada pelo audit (41.7.2+, 42.3.4+ ou 43/44).
-São vários majors; leia as breaking-changes notes do Electron entre 30 e a
+São onze majors; leia as breaking-changes notes do Electron entre 30 e a
 versão escolhida e liste no ticket o que tocou o código, se algo tocou.
-
-`playwright@^1.56.1` e `@playwright/test@^1.59.1` estão em minors diferentes.
-Alinhe os dois na mesma versão (1.63.0 era a atual em 2026-09-11). O
-Playwright aqui é dependência de **produção**: é ele que mantém a sessão JSF
-do SIGAA (`ARCHITECTURE.md`). Subir o Chromium que ele baixa muda o
-user-agent visto pelo portal.
 
 A pinagem de `allowScripts` no `package.json` é por versão: ao subir o
 Electron, rode `npm install-scripts approve electron` e `npm rebuild electron`
@@ -55,5 +49,4 @@ npx playwright test app.spec.ts
 
 - Commit: —
 - Electron escolhido e breaking changes que tocaram código: —
-- Playwright escolhido: —
 - Live smoke: —

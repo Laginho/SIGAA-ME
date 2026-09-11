@@ -2,7 +2,7 @@
 Status: open
 Stage: blocked
 Priority: P1
-Blocked by: DEP-003, DEP-004, DEP-005, DEP-006
+Blocked by: DEP-003, DEP-004, DEP-005, DEP-006, DEP-007
 Tracker status at migration: `NOT STARTED`
 
 - Owner: —
@@ -16,13 +16,14 @@ Tracker status at migration: `NOT STARTED`
 
 #### Split (2026-09-11)
 
-Este ticket virou guarda-chuva. Os passos abaixo foram divididos em quatro
+Este ticket virou guarda-chuva. Os passos abaixo foram divididos em cinco
 filhos, cada um com uma verificação própria que muda de saída antes/depois,
 porque um bump de dependência não tem teste unitário vermelho/verde:
 
 - `DEP-003` axios (passo 1)
 - `DEP-004` remover `@vitest/browser` e `@vitest/ui` sem uso, alinhar vitest (passo 5)
-- `DEP-005` Electron + Playwright (passo 3)
+- `DEP-007` alinhar playwright e @playwright/test (passo 3, parte Playwright)
+- `DEP-005` Electron (passo 3, parte Electron)
 - `DEP-006` electron-builder + electron-updater e audit residual (passos 4 e 7)
 
 Passos 2 e 6 já foram feitos pelo `DEP-002` (Vite 6.4.3, lock regenerado).
