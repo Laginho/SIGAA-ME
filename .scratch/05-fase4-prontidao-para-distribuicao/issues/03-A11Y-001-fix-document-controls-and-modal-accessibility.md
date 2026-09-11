@@ -1,6 +1,6 @@
 # A11Y-001 — Fix document, controls, and modal accessibility
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P2
 Blocked by: nenhum
 Tracker status at migration: `NOT STARTED`
@@ -394,3 +394,62 @@ Decisões desta etapa:
 
 Handoff: `.scratch/05-fase4-prontidao-para-distribuicao/handoffs/A11Y-001-rework-4.md`.
 O `rework-3` fica como histórico; o `rework-4` o substitui.
+
+### 2026-09-11 — etapa 2: retrabalho 4 implementado, pronto para revisão
+
+Commits em `a11y-001`, nesta ordem — teste primeiro (`diff --stat` só em
+`tests/`), depois código:
+
+1. `test: harden and extend A11Y-001 rework-4 coverage (criteria 4-8)` —
+   critérios 4, 5 (e2e), 8 vermelhos pelo motivo certo (meta vazando, `.news-item`
+   e cartões ainda com `div`/`p`); 6, 7b-e já passavam hoje e ficaram
+   endurecidos.
+2. `test: fix two test bugs found while turning A11Y-001 rework-4 green` — dois
+   bugs no teste novo, achados ao tentar deixá-lo verde: o mock padrão de
+   `getNewsDetail` sempre devolvia `notification: ''`, então a asserção do
+   critério 4 nunca teria pego a meta antiga de verdade; e o teste do critério 6
+   lia `getComputedStyle` sincronamente após o foco, no meio da transição de
+   `.btn-refresh` (`transition: all 0.2s`, animável em `outline-width`/
+   `outline-color`) — passou a esperar o valor estabilizar.
+3. `fix: close A11Y-001 rework-4 (criteria 4, 5, 8)` — código.
+
+Vermelho antes da correção (item 1 do handoff): `npx vitest run
+tests/unit/course-detail-a11y.test.ts tests/unit/sync-selection-a11y.test.ts
+tests/unit/dashboard-a11y.test.ts tests/unit/renderer-content-security.test.ts`
+com 4 falhas (meta vazando, `.news-item` e os dois cartões com conteúdo de
+fluxo) e 43 passando — os pares 6 e 7b-e já verdes, confirmando que eram só
+endurecimento. Depois da correção: 47/47. `npm run quality`: 633 passed, 4
+skipped, 0 erro de lint (62 warnings, todos pré-existentes — mesma linha de
+base do `rework-3`). `npm run test:e2e -- accessibility`: 15/15, incluindo o
+teste novo de tipografia do critério 5 (rebuild com `npx vite build` antes de
+rodar — o e2e carrega `dist/`, não `src/`, direto).
+
+Varredura de simetria (mecânica, pedida pelo handoff):
+
+- `grep -n 'modalMeta\|modalTitle' src/pages/course-detail.ts` — confirma os
+  quatro caminhos de saída de `openNewsModal` (cache, sucesso, `else` de erro,
+  `catch`) cobertos pelo reset único no topo; os dois caminhos de erro só
+  reescrevem o título, porque a meta já foi limpa antes de qualquer branch
+  rodar.
+- `grep -n 'news-title\|news-date\|news-notification' src/pages/course-detail.ts
+  src/styles/course-detail.css` — os seletores de tema escuro
+  (`course-detail.css:446-448`) são por classe, não por tag; não precisam mudar
+  com `div`→`span`.
+- `grep -n 'div\.\|p\.card\|h2\.card' src/styles/sync-selection.css` — vazio;
+  confirma que nenhum seletor CSS ali é qualificado por tag, então a troca para
+  `span` nos dois cartões-botão não quebra nada.
+- `.sync-card.disabled` (o terceiro cartão, "Modo Backup") continua `div` com
+  `h2`/`p` — não é `<button>`, então critério 8 não se aplica; não tocado.
+- `.sync-card` tem o mesmo defeito de tipografia latente do `.news-item`
+  (menção do handoff), mas todos os filhos já definem `font-size` próprio — sem
+  sintoma, e o handoff marca como opcional. Não corrigido nesta volta.
+
+Nenhum achado novo de assimetria além do que os itens 1-5 já cobriam.
+
+Fora desta volta, sem mudança — decisões do autor e follow-ups repetidos das
+revisões anteriores (ver comentários acima): `AGENTS.md:20-27`, o teste de
+`SEC-001` reescrito, o commit misto `9a83c26`, `href` sem checar esquema em
+`dom.ts`, CSS duplicado (`CLEAN-*`), `:focus-visible` perdendo para
+`login.css:63`, `markSeenOnHover` sem teclado, hierarquia de headings do
+`sync-selection`, `title` nos spans de status, e o defeito latente do
+`.sync-card` citado acima.
