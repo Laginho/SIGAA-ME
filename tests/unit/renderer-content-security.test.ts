@@ -221,7 +221,7 @@ describe('dashboard: conteúdo do SIGAA não cria nó executável', () => {
         expect(img?.getAttribute('src')).toBe('https://si3.ufc.br/sigaa/foto.jpg');
     });
 
-    it('linhas de notificação exibem literal e criam nenhum nó executável', async () => {
+    it('linhas de notificação exibem literal, criam nenhum nó executável, e o href do courseId adversarial fica literal', async () => {
         writeAccountItem('courses', JSON.stringify([]));
         setupApi();
         const app = document.createElement('div');
@@ -229,10 +229,11 @@ describe('dashboard: conteúdo do SIGAA não cria nó executável', () => {
 
         const { renderDashboardPage } = await import('../../src/pages/dashboard');
         const { pushNotifications } = await import('../../src/utils/notification-store');
+        const adversarialCourseId = "c1' onclick='alert(1)";
         pushNotifications([{
             id: 'news-c1-n1',
             type: 'news',
-            courseId: 'c1',
+            courseId: adversarialCourseId,
             courseName: '<svg onload=alert(1)>',
             itemId: 'n1',
             itemTitle: '<img src=x onerror=alert(1)>',
@@ -251,6 +252,8 @@ describe('dashboard: conteúdo do SIGAA não cria nó executável', () => {
         expect(list?.querySelectorAll('img, svg, script, iframe, [onerror], [onload]').length).toBe(0);
         const title = list?.querySelector('.notification-item-title');
         expect(title?.textContent).toBe('<img src=x onerror=alert(1)>');
+        const item = list?.querySelector('.notification-item');
+        expect(item?.getAttribute('href')).toBe(`#/course/${adversarialCourseId}`);
     });
 });
 

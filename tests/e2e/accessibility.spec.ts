@@ -62,8 +62,20 @@ test.describe('Acessibilidade', () => {
     test('fluxo por teclado: Tab alcança o sino e Enter abre o painel de notificações', async () => {
         await goto('#/dashboard');
         const { page } = launched;
+        await page.evaluate(() => document.body.focus());
+
+        let reached = false;
+        for (let i = 0; i < 20; i++) {
+            await page.keyboard.press('Tab');
+            const id = await page.evaluate(() => document.activeElement?.id ?? null);
+            if (id === 'notificationBellBtn') {
+                reached = true;
+                break;
+            }
+        }
+        expect(reached).toBe(true);
+
         const bell = page.locator('#notificationBellBtn');
-        await bell.focus();
         await expect(bell).toHaveAttribute('aria-expanded', 'false');
 
         await page.keyboard.press('Enter');
@@ -77,8 +89,12 @@ test.describe('Acessibilidade', () => {
         const { page } = launched;
         const refreshBtn = page.locator('#refreshBtn');
         await refreshBtn.focus();
-        const outlineStyle = await refreshBtn.evaluate((el) => getComputedStyle(el).outlineStyle);
+        const { outlineStyle, outlineWidth } = await refreshBtn.evaluate((el) => {
+            const s = getComputedStyle(el);
+            return { outlineStyle: s.outlineStyle, outlineWidth: s.outlineWidth };
+        });
         expect(outlineStyle).not.toBe('none');
+        expect(parseFloat(outlineWidth)).toBeGreaterThanOrEqual(1);
     });
 
     test('prefers-reduced-motion: reduce anula as transições', async () => {
@@ -106,6 +122,19 @@ test.describe('Acessibilidade', () => {
     test.describe('Modal de notícia (dialog nativo)', () => {
         test.beforeEach(async () => {
             await goto('#/course/c1');
+        });
+
+        test('título da notícia mantém a tipografia do corpo, não a do <button> nativo', async () => {
+            const { page } = launched;
+            const bodyFont = await page.evaluate(() => {
+                const s = getComputedStyle(document.body);
+                return { fontSize: s.fontSize, lineHeight: s.lineHeight };
+            });
+            const titleFont = await page.locator('.news-item .news-title').first().evaluate((el) => {
+                const s = getComputedStyle(el);
+                return { fontSize: s.fontSize, lineHeight: s.lineHeight };
+            });
+            expect(titleFont).toEqual(bodyFont);
         });
 
         test('abrir por teclado foca dentro do dialog; Escape fecha e devolve o foco ao item que abriu', async () => {

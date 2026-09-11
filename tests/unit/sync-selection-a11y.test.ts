@@ -30,11 +30,14 @@ describe('sync-selection: cartões clicáveis são <button>', () => {
         expect((card as HTMLButtonElement).type).toBe('button');
     });
 
-    it('o título do cartão não é um heading (evita heading dentro de button)', () => {
+    it.each([
+        ['btnFastSync', 'Modo Rápido'],
+        ['btnFullSync', 'Modo Completo'],
+    ])('%s não contém conteúdo de fluxo (div, p, heading) dentro do botão', (id, title) => {
         const app = buildApp();
         renderSyncSelectionPage(app);
-        const card = document.getElementById('btnFastSync')!;
-        expect(card.querySelector('h1,h2,h3,h4,h5,h6')).toBeNull();
-        expect(card.querySelector('.card-title')?.textContent).toBe('Modo Rápido');
+        const card = document.getElementById(id)!;
+        expect(card.querySelector('div, p, h1, h2, h3, h4, h5, h6')).toBeNull();
+        expect(card.querySelector('.card-title')?.textContent).toBe(title);
     });
 });

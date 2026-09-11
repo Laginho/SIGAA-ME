@@ -67,6 +67,26 @@ describe('dashboard: menu de notificação', () => {
         bell.click();
         expect(bell.getAttribute('aria-expanded')).toBe('false');
     });
+
+    it('clicar fora do painel fecha e aria-expanded volta a false', () => {
+        mount();
+        const bell = document.getElementById('notificationBellBtn')!;
+        bell.click();
+        expect(bell.getAttribute('aria-expanded')).toBe('true');
+        document.body.click();
+        expect(bell.getAttribute('aria-expanded')).toBe('false');
+    });
+
+    it('clicar num item de notificação fecha o painel e aria-expanded volta a false', () => {
+        pushNotifications([{ id: 'n1', type: 'news', courseId: 'c1', courseName: 'Estruturas de Dados', itemId: 'x', itemTitle: 'Aviso', timestamp: 1, read: false }]);
+        mount();
+        const bell = document.getElementById('notificationBellBtn')!;
+        bell.click();
+        expect(bell.getAttribute('aria-expanded')).toBe('true');
+        const item = document.querySelector('.notification-item') as HTMLElement;
+        item.click();
+        expect(bell.getAttribute('aria-expanded')).toBe('false');
+    });
 });
 
 describe('dashboard: cartão de disciplina é um link semântico', () => {
