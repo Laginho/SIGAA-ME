@@ -277,3 +277,35 @@ Nenhuma foi tocada no retrabalho 2, como o handoff mandou:
   `markSeenOnHover` sem caminho de teclado, hierarquia de headings do
   `sync-selection` (o card desabilitado ficou com o único `h2`), `title` nos
   spans de status do `course-detail`.
+
+### 2026-09-10 — QA-007: varredura mecânica de simetria
+
+Relatório completo:
+`docs/audits/2026-09-10-a11y-001-simetria.md`.
+
+Além do `modalMeta` stale já registrado acima, a varredura encontrou quatro
+itens introduzidos pela branch que pertencem ao retrabalho da `A11Y-001`:
+
+1. **Conteúdo inválido nos novos botões.** Os cartões rápido/completo em
+   `src/pages/sync-selection.ts:33-54` trocaram `h2` por `div`, mas continuam
+   contendo `div` e `p`; o botão `.news-item` em
+   `src/pages/course-detail.ts:201-216` também contém `div`. O modelo de
+   conteúdo de `<button>` admite conteúdo phrasing, não esses elementos de
+   fluxo. A conversão semântica ficou pela metade.
+2. **Reset visual incompleto do `.news-item`.** A conversão repôs `display`,
+   `width` e `text-align`, mas não `font-size`/`line-height`. No Chromium, o
+   título passou de `16px/24px` para `13.3333px/normal`, herdado do controle
+   nativo.
+3. **Teste de foco com falso verde.** O teste de `:focus-visible` só exige
+   `outlineStyle !== "none"`. Removida a regra de produção em runtime, o
+   Chromium devolve `outline-style: auto` e `outline-width: 0px`, portanto a
+   asserção continua verde sem contorno visível. O teste que diz que Tab chega
+   ao sino também chama `bell.focus()` diretamente e não exercita Tab.
+4. **Asserções gêmeas com força desigual.** O teste de sync procura heading
+   só no cartão rápido; o `aria-label` do botão de fechar e os títulos de
+   loading/erro aceitam qualquer texto truthy; o `href` adversarial é provado
+   no course-card, mas não no link irmão de notificação; `aria-expanded` só é
+   testado ao fechar pelo sino, não por clique externo ou seleção de item.
+
+Os dois defeitos de cor pré-existentes encontrados na mesma varredura não são
+retrabalho desta branch. Foram publicados como `A11Y-002` e `A11Y-003`.
