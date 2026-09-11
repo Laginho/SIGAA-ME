@@ -8,7 +8,7 @@ Blocked by: nenhum
 - Dependencies: `A11Y-001`
 - Primary files:
   - Nenhum. **Auditoria somente-leitura** — não altera código.
-  - New: `docs/audits/2026-09-10-a11y-001-simetria.md`
+  - New: `docs/audits/2026-09-10-a11y-001-simetria.md` (o único arquivo escrito)
 
 #### What to build
 
@@ -52,9 +52,29 @@ resto.** Candidatos a par neste diff:
 - `aria-label` adicionado a um controle de um grupo e não aos irmãos.
 - Asserção de teste reforçada num caso e deixada fraca no caso gêmeo.
 
-Rode contra a branch **antes do merge** se der — assim um achado ainda entra
+Rode **antes do merge** — assim um achado ainda entra
 na volta corrente do `A11Y-001` em vez de virar ticket novo. Depois do merge o
 `git diff 40a0d01..<merge>` continua valendo; só fica mais caro consertar.
+
+#### Roda em paralelo com o retrabalho 3 do `A11Y-001`
+
+Os dois podem correr ao mesmo tempo, sob três amarras. Sem elas, brigam.
+
+1. **Commit fixo, não a ponta da branch.** Audite `git diff 40a0d01..173a634`,
+   não `..a11y-001`. `173a634` é o último commit de código da branch; o
+   retrabalho 3 vai empilhar commits novos por cima e mudaria o diff embaixo
+   de você. O achado do `modalMeta` está **dentro** desse intervalo e é
+   conhecido — cite como confirmação do padrão, não como achado novo.
+2. **Worktree própria, somente leitura.**
+   `git worktree add .claude/worktrees/qa-007 173a634`. Não precisa de
+   `node_modules`: esta auditoria não roda o gate nem nada de npm, só `git` e
+   leitura de arquivo. O checkout principal está ocupado pelo implementador.
+3. **Não escreva no ticket do `A11Y-001`.** O implementador está editando esse
+   arquivo na mesma janela. O entregável desta volta é **só**
+   `docs/audits/2026-09-10-a11y-001-simetria.md`. A dobra dos achados em
+   comentário de ticket ou em ticket novo acontece depois, quando os dois
+   terminarem — o relatório só classifica cada achado (retrabalho da branch /
+   pré-existente / ticket próprio) e deixa pronto para dobrar.
 
 #### Acceptance criteria
 
@@ -68,13 +88,14 @@ na volta corrente do `A11Y-001` em vez de virar ticket novo. Depois do merge o
 4. O relatório declara explicitamente se **nada** foi achado em cada categoria
    varrida. Uma varredura sem achados é resultado, e precisa ser legível como
    tal.
-5. Nenhum arquivo de código foi alterado (`git status` limpo fora de
+5. Nada além de `docs/audits/` foi escrito — nem código, nem o ticket do
+   `A11Y-001`, que está aberto noutra sessão (`git status` limpo fora de
    `docs/audits/`).
 
 #### Verification
 
 ```text
-git diff --stat 40a0d01..a11y-001
+git diff --stat 40a0d01..173a634
 ```
 
 ```text
