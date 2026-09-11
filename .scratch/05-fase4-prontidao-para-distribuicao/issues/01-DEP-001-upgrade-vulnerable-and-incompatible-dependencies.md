@@ -62,3 +62,11 @@ npm run test:e2e
 - Commit: —
 - Selected Vite major: —
 - Audit summary: —
+
+## Comments
+
+- 2026-09-11 (revisão do `DEP-003`): o axios 1.20 declara
+  `https-proxy-agent@^5.0.1` como dependência direta. No lock, ele e o
+  `agent-base@6.0.2` perderam o `"dev": true` — são produção agora. Nenhum dos
+  dois tem achado de audit hoje; entra no passo 7 (audit residual) só como
+  superfície nova a conferir.

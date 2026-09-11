@@ -1,6 +1,6 @@
 # DEP-003: Subir o axios para fora da faixa vulnerável
-Status: open
-Stage: to-review
+Status: resolved
+Stage: done
 Priority: P1
 Blocked by: nenhum
 
@@ -39,7 +39,7 @@ npm run quality
 
 #### Implementation notes
 
-- Commit: —
+- Commit: `b29fc46`
 - Versão escolhida: `1.20.0` (`npm view axios version` em 2026-09-11).
 - Audit antes/depois (`npm audit --omit=dev`):
   - Antes: 6 high — axios (múltiplos), `electron-updater`→`builder-util-runtime`,
@@ -64,3 +64,42 @@ npm run quality
   `npx vitest run` (633 passed, 4 skipped) verdes depois do `npm ci` limpo.
 - Lock regenerado com `npm install` no Windows; `npm ci` depois limpo
   (679 pacotes, sem `install scripts blocked`).
+
+#### Resolution (2026-09-11)
+
+Revisão da etapa 3 (Opus) sobre `b29fc46`. **Aprovada sem mudança de código.**
+
+Diff dentro do limite: `package.json`, `package-lock.json`,
+`electron/services/http-scraper.service.ts` e este ticket — nada fora dos
+Primary files.
+
+Critérios, reverificados nesta sessão e não copiados das notas:
+
+1. ✅ com a leitura declarada nas notas. `npm audit --omit=dev` → 4 high,
+   nenhum de axios: `builder-util-runtime`/`electron-updater` (`DEP-006`),
+   `js-yaml` e `undici` via `cheerio` (passo 7 do `DEP-001`). O critério ao pé
+   da letra só fecha sobre o master com os irmãos mergeados.
+2. ✅ `npm ls axios` → `axios@1.20.0`, uma só.
+3. ✅ `npm run quality` verde: tsc limpo, eslint 0 erros / 62 warnings
+   (`no-explicit-any` pré-existentes), vitest 51 arquivos, 633 passed,
+   4 skipped.
+4. ✅ lock regenerado; `npm ci` limpo. `npm view axios@1.20.0 dependencies`
+   bate com o lock (`form-data ^4.0.6`, `proxy-from-env ^2.1.0`,
+   `follow-redirects ^1.16.0`, `https-proxy-agent ^5.0.1`).
+
+Sem teste vermelho-verde, como o ticket já previa: a mudança é de versão, e a
+prova é a saída do `npm audit`. O ajuste de tipo em `http-scraper.service.ts` é
+verificado pelo `tsc` — revertê-lo quebra o typecheck.
+
+Dois pontos olhados de perto e considerados não-achados:
+
+- `contentLength` com `Content-Length: ""`: antes `'' || '0'` dava `0`, agora
+  `parseInt('')` dá `NaN`. Os dois usos (`> MAX_DOWNLOAD_BYTES` e `> 0` para o
+  progresso) tratam `NaN` e `0` igual, então não há mudança de comportamento.
+- Os três `typeof === 'string'` repetidos poderiam virar um helper local. É
+  cosmético, o ESLint não reclama, e reescrever código que funciona não é
+  trabalho desta etapa.
+
+Um efeito colateral registrado como comentário no `DEP-001`: o axios 1.20
+declara `https-proxy-agent@^5` como dependência direta, o que moveu ele e o
+`agent-base@6` de dev para produção no lock.
