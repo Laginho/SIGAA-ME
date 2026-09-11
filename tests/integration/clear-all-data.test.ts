@@ -239,7 +239,13 @@ describe('clear-all-data', () => {
             expect(stop).toBeLessThan(cancel);
             expect(cancel).toBeLessThan(logout);
             for (const name of DESTRUCTIVE) expect(at(name), `${name} antes de fechar a sessão`).toBeGreaterThan(logout);
-            expect(at('backgroundSync.start')).toBe(order.length - 1);
+            // O agendador volta depois de tudo, menos do log: `start()` grava uma
+            // linha e o logger reabre `logs/app.log` no primeiro write, entao o
+            // log tem de ser o ultimo passo para nao renascer (clear-all.spec.ts).
+            for (const name of DESTRUCTIVE) {
+                if (name !== 'logger.clear') expect(at('backgroundSync.start'), `start antes de ${name}`).toBeGreaterThan(at(name));
+            }
+            expect(at('logger.clear')).toBe(order.length - 1);
         });
 
         it('is the credential file, not the scheduler, that blocks a sync from starting in the gap', async () => {
