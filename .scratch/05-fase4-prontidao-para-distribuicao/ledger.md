@@ -12,3 +12,4 @@
 | 2026-09-10 | QA-007 | b8d1f61; auditoria somente-leitura, aprovada na revisão com um nono achado encaminhado ao A11Y-003 |
 | 2026-09-11 | A11Y-001 | fda43a2, 1730807, 9a83c26, 9c7d4c7, 442f1de, 11e0918, 173a634, 98af5a4, 793f0ca, 375dcf6; quatro voltas de retrabalho, 8 critérios, fechada sem mudança de código na revisão |
 | 2026-09-11 | DEP-003 | b29fc46; revisão sem mudança de código, critério 1 fechado como "sem achado de axios" |
+| 2026-09-11 | A11Y-003 | e6f95d0, bbee8fd, 613c3b5; reaberta uma vez por critério sem teste, fechada sem mudança de código na revisão |
