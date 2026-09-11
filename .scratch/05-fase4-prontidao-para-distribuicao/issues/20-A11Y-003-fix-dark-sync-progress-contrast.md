@@ -1,6 +1,6 @@
 # A11Y-003: Corrigir o contraste do detalhe de progresso no tema escuro
-Status: open
-Stage: to-review
+Status: resolved
+Stage: done
 Priority: P2
 Blocked by: A11Y-001
 
@@ -165,3 +165,44 @@ Gate `npm run quality`: typecheck limpo, ESLint 0 erros / 62 warnings
 `npm run test:e2e -- accessibility`: 15 passed, claro e escuro.
 
 Sem commit de código nesta volta. Segue para etapa 3.
+
+#### Resolution (2026-09-11)
+
+Fechada na etapa 3 sem mudança de código. Commits: `e6f95d0` (teste),
+`bbee8fd` (código), `613c3b5` (teste da segunda volta).
+
+Separação verificada por `git show --stat`: os dois commits de teste tocam só
+`tests/unit/sync-selection-a11y.test.ts`, o de código só
+`src/styles/sync-selection.css`. `git diff master...a11y-003 --stat`:
+3 arquivos (ticket, CSS, teste), nada fora dos Primary files.
+
+Red-green refeito nesta revisão: com `src/styles/sync-selection.css` do
+`master` no working tree, `npx vitest run tests/unit/sync-selection-a11y.test.ts`
+dá **2 failed | 4 passed** — cai no `.progress-text` (`color: #444`) e no
+`.back-link:hover` (`color: #333`). Com o arquivo da branch, 6 passed.
+
+Gate `npm run quality`: typecheck limpo, ESLint 0 erros / 62 warnings
+(`no-explicit-any` pré-existentes), vitest 51 arquivos, **635 passed | 4 skipped**.
+`npm run test:e2e -- accessibility`: **15 passed**, claro e escuro.
+
+✔ Critério 1 — `var(--color-text-muted)` sobre `var(--color-surface)`:
+`#4b5563` em `#ffffff` = 7,56:1; `#94a3b8` em `#1e293b` = 5,70:1.
+
+✔ Critério 2 — `.overlay-status` e `.progress-text` usam o mesmo token.
+
+✔ Critério 3 — agora com prova. `grep -rn back-link src/styles/*.css` mostra
+**uma única** definição de `:hover`, em `src/styles/sync-selection.css:254`, e
+uma única cor base, em `src/styles/settings.css:137` — a cópia morta
+(`color: #666`) foi apagada, então a divergência acabou sem depender da ordem
+do CSS construído. Ambos os arquivos entram no mesmo bundle (`settings.ts` e
+`sync-selection.ts` importam o próprio CSS), logo o `:hover` vale nas duas
+telas. `var(--color-primary-hover)`: `#004482` em `#ffffff` = 9,77:1 no claro;
+`#60a5fa` em `#1e293b` = 5,75:1 (e 7,02:1 sobre `--color-background` `#0f172a`)
+no escuro. O teste de `613c3b5` falha se a cor voltar a um literal.
+
+✔ Critério 4 — `src/styles/sync-selection.dark.css` e `src/styles/dashboard.css`
+intocados.
+
+Nota de processo, sem impacto no código: na segunda volta o commit de teste
+`613c3b5` não moveu `Stage` para `implementing`; a transição só apareceu em
+`7180647`, já como `to-review`.
