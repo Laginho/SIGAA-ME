@@ -6,7 +6,10 @@
   --color-background: #f5f7fa;
   --color-surface: #ffffff;
   --color-text-main: #1f2937;
-  --color-text-muted: #6b7280;
+  /* A11Y-001: #6b7280 dava só 4.50:1 no fundo real (#f5f7fa) — na borda,
+     e o axe amostrava valores mais baixos ainda em certas telas. Mais escuro
+     dá margem sem mudar a leitura de "texto secundário". */
+  --color-text-muted: #4b5563;
   --color-border: #e5e7eb;
 
   --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -100,4 +103,19 @@ button {
 
 input {
   font-family: inherit;
+}
+
+/* ── Acessibilidade (A11Y-001) ───────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

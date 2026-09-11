@@ -11,7 +11,8 @@
 .back-button {
     background: transparent;
     border: none;
-    color: #007bff;
+    /* A11Y-001: #007bff dava 3.7:1 no scan do axe (WCAG AA exige 4.5:1). */
+    color: var(--color-primary);
     font-size: 1rem;
     cursor: pointer;
     padding: 0.5rem 0;
@@ -20,7 +21,7 @@
 }
 
 .back-button:hover {
-    color: #0056b3;
+    color: var(--color-primary-hover);
     text-decoration: underline;
 }
 
@@ -84,12 +85,16 @@
 }
 
 .btn-section-action--success {
-    background: #27ae60;
+    /* A11Y-001: #27ae60 dava 2.87:1 no scan do axe (WCAG AA exige 4.5:1
+       para o branco por cima); mesmo verde, mais escuro. */
+    background: #145c33;
     color: white;
 }
 
 .btn-section-action--warning {
-    background: #e67e22;
+    /* A11Y-001: #e67e22 dava 2.84:1 no scan do axe; mesmo laranja, mais
+       escuro. */
+    background: #7a4310;
     color: white;
 }
 
@@ -263,6 +268,9 @@
 }
 
 .news-item {
+    display: block;
+    width: 100%;
+    text-align: left;
     background: white;
     border: 1px solid #dc3545;
     border-radius: 4px;
@@ -270,6 +278,11 @@
     cursor: pointer;
     transition: all 0.2s;
     position: relative;
+    /* A11Y-001: o reset global de `button` (main.css) só repõe
+       `font-family` — sem isto o `.news-title` herda do controle nativo
+       (13.3333px/normal), não do corpo (16px/24px). */
+    font-size: inherit;
+    line-height: inherit;
 }
 
 .news-item:hover {
@@ -278,12 +291,15 @@
 }
 
 .news-title {
+    /* A11Y-001: span, não div — `<button>` não aceita conteúdo de fluxo. */
+    display: block;
     color: #dc3545;
     font-weight: 500;
     margin-bottom: 0.5rem;
 }
 
 .news-date {
+    display: block;
     font-size: 0.85rem;
     color: #666;
 }
@@ -299,29 +315,10 @@
     border-radius: 12px;
 }
 
-/* ── News Modal ─────────────────────────────────────────── */
-.modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    opacity: 0;
-    visibility: hidden;
-    transition: all 0.3s;
-}
-
-.modal-overlay.active {
-    opacity: 1;
-    visibility: visible;
-}
-
-.modal-content {
+/* ── News Modal ─────────────────────────────────────────────
+   `<dialog>` nativo (A11Y-001): o browser cuida do overlay via
+   `::backdrop`, da centralização e de mostrar/esconder com `[open]`. */
+dialog.modal-content {
     background: white;
     border-radius: 8px;
     width: 90%;
@@ -329,14 +326,12 @@
     max-height: 80vh;
     overflow-y: auto;
     padding: 2rem;
-    position: relative;
-    transform: translateY(20px);
-    transition: transform 0.3s;
+    border: none;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
 }
 
-.modal-overlay.active .modal-content {
-    transform: translateY(0);
+dialog.modal-content::backdrop {
+    background: rgba(0, 0, 0, 0.5);
 }
 
 .modal-close {
@@ -434,8 +429,8 @@
    prototype/dark-schemes. */
 
 [data-theme="dark"] .course-header h1 { color: var(--color-text-main); }
-[data-theme="dark"] .back-button { color: var(--color-primary); }
-[data-theme="dark"] .back-button:hover { color: var(--color-primary-hover); }
+/* .back-button já usa var(--color-primary)/--color-primary-hover na regra
+   base (A11Y-001) — não precisa mais de override aqui. */
 [data-theme="dark"] .course-code-header { color: var(--color-text-muted); }
 
 [data-theme="dark"] .course-content {
@@ -463,7 +458,9 @@
 [data-theme="dark"] .file-item { background: #1a2848; }
 [data-theme="dark"] .file-item:hover { background: #223257; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4); }
 [data-theme="dark"] .file-name { color: #e2e8f0; }
-[data-theme="dark"] .file-meta { color: #7d8db1; }
+/* A11Y-001: #7d8db1 dava 4.38:1 sobre #1a2848 (fundo "meia-noite" do card) —
+   mesmo tom, um pouco mais claro. */
+[data-theme="dark"] .file-meta { color: #8b9bc0; }
 [data-theme="dark"] .btn-download-file {
     background: transparent;
     border-color: #3b82f6;

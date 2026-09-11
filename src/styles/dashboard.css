@@ -101,6 +101,7 @@
 }
 
 .course-card {
+    display: block;
     background: var(--color-surface);
     padding: 1.5rem;
     border-radius: 8px;
@@ -108,6 +109,9 @@
     transition: transform 0.2s, box-shadow 0.2s;
     cursor: pointer;
     border: 1px solid var(--color-border);
+    /* Agora é um <a> semântico (A11Y-001); reseta o estilo padrão de link. */
+    text-decoration: none;
+    color: inherit;
 }
 
 .course-card:hover {
@@ -241,6 +245,11 @@
    nativa do <button> — o widget continua branco. O fundo explícito desliga. */
 [data-theme="dark"] .btn-logout { background: var(--color-surface); border-color: var(--color-border); color: var(--color-text-main); }
 [data-theme="dark"] .btn-logout:hover { background: #334155; border-color: #475569; }
+/* A11Y-001: --color-primary (#3b82f6) dava 3.97:1 sobre --color-surface
+   (#1e293b) do card — passa em cima do fundo da página, não do card. Reusa
+   --color-primary-hover, que já tem contraste de sobra sobre o card. */
+[data-theme="dark"] .course-code,
+[data-theme="dark"] .course-files-count { color: var(--color-primary-hover); }
 
 .btn-refresh, .btn-settings, .btn-clear-data {
     padding: 0.5rem 0.75rem;
@@ -509,6 +518,9 @@ input:checked+.slider:before {
     transition: background 0.15s;
     border-bottom: 1px solid var(--color-border);
     position: relative;
+    /* Agora é um <a> semântico (A11Y-001); reseta o estilo padrão de link. */
+    text-decoration: none;
+    color: inherit;
 }
 
 .notification-item:last-child {
