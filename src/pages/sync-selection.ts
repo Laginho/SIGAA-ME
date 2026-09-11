@@ -30,28 +30,30 @@ export function renderSyncSelectionPage(app: HTMLDivElement) {
 
       <div class="sync-cards-container">
         <!-- Fast Sync (Novice) -->
+        <!-- span, não div/p/h2: <button> não pode ter conteúdo de fluxo como
+             descendente (A11Y-001). Filhos de um flex column são blockificados
+             de qualquer forma — o layout não muda. -->
         <button type="button" class="sync-card" id="btnFastSync">
-          <div class="card-icon">⚡</div>
-          <!-- div, não h2: <button> não pode ter heading como descendente (A11Y-001) -->
-          <div class="card-title">Modo Rápido</div>
-          <p class="card-subtitle">Apenas o essencial</p>
-          <p class="card-description">
+          <span class="card-icon">⚡</span>
+          <span class="card-title">Modo Rápido</span>
+          <span class="card-subtitle">Apenas o essencial</span>
+          <span class="card-description">
             Verifica se há novas disciplinas, arquivos e títulos de notícias.
             Ideal para uma checagem rápida do dia-a-dia.
-          </p>
-          <div class="card-meta">Tempo estimado: ~10 seg</div>
+          </span>
+          <span class="card-meta">Tempo estimado: ~10 seg</span>
         </button>
 
         <!-- Full Sync (Witcher) -->
         <button type="button" class="sync-card" id="btnFullSync">
-          <div class="card-icon">📖</div>
-          <div class="card-title">Modo Completo</div>
-          <p class="card-subtitle">Leitura Offline</p>
-          <p class="card-description">
+          <span class="card-icon">📖</span>
+          <span class="card-title">Modo Completo</span>
+          <span class="card-subtitle">Leitura Offline</span>
+          <span class="card-description">
             Além da estrutura básica, baixa o <strong>conteúdo completo</strong> de todas as notícias
             para que você possa ler tudo offline.
-          </p>
-          <div class="card-meta">Tempo estimado: ~1-2 min</div>
+          </span>
+          <span class="card-meta">Tempo estimado: ~1-2 min</span>
         </button>
 
         <!-- Download All (Legend) -->
