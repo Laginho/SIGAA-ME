@@ -210,7 +210,7 @@
 
 .progress-text {
     padding: 1rem;
-    color: #444;
+    color: var(--color-text-muted);
     font-size: 0.9rem;
     text-align: center;
     white-space: nowrap;
@@ -243,7 +243,6 @@
 
 .back-link {
     margin-top: 2rem;
-    color: #666;
     text-decoration: none;
     font-size: 0.95rem;
     padding: 0.75rem 1.5rem;
@@ -253,7 +252,7 @@
 }
 
 .back-link:hover {
-    color: #333;
+    color: var(--color-primary-hover);
     border-color: #bbb;
     background: rgba(0, 0, 0, 0.02);
 }

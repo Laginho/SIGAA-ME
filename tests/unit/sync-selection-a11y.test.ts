@@ -6,6 +6,8 @@
  *
  * Seam: `renderSyncSelectionPage`, como o teste existente do arquivo.
  */
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { renderSyncSelectionPage } from '../../src/pages/sync-selection';
 
@@ -39,5 +41,31 @@ describe('sync-selection: cartões clicáveis são <button>', () => {
         const card = document.getElementById(id)!;
         expect(card.querySelector('div, p, h1, h2, h3, h4, h5, h6')).toBeNull();
         expect(card.querySelector('.card-title')?.textContent).toBe(title);
+    });
+});
+
+describe('sync-selection: .progress-text usa token temático (A11Y-003)', () => {
+    it('não fixa um literal de cor de tema claro sobre --color-surface', () => {
+        const css = readFileSync(
+            path.join(process.cwd(), 'src/styles/sync-selection.css'),
+            'utf8',
+        );
+        const block = css.match(/\.progress-text\s*\{([^}]*)\}/)?.[1];
+        expect(block).toBeDefined();
+        expect(block).toMatch(/color:\s*var\(--color-text-muted\)/);
+        expect(block).not.toMatch(/color:\s*#[0-9a-fA-F]+/);
+    });
+});
+
+describe('sync-selection: .back-link:hover usa token temático (A11Y-003)', () => {
+    it('não fixa um literal de cor de tema claro', () => {
+        const css = readFileSync(
+            path.join(process.cwd(), 'src/styles/sync-selection.css'),
+            'utf8',
+        );
+        const block = css.match(/\.back-link:hover\s*\{([^}]*)\}/)?.[1];
+        expect(block).toBeDefined();
+        expect(block).toMatch(/(?<!-)color:\s*var\(--color-primary-hover\)/);
+        expect(block).not.toMatch(/(?<!-)color:\s*#[0-9a-fA-F]+/);
     });
 });
