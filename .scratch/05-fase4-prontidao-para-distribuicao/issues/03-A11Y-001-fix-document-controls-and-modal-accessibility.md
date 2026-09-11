@@ -1,6 +1,6 @@
 # A11Y-001 — Fix document, controls, and modal accessibility
 Status: open
-Stage: to-review
+Stage: to-implement
 Priority: P2
 Blocked by: nenhum
 Tracker status at migration: `NOT STARTED`
@@ -201,3 +201,79 @@ com o teste novo falhando sozinho (9 passed, 1 failed), commit de teste
 isolado. Depois da correção: gate (`npm run quality`) verde — 627 passed, 4
 skipped, 0 erro de lint — e `npm run test:e2e -- accessibility` verde, 14
 passed.
+
+### 2026-09-10 — terceira revisão: retrabalho 2 fechado, um item novo segura o merge
+
+Branch `a11y-001`, 10 commits sobre `40a0d01` (+960/-101), revisada nos dois
+eixos. `npm run quality` verde nesta revisão: 51 arquivos, **627 passed, 4
+skipped, 0 erro de lint** (62 warnings de `no-explicit-any`, todos
+pré-existentes).
+
+Os dois itens do retrabalho 2: **fechados**, verificados no código.
+
+1. `closeBtn?.addEventListener('click', close)` sem `{ once: true }`, e o
+   listener do `close` nativo remove os dois (`course-detail.ts:513-524`). O
+   `close` do dialog dispara nos três caminhos, então não sobra listener por
+   caminho nenhum. O teste novo
+   (`tests/unit/course-detail-a11y.test.ts:130`) fecha pelo fundo duas vezes
+   antes de fechar pelo botão — é o caminho que o `once` não cobria.
+2. `accessibility.spec.ts:182` confere `data-theme` depois do `goto`. A
+   asserção falha se o atributo não sobreviver à navegação.
+
+Separação teste/código respeitada nesta volta: `11e0918` só `tests/`,
+`173a634` só `src/pages/course-detail.ts`.
+
+#### ❌ Critério 3 (nenhuma violação nas telas testadas) — não é o que cai; cai a correção do item 5 da primeira volta
+
+**`#modalMeta` nunca é limpo entre aberturas do modal.**
+`src/pages/course-detail.ts:497` reseta `modalTitle` para "Carregando
+notícia..." a cada `openNewsModal`, mas `#modalMeta` só é escrito dentro de
+`renderNewsIntoModal` (linha 612). Antes do retrabalho isso não existia: o
+header inteiro vivia dentro de `modalBody` e o `replaceChildren` o apagava em
+todo caminho. Tirar `#modalTitle`/`#modalMeta` do `modalBody` (item 5 da
+primeira volta) resolveu o `aria-labelledby` e abriu este furo.
+
+Consequência, em dois caminhos:
+
+- **Carregando** — abrir uma notícia não cacheada depois de já ter aberto
+  outra mostra "Carregando notícia..." com a data e o "🔔 Notificação
+  enviada" da notícia **anterior**, durante todo o fetch pelo Playwright
+  (segundos).
+- **Erro** — os dois caminhos de erro (linhas 586 e 592) trocam o título mas
+  deixam a meta antiga embaixo de "Erro ao carregar notícia".
+
+Reproduzido nesta revisão com um teste descartável sobre `renderCourseDetailPage`
+(mesmo seam dos testes de `course-detail-a11y`): abrir `n1` com sucesso,
+`modal.close()`, abrir `n2` com `getNewsDetail` falhando —
+`#modalMeta.textContent` continua `📅 01/01/2026🔔 Notificação enviada`.
+
+Cabe nos Primary files (`src/pages/course-detail.ts`) e é uma linha ao lado do
+reset do título, mas **exige teste novo** — volta para a etapa 2 pela regra
+mecânica, não por tamanho.
+
+#### Decisões do autor ainda em aberto (repetidas da segunda revisão)
+
+Nenhuma foi tocada no retrabalho 2, como o handoff mandou:
+
+- `AGENTS.md:20-27` — nota de que o scan do axe fica fora do gate. Conteúdo
+  certo, arquivo fora dos Primary files, decisão era do autor. Confirme ou
+  reverta.
+- `tests/unit/renderer-content-security.test.ts:200` — teste de `SEC-001`
+  reescrito de clique para leitura de atributo. Mais fraco, mas o vetor antigo
+  (interpolação em HTML) deixou de existir junto com o `onClick`.
+- `9a83c26` mistura código e teste no mesmo commit. Histórico, não corrigível
+  sem reescrever a branch.
+
+#### Follow-up, não retrabalho desta branch
+
+- `src/utils/dom.ts:36` aceita `href` sem checar esquema, no helper cujo
+  contrato é ser seguro por construção (`SEC-001`). Foi **introduzido nesta
+  branch**, ao contrário do que a segunda revisão disse. Não é explorável hoje
+  (os dois chamadores prefixam `#/course/`), mas um `href: sigaaUrl` futuro
+  torna `javascript:` executável. Merece ticket próprio, não uma quarta volta.
+- Os follow-ups das duas revisões anteriores continuam abertos:
+  `.btn-section-action--success` duplicado (`CLEAN-*`), `:focus-visible` do
+  `main.css:107` perdendo para `login.css:63` numa tela fora do scan,
+  `markSeenOnHover` sem caminho de teclado, hierarquia de headings do
+  `sync-selection` (o card desabilitado ficou com o único `h2`), `title` nos
+  spans de status do `course-detail`.
