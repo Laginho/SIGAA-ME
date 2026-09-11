@@ -1,6 +1,6 @@
 # A11Y-003: Corrigir o contraste do detalhe de progresso no tema escuro
 Status: open
-Stage: to-implement
+Stage: implementing
 Priority: P2
 Blocked by: A11Y-001
 
