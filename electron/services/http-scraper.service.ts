@@ -866,9 +866,12 @@ export class HttpScraperService {
 
             this.updateCookies(response);
 
-            const contentType: string | undefined = response.headers['content-type'];
-            const contentLength = parseInt(response.headers['content-length'] || '0', 10);
-            const hintFileName = fileNameFromContentDisposition(response.headers['content-disposition']);
+            const contentTypeHeader = response.headers['content-type'];
+            const contentType: string | undefined = typeof contentTypeHeader === 'string' ? contentTypeHeader : undefined;
+            const contentLengthHeader = response.headers['content-length'];
+            const contentLength = parseInt(typeof contentLengthHeader === 'string' ? contentLengthHeader : '0', 10);
+            const contentDispositionHeader = response.headers['content-disposition'];
+            const hintFileName = fileNameFromContentDisposition(typeof contentDispositionHeader === 'string' ? contentDispositionHeader : undefined);
 
             log.info(`Response headers. Content-Length=${response.headers['content-length']}.`, { contentType });
 
