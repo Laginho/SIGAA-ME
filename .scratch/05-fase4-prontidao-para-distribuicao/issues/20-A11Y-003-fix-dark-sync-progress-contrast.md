@@ -1,6 +1,6 @@
 # A11Y-003: Corrigir o contraste do detalhe de progresso no tema escuro
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P2
 Blocked by: A11Y-001
 
@@ -147,3 +147,21 @@ vermelho, rode o teste com o CSS do `master`.
 Continue na branch `a11y-003`; o teste vai em commit próprio, antes de
 qualquer código, como na primeira volta. Nada mais muda: os critérios 1, 2 e 4
 estão fechados e o código do critério 3 já está certo.
+
+### 2026-09-11 — etapa 2, segunda volta
+
+Commit `613c3b5`, só teste: `tests/unit/sync-selection-a11y.test.ts` ganha um
+bloco para `.back-link:hover`, exigindo `color: var(--color-primary-hover)` e
+recusando um literal hex na linha `color:` (o negative lookbehind `(?<!-)`
+evita falso positivo em `border-color: #bbb`, que não é o alvo do critério).
+
+Vermelho confirmado contra `src/styles/sync-selection.css` do `master`
+(`color: #333`): 2 failed, 4 passed. Verde contra o arquivo atual da branch:
+6 passed — nenhum código mudou, o `var(--color-primary-hover)` já estava
+certo desde `bbee8fd`.
+
+Gate `npm run quality`: typecheck limpo, ESLint 0 erros / 62 warnings
+(pré-existentes), vitest 51 arquivos, 635 passed, 4 skipped.
+`npm run test:e2e -- accessibility`: 15 passed, claro e escuro.
+
+Sem commit de código nesta volta. Segue para etapa 3.
