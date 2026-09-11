@@ -1,6 +1,6 @@
 # A11Y-003: Corrigir o contraste do detalhe de progresso no tema escuro
 Status: open
-Stage: to-review
+Stage: to-implement
 Priority: P2
 Blocked by: A11Y-001
 
@@ -80,3 +80,70 @@ O `.back-link` duplicado entrou aqui na etapa 3: é pré-existente e do mesmo
 arquivo, mas a varredura da QA-007 não o pegou porque a categoria de classe
 duplicada rodou só sobre classes alteradas pela branch. Detalhe no achado 9
 de `docs/audits/2026-09-10-a11y-001-simetria.md`.
+
+### 2026-09-11 — revisão etapa 3: critérios 1, 2 e 4 fechados, critério 3 volta sem prova
+
+Branch `a11y-003`, commits `e6f95d0` (teste) e `bbee8fd` (código).
+Separação dos commits confere: o commit de teste toca só
+`tests/unit/sync-selection-a11y.test.ts`, o de código só
+`src/styles/sync-selection.css`. Nada fora dos Primary files.
+
+Prova red-green do `.progress-text`: com `src/styles/sync-selection.css` do
+`master`, `npx vitest run tests/unit/sync-selection-a11y.test.ts` falha em
+`expect(block).toMatch(/color:\s*var\(--color-text-muted\)/)` com o bloco ainda
+em `color: #444` (1 failed | 4 passed). Com a mudança, 5 passed.
+
+Gate: `npm run quality` verde — typecheck limpo, ESLint 0 erros / 62 warnings
+(todos `no-explicit-any` pré-existentes), vitest 51 arquivos, 634 passed,
+4 skipped.
+
+Scan de axe (`npm run test:e2e -- accessibility`, exigido pelo `AGENTS.md` para
+mudança de cor em `src/styles/*.css`): 15 passed, claro e escuro.
+
+#### ✔ Critério 1 — contraste do `.progress-text`
+
+`var(--color-text-muted)` sobre `var(--color-surface)`: `#4b5563` em `#ffffff`
+= 7,56:1 no claro; `#94a3b8` em `#1e293b` = 5,70:1 no escuro. O
+`.progress-text` fica dentro do `.progress-list`, que é quem pinta
+`background: var(--color-surface)`. Texto de 0,9rem precisa de 4,5:1 — passa
+nos dois.
+
+#### ✔ Critério 2 — tratamento coerente
+
+`.overlay-status` e `.progress-text` usam agora o mesmo
+`var(--color-text-muted)`.
+
+#### ❌ Critério 3 — a cor está certa, mas nenhum teste a segura
+
+`.back-link:hover` com `var(--color-primary-hover)` dá `#004482` sobre fundo
+claro (9,8:1) e `#60a5fa` sobre `#1e293b` (5,76:1) — AA nos dois temas. A
+remoção do `color: #666` da cópia da sync-selection é a decisão certa e é mais
+limpa do que o ticket pedia: sobrou **uma** definição de cor base
+(`src/styles/settings.css:139`, `var(--color-primary)`), então a divergência
+acabou sem depender da ordem do CSS construído.
+
+O que falta é prova. Reverter `var(--color-primary-hover)` para `#333` deixa a
+suíte inteira e o scan de axe verdes: o axe-core não avalia estado `:hover`, e
+nenhum teste lê esse bloco. É o item 5 do "Antes de commitar" do `CLAUDE.md`
+não cumprido — pergunta "qual teste falharia se a correção fosse revertida?",
+resposta "nenhum".
+
+Não corrijo aqui: pela regra da `ticket-flow`, achado que precisa de teste novo
+volta para a etapa 2, sem exceção.
+
+#### ✔ Critério 4 — nada fora do escopo
+
+`git diff master...a11y-003 --stat`: 3 arquivos, 18 inserções, 4 remoções.
+`src/styles/sync-selection.dark.css` e `src/styles/dashboard.css` intocados.
+
+#### O que a etapa 2 faz nesta volta
+
+Um teste, no mesmo seam do que já existe (lê o stylesheet de produção), em
+`tests/unit/sync-selection-a11y.test.ts`: o bloco `.back-link:hover` de
+`src/styles/sync-selection.css` usa token temático na `color`, não literal de
+tema claro. Vermelho em `color: #333` antes da mudança — para provar o
+vermelho, rode o teste com o CSS do `master`.
+
+Continue na branch `a11y-003`; o teste vai em commit próprio, antes de
+qualquer código, como na primeira volta. Nada mais muda: os critérios 1, 2 e 4
+estão fechados e o código do critério 3 já está certo.
