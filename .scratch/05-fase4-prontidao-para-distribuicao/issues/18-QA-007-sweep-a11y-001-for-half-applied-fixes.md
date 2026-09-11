@@ -1,6 +1,6 @@
 # QA-007: Varrer o diff da `a11y-001` atrás de correção aplicada pela metade
-Status: open
-Stage: to-implement
+Status: resolved
+Stage: done
 Priority: P2
 Blocked by: nenhum
 
@@ -91,3 +91,49 @@ correções dele estavam todas certas, o que falhou foi atenção a caso simétr
 adjacente, que responde a effort e a passo mecânico no handoff (adicionado ao
 `A11Y-001-rework-3.md`). Modelo bom rende mais aqui, nesta varredura, do que
 no conserto de uma linha.
+
+### 2026-09-10 — implementação concluída
+
+Relatório publicado em
+`docs/audits/2026-09-10-a11y-001-simetria.md`. Os 22 arquivos do snapshot de
+código (`40a0d01..173a634`) foram percorridos; o diff do nome de branch tem um
+23º arquivo porque passou a incluir a própria `QA-007` depois daquele
+snapshot.
+
+Quatro achados introduzidos pela branch foram registrados no fim de
+`A11Y-001`. Os dois achados pré-existentes viraram `A11Y-002` e `A11Y-003`.
+Dois probes E2E descartáveis confirmaram o falso verde de `:focus-visible`, as
+métricas tipográficas do botão de notícia e as violações sérias de contraste
+do modal aberto; ambos foram removidos depois da execução.
+
+Verificação: `git diff --stat 40a0d01..a11y-001`; `git status --short`, sem
+arquivo de código alterado pela QA-007.
+
+### 2026-09-10 — revisão (etapa 3)
+
+Aprovado. Os cinco critérios de aceite estão cumpridos e os achados foram
+conferidos contra o código, não contra o relatório:
+
+- `git diff --stat 40a0d01..173a634` bate exato com o declarado: 22 arquivos,
+  `+937/-100`.
+- Achados 1, 2, 3, 4 e 5 confirmados nos arquivos e linhas citados.
+- Achados 7 e 8: as razões de contraste `2,55:1` e `1,50:1` foram recalculadas
+  a partir do sRGB e conferem no dígito. Nenhuma das duas regras é tocada pelo
+  diff da branch, então a classificação de pré-existente está certa.
+- AC5: `git status` limpo fora de `.scratch/` e `docs/audits/`.
+
+Uma categoria ficou com achado faltando — registrado na seção `## Revisão` do
+relatório e encaminhado ao `A11Y-003`: `.back-link` está definida em
+`settings.css` e em `sync-selection.css` com valores divergentes, e o
+`:hover` (`color: #333`, só na cópia da sync-selection) vale nas duas telas.
+No tema escuro isso dá cerca de `1,4:1` no link de voltar do settings. É o
+mesmo formato do `.btn-section-action--success` que o ticket citou como caso
+conhecido. A varredura de classe duplicada rodou com filtro "classe alterada
+pela branch", enquanto a varredura de cor rodou sem esse filtro; a assimetria
+entre os dois filtros é o que abriu a brecha.
+
+Ressalvas menores, todas registradas no relatório: o roteamento do item 4 para
+o `A11Y-002` não explica por que difere dos itens 3 e 5; o item 1 é o único
+sem sintoma observável e não deve segurar o retrabalho antes do item 2; e o
+probe fala em dois `span` de `#modalMeta`, mas a fixture E2E tem
+`notification: ''`, que renderiza um.
