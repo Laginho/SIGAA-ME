@@ -9,3 +9,4 @@
 | 2026-09-09 | OBS-001 | d60d3a1, e08dd3d; cinco achados corrigidos na revisão, neste commit |
 | 2026-09-09 | OBS-004 | 2359776, 44fae3a, e404135, adb193c; reaberta uma vez pelo `clear()` do OBS-001, fechada na segunda passada |
 | 2026-09-09 | OBS-005 | 019b798, eaa5ef0, 1f05cfa, aa40ddc; dois achados corrigidos na revisão (chave de meta fora da lista redigida, teste sem asserção), critério 1 aceito com ressalva |
+| 2026-09-10 | QA-007 | b8d1f61; auditoria somente-leitura, aprovada na revisão com um nono achado encaminhado ao A11Y-003 |
