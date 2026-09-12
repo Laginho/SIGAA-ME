@@ -2,8 +2,8 @@ import axios, { AxiosResponse } from 'axios';
 import * as cheerio from 'cheerio';
 import * as fs from 'fs';
 import * as path from 'path';
-import { app } from 'electron';
 import { logger } from './logger.service';
+import { diagnosticsService } from './diagnostics.service';
 import { sanitizeSegment, isInsideRoot } from './download-path';
 import { MAX_DOWNLOAD_BYTES, fileNameFromContentDisposition, finalizeDownload } from './file-validation.service';
 import type { AppErrorCode } from '../../shared/errors';
@@ -195,15 +195,7 @@ export class HttpScraperService {
             const lookup = findCourseRow(portalResponse.data, courseId);
             if (lookup.status === 'not_found') {
                 log.warn(`Course ${courseId} not found in recognized portal.`);
-                if (!app.isPackaged) {
-                    try {
-                        const safeId = String(courseId).replace(/[^a-zA-Z0-9_-]/g, '_');
-                        await fs.promises.writeFile(
-                            path.join(app.getPath('userData'), `debug_portal_fail_${safeId}.html`),
-                            portalResponse.data
-                        );
-                    } catch (e) { log.warn('Failed to save debug file.', { error: e }); }
-                }
+                diagnosticsService.saveRaw(`debug_portal_fail_${courseId}.html`, portalResponse.data);
                 return { success: false, error: `Course ${courseId} not found in portal`, errorCode: 'NOT_FOUND' };
             }
             if (lookup.status === 'malformed') {
@@ -242,15 +234,7 @@ export class HttpScraperService {
             const entryCheck = validateCourseEntryEnd(enterResponse.data);
             if (entryCheck) {
                 log.warn(`Course entry response rejected: ${entryCheck.code}`);
-                if (!app.isPackaged) {
-                    try {
-                        const safeId = String(courseId).replace(/[^a-zA-Z0-9_-]/g, '_');
-                        await fs.promises.writeFile(
-                            path.join(app.getPath('userData'), `debug_http_entry_${safeId}.html`),
-                            enterResponse.data
-                        );
-                    } catch (e) { }
-                }
+                diagnosticsService.saveRaw(`debug_http_entry_${courseId}.html`, enterResponse.data);
                 return { success: false, error: entryCheck.message, errorCode: entryCheck.code };
             }
 
@@ -312,18 +296,7 @@ export class HttpScraperService {
 
             // Skip navigation if using Playwright HTML (already navigated)
             if (preFetchedHtml) {
-                if (!app.isPackaged) {
-                    try {
-                        const safeId = String(courseId).replace(/[^a-zA-Z0-9_-]/g, '_');
-                        await fs.promises.writeFile(
-                            path.join(app.getPath('userData'), `debug_playwright_${safeId}.html`),
-                            preFetchedHtml
-                        );
-                        log.info('Saved Playwright HTML debug dump.');
-                    } catch (e) {
-                        log.warn('Failed to save debug file.', { error: e });
-                    }
-                }
+                diagnosticsService.saveRaw(`debug_playwright_${courseId}.html`, preFetchedHtml);
                 log.info('Using Playwright HTML directly.');
             } else {
                 // Strategy 1: Look for "Conteúdo" in menu
@@ -719,16 +692,7 @@ export class HttpScraperService {
             this.updateCookies(newsResponse);
 
             // DEBUG: Save the news page
-            if (!app.isPackaged) {
-                try {
-                    const safeId = String(newsId).replace(/[^a-zA-Z0-9_-]/g, '_');
-                    await fs.promises.writeFile(
-                        path.join(app.getPath('userData'), `debug_news_content_${safeId}.html`),
-                        newsResponse.data
-                    );
-                    log.info('Saved debug news content dump.');
-                } catch (e) { log.warn('Failed to save debug news content dump.', { error: e }); }
-            }
+            diagnosticsService.saveRaw(`debug_news_content_${newsId}.html`, newsResponse.data);
 
             const $news = cheerio.load(newsResponse.data);
 
