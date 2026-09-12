@@ -103,14 +103,14 @@ describe('CacheService', () => {
         expect(service.getCourseState(ACC, 'anything')).toEqual({ files: [], news: [] });
     });
 
-    it('swallows a write failure instead of letting it propagate out of updateCourseState', () => {
+    it('a write failure propagates out of updateCourseState and leaves the state untouched (DATA-003)', () => {
         const service = new CacheService();
         vi.mocked(fs.writeFileSync).mockImplementationOnce(() => {
             throw new Error('disk full');
         });
 
-        expect(() => service.updateCourseState(ACC, 'c1', ['1'], [])).not.toThrow();
-        expect(loggerMock.cacheScope.error).toHaveBeenCalled();
+        expect(() => service.updateCourseState(ACC, 'c1', ['1'], [])).toThrow('disk full');
+        expect(service.getCourseState(ACC, 'c1')).toEqual({ files: [], news: [] });
     });
 
     describe('forgetLastFile', () => {
@@ -145,6 +145,17 @@ describe('CacheService', () => {
             expect(result).toEqual({ courseId: 'c2', fileId: '7' });
             expect(service.getCourseState(ACC, 'c2').files).toEqual([]);
             expect(fs.writeFileSync).toHaveBeenCalled();
+        });
+
+        it('a write failure propagates and leaves the file in place instead of dropping it from memory (DATA-003)', () => {
+            const service = new CacheService();
+            service.updateCourseState(ACC, 'c1', ['1', '2'], []);
+            vi.mocked(fs.writeFileSync).mockImplementationOnce(() => {
+                throw new Error('disk full');
+            });
+
+            expect(() => service.forgetLastFile(ACC)).toThrow('disk full');
+            expect(service.getCourseState(ACC, 'c1').files).toEqual(['1', '2']);
         });
     });
 });

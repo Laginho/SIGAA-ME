@@ -188,6 +188,28 @@ describe('BackgroundSyncService.syncNow', () => {
         expect(sendIndex).toBeLessThan(updateIndex);
     });
 
+    it('still delivers to the renderer and fires notifications when persisting lastBackgroundSync fails (DATA-003)', async () => {
+        const { persistenceService } = await import('../../electron/services/persistence.service');
+        vi.mocked(persistenceService.updateSetting).mockImplementationOnce(() => {
+            throw new Error('ENOSPC');
+        });
+        const sigaaService = makeSigaaService({
+            getCourses: vi.fn(async () => ok({ courses: [{ id: 'c1', name: 'Course 1' }] })),
+            getCourseFiles: vi.fn(async () => ok({
+                files: [{ id: '1', name: 'f1.pdf' }, { id: '2', name: 'f2.pdf' }],
+                news: []
+            }))
+        });
+        const window = makeWindow();
+        const service = new BackgroundSyncService(sigaaService, () => window);
+
+        const p = service.syncNow();
+        await vi.runAllTimersAsync();
+        await expect(p).resolves.toBeUndefined();
+
+        expect(window.webContents.send).toHaveBeenCalledTimes(1);
+    });
+
     it('never commits the baseline or delivers to the renderer when auto-download throws mid-course, so the next sync retries the whole course', async () => {
         settings.autoDownloadUpdates = true;
         settings.lastDownloadPath = '/downloads';
