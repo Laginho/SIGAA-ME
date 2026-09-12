@@ -1,6 +1,6 @@
 # DL-003: `reject` no erro de escrita derruba o lote inteiro
 Status: open
-Stage: to-review
+Stage: to-merge
 Priority: P1
 Blocked by: nenhum
 
@@ -47,3 +47,55 @@ aborta e o usuário vê `[object Object]`.
 ## Comments
 
 - Fix esperado: uma linha, `reject` → `resolve`. Não amplie.
+- Fix esperado confirmado na revisão: o diff de produção é uma linha só.
+
+#### Resolution (2026-09-11)
+
+**Decisão:** aprovado. Critério 1 fechado; critério 2 aceito com ressalva.
+
+**Arquivos:** `electron/services/http-scraper.service.ts` (`writer.on('error')`,
+`:958`, e o `new Promise((resolve))` em `:929` que perdeu o parâmetro `reject`);
+`tests/integration/audit-download-disk.test.ts` (novo).
+
+**Vermelho-verde.** Reprovado contra o código do master de hoje, como o ticket
+pedia, e não só contra `40a0d01`:
+
+    AssertionError: promise rejected "{ success: false, …(1) }" instead of resolving
+     ❯ tests/integration/audit-download-disk.test.ts:88
+
+Com a correção, verde. O achado não tinha morrido.
+
+**Critério 1, traçado até a ponta.** Antes: o `reject` de um objeto simples
+saía do `await this.httpScraper.downloadFile(...)` como throw, passava por fora
+do `if/else` por arquivo no laço de `_downloadAllFilesInternal`
+(`sigaa.service.ts:464`), caía no `catch` externo e chegava em `errorMessage()`
+(`shared/errors.ts:104`), que faz `String(error)` em valor que não é `Error` —
+daí o `[object Object]`, e o lote inteiro morria no primeiro erro de disco.
+Depois: resolve normal, o `else` do laço roda (`failed++`,
+`results.push({ status: 'failed' })`), o laço segue para o próximo arquivo e
+nenhum texto cru de erro chega ao chamador.
+
+**Critério 2, a ressalva.** O `.part` não regrediu — o diff não toca
+`descartarParcial` nem a chamada dela, e o `resolve` acontece depois do `await`.
+Mas o teste novo não prova isso: ele apaga a pasta de destino inteira, então o
+`createWriteStream` falha no `open()`, o `.part` nunca existe e o `unlink` de
+`descartarParcial` erra em silêncio dentro do próprio `try/catch`. Nenhum outro
+teste da suíte cobre o descarte do parcial nesse ramo. Registrado como comentário
+no `DL-004`, que já edita este arquivo de teste. Não reabre o `DL-003`: o ticket
+nunca pediu esse teste.
+
+**Achados corrigidos nesta revisão** (dentro dos Primary files, sem teste novo):
+comentário órfão `/** PDF válido mínimo ... */` e helper morto
+`arquivosNoDestino`, os dois sobra do corte do caso de colisão do `DL-004`, mais
+o `readdirSync` que ficou importado sem uso.
+
+**Achados encaminhados:** `CLEAN-005` (retorno de `downloadFile` com campos
+opcionais em vez de união discriminada, regra 6; quatro checagens duplas em
+`sigaa.service.ts`) e `QA-008` (`tests/unit/sync-selection.test.ts` falha por
+corrida — apareceu numa rodada do gate aqui, passou na seguinte).
+
+**Gate:**
+
+    ✖ 62 problems (0 errors, 62 warnings)   # no-explicit-any pré-existentes
+    Test Files  52 passed (52)
+    Tests  636 passed | 4 skipped (640)

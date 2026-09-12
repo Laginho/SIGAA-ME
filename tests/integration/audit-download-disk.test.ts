@@ -18,7 +18,7 @@
  * repositório. Chamar `getCourseFiles()` com a fixture é o que a produção faz.
  */
 
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'fs';
 import os from 'os';
 import path from 'path';
 import { Readable } from 'stream';
@@ -48,8 +48,6 @@ const fixture = (name: string) =>
 const DOWNLOAD_SCRIPT =
     "jsfcljs(document.forms['formAva'],'formAva:download,formAva:download,id,555','');";
 
-/** PDF válido mínimo: só os magic bytes importam para a verificação. */
-
 /** Resposta de download: corpo, content-type e headers opcionais. */
 const resposta = (body: Buffer | string, contentType: string, extra: Record<string, string> = {}) => ({
     headers: { 'content-type': contentType, 'content-length': String(Buffer.from(body).length), ...extra },
@@ -78,8 +76,6 @@ beforeEach(async () => {
 afterEach(() => {
     rmSync(sandbox, { recursive: true, force: true });
 });
-
-const arquivosNoDestino = () => readdirSync(destino);
 
 describe('audit download disk failures and collisions', () => {
     it('resolves a writer error with a readable per-file failure', async () => {
