@@ -85,3 +85,5 @@ texto da mensagem em vez de passar em `meta`: `currentUrl`, `page.url()`,
 ficaram. Se este ticket for mexer nessas linhas para pendurar `[op:<id>]`, é a
 hora barata de mover o valor para `meta` junto — `url` já está em
 `CONTENT_KEYS`, `newsId` não precisa estar.
+
+- 2026-09-12 Attempt 1 failed: exit . Gate/log tail: 
