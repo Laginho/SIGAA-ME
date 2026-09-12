@@ -1,13 +1,16 @@
 # DATA-003: Escrita engolida em settings e cache
 Status: open
-Stage: to-review
+Stage: to-implement
 Priority: P2
 Blocked by: nenhum
 
 - Primary files:
   - `electron/services/persistence.service.ts` (`updateSetting`, `applySetting`, `saveSettings`)
   - `electron/services/cache.service.ts` (`updateCourseState` e quem mais chama `saveCache`; `saveCache`)
-  - `electron/ipc/register-handlers.ts` (handler `update-app-setting`, `:240-257`)
+  - `electron/ipc/register-handlers.ts` (handlers `update-app-setting` `:240-257`
+    e `select-download-folder` `:155-171`)
+  - `electron/services/background-sync.service.ts` (só as chamadas `:263` e `:306`
+    e a ordem delas)
   - `tests/unit/cache-service.test.ts` e os testes existentes de persistência (só se o contrato mudar o que já é asserido)
   - New: `tests/unit/audit-persistence.test.ts`
 
@@ -34,6 +37,14 @@ próximo boot.
 4. `saveSettings`/`saveCache` não têm mais `try/catch` que só loga, e nenhum
    chamador deles passa a engolir o erro por conta própria (grep no diff pelo
    revisor).
+5. `select-download-folder` devolve `fail('STORAGE', ...)` quando `updateSetting`
+   lança, em vez de rejeitar a `invoke`: o contrato do canal é a união
+   `AppResult`, não uma promise rejeitada.
+6. `CacheService.forgetLastFile` grava antes de mutar, como o `commit` documenta:
+   com a escrita falhando, o id esquecido continua em `getCourseState`.
+7. Uma falha ao gravar `lastBackgroundSync` não descarta o push ao renderer nem
+   as notificações daquele ciclo de sync, e a decisão sobre os dois chamadores
+   em `background-sync.service.ts` está anotada em `## Comments`.
 
 #### Verification
 
@@ -56,3 +67,47 @@ próximo boot.
   tirar o `try`: um chamador em caminho de boot que passa a lançar derruba o
   main. Se houver, decida caso a caso e anote aqui; não reintroduza o `catch`
   silencioso.
+
+#### Revisão etapa 3 (2026-09-11) — reaberto
+
+Gate verde no commit `485e38d`: `npm run quality` limpo, 52 arquivos,
+638 passed | 4 skipped. Red-green conferido trocando só `electron/` pelo
+merge-base: 4 testes falham (audit-persistence 2, cache-service 1,
+ipc-validation 1) e passam com a mudança. Separação teste/código correta nos
+três commits.
+
+Critérios 1, 2 e 3 ✅. Critério 4 ❌ parcial — os `try/catch` que só logavam
+saíram, mas o grep de chamadores que o próprio ticket pedia não foi feito, e
+três pontos ficaram inconsistentes com o invariante que o `commit` documenta:
+
+- ❌ **`select-download-folder` sem guarda** (`register-handlers.ts:169`).
+  `updateSetting('lastDownloadPath', ...)` agora lança e nada captura: o
+  `handle()` não tem `try`, então a `invoke` rejeita em vez de devolver a união
+  `AppResult` que todo handler do arquivo devolve. Irmão direto do
+  `update-app-setting` que foi corrigido — mesma origem, um call site tratado e
+  outro não. Vira o critério 5.
+- ❌ **`forgetLastFile` muta antes de gravar** (`cache.service.ts:157-166`).
+  `state.files.pop()!` altera o objeto que `this.loaded` referencia e só depois
+  chama `this.commit(this.cache)`. Com a escrita falhando, o id já sumiu da
+  memória — o oposto do que o docstring do `commit` promete. Dev-only, mas é a
+  mesma classe e o mesmo ticket. Vira o critério 6.
+- ❌ **Chamadores do `background-sync` não decididos nem anotados.** O
+  `## Comments` mandava conferir quem mais chama `saveSettings`/`saveCache` e
+  registrar a decisão caso a caso; o commit só mudou a linha `Stage:`. São dois:
+  `updateSetting('lastBackgroundSync', ...)` (`:263`) e `updateCourseState`
+  (`:306`). O `:306` está aceitável — o `catch` do método já é descrito como
+  load-bearing e o efeito é re-diff no próximo ciclo. O `:263` não: ele roda
+  **antes** do push ao renderer e das notificações, então um `ENOSPC` numa
+  escrita de setting agora descarta a UI e as notificações do ciclo inteiro,
+  onde antes só logava. Vira o critério 7.
+
+Nenhum dos três cabe em correção de revisor: todos precisam de teste novo, e o
+`:263` fica fora do limite original. Por isso o ticket volta para
+`to-implement`, com `Primary files` estendido e os critérios 5-7. O trabalho
+continua na branch `data-003` — os critérios 1-3 já estão prontos e testados,
+não refaça.
+
+Fora do escopo, não bloqueia: `tests/unit/sync-selection.test.ts` falha de forma
+intermitente na suíte cheia sob carga (`expect(window.location.hash).not.toBe(
+'#/dashboard')`, `:300`), inclusive com `electron/` no merge-base. Aberto como
+QA-008.
