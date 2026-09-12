@@ -73,6 +73,10 @@ export function domFingerprint(html: string): string {
     const $ = cheerio.load(html);
     const tags: string[] = [];
     $('*').each((_, el) => {
+        // `domhandler` tipa `Element.type` como `Tag | Script | Style`, então esta
+        // guarda deixa `<script>` e `<style>` de fora de propósito: corpo de script
+        // muda sem a estrutura mudar, e um fingerprint que reagisse a isso daria
+        // falso positivo de selector drift. Não é um `=== 'tag'` esquecido.
         if (el.type === 'tag') tags.push(el.name);
     });
     return createHash('sha256').update(tags.join('.')).digest('hex');

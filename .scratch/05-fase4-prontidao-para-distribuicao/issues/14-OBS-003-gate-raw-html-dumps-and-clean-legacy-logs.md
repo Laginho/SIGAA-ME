@@ -1,6 +1,6 @@
 # OBS-003 — Gate raw HTML dumps, wire diagnostics clear, clean legacy logs
 Status: open
-Stage: to-review
+Stage: reviewing
 Priority: P2
 Blocked by: OBS-005
 
@@ -267,3 +267,56 @@ exata de chamadas — sem o gate ali o teste quebra porque a chamada extra
 consome o valor mockado que o teste reserva para a leitura de diagnóstico
 real. Os outros ~10 call sites não têm essa dependência de contagem e
 ficaram sem `if`, como o critério pede.
+
+## Revisão da etapa 3 (2026-09-12)
+
+Veredito: **Needs your call** — um achado, abaixo.
+
+Separação de commits conferida no `diff --stat`: `557d071` e `6bc7e92` só
+tocam `tests/`, `24e0048` só toca `electron/`. Vermelho-verde refeito nesta
+sessão, não aceito do relatório: `git revert --no-commit 24e0048` → `npm test`
+→ **14 failed | 642 passed | 4 skipped**, pelo motivo certo
+(`removeLegacyLogs is not a function`, `clear()` devolvendo `undefined` para
+`.rejects`, `IpcDeps` sem `diagnostics`); restaurado, `npm run quality` →
+0 erros, 55 warnings (`no-explicit-any`, todos legados),
+**656 passed | 4 skipped (660)**.
+
+Critérios detalhados 1 a 5 e 7: ✅, cada um com teste que falha sem o código.
+Critério 4 cobre os dois lados que a regressão do `OBS-004` abriu — o handler
+chamando `deps.diagnostics.clear()` com `fsMock.unlinked` vazio, e o serviço
+real rejeitando com `EPERM` injetado em `fs.promises.rm`.
+
+Critério 6: ✅ para `fs.writeFileSync` com `debug_` (zero restantes nos dois
+arquivos). O desvio declarado pela etapa 2 — o `shouldCaptureRawArtifact`
+inline em `playwright-login.service.ts:333` — foi verificado, não aceito de
+palavra: `tests/integration/portal-selector-resilience.test.ts:25` mocka
+`isPackaged: true`, então a guarda de fato fecha a chamada extra de
+`page.content()` e a contagem que o teste reserva se mantém. A justificativa
+de custo também procede: sem a guarda, `getCourses()` pagaria um round-trip no
+Chromium em produção para descartar o resultado. Desvio aceito.
+
+Correção pequena aplicada por esta etapa (dentro dos Primary files, sem teste
+novo): o comentário sobre `el.type === 'tag'` em `domFingerprint`, que a seção
+"Ressalvas herdadas" mandava a etapa 2 escrever e ficou de fora. Claim
+conferido em `domhandler/lib/esm/node.d.ts:172` (`ElementType.Tag | Script |
+Style`) antes de virar comentário.
+
+#### Achado — `removeLegacyLogs` roda no import do módulo
+
+`main.ts:84` é `void removeLegacyLogs(app.getPath('userData'))` em escopo de
+módulo. Em produção isso é exatamente o que a decisão 6 pede. O efeito colateral
+está no teste: três arquivos importam `electron/main` com `app.getPath` mockado
+para `os.tmpdir()` — `legacy-log-cleanup.test.ts`, `navigation-policy.test.ts`,
+`updater-consent.test.ts` — então **todo `npm test` apaga de verdade
+`%TEMP%/sigaa-me.log`, `%TEMP%/scraper.log`, `%TEMP%/debug_*.html|json` e
+`%TEMP%/logs/app_*.log`** do diretório temporário do sistema. Nenhum teste
+falha por isso e não há flake (os diretórios que a suíte cria não casam com os
+padrões), mas é exclusão de arquivo fora do repositório, disparada por rodar a
+suíte, e é nova neste commit.
+
+Não corrigido aqui pela regra mecânica: a correção natural é mover a chamada
+para dentro do `whenReady()`, logo antes de `createWindow()` — leitura mais
+literal da decisão 6 do que o escopo de módulo —, e provar isso exige teste
+novo ("não é chamado no import"), o que tira o conserto da etapa 3. Se você
+concordar, vira `CLEAN-*` ou reabre este ticket; se achar aceitável, o merge
+segue como está.
