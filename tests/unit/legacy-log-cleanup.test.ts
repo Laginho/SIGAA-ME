@@ -118,7 +118,14 @@ const REMOVED = ['sigaa-me.log', 'scraper.log', 'debug_a.html', 'debug_b.json', 
 const KEPT = ['settings.json', 'cache.json', path.join('logs', 'app.log'), path.join('diagnostics', 'x.json'), 'debug'];
 
 beforeEach(() => {
-    loggerHarness.scopes.clear();
+    // `main.ts` roda `logger.scope('main')` uma única vez no import: limpar o
+    // `Map` perderia essa referência para sempre. Zera as chamadas gravadas,
+    // não o registro de escopos.
+    for (const scope of loggerHarness.scopes.values()) {
+        scope.info.mockClear();
+        scope.warn.mockClear();
+        scope.error.mockClear();
+    }
     fs.rmSync(root, { recursive: true, force: true });
     plant();
 });
