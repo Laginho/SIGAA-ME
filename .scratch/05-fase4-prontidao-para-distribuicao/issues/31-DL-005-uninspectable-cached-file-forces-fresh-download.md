@@ -1,6 +1,6 @@
 # DL-005: Arquivo em cache que não dá para inspecionar é tratado como válido
 Status: open
-Stage: implementing
+Stage: to-review
 Priority: P2
 Blocked by: nenhum
 
