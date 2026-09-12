@@ -89,3 +89,10 @@ Já encaminhado no master: `CourseFile.id` e `DownloadToken` existem no pedido;
   quebre no `tsc`.
 - Fora de escopo: extrair o leitor de notícias de
   `playwright-login.service.ts` (1282 linhas). Ticket próprio.
+- Da revisão do `DL-005` (2026-09-11): o filtro de duplicata do critério 5
+  (`sigaa.service.ts:357-375`) decide por `existsSync` puro — presença basta,
+  conteúdo nunca é olhado. O caminho de arquivo único valida a cabeça antes de
+  reaproveitar (`download.service.ts:71-89`, `DL-002` + `DL-005`); o lote não.
+  Arquivo truncado ou página de erro salva com o nome certo fica em disco para
+  sempre, reportado como `skipped`. Chavear por id não resolve isso; é decisão
+  de etapa 1 se vira critério aqui ou ticket próprio.
