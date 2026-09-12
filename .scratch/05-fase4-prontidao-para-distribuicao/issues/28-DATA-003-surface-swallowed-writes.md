@@ -1,6 +1,6 @@
 # DATA-003: Escrita engolida em settings e cache
 Status: open
-Stage: to-implement
+Stage: implementing
 Priority: P2
 Blocked by: nenhum
 
