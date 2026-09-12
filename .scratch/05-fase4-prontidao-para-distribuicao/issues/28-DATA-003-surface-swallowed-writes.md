@@ -1,6 +1,6 @@
 # DATA-003: Escrita engolida em settings e cache
 Status: open
-Stage: implementing
+Stage: to-review
 Priority: P2
 Blocked by: nenhum
 
@@ -67,6 +67,18 @@ próximo boot.
   tirar o `try`: um chamador em caminho de boot que passa a lançar derruba o
   main. Se houver, decida caso a caso e anote aqui; não reintroduza o `catch`
   silencioso.
+
+- `background-sync.service.ts` tem dois chamadores de escrita dentro do mesmo
+  `try` do ciclo de sync (critério 7). Decisão para cada um:
+  - `:263` `updateSetting('lastBackgroundSync', ...)` — movido para depois do
+    push ao renderer e das notificações. Rodava antes; um `ENOSPC` aqui
+    descartava a entrega inteira do ciclo por causa de um timestamp. Continua
+    dentro do `try`, então ainda pode pular o commit da baseline logo abaixo —
+    aceitável, mesmo efeito do `:306`.
+  - `:306` `cacheService.updateCourseState(...)` (loop de `pendingCommits`) —
+    sem mudança. O `catch` do método já é descrito como load-bearing: uma
+    falha aqui deixa os itens do ciclo sem commit, e o próximo sync os
+    rediffa e renotifica em vez de marcá-los como vistos silenciosamente.
 
 #### Revisão etapa 3 (2026-09-11) — reaberto
 
