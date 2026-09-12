@@ -386,6 +386,13 @@ describe('registerIpcHandlers: remetente, validação e cópia limpa', () => {
         expect(deps.backgroundSync.restart).toHaveBeenCalled();
     });
 
+    it('update-app-setting devolve STORAGE quando a escrita falha e não reinicia o sync (DATA-003)', async () => {
+        deps.persistence.applySetting.mockImplementation(() => { throw new Error('ENOSPC: no space left'); });
+        const result = await invoke('update-app-setting', { key: 'syncInterval', value: 30 });
+        expect(result).toMatchObject({ success: false, error: { code: 'STORAGE' } });
+        expect(deps.backgroundSync.restart).not.toHaveBeenCalled();
+    });
+
     it('download-file sem pasta definida devolve INVALID_REQUEST, comportamento de hoje', async () => {
         deps.persistence.getSettings.mockReturnValue({ lastDownloadPath: null });
         const result = await invoke('download-file', {
