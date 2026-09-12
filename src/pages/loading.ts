@@ -1,7 +1,21 @@
 import { loadingMessages } from '../data/loading-messages';
 import '../styles/login.css';
 
+// Handles em módulo, não em `window`: o `main.ts` chamava um global que
+// ninguém definia e o intervalo nunca era limpo (CLEAN-004).
+let messageInterval: ReturnType<typeof setInterval> | undefined;
+let fadeTimeout: ReturnType<typeof setTimeout> | undefined;
+
+/** Para a troca de mensagens e o fade pendente. Idempotente. */
+export function stopLoadingInterval() {
+  clearInterval(messageInterval);
+  clearTimeout(fadeTimeout);
+  messageInterval = undefined;
+  fadeTimeout = undefined;
+}
+
 export function renderLoadingPage(app: HTMLDivElement) {
+  stopLoadingInterval();
   app.innerHTML = `
     <div class="login-container">
       <div class="login-card" style="text-align: center;">
@@ -19,7 +33,7 @@ export function renderLoadingPage(app: HTMLDivElement) {
   let lastIndex = Math.floor(Math.random() * loadingMessages.length);
   textElement.textContent = loadingMessages[lastIndex];
 
-  const interval = setInterval(() => {
+  messageInterval = setInterval(() => {
     let newIndex;
     do {
       newIndex = Math.floor(Math.random() * loadingMessages.length);
@@ -29,11 +43,9 @@ export function renderLoadingPage(app: HTMLDivElement) {
     const randomMsg = loadingMessages[newIndex];
 
     textElement.style.opacity = '0';
-    setTimeout(() => {
+    fadeTimeout = setTimeout(() => {
       textElement.textContent = randomMsg;
       textElement.style.opacity = '1';
     }, 200);
   }, 3000);
-
-  (window as any).currentLoadingInterval = interval;
 }
