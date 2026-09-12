@@ -26,9 +26,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('electron', () => {
     // O construtor do serviço abre um WriteStream de log em `userData`, então a
-    // pasta precisa existir de verdade antes do primeiro `new`.
-    const userData = path.join(os.tmpdir(), 'sigaa-me-download-tests-userdata');
-    mkdirSync(userData, { recursive: true });
+    // pasta precisa existir de verdade antes do primeiro `new`. Nome sorteado e
+    // não fixo: dois arquivos de teste em workers paralelos, ou duas sessões
+    // rodando o gate ao mesmo tempo, dividiriam o mesmo diretório.
+    const userData = mkdtempSync(path.join(os.tmpdir(), 'sigaa-me-download-tests-'));
     return { app: { isPackaged: true, getPath: () => userData } };
 });
 vi.mock('../../electron/services/logger.service', () => ({
