@@ -16,3 +16,4 @@
 | 2026-09-11 | CLEAN-004 | 3d1f22f, 622ac43; revisão sem mudança de código, três critérios OK |
 | 2026-09-11 | DL-003 | e93f4fe, ca946ac, 7079768; três linhas mortas apagadas na revisão, critério 2 aceito com ressalva (descarte do `.part` sem teste, encaminhado ao DL-004), CLEAN-005 e QA-008 abertos |
 | 2026-09-11 | DL-005 | e42d4f2, 1ca9b12, 3be2250; reaberta uma vez por critério 2 sem teste, fechada sem mudança de código na revisão |
+| 2026-09-11 | DATA-003 | a4f7405, 1d6ef0f, 485e38d, 3a72628, 8c615c1, 34c6941, 1c921e1; reaberta uma vez pelos critérios 5-7, fechada sem mudança de código na segunda revisão |
