@@ -15,3 +15,4 @@
 | 2026-09-11 | A11Y-003 | e6f95d0, bbee8fd, 613c3b5; reaberta uma vez por critério sem teste, fechada sem mudança de código na revisão |
 | 2026-09-11 | CLEAN-004 | 3d1f22f, 622ac43; revisão sem mudança de código, três critérios OK |
 | 2026-09-11 | DL-003 | e93f4fe, ca946ac, 7079768; três linhas mortas apagadas na revisão, critério 2 aceito com ressalva (descarte do `.part` sem teste, encaminhado ao DL-004), CLEAN-005 e QA-008 abertos |
+| 2026-09-11 | DL-005 | e42d4f2, 1ca9b12, 3be2250; reaberta uma vez por critério 2 sem teste, fechada sem mudança de código na revisão |
