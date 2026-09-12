@@ -2,7 +2,7 @@ import './styles/main.css'
 import { renderLoginPage } from './pages/login'
 import { renderDashboardPage } from './pages/dashboard'
 import { renderCourseDetailPage } from './pages/course-detail'
-import { renderLoadingPage } from './pages/loading'
+import { renderLoadingPage, stopLoadingInterval } from './pages/loading'
 import { renderSyncSelectionPage } from './pages/sync-selection'
 import { renderSettingsPage } from './pages/settings'
 import { getActiveAccount, readAccountItem, setActiveAccount } from './data/account-storage'
@@ -53,7 +53,7 @@ if (!window.location.hash || window.location.hash === '#/login') {
   renderLoadingPage(app);
 
   window.api.tryAutoLogin().then((result) => {
-    if ((window as any).stopLoadingInterval) (window as any).stopLoadingInterval();
+    stopLoadingInterval();
 
     if (result.success) {
       console.log('Auto-login success!');
@@ -63,7 +63,7 @@ if (!window.location.hash || window.location.hash === '#/login') {
       route();
     }
   }).catch(() => {
-    if ((window as any).stopLoadingInterval) (window as any).stopLoadingInterval();
+    stopLoadingInterval();
     route();
   });
 } else {
