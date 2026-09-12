@@ -127,13 +127,15 @@ Separação do `diff --stat` correta nas quatro commits: `e42d4f2` e `3be2250` s
 tocam teste + ticket, `1ca9b12` só fonte + ticket, `10b1ead` só tracker. Nada
 fora dos Primary files.
 
-Gate rodado na revisão. O `npm run quality` não sobe neste checkout —
-`node_modules/.bin` não existe, então os shims `tsc`/`eslint`/`vitest` não
-resolvem; as três ferramentas foram chamadas direto pelo entry point delas, o
-mesmo que o script faz. `tsc --noEmit` sai 0; `eslint .` sai 0 com 62 warnings
-`no-explicit-any` legados, 0 erros; `vitest run` dá 52 arquivos, 637 passed,
-4 skipped. Reinstalar (`npm ci` no Windows) devolve o `.bin` — é ambiente, não
-código.
+Gate rodado na revisão, duas vezes. Na primeira o `npm run quality` não subia
+— o `node_modules/.bin` deste checkout tinha sumido e os shims `tsc`/`eslint`/
+`vitest` não resolviam — então as três ferramentas foram chamadas direto pelo
+entry point delas: `tsc --noEmit` 0, `eslint .` 0 erros e 62 warnings
+`no-explicit-any` legados, `vitest run` 52 arquivos, 637 passed, 4 skipped.
+Depois do merge em `master` e de um `npm ci` no Windows, `npm run quality`
+rodou inteiro e saiu 0: 0 erros de lint (57 warnings, legado), 54 arquivos,
+639 passed, 4 skipped. Os números sobem porque o `master` já trazia DL-003 e
+CLEAN-004; era ambiente, não código.
 
 Arquivos: `electron/services/download.service.ts` (+4 −1),
 `tests/unit/audit-download-inspect.test.ts` (novo, 54 linhas).
