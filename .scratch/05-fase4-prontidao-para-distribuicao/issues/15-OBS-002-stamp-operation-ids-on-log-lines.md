@@ -1,6 +1,6 @@
 # OBS-002 — Stamp operation IDs on log lines
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P3
 Blocked by: OBS-004
 
@@ -41,8 +41,8 @@ cortado sem afetar `OBS-001` nem `OBS-003`.
   ciclo o carrega. O teste falha nomeando a primeira linha sem id antes de
   conferir igualdade (auditoria cega de 2026-09-07, achado 6: `filter(Boolean)`
   aceitava linha sem id).
-- ❌ `name` aparece em `meta` só na primeira linha logada dentro da
-  `runOperation`; nenhuma linha seguinte da mesma operação o repete.
+- ~~`name` aparece em `meta` só na primeira linha~~ — cortado em 2026-09-12,
+  ver "Decisão do humano" nos Comments.
 
 #### Verification
 
@@ -65,8 +65,10 @@ Formato da linha com o campo preenchido:
 <ISO-8601> <LEVEL> [<scope>] [op:<id>] <message> <meta em JSON, se houver>
 ```
 
-`id` é curto e opaco (8 hex de um `randomUUID()` bastam); `name` vai só na
-primeira linha da operação, como `meta`.
+`id` é curto e opaco (8 hex de um `randomUUID()` bastam). `name` não aparece
+no log: a linha de abertura que `syncNow` e `start()` já emitem diz qual é a
+operação (cortado em 2026-09-12; a assinatura de `runOperation` mantém o
+parâmetro para documentar o call site).
 
 ## Para o revisor
 
@@ -78,6 +80,16 @@ primeira linha da operação, como `meta`.
   `AsyncLocalStorage` não está sendo usado.
 
 ## Comments
+
+**Decisão do humano (2026-09-12): corta o requisito, volta a `to-review`.**
+O consumidor do log é o desenvolvedor, e a linha de abertura da operação já
+nomeia o que está rodando; um mecanismo de "primeira linha" no
+`AsyncLocalStorage` seria código para um dado que ninguém lê. Contrato e
+critério ajustados acima. A branch já cumpre o resto do ticket, então não há
+rodada de etapa 2: a etapa 3 revisa de novo e, como fix pequeno dentro dos
+Primary files e sem teste novo, **remove o campo `name` do
+`OperationIdContext`** (o achado de Standards), mantendo a assinatura
+`runOperation(name, fn)` para os testes ficarem intocados.
 
 **Revisão do OBS-002 (2026-09-12), reabre.** Standards + Spec, ambos em paralelo,
 `git diff master...HEAD` do branch `obs-002` (3 commits: teste vermelho, `feat`,
