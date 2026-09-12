@@ -1,6 +1,6 @@
 # DATA-003: Escrita engolida em settings e cache
-Status: open
-Stage: to-review
+Status: resolved
+Stage: done
 Priority: P2
 Blocked by: nenhum
 
@@ -123,3 +123,43 @@ Fora do escopo, não bloqueia: `tests/unit/sync-selection.test.ts` falha de form
 intermitente na suíte cheia sob carga (`expect(window.location.hash).not.toBe(
 '#/dashboard')`, `:300`), inclusive com `electron/` no merge-base. Aberto como
 QA-008.
+
+#### Resolution (2026-09-11)
+
+Fechada na segunda revisão, sem mudança de código pelo revisor.
+
+Critérios 5, 6 e 7 ✅; 1-4 reconferidos e mantidos.
+
+- **5** — `register-handlers.ts:169-174` embrulha `updateSetting` e devolve
+  `fail('STORAGE', ...)`. A `invoke` volta a respeitar a união `AppResult`.
+- **6** — `cache.service.ts:160-173` lê o último id sem `pop()` e passa uma
+  cópia com `files.slice(0, -1)` ao `commit`. Nada muta antes da escrita, como
+  o docstring do `commit` promete.
+- **7** — `background-sync.service.ts:301-303`: `updateSetting('lastBackgroundSync')`
+  desceu para depois do push ao renderer e da notificação do SO. As decisões
+  dos dois chamadores estão anotadas no `## Comments` acima. Efeito residual
+  aceito: a escrita fica antes do flush de `pendingCommits`, então um `ENOSPC`
+  aqui ainda pula a baseline — mesmo desfecho do `:306`, re-diff e renotificação
+  no ciclo seguinte, e estritamente melhor que o master, onde descartava
+  também o push e as notificações.
+
+Grep do critério 4 feito nos chamadores de `saveSettings`/`saveCache` (hoje
+`commit`/`applySetting`/`updateSetting`/`updateCourseState`/`forgetLastFile`):
+`register-handlers.ts:170` e `:250` tratam; `background-sync.service.ts:303` e
+`:309` decididos acima; `main.ts:51` vira BUG-012. Nenhum `catch` que só loga
+foi reintroduzido.
+
+Separação teste/código correta: `3a72628` toca só `tests/` e a linha `Stage:`;
+`8c615c1`, `34c6941` e `1c921e1` não tocam teste nenhum.
+
+Red-green: com `electron/` revertido para `f828903` e os testes de hoje, 3 falham
+(cache-service 1, ipc-validation 1, background-sync 1) e passam com a mudança.
+
+Gate em `1b442ea`: `npm run quality` limpo — 0 erros de ESLint (62 warnings
+`no-explicit-any` preexistentes), 52 arquivos, **641 passed | 4 skipped**.
+
+Encaminhado, não bloqueia: `test-simulate-new-file` (`register-handlers.ts:350`)
+e o item de tray `[Dev] Simular Arquivo Novo` (`main.ts:224`) chamam
+`simulateNewFile`, que agora pode lançar pelo `forgetLastFile`. Canal só de dev,
+e devolve `boolean` cru em vez de `AppResult` — fora do contrato do critério 5.
+Aberto como BUG-012.
