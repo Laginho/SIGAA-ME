@@ -238,25 +238,38 @@ describe('DiagnosticsService', () => {
         expect(remaining[remaining.length - 1]).toBe(25);
     });
 
-    it('clear remove todos os diagnósticos gravados', () => {
+    it('clear remove todos os diagnósticos gravados', async () => {
         const service = new DiagnosticsService();
         service.record(diagnosticAt(1));
         service.record(diagnosticAt(2));
 
-        service.clear();
+        await service.clear();
 
         const dir = path.join(userDataPath, 'diagnostics');
         expect(fs.existsSync(dir) && fs.readdirSync(dir).length > 0).toBe(false);
     });
 
-    it('grava normalmente depois de um clear anterior', () => {
+    it('grava normalmente depois de um clear anterior', async () => {
         const service = new DiagnosticsService();
         service.record(diagnosticAt(1));
-        service.clear();
+        await service.clear();
 
         expect(() => service.record(diagnosticAt(2))).not.toThrow();
 
         const dir = path.join(userDataPath, 'diagnostics');
         expect(fs.readdirSync(dir)).toHaveLength(1);
+    });
+
+    it('clear() rejeita com o erro da exclusão (EPERM injetado) e a pasta continua', async () => {
+        const service = new DiagnosticsService();
+        service.record(diagnosticAt(1));
+        const error = Object.assign(new Error('EPERM: recurso ocupado'), { code: 'EPERM' });
+        const rmSpy = vi.spyOn(fs.promises, 'rm').mockRejectedValueOnce(error);
+
+        await expect(service.clear()).rejects.toThrow('EPERM: recurso ocupado');
+
+        rmSpy.mockRestore();
+        const dir = path.join(userDataPath, 'diagnostics');
+        expect(fs.existsSync(dir)).toBe(true);
     });
 });
