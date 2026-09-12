@@ -233,6 +233,17 @@ describe('Sync: selector drift (QA-003)', () => {
 });
 
 describe('Sync: falha de disciplina preserva cache (ARCH-001 READ §1)', () => {
+    // QA-008: flushAll() espera um setTimeout real. sync-selection.ts:245 deixa
+    // um setTimeout(600ms) pendente e sem cancelamento depois de um sync
+    // bem-sucedido em outro teste deste arquivo (jsdom é por arquivo, não por
+    // teste); quanto mais flushAll(), mais chance desse timer órfão disparar
+    // durante ESTE teste e sobrescrever o hash. Este describe só cobre o
+    // caminho de falha, que nunca agenda esse timer — então esperar apenas
+    // microtasks é suficiente e nunca cede à fase de timers do event loop.
+    function flushMicrotasks() {
+        return Promise.resolve();
+    }
+
     it('does not overwrite cached files when getCourseFiles fails for a course', async () => {
         writeAccountItem('courses', JSON.stringify([
             { id: 'c1', name: 'Cálculo I', code: 'CB0001', files: [{ id: '555', name: 'Lista 3.pdf', type: 'file' }], news: [], fileCount: 1 }
@@ -250,7 +261,7 @@ describe('Sync: falha de disciplina preserva cache (ARCH-001 READ §1)', () => {
         const app = buildApp();
         renderSyncSelectionPage(app);
         document.getElementById('btnFastSync')?.click();
-        for (let i = 0; i < 10; i++) await flushAll();
+        for (let i = 0; i < 50; i++) await flushMicrotasks();
 
         const overlay = app.querySelector('.sync-progress-overlay');
         expect(overlay?.textContent).toContain('Cálculo I');
@@ -294,7 +305,7 @@ describe('Sync: falha de disciplina preserva cache (ARCH-001 READ §1)', () => {
         const app = buildApp();
         renderSyncSelectionPage(app);
         document.getElementById('btnFastSync')?.click();
-        for (let i = 0; i < 10; i++) await flushAll();
+        for (let i = 0; i < 50; i++) await flushMicrotasks();
 
         expect(document.getElementById('dashboardBtn')).not.toBeNull();
         expect(window.location.hash).not.toBe('#/dashboard');
