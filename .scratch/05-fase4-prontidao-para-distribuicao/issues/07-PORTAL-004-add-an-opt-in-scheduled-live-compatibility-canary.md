@@ -38,3 +38,7 @@ RUN_LIVE_SIGAA_TESTS=true npm run test:live
 - Commit: —
 - Schedule: —
 - Alert destination: —
+
+## Comments
+
+- 2026-09-12 Attempt 1 failed: exit . Gate/log tail: 
