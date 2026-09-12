@@ -1,6 +1,6 @@
 # OBS-003 — Gate raw HTML dumps, wire diagnostics clear, clean legacy logs
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P2
 Blocked by: OBS-005
 
@@ -240,3 +240,30 @@ a cada revisão:
 ## Comments
 
 - 2026-09-11, corte da auditoria `40a0d01`: `tests/unit/audit-diagnostics.test.ts` de `19ba8aa` (branch `codex/fix-audit-2026-09-09`, nunca mergeada) cobre o teto de retenção compartilhado (24 crus + 24 estruturais deixam 20), containment de nome hostil, no-op em `isPackaged` e falha de captura que não derruba o chamador. Serve de ponto de partida para os critérios 1 a 3 e 7. Diferenças de contrato: lá o método é `captureRaw(name, () => string, ext)` assíncrono e `clear()` síncrono; aqui é `saveRaw(name, content)` e `clear(): Promise<void>` (decisão 7). Adaptar, não colher literalmente. Estado no master confirmado hoje: `DiagnosticsService` só expõe `record()`, e cada dump cru continua `fs.writeFileSync` ad-hoc atrás do próprio `!app.isPackaged` (`playwright-login.service.ts:159,338,411,556,1089,1224`; `http-scraper.service.ts:202,249,319,726`), nome fixo, sem teto.
+
+## Nota da etapa 2 (2026-09-12)
+
+Implementado em três commits na branch `obs-003`: testes vermelhos
+(`557d071`, mais o conserto de harness `6bc7e92`), depois o código
+(`24e0048`), gate verde. Prova vermelho-verde antes deste relatório:
+`git revert --no-commit 24e0048` → `npm test` → 14 testes falham pelo
+motivo certo (`saveRaw`/`removeLegacyLogs` inexistentes, `clear()` ainda
+síncrono, `IpcDeps` sem `diagnostics`) → `git restore --source=HEAD
+--staged --worktree` devolve o código e a suíte volta a 656 passed | 4
+skipped (660). `npm run quality`: 0 erros, 55 warnings (`no-explicit-any`,
+legado, nenhum novo).
+
+Um desvio deliberado do critério 6 (nenhum `app.isPackaged` inline ao
+lado de um dump): `debug_portal_page.html`
+(`playwright-login.service.ts`, dump de `debug_portal_page.html` logo
+após o clique em "Menu Discente") mantém
+`shouldCaptureRawArtifact(app.isPackaged, false)` guardando o
+`page.content()` antes do `saveRaw`. Nesse único ponto o fetch existe só
+para o dump — sem gate, `getCourses()` chamaria `page.content()` uma vez
+a mais mesmo empacotado, e `tests/integration/portal-selector-resilience.test.ts`
+("preserva o SELECTOR_DRIFT quando nem o HTML da página pode ser lido",
+fora do Primary files desta ticket, não editado) depende da contagem
+exata de chamadas — sem o gate ali o teste quebra porque a chamada extra
+consome o valor mockado que o teste reserva para a leitura de diagnóstico
+real. Os outros ~10 call sites não têm essa dependência de contagem e
+ficaram sem `if`, como o critério pede.
