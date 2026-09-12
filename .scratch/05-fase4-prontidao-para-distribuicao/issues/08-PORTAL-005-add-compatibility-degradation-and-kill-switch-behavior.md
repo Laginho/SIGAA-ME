@@ -34,3 +34,7 @@ npm run test:e2e
 
 - Commit: —
 - Trigger threshold: —
+
+## Comments
+
+- 2026-09-12 Attempt 1 failed: exit . Gate/log tail: 
