@@ -166,7 +166,12 @@ export function registerIpcHandlers(deps: IpcDeps): void {
     }
 
     const folderPath = result.filePaths[0];
-    deps.persistence.updateSetting('lastDownloadPath', folderPath);
+    try {
+      deps.persistence.updateSetting('lastDownloadPath', folderPath);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return fail('STORAGE', `Não foi possível salvar a pasta de downloads: ${message}`);
+    }
     return ok({ folderPath });
   }, () => fail('INVALID_REQUEST', 'select-download-folder: não recebe payload'));
 
