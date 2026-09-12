@@ -1,6 +1,6 @@
 # DL-005: Arquivo em cache que não dá para inspecionar é tratado como válido
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P2
 Blocked by: nenhum
 
@@ -25,7 +25,7 @@ deve forçar download novo.
 1. Com `readHeadSync` lançando para o caminho existente, `checkAndClearCorruptFile`
    devolve `false` e o `downloadFile` segue para baixar de novo em vez de
    devolver o caminho antigo.
-2. ❌ Comportamento com arquivo legível continua: cabeça válida reaproveita,
+2. Comportamento com arquivo legível continua: cabeça válida reaproveita,
    cabeça inválida apaga e baixa.
 
 #### Verification
@@ -75,6 +75,23 @@ Aceito sem mudança, registrado para não voltar como achado: o teste novo usa
 `fs` real em pasta temporária em vez do `vi.mock` + `Map` que
 `docs/agents/orchestration.md` documenta. O ponto do teste é um `EISDIR` de
 verdade, que mock nenhum reproduz; o cabeçalho do arquivo já explica a escolha.
+
+#### Fechamento do critério 2 (2026-09-11)
+
+Teste novo em `tests/unit/audit-download-inspect.test.ts`: `an existing file
+with an invalid signature is deleted instead of reused`. Pré-grava
+`aviso.pdf` com conteúdo que não bate a assinatura `.pdf`, chama o
+`downloadFile` de produção com `Page` em `about:blank`, e prova duas coisas —
+`existsSync(fullPath)` vira `false` (arquivo antigo apagado) e o resultado é
+`success: false` com `'Page lost context'` (seguiu para baixar de novo, não
+devolveu o caminho antigo).
+
+Vermelho-verde: com `download.service.ts:77-81` revertido para `return true`
+no branch `!check.ok` (o comportamento que este critério proíbe), o teste
+falha em `expect(result.success).toBe(false)` — recebido `true`. Restaurado o
+`fs.unlinkSync` + `return false`, passa. Nenhuma mudança de fonte ficou —
+`git diff --stat` só mostra o teste. Gate `npm run quality`: 0 erros de lint
+(62 warnings `no-explicit-any`, legado), 52 arquivos, 637 passed, 4 skipped.
 
 Achados fora do escopo deste ticket, encaminhados como comentário:
 
