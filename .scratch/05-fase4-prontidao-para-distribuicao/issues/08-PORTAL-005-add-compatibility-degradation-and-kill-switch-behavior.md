@@ -1,6 +1,6 @@
 # PORTAL-005 — Add compatibility degradation and kill-switch behavior
 Status: open
-Stage: to-implement
+Stage: blocked
 Priority: P1
 Blocked by: ARCH-001
 Tracker status at migration: `NOT STARTED`
@@ -37,4 +37,6 @@ npm run test:e2e
 
 ## Comments
 
-- 2026-09-12 Attempt 1 failed: exit . Gate/log tail: 
+- 2026-09-12 Attempt 1 failed: exit . Gate/log tail:
+
+- 2026-09-12 Attempt 2 failed: exit ; blocked after two attempts
