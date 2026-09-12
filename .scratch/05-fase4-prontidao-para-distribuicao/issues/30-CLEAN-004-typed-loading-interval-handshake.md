@@ -1,6 +1,6 @@
 # CLEAN-004: Handshake do intervalo de loading por global não tipado
 Status: open
-Stage: to-implement
+Stage: implementing
 Priority: P3
 Blocked by: nenhum
 
