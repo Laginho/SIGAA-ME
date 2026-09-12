@@ -1,6 +1,6 @@
 # OBS-003 — Gate raw HTML dumps, wire diagnostics clear, clean legacy logs
 Status: open
-Stage: reviewing
+Stage: to-implement
 Priority: P2
 Blocked by: OBS-005
 
@@ -320,3 +320,19 @@ literal da decisão 6 do que o escopo de módulo —, e provar isso exige teste
 novo ("não é chamado no import"), o que tira o conserto da etapa 3. Se você
 concordar, vira `CLEAN-*` ou reabre este ticket; se achar aceitável, o merge
 segue como está.
+
+## Decisão do humano (2026-09-12): reabre
+
+Exclusão de arquivo fora do repositório disparada por `npm test` não fica.
+Reaberto para a etapa 2 na mesma branch `obs-003`, que já tem tudo o mais.
+Escopo da rodada: só o achado acima. Nada mais do ticket muda.
+
+8. **Sem efeito colateral no import.** Importar `electron/main` não chama
+   `removeLegacyLogs` nem toca o filesystem; a chamada fica dentro do
+   `whenReady()`, antes de `createWindow()`. Teste em
+   `tests/unit/legacy-log-cleanup.test.ts`: com `app.getPath` apontando para
+   uma pasta temporária semeada com `sigaa-me.log`, importar `electron/main`
+   deixa o arquivo lá; resolver o `whenReady` mockado faz o arquivo sumir.
+   Commit de teste separado do commit de código, como nos outros critérios.
+
+- 2026-09-12 Reaberto pelo humano com o critério 8; branch preservada.
