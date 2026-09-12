@@ -57,3 +57,11 @@ npm run test:e2e
 
 - Commit: —
 - Coverage thresholds: —
+
+## Comments
+
+- Da revisão do `DL-005` (2026-09-11): `tests/unit/sync-selection.test.ts:259`
+  (`expect(window.location.hash).not.toBe("#/dashboard")`) falhou uma vez num
+  `npm run quality` completo e passou sozinho e na repetição imediata, sem
+  mudança nenhuma no meio. Instabilidade na suíte cheia, não no arquivo — é o
+  tipo de coisa que "deterministic test gate" existe para pegar.
