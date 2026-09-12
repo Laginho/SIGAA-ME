@@ -56,3 +56,16 @@ teste.
 
 - Reproduzido com a suíte inteira em paralelo, num worktree, com outras duas
   sessões de agente rodando na mesma máquina. Carga ajuda a reproduzir.
+- Reproduzido de novo na revisão do `CLEAN-004` (2026-09-11), em `13d785a` —
+  o `master` **antes** do merge do `DL-003` e do `CLEAN-004`. O flake não é de
+  nenhum dos dois. Taxa medida: 1 falha em 4 rodadas da suíte inteira em
+  `13d785a`, 1 em 4 no `master` já com o `CLEAN-004`, e 6/6 verde com o arquivo
+  rodando sozinho.
+- **O flake pega os dois testes do describe, não só o do `:300`.** Numa das
+  rodadas caiu `does not overwrite cached files when getCourseFiles fails for a
+  course`, o primeiro. A saída capturada foi só a linha `FAIL`, sem a asserção —
+  não sei qual dos cinco `expect` dele falhou. Consequência para os Primary
+  files deste ticket: o limite hoje é `:259` e `:300` mais o laço de
+  `flushAll`; se o primeiro teste falha por outra asserção, o limite é o
+  describe inteiro (`:235`–`:302`) e a barreira fraca é a causa comum dos dois.
+  A etapa 1 decide isso antes da etapa 2 começar.
