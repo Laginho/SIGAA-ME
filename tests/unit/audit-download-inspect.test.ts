@@ -9,7 +9,7 @@
  * ele **não** reaproveitou o caminho ilegível.
  */
 
-import { mkdirSync, mkdtempSync, rmSync } from 'fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import os from 'os';
 import path from 'path';
 import type { Page } from 'playwright';
@@ -38,4 +38,17 @@ it('an existing path that cannot be inspected is not reported as a valid downloa
 
     expect(result.success).toBe(false);
     expect(result.error).toContain('Page lost context');
+});
+
+it('an existing file with an invalid signature is deleted instead of reused', async () => {
+    const { fullPath } = resolveDownloadTarget(destino, COURSE, 'aviso.pdf');
+    mkdirSync(path.dirname(fullPath), { recursive: true });
+    writeFileSync(fullPath, 'not a real pdf');
+    const page = { url: () => 'about:blank' } as unknown as Page;
+
+    const result = await new DownloadService(null).downloadFile(page, '', 'aviso.pdf', COURSE, destino);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Page lost context');
+    expect(existsSync(fullPath)).toBe(false);
 });
