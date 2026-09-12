@@ -1,6 +1,6 @@
 # PORTAL-004 — Add an opt-in scheduled live compatibility canary
 Status: open
-Stage: to-implement
+Stage: blocked
 Priority: P1
 Blocked by: ARCH-001
 Tracker status at migration: `PARTIAL`
@@ -41,4 +41,6 @@ RUN_LIVE_SIGAA_TESTS=true npm run test:live
 
 ## Comments
 
-- 2026-09-12 Attempt 1 failed: exit . Gate/log tail: 
+- 2026-09-12 Attempt 1 failed: exit . Gate/log tail:
+
+- 2026-09-12 Attempt 2 failed: exit ; blocked after two attempts
