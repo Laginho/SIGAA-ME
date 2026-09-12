@@ -160,8 +160,17 @@ export class CacheService {
 
         for (const [courseId, state] of Object.entries(bucket.courses)) {
             if (state.files.length > 0) {
-                const fileId = state.files.pop()!;
-                this.commit(this.cache);
+                const fileId = state.files[state.files.length - 1];
+                this.commit({
+                    ...this.cache,
+                    accounts: {
+                        ...this.cache.accounts,
+                        [accountId]: {
+                            ...bucket,
+                            courses: { ...bucket.courses, [courseId]: { ...state, files: state.files.slice(0, -1) } },
+                        },
+                    },
+                });
                 return { courseId, fileId };
             }
         }
