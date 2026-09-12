@@ -1,6 +1,4 @@
 import { chromium, Browser, BrowserContext, Page } from 'playwright';
-import * as fs from 'fs';
-import * as path from 'path';
 import { app } from 'electron';
 import { logger } from './logger.service';
 import { buildStructuralDiagnostic, diagnosticsService, shouldCaptureRawArtifact } from './diagnostics.service';
@@ -156,15 +154,7 @@ export class PlaywrightLoginService {
             log.info('Playwright: Login successful! Extracting user data...');
 
             // DEBUG: Save login page HTML for selector inspection (dev only)
-            if (!app.isPackaged) {
-                try {
-                    const debugPath = path.join(app.getPath('userData'), 'debug_login_page.html');
-                    fs.writeFileSync(debugPath, endHtml);
-                    log.info('Playwright: Saved debug_login_page.html for inspection.');
-                } catch (e) {
-                    log.warn('Playwright: Failed to save debug HTML.', { error: e });
-                }
-            }
+            diagnosticsService.saveRaw('debug_login_page.html', endHtml);
 
             // Stay on current page after login to extract user info
             const nameElement = await page.$(LOGIN.userNameFallback);
@@ -334,16 +324,15 @@ export class PlaywrightLoginService {
             // Wait a bit for dynamic content
             await page.waitForTimeout(1000);
 
-            // DEBUG: Save portal page HTML for professor selector inspection (dev only)
-            if (!app.isPackaged) {
-                try {
-                    const portalHtml = await page.content();
-                    const debugPath = path.join(app.getPath('userData'), 'debug_portal_page.html');
-                    fs.writeFileSync(debugPath, portalHtml);
-                    log.info('Playwright: Saved debug_portal_page.html for inspection.');
-                } catch (e) {
-                    log.warn('Playwright: Failed to save debug HTML.', { error: e });
-                }
+            // DEBUG: Save portal page HTML for professor selector inspection (dev only).
+            // Guarda de exceção ao critério 6 do OBS-003: aqui, diferente dos outros
+            // dumps, o fetch de `page.content()` só existe para o dump — gatear antes
+            // dele evita um round-trip a mais no Chromium quando o resultado seria
+            // descartado, e preserva a contagem de chamadas de
+            // `portal-selector-resilience.test.ts` (fora do escopo desta ticket).
+            if (shouldCaptureRawArtifact(app.isPackaged, false)) {
+                const portalHtml = await page.content().catch(() => '');
+                if (portalHtml) diagnosticsService.saveRaw('debug_portal_page.html', portalHtml);
             }
 
             // Extract courses with robust selector-based logic
@@ -408,15 +397,7 @@ export class PlaywrightLoginService {
             log.info(`Playwright: Found ${courses.length} courses.`);
 
             // Save to debug file for analysis (dev only)
-            if (!app.isPackaged) {
-                try {
-                    const debugPath = path.join(app.getPath('userData'), 'debug_courses.json');
-                    fs.writeFileSync(debugPath, JSON.stringify(courses, null, 2));
-                    log.info('Playwright: Saved course debug info.', { path: debugPath });
-                } catch (err) {
-                    log.error('Playwright: Failed to save debug info.', { error: err });
-                }
-            }
+            diagnosticsService.saveRaw('debug_courses.json', JSON.stringify(courses, null, 2));
 
             if (courses.length > 0) {
                 log.info('Playwright: Sample courses.', { courses: courses.slice(0, 3) });
@@ -552,15 +533,7 @@ export class PlaywrightLoginService {
 
                 // Save debug HTML
                 const html = await page.content();
-                try {
-                    if (!app.isPackaged) {
-                        const debugPath = path.join(app.getPath('userData'), `debug_portal_fail_${courseId}.html`);
-                        fs.writeFileSync(debugPath, html);
-                        log.info('Playwright: Saved debug HTML.', { path: debugPath });
-                    }
-                } catch (e) {
-                    log.error('Playwright: Failed to save debug HTML.', { error: e });
-                }
+                diagnosticsService.saveRaw(`debug_portal_fail_${courseId}.html`, html);
 
                 // Don't close page - keep it for potential retry
                 return {
@@ -630,13 +603,7 @@ export class PlaywrightLoginService {
 
         } catch (error: any) {
             const html = this.page ? await this.page.content().catch(() => '') : '';
-            // PORTAL-003: sem fonte de consentimento ainda, então `false` — comportamento
-            // idêntico a antes (`!app.isPackaged`) até uma configuração ligar o consentimento.
-            if (html && shouldCaptureRawArtifact(app.isPackaged, false)) {
-                const debugFullPath = path.join(app.getPath('userData'), `debug_playwright_fail_${courseId}.html`);
-                fs.writeFileSync(debugFullPath, html);
-                log.error('Playwright: Navigation failed. Saved HTML.', { path: debugFullPath });
-            }
+            if (html) diagnosticsService.saveRaw(`debug_playwright_fail_${courseId}.html`, html);
             log.error('Playwright: Error entering course.', { courseId, error });
             // Don't close likely
             return { success: false, error: error.message };
@@ -1086,13 +1053,9 @@ export class PlaywrightLoginService {
             }
 
             if (!found) {
-                if (!app.isPackaged) {
-                    const html = await page.content();
-                    const safeId = String(newsId).replace(/[^a-zA-Z0-9_-]/g, '_');
-                    const debugPath = path.join(app.getPath('userData'), `debug_playwright_news_fail_${safeId}.html`);
-                    fs.writeFileSync(debugPath, html);
-                    log.info('Playwright: Saved debug HTML.', { path: debugPath });
-                }
+                const html = await page.content().catch(() => '');
+                const safeId = String(newsId).replace(/[^a-zA-Z0-9_-]/g, '_');
+                if (html) diagnosticsService.saveRaw(`debug_playwright_news_fail_${safeId}.html`, html);
                 return { success: false, error: `News link with ID ${newsId} not found` };
             }
 
@@ -1103,13 +1066,9 @@ export class PlaywrightLoginService {
             await page.waitForTimeout(1000);
 
             // DEBUG: Save news detail page HTML (dev only)
-            if (!app.isPackaged) {
-                const newsDetailHtml = await page.content();
-                const safeId = String(newsId).replace(/[^a-zA-Z0-9_-]/g, '_');
-                const debugNewsPath = path.join(app.getPath('userData'), `debug_news_detail_${safeId}.html`);
-                fs.writeFileSync(debugNewsPath, newsDetailHtml);
-                log.info('Playwright: Saved news detail page.', { path: debugNewsPath });
-            }
+            const newsDetailHtml = await page.content().catch(() => '');
+            const newsDetailSafeId = String(newsId).replace(/[^a-zA-Z0-9_-]/g, '_');
+            if (newsDetailHtml) diagnosticsService.saveRaw(`debug_news_detail_${newsDetailSafeId}.html`, newsDetailHtml);
 
             // 4. Parse the news content
             const newsData = await page.evaluate(() => {
@@ -1221,12 +1180,8 @@ export class PlaywrightLoginService {
             // await page.goBack();
 
             if (!newsData.content && !newsData.title) {
-                if (!app.isPackaged) {
-                    const html = await page.content();
-                    const debugPath = path.join(app.getPath('userData'), `debug_playwright_news_${newsId}.html`);
-                    fs.writeFileSync(debugPath, html);
-                    log.info('Playwright: Saved debug HTML.', { path: debugPath });
-                }
+                const html = await page.content().catch(() => '');
+                if (html) diagnosticsService.saveRaw(`debug_playwright_news_${newsId}.html`, html);
                 return { success: false, error: 'Could not parse news content from page' };
             }
 

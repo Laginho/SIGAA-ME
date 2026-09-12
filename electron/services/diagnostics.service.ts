@@ -12,6 +12,11 @@ import * as cheerio from 'cheerio';
 import { app } from 'electron';
 import { classify } from '../sigaa/portal-state-classifier';
 import type { PortalState } from '../sigaa/portal-contracts';
+import { sanitizeSegment } from './download-path';
+import { logger } from './logger.service';
+
+const MAX_RAW_NAME_LENGTH = 150;
+const log = logger.scope('Diagnostics');
 
 export interface StructuralDiagnostic {
     timestamp: number;
@@ -114,20 +119,46 @@ export class DiagnosticsService {
         this.prune();
     }
 
-    /** Ordena pelo timestamp embutido no nome do arquivo, não pela string — "10" vem antes de "2" em ordem lexicográfica. */
+    /**
+     * HTML/JSON cru para depurar o parser, não redigido — a proteção é o
+     * gate de modo, não o conteúdo. `app.isPackaged` é lido a cada chamada
+     * (DEV-002), como o getter `dir`. Nunca lança: uma falha de captura não
+     * pode derrubar o chamador que a pediu para depurar o próprio erro dele.
+     */
+    saveRaw(name: string, content: string): void {
+        if (!shouldCaptureRawArtifact(app.isPackaged, false)) return;
+        try {
+            fs.mkdirSync(this.dir, { recursive: true });
+            const file = path.join(this.dir, `${Date.now()}-${sanitizeSegment(name, MAX_RAW_NAME_LENGTH)}`);
+            fs.writeFileSync(file, content);
+            this.prune();
+        } catch (error) {
+            // Decisão, não silêncio (regra 3 do CLAUDE.md): o erro do scraper que
+            // motivou o dump é o que volta ao usuário, não este. Loga e segue.
+            log.error('saveRaw falhou', { name, error: error instanceof Error ? error.message : String(error) });
+        }
+    }
+
+    /**
+     * Ordena pelo timestamp embutido no nome do arquivo, não pela string —
+     * "10" vem antes de "2" em ordem lexicográfica. Um nome cujo prefixo não é
+     * número (arquivo estranho na pasta) fica fora do lote podado: incluí-lo
+     * com timestamp `NaN` deixava a ordenação arbitrária, podendo apagar um
+     * arquivo válido no lugar dele.
+     */
     private prune(): void {
         const entries = fs
             .readdirSync(this.dir)
-            .filter((name) => name.endsWith('.json'))
             .map((name) => ({ name, timestamp: Number(name.split('-')[0]) }))
+            .filter((entry) => Number.isFinite(entry.timestamp))
             .sort((a, b) => a.timestamp - b.timestamp);
         const excess = entries.length - MAX_RETAINED;
         for (let i = 0; i < excess; i++) fs.unlinkSync(path.join(this.dir, entries[i].name));
     }
 
-    clear(): void {
-        if (!fs.existsSync(this.dir)) return;
-        fs.rmSync(this.dir, { recursive: true, force: true });
+    /** Apaga `diagnostics/` via `fs.promises`. Rejeita com o erro da exclusão. */
+    async clear(): Promise<void> {
+        await fs.promises.rm(this.dir, { recursive: true, force: true });
     }
 }
 
