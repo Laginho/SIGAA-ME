@@ -236,3 +236,7 @@ a cada revisão:
   guarda exclui os dois do fingerprint — corpo de script muda sem a estrutura
   mudar, e excluir é o comportamento desejado. A etapa 2 confirma com `tsc` e
   troca a linha por um comentário dizendo isso, não por correção.
+
+## Comments
+
+- 2026-09-11, corte da auditoria `40a0d01`: `tests/unit/audit-diagnostics.test.ts` de `19ba8aa` (branch `codex/fix-audit-2026-09-09`, nunca mergeada) cobre o teto de retenção compartilhado (24 crus + 24 estruturais deixam 20), containment de nome hostil, no-op em `isPackaged` e falha de captura que não derruba o chamador. Serve de ponto de partida para os critérios 1 a 3 e 7. Diferenças de contrato: lá o método é `captureRaw(name, () => string, ext)` assíncrono e `clear()` síncrono; aqui é `saveRaw(name, content)` e `clear(): Promise<void>` (decisão 7). Adaptar, não colher literalmente. Estado no master confirmado hoje: `DiagnosticsService` só expõe `record()`, e cada dump cru continua `fs.writeFileSync` ad-hoc atrás do próprio `!app.isPackaged` (`playwright-login.service.ts:159,338,411,556,1089,1224`; `http-scraper.service.ts:202,249,319,726`), nome fixo, sem teto.

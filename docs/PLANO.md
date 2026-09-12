@@ -455,6 +455,11 @@ fases anteriores.
 - `PORTAL-001..005` — adaptador de compatibilidade e canário
 - `REL-001` — assinatura de código (**custa dinheiro** — certificado de code
   signing para Windows)
+- Auditoria `docs/audits/2026-09-09-40a0d01.md`, cortada em 2026-09-11:
+  `DL-003` (writer `reject` → `resolve`), `DL-004` (identidade por id no
+  download, depois de `DL-003`), `DATA-003` (escrita engolida em settings e
+  cache), `CLEAN-003` (lote Playwright morto, depois de `DL-004` e `OBS-003`),
+  `CLEAN-004` (handshake do loading sem `as any`)
 
 **Marco:** produto público de verdade.
 
