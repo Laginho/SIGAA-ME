@@ -1,6 +1,6 @@
 # OBS-002 — Stamp operation IDs on log lines
 Status: open
-Stage: to-review
+Stage: to-implement
 Priority: P3
 Blocked by: OBS-004
 
@@ -41,6 +41,8 @@ cortado sem afetar `OBS-001` nem `OBS-003`.
   ciclo o carrega. O teste falha nomeando a primeira linha sem id antes de
   conferir igualdade (auditoria cega de 2026-09-07, achado 6: `filter(Boolean)`
   aceitava linha sem id).
+- ❌ `name` aparece em `meta` só na primeira linha logada dentro da
+  `runOperation`; nenhuma linha seguinte da mesma operação o repete.
 
 #### Verification
 
@@ -76,6 +78,35 @@ primeira linha da operação, como `meta`.
   `AsyncLocalStorage` não está sendo usado.
 
 ## Comments
+
+**Revisão do OBS-002 (2026-09-12), reabre.** Standards + Spec, ambos em paralelo,
+`git diff master...HEAD` do branch `obs-002` (3 commits: teste vermelho, `feat`,
+bump de estágio).
+
+Standards: nenhuma violação de regra documentada (nada de `console.*` fora do
+logger, nada de `as any`, nenhum `try/catch` engolindo erro, nenhum
+`operationId` novo em assinatura). Dois achados de julgamento, não bloqueantes
+por si: `OperationIdContext.name` é capturado e nunca lido em lugar nenhum
+(possível Speculative Generality), e `start()` agora abre dois
+`AsyncLocalStorage.run` aninhados para a mesma operação — decisão arquitetural
+deliberada e comentada (logger não pode importar a fila do coordenador), não
+duplicação acidental.
+
+Spec: contrato e todas as três acceptance criteria batem — assinaturas exatas de
+`runOperation`/`currentOperationId`, `start()` envolvendo `fn`, a linha de
+abertura do `syncNow` movida para dentro do ciclo, aninhamento herdando o id de
+fora, formato `[<scope>] [op:<id>] <message>`. Um requisito do Contrato ficou de
+fora: *"`name` vai só na primeira linha da operação, como `meta`"* — nada grava
+`name` em lugar nenhum; é exatamente o mesmo dado que a revisão de Standards
+achou morto. As duas revisões, independentes, apontam para o mesmo buraco.
+
+Por que reabre em vez de fix pequeno: implementar isso precisa de um mecanismo
+novo (saber que uma linha é a primeira da operação — estado mutável no
+contexto do `AsyncLocalStorage`, lido pelo logger) e de teste novo que hoje não
+existe (nenhum teste afirma `name` em `meta` na primeira linha, nem a ausência
+dele nas seguintes). Foge da régua de "fix pequeno" do loop
+(`docs/agents/ticket-flow` — cabe nos Primary files *e* não precisa de teste
+novo); volta para o stage 2.
 
 **Da revisão do `OBS-005` (2026-09-09).** Depois da migração,
 `playwright-login.service.ts` ainda tem ~12 chamadas que interpolam valor no
