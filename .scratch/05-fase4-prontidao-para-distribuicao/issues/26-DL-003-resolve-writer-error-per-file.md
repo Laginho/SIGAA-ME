@@ -1,6 +1,6 @@
 # DL-003: `reject` no erro de escrita derruba o lote inteiro
-Status: open
-Stage: to-merge
+Status: resolved
+Stage: done
 Priority: P1
 Blocked by: nenhum
 
@@ -99,3 +99,11 @@ corrida — apareceu numa rodada do gate aqui, passou na seguinte).
     ✖ 62 problems (0 errors, 62 warnings)   # no-explicit-any pré-existentes
     Test Files  52 passed (52)
     Tests  636 passed | 4 skipped (640)
+
+Números acima são de antes de trazer o `master` para a branch. Depois do merge
+do `CLEAN-004`, com o gate rodado de novo antes de fechar: 0 erros de lint,
+53 arquivos, 637 passed | 4 skipped (641).
+
+Mérito direto no `master` a pedido do autor, em vez do PR que o loop pede
+quando a etapa 3 mexe em código — o que ela mexeu foram três linhas mortas num
+arquivo de teste.
