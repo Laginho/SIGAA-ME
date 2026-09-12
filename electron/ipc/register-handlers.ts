@@ -166,7 +166,12 @@ export function registerIpcHandlers(deps: IpcDeps): void {
     }
 
     const folderPath = result.filePaths[0];
-    deps.persistence.updateSetting('lastDownloadPath', folderPath);
+    try {
+      deps.persistence.updateSetting('lastDownloadPath', folderPath);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return fail('STORAGE', `Não foi possível salvar a pasta de downloads: ${message}`);
+    }
     return ok({ folderPath });
   }, () => fail('INVALID_REQUEST', 'select-download-folder: não recebe payload'));
 
@@ -241,7 +246,14 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 
   handle('update-app-setting', parseSettingUpdate,
     async (req) => {
-      deps.persistence.applySetting(req);
+      try {
+        deps.persistence.applySetting(req);
+      } catch (error) {
+        // Disco recusou a escrita: a memória não mudou (DATA-003), então nada
+        // abaixo deve rodar e o renderer precisa saber que não foi salvo.
+        const message = error instanceof Error ? error.message : String(error);
+        return fail('STORAGE', `Não foi possível salvar a configuração: ${message}`);
+      }
       if (req.key === 'openAtLogin') {
         app.setLoginItemSettings({
           openAtLogin: req.value,

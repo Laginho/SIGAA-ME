@@ -80,7 +80,10 @@ export class DownloadService {
                         return false;
                     }
                 } catch (e) {
-                    log.error('Error inspecting existing file.', { path: p, error: e });
+                    // Não deu para ler: não dá para afirmar que é válido. Força
+                    // download novo em vez de devolver um caminho ilegível (DL-005).
+                    log.error('Error inspecting existing file, forcing fresh download.', { path: p, error: e });
+                    return false;
                 }
                 return true;
             };

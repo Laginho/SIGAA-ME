@@ -260,7 +260,6 @@ export class BackgroundSyncService {
             }
 
             log.info('Sync complete.');
-            persistenceService.updateSetting('lastBackgroundSync', Date.now());
 
             // Push updated data to renderer
             if (allCoursesData.length > 0) {
@@ -298,6 +297,10 @@ export class BackgroundSyncService {
                     log.info(`Triggered generic notification for ${coursesWithUpdates} course(s).`);
                 }
             }
+
+            // Grava depois do push/notificações (DATA-003): uma escrita falhada aqui
+            // não pode descartar o que já foi entregue ao usuário nesse ciclo.
+            persistenceService.updateSetting('lastBackgroundSync', Date.now());
 
             // Commit the baseline only after the user had every chance to be told.
             // A crash before this point means re-notifying next sync — the renderer

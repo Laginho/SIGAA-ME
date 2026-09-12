@@ -1,13 +1,16 @@
 # DATA-003: Escrita engolida em settings e cache
-Status: open
-Stage: to-implement
+Status: resolved
+Stage: done
 Priority: P2
 Blocked by: nenhum
 
 - Primary files:
   - `electron/services/persistence.service.ts` (`updateSetting`, `applySetting`, `saveSettings`)
   - `electron/services/cache.service.ts` (`updateCourseState` e quem mais chama `saveCache`; `saveCache`)
-  - `electron/ipc/register-handlers.ts` (handler `update-app-setting`, `:240-257`)
+  - `electron/ipc/register-handlers.ts` (handlers `update-app-setting` `:240-257`
+    e `select-download-folder` `:155-171`)
+  - `electron/services/background-sync.service.ts` (só as chamadas `:263` e `:306`
+    e a ordem delas)
   - `tests/unit/cache-service.test.ts` e os testes existentes de persistência (só se o contrato mudar o que já é asserido)
   - New: `tests/unit/audit-persistence.test.ts`
 
@@ -34,6 +37,14 @@ próximo boot.
 4. `saveSettings`/`saveCache` não têm mais `try/catch` que só loga, e nenhum
    chamador deles passa a engolir o erro por conta própria (grep no diff pelo
    revisor).
+5. `select-download-folder` devolve `fail('STORAGE', ...)` quando `updateSetting`
+   lança, em vez de rejeitar a `invoke`: o contrato do canal é a união
+   `AppResult`, não uma promise rejeitada.
+6. `CacheService.forgetLastFile` grava antes de mutar, como o `commit` documenta:
+   com a escrita falhando, o id esquecido continua em `getCourseState`.
+7. Uma falha ao gravar `lastBackgroundSync` não descarta o push ao renderer nem
+   as notificações daquele ciclo de sync, e a decisão sobre os dois chamadores
+   em `background-sync.service.ts` está anotada em `## Comments`.
 
 #### Verification
 
@@ -56,3 +67,99 @@ próximo boot.
   tirar o `try`: um chamador em caminho de boot que passa a lançar derruba o
   main. Se houver, decida caso a caso e anote aqui; não reintroduza o `catch`
   silencioso.
+
+- `background-sync.service.ts` tem dois chamadores de escrita dentro do mesmo
+  `try` do ciclo de sync (critério 7). Decisão para cada um:
+  - `:263` `updateSetting('lastBackgroundSync', ...)` — movido para depois do
+    push ao renderer e das notificações. Rodava antes; um `ENOSPC` aqui
+    descartava a entrega inteira do ciclo por causa de um timestamp. Continua
+    dentro do `try`, então ainda pode pular o commit da baseline logo abaixo —
+    aceitável, mesmo efeito do `:306`.
+  - `:306` `cacheService.updateCourseState(...)` (loop de `pendingCommits`) —
+    sem mudança. O `catch` do método já é descrito como load-bearing: uma
+    falha aqui deixa os itens do ciclo sem commit, e o próximo sync os
+    rediffa e renotifica em vez de marcá-los como vistos silenciosamente.
+
+#### Revisão etapa 3 (2026-09-11) — reaberto
+
+Gate verde no commit `485e38d`: `npm run quality` limpo, 52 arquivos,
+638 passed | 4 skipped. Red-green conferido trocando só `electron/` pelo
+merge-base: 4 testes falham (audit-persistence 2, cache-service 1,
+ipc-validation 1) e passam com a mudança. Separação teste/código correta nos
+três commits.
+
+Critérios 1, 2 e 3 ✅. Critério 4 ❌ parcial — os `try/catch` que só logavam
+saíram, mas o grep de chamadores que o próprio ticket pedia não foi feito, e
+três pontos ficaram inconsistentes com o invariante que o `commit` documenta:
+
+- ❌ **`select-download-folder` sem guarda** (`register-handlers.ts:169`).
+  `updateSetting('lastDownloadPath', ...)` agora lança e nada captura: o
+  `handle()` não tem `try`, então a `invoke` rejeita em vez de devolver a união
+  `AppResult` que todo handler do arquivo devolve. Irmão direto do
+  `update-app-setting` que foi corrigido — mesma origem, um call site tratado e
+  outro não. Vira o critério 5.
+- ❌ **`forgetLastFile` muta antes de gravar** (`cache.service.ts:157-166`).
+  `state.files.pop()!` altera o objeto que `this.loaded` referencia e só depois
+  chama `this.commit(this.cache)`. Com a escrita falhando, o id já sumiu da
+  memória — o oposto do que o docstring do `commit` promete. Dev-only, mas é a
+  mesma classe e o mesmo ticket. Vira o critério 6.
+- ❌ **Chamadores do `background-sync` não decididos nem anotados.** O
+  `## Comments` mandava conferir quem mais chama `saveSettings`/`saveCache` e
+  registrar a decisão caso a caso; o commit só mudou a linha `Stage:`. São dois:
+  `updateSetting('lastBackgroundSync', ...)` (`:263`) e `updateCourseState`
+  (`:306`). O `:306` está aceitável — o `catch` do método já é descrito como
+  load-bearing e o efeito é re-diff no próximo ciclo. O `:263` não: ele roda
+  **antes** do push ao renderer e das notificações, então um `ENOSPC` numa
+  escrita de setting agora descarta a UI e as notificações do ciclo inteiro,
+  onde antes só logava. Vira o critério 7.
+
+Nenhum dos três cabe em correção de revisor: todos precisam de teste novo, e o
+`:263` fica fora do limite original. Por isso o ticket volta para
+`to-implement`, com `Primary files` estendido e os critérios 5-7. O trabalho
+continua na branch `data-003` — os critérios 1-3 já estão prontos e testados,
+não refaça.
+
+Fora do escopo, não bloqueia: `tests/unit/sync-selection.test.ts` falha de forma
+intermitente na suíte cheia sob carga (`expect(window.location.hash).not.toBe(
+'#/dashboard')`, `:300`), inclusive com `electron/` no merge-base. Aberto como
+QA-008.
+
+#### Resolution (2026-09-11)
+
+Fechada na segunda revisão, sem mudança de código pelo revisor.
+
+Critérios 5, 6 e 7 ✅; 1-4 reconferidos e mantidos.
+
+- **5** — `register-handlers.ts:169-174` embrulha `updateSetting` e devolve
+  `fail('STORAGE', ...)`. A `invoke` volta a respeitar a união `AppResult`.
+- **6** — `cache.service.ts:160-173` lê o último id sem `pop()` e passa uma
+  cópia com `files.slice(0, -1)` ao `commit`. Nada muta antes da escrita, como
+  o docstring do `commit` promete.
+- **7** — `background-sync.service.ts:301-303`: `updateSetting('lastBackgroundSync')`
+  desceu para depois do push ao renderer e da notificação do SO. As decisões
+  dos dois chamadores estão anotadas no `## Comments` acima. Efeito residual
+  aceito: a escrita fica antes do flush de `pendingCommits`, então um `ENOSPC`
+  aqui ainda pula a baseline — mesmo desfecho do `:306`, re-diff e renotificação
+  no ciclo seguinte, e estritamente melhor que o master, onde descartava
+  também o push e as notificações.
+
+Grep do critério 4 feito nos chamadores de `saveSettings`/`saveCache` (hoje
+`commit`/`applySetting`/`updateSetting`/`updateCourseState`/`forgetLastFile`):
+`register-handlers.ts:170` e `:250` tratam; `background-sync.service.ts:303` e
+`:309` decididos acima; `main.ts:51` vira BUG-012. Nenhum `catch` que só loga
+foi reintroduzido.
+
+Separação teste/código correta: `3a72628` toca só `tests/` e a linha `Stage:`;
+`8c615c1`, `34c6941` e `1c921e1` não tocam teste nenhum.
+
+Red-green: com `electron/` revertido para `f828903` e os testes de hoje, 3 falham
+(cache-service 1, ipc-validation 1, background-sync 1) e passam com a mudança.
+
+Gate em `1b442ea`: `npm run quality` limpo — 0 erros de ESLint (62 warnings
+`no-explicit-any` preexistentes), 52 arquivos, **641 passed | 4 skipped**.
+
+Encaminhado, não bloqueia: `test-simulate-new-file` (`register-handlers.ts:350`)
+e o item de tray `[Dev] Simular Arquivo Novo` (`main.ts:224`) chamam
+`simulateNewFile`, que agora pode lançar pelo `forgetLastFile`. Canal só de dev,
+e devolve `boolean` cru em vez de `AppResult` — fora do contrato do critério 5.
+Aberto como BUG-012.

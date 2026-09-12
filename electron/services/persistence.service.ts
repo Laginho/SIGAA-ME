@@ -97,8 +97,7 @@ export class PersistenceService {
     }
 
     public updateSetting<K extends keyof AppSettings>(key: K, value: AppSettings[K]) {
-        this.settings[key] = value;
-        this.saveSettings();
+        this.commit({ ...this.settings, [key]: value });
     }
 
     /**
@@ -107,12 +106,11 @@ export class PersistenceService {
      * Existe separado de `updateSetting` por uma limitação do TypeScript: ele
      * não correlaciona `key` e `value` quando os dois vêm de uma união
      * discriminada, então `updateSetting(update.key, update.value)` não
-     * compila. `Object.assign` resolve sem precisar de cast — e a fronteira,
-     * que é o que importa, continua estritamente tipada.
+     * compila. A chave computada no spread resolve sem precisar de cast — e a
+     * fronteira, que é o que importa, continua estritamente tipada.
      */
     public applySetting(update: SettingUpdate) {
-        Object.assign(this.settings, { [update.key]: update.value });
-        this.saveSettings();
+        this.commit({ ...this.settings, [update.key]: update.value });
     }
 
     /**
@@ -176,7 +174,7 @@ export class PersistenceService {
 
     /**
      * Volta ao estado do primeiro boot (DATA-002). A memória é resetada ANTES
-     * do disco: se o `unlink` falhar, um `saveSettings()` depois ainda parte
+     * do disco: se o `unlink` falhar, um `commit()` depois ainda parte
      * do default, nunca do que havia antes.
      */
     public reset(): void {
@@ -185,12 +183,14 @@ export class PersistenceService {
         if (fs.existsSync(this.credentialsPath)) fs.unlinkSync(this.credentialsPath);
     }
 
-    private saveSettings() {
-        try {
-            fs.writeFileSync(this.settingsPath, JSON.stringify({ schemaVersion: SETTINGS_SCHEMA_VERSION, ...this.settings }, null, 2));
-        } catch (error) {
-            log.error('Failed to save settings', { error });
-        }
+    /**
+     * Grava e só depois troca a memória (DATA-003). Escrita falhada lança para
+     * o chamador e deixa `settings` como estava: o que o app mostra é o que
+     * está no disco, nunca uma configuração que some no próximo boot.
+     */
+    private commit(next: AppSettings) {
+        fs.writeFileSync(this.settingsPath, JSON.stringify({ schemaVersion: SETTINGS_SCHEMA_VERSION, ...next }, null, 2));
+        this.loaded = next;
     }
 }
 
