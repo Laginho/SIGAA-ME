@@ -1,6 +1,6 @@
 # PORTAL-004 — Live compatibility check, manual e pré-release
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P1
 Blocked by: ARCH-001
 Tracker status at migration: `PARTIAL`
