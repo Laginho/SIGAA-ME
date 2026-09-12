@@ -89,3 +89,10 @@ Já encaminhado no master: `CourseFile.id` e `DownloadToken` existem no pedido;
   quebre no `tsc`.
 - Fora de escopo: extrair o leitor de notícias de
   `playwright-login.service.ts` (1282 linhas). Ticket próprio.
+- Da revisão do `DL-003` (2026-09-11): o descarte do `.part` no ramo
+  `writer.on('error')` não é coberto por nenhum teste da suíte. O teste do
+  `DL-003` apaga a pasta de destino inteira, então o `.part` nunca chega a
+  existir e o `unlink` do `descartarParcial` falha em silêncio — o caso
+  "parcial existe, depois some" continua sem prova. `DL-004` já edita
+  `audit-download-disk.test.ts`; se couber num `it` a mais ali, cubra. Não é
+  critério novo: só não deixe o buraco fechar sem alguém ver.
