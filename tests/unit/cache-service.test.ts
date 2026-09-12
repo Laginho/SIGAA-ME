@@ -103,14 +103,14 @@ describe('CacheService', () => {
         expect(service.getCourseState(ACC, 'anything')).toEqual({ files: [], news: [] });
     });
 
-    it('swallows a write failure instead of letting it propagate out of updateCourseState', () => {
+    it('a write failure propagates out of updateCourseState and leaves the state untouched (DATA-003)', () => {
         const service = new CacheService();
         vi.mocked(fs.writeFileSync).mockImplementationOnce(() => {
             throw new Error('disk full');
         });
 
-        expect(() => service.updateCourseState(ACC, 'c1', ['1'], [])).not.toThrow();
-        expect(loggerMock.cacheScope.error).toHaveBeenCalled();
+        expect(() => service.updateCourseState(ACC, 'c1', ['1'], [])).toThrow('disk full');
+        expect(service.getCourseState(ACC, 'c1')).toEqual({ files: [], news: [] });
     });
 
     describe('forgetLastFile', () => {
