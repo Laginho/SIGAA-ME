@@ -1,6 +1,6 @@
 # QA-008: timer de navegação vaza de um teste para o seguinte
 Status: open
-Stage: implementing
+Stage: to-review
 Priority: P2
 Blocked by: nenhum
 
