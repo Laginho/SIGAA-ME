@@ -250,7 +250,7 @@ describe('Sync: falha de disciplina preserva cache (ARCH-001 READ §1)', () => {
         const app = buildApp();
         renderSyncSelectionPage(app);
         document.getElementById('btnFastSync')?.click();
-        for (let i = 0; i < 10; i++) await flushAll();
+        for (let i = 0; i < 50; i++) await flushAll();
 
         const overlay = app.querySelector('.sync-progress-overlay');
         expect(overlay?.textContent).toContain('Cálculo I');
@@ -294,7 +294,7 @@ describe('Sync: falha de disciplina preserva cache (ARCH-001 READ §1)', () => {
         const app = buildApp();
         renderSyncSelectionPage(app);
         document.getElementById('btnFastSync')?.click();
-        for (let i = 0; i < 10; i++) await flushAll();
+        for (let i = 0; i < 50; i++) await flushAll();
 
         expect(document.getElementById('dashboardBtn')).not.toBeNull();
         expect(window.location.hash).not.toBe('#/dashboard');
