@@ -393,6 +393,13 @@ describe('registerIpcHandlers: remetente, validação e cópia limpa', () => {
         expect(deps.backgroundSync.restart).not.toHaveBeenCalled();
     });
 
+    it('select-download-folder devolve STORAGE quando a escrita falha, em vez de rejeitar a invoke (DATA-003)', async () => {
+        electronMock.dialog.showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: ['C:\\Downloads'] });
+        deps.persistence.updateSetting.mockImplementation(() => { throw new Error('ENOSPC: no space left'); });
+        const result = await invoke('select-download-folder');
+        expect(result).toMatchObject({ success: false, error: { code: 'STORAGE' } });
+    });
+
     it('download-file sem pasta definida devolve INVALID_REQUEST, comportamento de hoje', async () => {
         deps.persistence.getSettings.mockReturnValue({ lastDownloadPath: null });
         const result = await invoke('download-file', {
