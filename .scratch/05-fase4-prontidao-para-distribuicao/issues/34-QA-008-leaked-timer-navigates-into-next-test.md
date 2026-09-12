@@ -1,6 +1,6 @@
 # QA-008: timer de navegação vaza de um teste para o seguinte
-Status: open
-Stage: to-implement
+Status: resolved
+Stage: done
 Priority: P2
 Blocked by: nenhum
 
@@ -12,7 +12,73 @@ Blocked by: nenhum
 Aberto duas vezes em paralelo no mesmo dia, pela revisão do `DL-003` e pela do
 `DATA-003` — dois arquivos com o mesmo ID (`32-QA-008-flaky-sync-selection-hash`
 e `33-QA-008-flaky-sync-selection-navigation-assert`). Consolidados aqui; os
-dois foram apagados. A duplicata é achado próprio, ver `## Comments`.
+dois foram apagados. A duplicata é achado próprio, ver `#### Resolution (2026-09-11)
+
+Aprovada na revisão sem mudança de código. Os dois commits da etapa 2 ficaram
+separados como o loop exige: `31bd5b2` é o vermelho (sobe o laço para 50 com o
+`flushAll` real), `44e6136` é o verde (troca a espera por microtasks). Nenhum
+arquivo fora dos Primary files foi tocado; `src/pages/sync-selection.ts` ficou
+intacto, como o ticket mandou.
+
+Decisão: o describe `:235` passou a esperar só microtasks
+(`flushMicrotasks = () => Promise.resolve()`). Microtask nunca cede à fase de
+timers do event loop, então o `setTimeout` órfão de 600ms não tem janela para
+disparar dentro desses dois testes, por mais carregada que esteja a máquina. O
+timer continua vazando do teste de sucesso (`:91`) — o defeito de produto segue
+fora de escopo, agora em `BUG-013`.
+
+Critérios:
+
+1. OK, e já estava: `beforeEach:45` zera `window.location.hash`. O que este
+   diff entrega é a segunda alternativa do critério — a asserção deixou de
+   depender do que o teste anterior deixou pendente.
+2. OK para os dois testes nomeados, **com ressalva**: o timer órfão continua
+   existindo, o que mudou é que estes testes não têm mais como observá-lo. E a
+   espera continua sendo uma contagem (50 voltas), só que de microtask, não de
+   relógio. Trocar por `vi.waitFor` seria pior: ele faz polling com
+   `setTimeout` e reabriria exatamente a corrida.
+3. OK — `npx vitest run` cinco vezes seguidas na suíte cheia, 55 arquivos,
+   645 passed | 4 skipped nas cinco.
+4. **Não cumprido ao pé da letra**, aceito com ressalva. O critério pedia o
+   arquivo verde com o laço de `flushAll` em 50; o verde veio de substituir o
+   `flushAll` por `flushMicrotasks`, então esse cenário deixou de existir. O
+   que o critério queria provar — que a barreira não é mais de tempo — está
+   provado por construção: microtask não cede à fase de timers. O vermelho
+   do cenário original fica registrado em `31bd5b2` e foi re-rodado nesta
+   revisão.
+
+Prova red-green (re-rodada na revisão, não só herdada da etapa 2):
+
+    # conteúdo de 31bd5b2 (flushAll real, laço em 50)
+    npx vitest run tests/unit/sync-selection.test.ts
+    #  FAIL  does not overwrite cached files when getCourseFiles fails for a course
+    #  AssertionError: expected '#/dashboard' not to be '#/dashboard'  (:270)
+    #  Tests  1 failed | 12 passed (13)
+
+    # com HEAD
+    npm run quality
+    #  tsc limpo; eslint 0 errors, 57 warnings (no-explicit-any pré-existentes)
+    #  Test Files 55 passed (55) | Tests 645 passed | 4 skipped (649)
+
+Dois achados, nenhum bloqueante:
+
+- O comentário novo (`:236-242`) usa parêntese explicativo, que o `CLAUDE.md`
+  proíbe em prosa. A regra de comentário em código ("só quando o porquê não
+  está óbvio") está cumprida e o conteúdo é correto. Não mexi: reescrever o
+  comentário viraria commit de código e, pelo loop, PR — caro demais para isto.
+- O laço de 50 microtasks está duplicado nos dois testes. É a forma que já
+  existia com `flushAll`; não é duplicação nova.
+
+Item das Comments verificado e fechado aqui: `account-isolation.test.ts` não
+existe, e dos arquivos que citam `location.hash`
+(`dashboard-session-actions`, `login-selector-failure`,
+`renderer-content-security`, `sync-selection`) só o `renderer-content-security`
+também tem laço de `flushAll` — e ali `location.hash` aparece apenas dentro de
+um comentário, e o arquivo não renderiza a tela de sync, então não agenda o
+timer. `jsdom` é por arquivo: não há vazamento entre arquivos. Sem exposição
+irmã, sem ticket de acompanhamento para esse item.
+
+## Comments`.
 
 #### What to build
 
