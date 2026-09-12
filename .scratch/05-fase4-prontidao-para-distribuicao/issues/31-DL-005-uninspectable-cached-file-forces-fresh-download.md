@@ -1,6 +1,6 @@
 # DL-005: Arquivo em cache que não dá para inspecionar é tratado como válido
-Status: open
-Stage: to-review
+Status: resolved
+Stage: done
 Priority: P2
 Blocked by: nenhum
 
@@ -101,3 +101,39 @@ Achados fora do escopo deste ticket, encaminhados como comentário:
   completa e passou sozinho e na repetição.
 
 ## Comments
+
+#### Resolution (2026-09-11)
+
+Aprovada sem mudança de código. Critério 1 já estava fechado na primeira
+revisão; esta passada só cobra o que reabriu o ticket.
+
+Critério 2 ✅. A metade que faltava tem teste agora: `an existing file with an
+invalid signature is deleted instead of reused`, em
+`tests/unit/audit-download-inspect.test.ts`. A outra metade continua coberta por
+`tests/integration/download-boundary.test.ts:200`.
+
+Vermelho-verde refeito na revisão, por mutação de `download.service.ts:77-81`,
+uma por vez, com o teste restaurado depois de cada uma:
+
+- `return false` → `return true` no branch `!check.ok`: falha em
+  `expect(result.success).toBe(false)` (linha 51), recebido `true`.
+- `fs.unlinkSync(p)` removido, `return false` mantido: falha em
+  `expect(existsSync(fullPath)).toBe(false)` (linha 53), recebido `true`.
+
+Cada metade do critério tem um assert que a segura sozinha — não é um teste que
+passa por sorte com o outro.
+
+Separação do `diff --stat` correta nas quatro commits: `e42d4f2` e `3be2250` só
+tocam teste + ticket, `1ca9b12` só fonte + ticket, `10b1ead` só tracker. Nada
+fora dos Primary files.
+
+Gate rodado na revisão. O `npm run quality` não sobe neste checkout —
+`node_modules/.bin` não existe, então os shims `tsc`/`eslint`/`vitest` não
+resolvem; as três ferramentas foram chamadas direto pelo entry point delas, o
+mesmo que o script faz. `tsc --noEmit` sai 0; `eslint .` sai 0 com 62 warnings
+`no-explicit-any` legados, 0 erros; `vitest run` dá 52 arquivos, 637 passed,
+4 skipped. Reinstalar (`npm ci` no Windows) devolve o `.bin` — é ambiente, não
+código.
+
+Arquivos: `electron/services/download.service.ts` (+4 −1),
+`tests/unit/audit-download-inspect.test.ts` (novo, 54 linhas).
