@@ -1,6 +1,6 @@
 # DL-003: `reject` no erro de escrita derruba o lote inteiro
 Status: open
-Stage: to-implement
+Stage: implementing
 Priority: P1
 Blocked by: nenhum
 
