@@ -926,7 +926,7 @@ export class HttpScraperService {
 
             response.data.pipe(writer);
 
-            return new Promise((resolve, reject) => {
+            return new Promise((resolve) => {
                 writer.on('finish', async () => {
                     if (tooLarge) return; // resolvido pelo handler de erro do stream
                     try {
@@ -956,7 +956,7 @@ export class HttpScraperService {
                 writer.on('error', async (err) => {
                     log.error('File write error.', { error: err });
                     await descartarParcial('erro de escrita');
-                    reject({ success: false, error: err.message });
+                    resolve({ success: false, error: err.message });
                 });
                 // Erro NA ORIGEM (conexão caiu, ou o teto de tamanho abortou o
                 // stream). Sem isto o `writer` nunca emite `finish` nem `error`, e
