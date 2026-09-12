@@ -452,7 +452,9 @@ fases anteriores.
 - `OBS-002` — `[op:<id>]` via `AsyncLocalStorage` (depois de `OBS-004`;
   cortável)
 - `A11Y-001` — acessibilidade (`lang="pt-BR"`, semântica, foco)
-- `PORTAL-001..005` — adaptador de compatibilidade e canário
+- `PORTAL-001..006` — adaptador de compatibilidade e canário (2026-09-12:
+  `PORTAL-004` virou check live manual, sem canário na nuvem; `PORTAL-005`
+  fatiado em main e renderer, o renderer é `PORTAL-006`)
 - `REL-001` — assinatura de código (**custa dinheiro** — certificado de code
   signing para Windows)
 - Auditoria `docs/audits/2026-09-09-40a0d01.md`, cortada em 2026-09-11:
