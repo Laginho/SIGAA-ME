@@ -101,16 +101,13 @@ export class CacheService {
         return { schemaVersion: 2, accounts: {} };
     }
 
-    private saveCache() {
-        try {
-            fs.writeFileSync(this.cachePath, JSON.stringify(this.cache, null, 2));
-        } catch (error) {
-            log.error('Failed to save cache', { error });
-        }
-    }
-
-    private bucket(accountId: AccountId): AccountBucket {
-        return this.cache.accounts[accountId] ??= { courses: {}, updatedAt: 0 };
+    /**
+     * Grava e só depois troca a memória (DATA-003). Escrita falhada lança e
+     * deixa o cache como estava, em vez de fingir uma baseline salva.
+     */
+    private commit(next: CacheFileV2) {
+        fs.writeFileSync(this.cachePath, JSON.stringify(next, null, 2));
+        this.loaded = next;
     }
 
     public getCourseState(accountId: AccountId, courseId: CourseId): CourseState {
@@ -118,10 +115,14 @@ export class CacheService {
     }
 
     public updateCourseState(accountId: AccountId, courseId: CourseId, files: string[], news: string[]) {
-        const bucket = this.bucket(accountId);
-        bucket.courses[courseId] = { files, news };
-        bucket.updatedAt = Date.now();
-        this.saveCache();
+        const bucket: AccountBucket = this.cache.accounts[accountId] ?? { courses: {}, updatedAt: 0 };
+        this.commit({
+            ...this.cache,
+            accounts: {
+                ...this.cache.accounts,
+                [accountId]: { courses: { ...bucket.courses, [courseId]: { files, news } }, updatedAt: Date.now() },
+            },
+        });
     }
 
     /**
@@ -160,7 +161,7 @@ export class CacheService {
         for (const [courseId, state] of Object.entries(bucket.courses)) {
             if (state.files.length > 0) {
                 const fileId = state.files.pop()!;
-                this.saveCache();
+                this.commit(this.cache);
                 return { courseId, fileId };
             }
         }
