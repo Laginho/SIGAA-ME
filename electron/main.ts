@@ -10,8 +10,10 @@ import { BackgroundSyncService } from './services/background-sync.service'
 import { cacheService } from './services/cache.service'
 import { logger } from './services/logger.service'
 import { getActiveAccount } from './services/account-context.service'
+import { diagnosticsService } from './services/diagnostics.service'
 import { registerIpcHandlers } from './ipc/register-handlers'
 import { installNavigationGuard } from './security/navigation-policy'
+import { errorMessage } from '../shared/errors'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -28,6 +30,48 @@ const log = logger.scope('main');
 const updaterLog = logger.scope('Updater');
 
 log.info('=== SIGAA-ME App Started ===');
+
+/**
+ * Legado deixado por versões antigas: `sigaa-me.log`/`scraper.log` (loggers
+ * substituídos em OBS-001/OBS-004), `debug_*.html|json` na raiz do `userData`
+ * (dumps que OBS-003 move para `diagnostics/`) e `logs/app_*.log` (rotação
+ * antiga). Idempotente e nunca lança: quem já rodou uma vez, ou quem nunca
+ * teve nada disso, não sente diferença. Não bloqueia o boot além do
+ * `readdir` — cada exclusão é disparada, não aguardada em série pelo chamador.
+ */
+export async function removeLegacyLogs(userDataPath: string): Promise<void> {
+  const targets = [
+    path.join(userDataPath, 'sigaa-me.log'),
+    path.join(userDataPath, 'scraper.log'),
+  ];
+
+  try {
+    for (const entry of fs.readdirSync(userDataPath)) {
+      if (/^debug_.*\.(html|json)$/.test(entry)) targets.push(path.join(userDataPath, entry));
+    }
+  } catch {
+    // userData ainda não existe (primeiro boot): nada a limpar.
+  }
+
+  const logsDir = path.join(userDataPath, 'logs');
+  try {
+    for (const entry of fs.readdirSync(logsDir)) {
+      if (/^app_.*\.log$/.test(entry)) targets.push(path.join(logsDir, entry));
+    }
+  } catch {
+    // logs/ ainda não existe (LoggerService só a cria no primeiro write).
+  }
+
+  for (const file of targets) {
+    try {
+      await fs.promises.unlink(file);
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === 'ENOENT') continue; // já apagado numa chamada anterior
+      log.error('Falha ao apagar log legado', { file, error: errorMessage(error) });
+    }
+  }
+}
 
 process.env.APP_ROOT = path.join(__dirname, '..')
 
@@ -64,6 +108,7 @@ registerIpcHandlers({
   backgroundSync: backgroundSyncService,
   cache: cacheService,
   logger,
+  diagnostics: diagnosticsService,
   userDataPath: app.getPath('userData'),
   clearBrowserStorage: () => session.defaultSession.clearStorageData(),
   getWindow: () => win,
@@ -177,6 +222,8 @@ app.on('activate', () => {
 })
 
 app.whenReady().then(() => {
+  void removeLegacyLogs(app.getPath('userData'));
+
   try {
     // Chrome ausente não é erro: é o caso que estamos detectando. Por isso os
     // catch abaixo não engolem falha — a ausência É a informação, e ela vira o

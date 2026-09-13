@@ -10,7 +10,6 @@
 
 import { app, dialog, ipcMain, type BrowserWindow } from 'electron';
 import fs from 'node:fs';
-import path from 'node:path';
 import { isInsideRoot } from '../services/download-path';
 import type { SigaaService } from '../services/sigaa.service';
 import type { PersistenceService } from '../services/persistence.service';
@@ -18,6 +17,7 @@ import type { BackgroundSyncService } from '../services/background-sync.service'
 import type { CacheService } from '../services/cache.service';
 import type { LoggerService } from '../services/logger.service';
 import { logger } from '../services/logger.service';
+import type { DiagnosticsService } from '../services/diagnostics.service';
 import type { DownloadProgress } from '../../shared/ipc';
 import type { DownloadStatus } from '../../shared/domain';
 import { errorMessage, fail, ok } from '../../shared/errors';
@@ -57,7 +57,7 @@ export interface IpcDeps {
   backgroundSync: Pick<BackgroundSyncService, 'restart' | 'stop' | 'start' | 'cancel'>;
   cache: Pick<CacheService, 'clear'>;
   logger: Pick<LoggerService, 'clear'>;
-  /** `app.getPath('userData')`: onde os `debug_*` a apagar vivem. */
+  diagnostics: Pick<DiagnosticsService, 'clear'>;
   userDataPath: string;
   clearBrowserStorage: () => Promise<void>;
   getWindow: () => BrowserWindow | null;
@@ -315,11 +315,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
     // 2. Só agora, os passos destrutivos.
     await attempt(() => deps.cache.clear(), failures, 'Limpar cache');
     await attempt(() => deps.persistence.reset(), failures, 'Limpar configurações');
-    await attempt(() => {
-      for (const entry of fs.readdirSync(deps.userDataPath)) {
-        if (entry.startsWith('debug_')) fs.unlinkSync(path.join(deps.userDataPath, entry));
-      }
-    }, failures, 'Apagar diagnósticos salvos');
+    await attempt(() => deps.diagnostics.clear(), failures, 'Apagar diagnósticos salvos');
     await attempt(() => deps.clearBrowserStorage(), failures, 'Limpar armazenamento do navegador');
 
     if (openAtLoginBefore) {
