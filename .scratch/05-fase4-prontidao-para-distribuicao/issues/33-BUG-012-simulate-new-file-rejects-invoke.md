@@ -1,6 +1,6 @@
 # BUG-012: `simulateNewFile` rejeita a invoke quando a escrita do cache falha
 Status: open
-Stage: to-implement
+Stage: implementing
 Priority: P4
 Blocked by: nenhum
 
