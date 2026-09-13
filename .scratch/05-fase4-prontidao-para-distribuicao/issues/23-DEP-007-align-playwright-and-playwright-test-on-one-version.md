@@ -1,6 +1,6 @@
 # DEP-007: Alinhar playwright e @playwright/test numa só versão
-Status: open
-Stage: to-merge
+Status: resolved
+Stage: done
 Priority: P1
 Blocked by: nenhum
 
@@ -50,13 +50,17 @@ npx playwright test app.spec.ts
 - `npx playwright test visual.spec.ts`: 11 passed — critério 3 ok.
 - `npx playwright test app.spec.ts`: 2 passed, 3 skipped (os 3 com credencial,
   esperado sem `.env` de conta real) — critério 3 ok.
-- Live smoke: **pendente.** Critério 4 pede rodada manual do autor no Windows
-  com `RUN_LIVE_SIGAA_TESTS=true` — não roda em agente/loop (ver CLAUDE.md,
-  tiers de teste). Cole o resultado aqui antes de fechar o ticket.
+- Live smoke: rodado pelo autor no Windows em 2026-09-13 (`npm run test:live`,
+  `.env` real): `tests/integration/scraper.test.ts` 6 passed em 27,6s — login,
+  enumeração de disciplinas, arquivos e notícias da primeira disciplina,
+  logout. Ruído sem efeito: o logger falha ao gravar em
+  `D:/tmp/sigaa-me-test/logs/app.log` (ENOENT) e desliga o sink — critério 4 ok.
 
 #### Review (2026-09-13, etapa 3)
 
-Verdito: **Needs your call** — critério 4 só o autor fecha.
+Verdito: **Needs your call** — critério 4 só o autor fecha. Fechado em
+2026-09-13 com o live smoke verde (ver Implementation notes). Merge por PR #19
+(`ab92ae9`).
 
 - Critério 1 ✅ `npm ls`: `@playwright/test@1.63.0` e `playwright@1.63.0`
   (deduped), uma versão de cada.
