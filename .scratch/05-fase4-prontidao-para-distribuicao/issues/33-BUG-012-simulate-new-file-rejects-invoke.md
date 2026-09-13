@@ -1,6 +1,6 @@
 # BUG-012: `simulateNewFile` rejeita a invoke quando a escrita do cache falha
-Status: open
-Stage: to-review
+Status: resolved
+Stage: done
 Priority: P4
 Blocked by: nenhum
 
@@ -93,3 +93,51 @@ atual. Cobre o critério 2, que ficava sem teste algum.
 
 Nenhum arquivo em `electron/` mudou — só o teste, commit `5d9d609` em cima da
 `bug-012`.
+
+#### Resolution (2026-09-13)
+
+Aprovado sem mudança de código na segunda revisão. PR #21, merge `6885dc5`.
+
+Decisão: dois `catch`, um por camada, cada um logando o motivo e devolvendo
+`false`. `electron/main.ts:103-109` em volta do `forgetLastFile` (o caminho do
+tray, que não passa pelo IPC) e `electron/ipc/register-handlers.ts:360-366` no
+handler (a segunda linha de defesa, para qualquer falha futura de
+`deps.simulateNewFile`).
+
+Arquivos: `electron/main.ts`, `electron/ipc/register-handlers.ts`,
+`tests/unit/ipc-validation.test.ts`,
+`tests/integration/dev-cache-mutation-boundary.test.ts`. Nada fora dos Primary
+files.
+
+**Red-green, hunk a hunk** — é o que faltava na primeira passada, quando
+reverter só o `main.ts` deixava a suíte verde:
+
+| Revertido para `ab64846` | Resultado |
+|---|---|
+| só `electron/main.ts` | vermelho — `tray click leaves no unhandled rejection…`, `unhandledRejection` chamado 1 vez com `Error: disk full` |
+| só `electron/ipc/register-handlers.ts` | vermelho — `test-simulate-new-file devolve false…`, `Error: cache.json: disk full` |
+| nada (HEAD) | verde, 52 testes nos dois arquivos |
+
+O teste do tray é o único seam que derruba o `catch` do `main.ts` sozinho:
+acha o item `[Dev] Simular Arquivo Novo` no template capturado e chama
+`.click()` direto, sem IPC no caminho.
+
+- Critério 1 ✅ — com ressalva: o retorno `false` está preso nas duas camadas,
+  mas a metade "o motivo vai para o log" não tem asserção. Apagar as duas
+  linhas de `log.error` não derruba teste nenhum. Aceito em vez de reaberto:
+  é linha de diagnóstico em canal só de dev num P4, e o comportamento que o
+  ticket existe para garantir está preso duas vezes. Registrado aqui para não
+  virar cobertura imaginária.
+- Critério 2 ✅ — o clique no tray não deixa rejection sem tratamento.
+
+Separação de commit correta pelo `diff --stat`: `ab64846` e `5d9d609` só tocam
+teste, `dfdf4d8` não toca teste.
+
+Verificado também que o `let forgotten` sem anotação (`main.ts:103`) não vira
+`any`: o evolving-let resolve para `{ courseId: string; fileId: string } | null`
+no ponto de uso, e um `forgotten.fileIdTypoProbe` plantado de propósito dá
+`TS2339`.
+
+Gate: `npm run quality` verde — 688 passed, 5 skipped, 60 arquivos, 0 erro de
+lint (55 warnings `no-explicit-any` pré-existentes). CI do PR verde nos três
+jobs (typecheck/lint/testes, E2E sem credencial, scanner de segredo).
