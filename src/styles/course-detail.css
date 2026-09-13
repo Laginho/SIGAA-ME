@@ -474,6 +474,7 @@ dialog.modal-content::backdrop {
 
 [data-theme="dark"] .modal-content { background: var(--color-surface); }
 [data-theme="dark"] .modal-title { color: var(--color-primary); }
+[data-theme="dark"] .modal-meta { color: var(--color-text-muted); }
 [data-theme="dark"] .modal-body { color: var(--color-text-main); }
 [data-theme="dark"] .modal-close { color: var(--color-text-muted); }
 [data-theme="dark"] .modal-close:hover { color: var(--color-text-main); }
