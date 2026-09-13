@@ -242,6 +242,19 @@ a cada revisão:
 ## Comments
 
 - 2026-09-11, corte da auditoria `40a0d01`: `tests/unit/audit-diagnostics.test.ts` de `19ba8aa` (branch `codex/fix-audit-2026-09-09`, nunca mergeada) cobre o teto de retenção compartilhado (24 crus + 24 estruturais deixam 20), containment de nome hostil, no-op em `isPackaged` e falha de captura que não derruba o chamador. Serve de ponto de partida para os critérios 1 a 3 e 7. Diferenças de contrato: lá o método é `captureRaw(name, () => string, ext)` assíncrono e `clear()` síncrono; aqui é `saveRaw(name, content)` e `clear(): Promise<void>` (decisão 7). Adaptar, não colher literalmente. Estado no master confirmado hoje: `DiagnosticsService` só expõe `record()`, e cada dump cru continua `fs.writeFileSync` ad-hoc atrás do próprio `!app.isPackaged` (`playwright-login.service.ts:159,338,411,556,1089,1224`; `http-scraper.service.ts:202,249,319,726`), nome fixo, sem teto.
+- 2026-09-12, herdado do `OBS-005` via `OBS-002`, que fechou sem tocar nessas
+  linhas: `playwright-login.service.ts` ainda tem ~12 chamadas que interpolam
+  valor no texto da mensagem em vez de passar em `meta` — `currentUrl`,
+  `page.url()`, `newsId`, `courses.length`. Nenhum é dos cinco valores não
+  confiáveis que o `OBS-005` nomeia, e todos passam o grep do critério 3
+  daquele ticket, então ficaram. Este ticket tem o arquivo nos Primary files;
+  se mexer nessas linhas, é a hora barata de mover o valor para `meta` junto
+  (`url` já está em `CONTENT_KEYS`, `newsId` não precisa estar). Nota, não
+  requisito: só vira critério se a etapa 1 dobrar para o corpo.
+- 2026-09-12, ao fechar: a nota acima **não** foi recolhida. A etapa 1 nunca a
+  dobrou para o corpo, então nunca foi requisito deste ticket, e as rodadas que
+  tocaram `playwright-login.service.ts` foram antes dela chegar aqui. Fica sem
+  dono agora que `OBS-003` fechou — se ainda interessar, vira `CLEAN-*` próprio.
 
 ## Nota da etapa 2 (2026-09-12)
 
