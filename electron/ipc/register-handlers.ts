@@ -358,7 +358,12 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 
   if (!deps.isPackaged) {
     handle('test-simulate-new-file', noPayload, async () => {
-      return await deps.simulateNewFile();
+      try {
+        return await deps.simulateNewFile();
+      } catch (error) {
+        log.error('[Dev] simulateNewFile falhou', { error: errorMessage(error) });
+        return false;
+      }
     }, () => false);
   }
 }
