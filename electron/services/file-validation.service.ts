@@ -254,7 +254,16 @@ export async function finalizeDownload(input: {
                 }
             }
         }
-        await fs.promises.rename(partPath, filePath);
+        // O `open('wx')` acima já deixou o placeholder de 0 byte em `filePath`.
+        // Se o `rename` falhar (lock de antivírus/indexador/sync), esse
+        // placeholder ficaria para sempre com o nome certo — arquivo vira dois
+        // e o dedup do lote (existsSync) passaria a marcá-lo como já baixado.
+        try {
+            await fs.promises.rename(partPath, filePath);
+        } catch (err) {
+            await fs.promises.unlink(filePath).catch(() => { });
+            throw err;
+        }
         return { ok: true, filePath };
     } catch (err) {
         await cleanup();
