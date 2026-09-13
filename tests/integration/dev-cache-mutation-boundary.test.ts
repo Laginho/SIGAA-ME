@@ -175,3 +175,51 @@ describe('DEV-001: packaging controls the cache mutation bridge', () => {
         },
     );
 });
+
+describe('BUG-012: simulateNewFile survives a cache write failure', () => {
+    it('resolves false and does not sync when forgetLastFile fails to persist', async () => {
+        process.env.NODE_ENV = 'test';
+        const devArgs = await bootMain(false);
+        const { cacheService } = await import('../../electron/services/cache.service');
+        const { setActiveAccount } = await import('../../electron/services/account-context.service');
+        const account = 'a'.repeat(64);
+        setActiveAccount(account);
+        cacheService.updateCourseState(account, '101', ['1'], []);
+
+        await loadPreload(devArgs);
+        const testApi = harness.exposed.get('testApi');
+        const simulate = testApi?.simulateNewFile as (() => Promise<boolean>) | undefined;
+        expect(typeof simulate).toBe('function');
+
+        harness.fs.writeFileSync.mockImplementationOnce(() => {
+            throw new Error('disk full');
+        });
+        await expect(simulate!()).resolves.toBe(false);
+        expect(harness.syncNow).not.toHaveBeenCalled();
+    });
+
+    it('tray click leaves no unhandled rejection when forgetLastFile fails to persist', async () => {
+        process.env.NODE_ENV = 'test';
+        await bootMain(false);
+        const { cacheService } = await import('../../electron/services/cache.service');
+        const { setActiveAccount } = await import('../../electron/services/account-context.service');
+        const account = 'a'.repeat(64);
+        setActiveAccount(account);
+        cacheService.updateCourseState(account, '101', ['1'], []);
+
+        const trayItem = harness.buildFromTemplate.mock.calls[0][0]
+            .find((item) => item.label === '[Dev] Simular Arquivo Novo');
+        expect(typeof trayItem?.click).toBe('function');
+
+        harness.fs.writeFileSync.mockImplementationOnce(() => {
+            throw new Error('disk full');
+        });
+
+        const unhandled = vi.fn();
+        process.once('unhandledRejection', unhandled);
+        (trayItem!.click as () => void)();
+        await new Promise((resolve) => setImmediate(resolve));
+        process.off('unhandledRejection', unhandled);
+        expect(unhandled).not.toHaveBeenCalled();
+    });
+});
