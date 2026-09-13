@@ -274,7 +274,7 @@ async function fetchCourseFiles(courseId: string) {
 
       filesListElement.replaceChildren()
       for (const file of course.files) {
-        const isDownloaded = !!courseDownloads[file.name];
+        const isDownloaded = !!courseDownloads[file.id];
         const unread = !isItemRead('file', courseId, file.name);
 
         const row = h('div', {
@@ -335,9 +335,9 @@ async function fetchCourseFiles(courseId: string) {
       // Listen for progress events from "Download All"
       if ((window as any).cleanupProgress) (window as any).cleanupProgress();
 
-      (window as any).cleanupProgress = window.api.onDownloadProgress((data: { fileName: string, status: string }) => {
+      (window as any).cleanupProgress = window.api.onDownloadProgress((data: { fileId: string, fileName: string, status: string }) => {
         const buttons = Array.from(document.querySelectorAll('.btn-download-file'));
-        const targetBtn = buttons.find(b => b.getAttribute('data-file-name') === data.fileName) as HTMLElement;
+        const targetBtn = buttons.find(b => b.getAttribute('data-file-id') === data.fileId) as HTMLElement;
 
         if (targetBtn) {
           if (data.status === 'downloaded' || data.status === 'skipped') {
@@ -385,7 +385,7 @@ async function downloadSingleFile(course: CourseSnapshot, fileId: string, fileNa
 
     if (result.success) {
       if (!downloadedFiles[course.id]) downloadedFiles[course.id] = {};
-      downloadedFiles[course.id][fileName] = {
+      downloadedFiles[course.id][fileId] = {
         downloadedAt: Date.now(),
         path: result.data.filePath
       };
@@ -468,7 +468,7 @@ async function testDownloadAll(courseId: string) {
       results.forEach((r) => {
         if (r.status === 'downloaded') {
           if (!downloadedFiles[courseId]) downloadedFiles[courseId] = {};
-          downloadedFiles[courseId][r.fileName] = {
+          downloadedFiles[courseId][r.fileId] = {
             downloadedAt: Date.now(),
             path: r.filePath
           };
