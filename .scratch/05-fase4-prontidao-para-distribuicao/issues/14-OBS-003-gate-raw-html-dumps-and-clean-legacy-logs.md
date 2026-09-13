@@ -1,6 +1,6 @@
 # OBS-003 — Gate raw HTML dumps, wire diagnostics clear, clean legacy logs
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P2
 Blocked by: OBS-005
 
@@ -336,3 +336,25 @@ Escopo da rodada: só o achado acima. Nada mais do ticket muda.
    Commit de teste separado do commit de código, como nos outros critérios.
 
 - 2026-09-12 Reaberto pelo humano com o critério 8; branch preservada.
+
+## Nota da etapa 2 — critério 8 (2026-09-12)
+
+Escopo desta rodada: só o critério 8. Dois commits na branch `obs-003`:
+teste vermelho (`4e69bb3`), depois o código (`a80d289`).
+
+`void removeLegacyLogs(app.getPath('userData'))` saiu do escopo do módulo
+e entrou como primeira linha do callback de `app.whenReady().then(...)`,
+antes do `try` de detecção do Chrome e de `createWindow()`.
+
+Prova vermelho-verde antes deste relatório: `git stash push -- electron/main.ts`
+(isola só o código, o teste fica) → `npx vitest run
+tests/unit/legacy-log-cleanup.test.ts` → 1 failed | 3 passed pelo motivo
+certo (`expected false to be true` — o arquivo semeado sobrevive ao
+import porque `removeLegacyLogs` não roda mais nele; a asserção que
+prova isso falha antes do código voltar) → `git stash pop` → mesma suíte
+verde, 4 passed.
+
+`npm run quality`: 0 erros, 55 warnings (`no-explicit-any`, todos
+legados, nenhum novo). `npx vitest run` completo: 657 passed | 4 skipped
+(661) — um a mais que o baseline da revisão anterior (656), o teste novo
+deste critério.
