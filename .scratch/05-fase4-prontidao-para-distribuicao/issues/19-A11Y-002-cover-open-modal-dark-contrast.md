@@ -1,6 +1,6 @@
 # A11Y-002: Cobrir o modal aberto e corrigir o contraste dos metadados
-Status: open
-Stage: to-review
+Status: resolved
+Stage: done
 Priority: P2
 Blocked by: A11Y-001
 
@@ -137,3 +137,40 @@ CSS fonte. Rebuild resolveu; vale lembrar em qualquer sessão futura que rode
 
 `test:e2e -- accessibility`: 17 passed. `npm run quality`: 0 erro de lint,
 685 passed / 5 skipped.
+
+#### Resolution (2026-09-12)
+
+**Decisão:** Approve, sem mudança de código na revisão. Os cinco critérios
+ficaram provados; nenhum achado grande, nenhum reopen.
+
+**Arquivos.** `src/styles/course-detail.css` (`.news-notification` no tema
+claro, `[data-theme="dark"] .modal-meta`) e
+`tests/e2e/accessibility.spec.ts`. Nada fora dos Primary files. O
+`diff --stat` confere a separação: `17663af` só toca `tests/`, `e31fa3b` só
+toca `src/`.
+
+**Vermelho-verde, reproduzido na revisão** (Windows, não por relato).
+Revertendo só a linha da cor (`#145c33` → `#28a745`): **1 failed, 16 passed**
+— falha `course-detail (tema light)` com `color-contrast` no alvo
+`.news-notification`, tags `wcag2aa`/`wcag143`, e os **dois** testes de modal
+aberto passam no mesmo run. É a prova direta de que o critério 4 é carga: o
+estado aberto não substituía o fechado, escondia. Cor restaurada, 17 passed.
+
+**Contraste conferido no cálculo WCAG, não só no axe:** `#145c33` sobre
+`#e6f9e9` = 7,32:1 (era 2,84:1).
+
+**Gate.** `npm run quality`: 0 erro, 55 warnings pré-existentes de
+`no-explicit-any`, 685 passed / 5 skipped.
+`npm run test:e2e -- accessibility`: 17 passed. CI do PR #17 verde nos três
+jobs (typecheck/lint/testes, E2E sem credencial, scanner de segredo).
+
+**Duas notas, nenhuma bloqueante.**
+
+- A nota da etapa 2 sobre `dist/` velho: o script `test:e2e` já é
+  `tsc && vite build && playwright test`. A armadilha é rodar
+  `npx playwright test` direto, não o comando documentado.
+- `.news-item--unread` e `.item-unread-dot` não são escaneados em tema
+  nenhum — os testes do describe `Modal de notícia` clicam no item antes do
+  bloco de scan e `clearUnread` → `markAsRead` persiste. Anterior a esta
+  branch e sem perda real: as duas variantes são `border-left` e uma
+  bolinha, sem texto, e `color-contrast` do axe só se aplica a texto.
