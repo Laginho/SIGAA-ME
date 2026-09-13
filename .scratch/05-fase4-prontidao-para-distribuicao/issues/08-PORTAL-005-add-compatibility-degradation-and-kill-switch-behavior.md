@@ -1,6 +1,6 @@
 # PORTAL-005 — Kill-switch de compatibilidade: estado no main, sync pausado
 Status: open
-Stage: to-review
+Stage: to-implement
 Priority: P1
 Blocked by: OBS-003
 Tracker status at migration: `NOT STARTED`
@@ -142,11 +142,14 @@ compatibility: Pick<PortalCompatibilityService, 'status' | 'recordSuccess' | 'cl
    `incompatible`: `syncNow()` resolve sem chamar `sigaaService.getCourses`,
    `login` nem `downloadAllFiles`. Com `ok`, chama como hoje
    (`background-sync.test.ts` segue verde).
-4. **Contagem no ciclo.** Três ciclos com `getCourses` em
+4. ❌ **Contagem no ciclo.** Três ciclos com `getCourses` em
    `fail('SELECTOR_DRIFT', …)` chamam `recordStructuralFailure` três vezes.
    Ciclo com `PORTAL_UNAVAILABLE` não chama nem `recordStructuralFailure` nem
    `recordSuccess`. Ciclo com `getCourses` ok e 2 de 2 `getCourseFiles` em
    `SELECTOR_DRIFT` conta; com 1 de 2, chama `recordSuccess`.
+   **Falta o caminho de re-login:** ciclo em que o primeiro `getCourses` falha
+   com `SESSION_EXPIRED`, o `login` passa e o `getCourses` de retry falha com
+   `SELECTOR_DRIFT` também conta como falha estrutural.
 5. **Restauração.** `get-course-files` com `sigaaService.getCourseFiles` ok
    chama `deps.compatibility.recordSuccess()`; com falha, não chama.
    `get-compatibility-status` devolve o que `status()` devolve.
@@ -198,6 +201,64 @@ npm run quality
   ajuste mecânico: o novo canal `get-compatibility-status` mudou a contagem
   que o teste fixa por nome — o próprio teste se chama "novo canal aparece
   aqui". Nenhuma asserção de comportamento mudou, só o roster.
+
+#### Review (2026-09-12) — reaberto
+
+Gate verde na branch (`683 passed | 4 skipped`, 60 arquivos, lint 0 erros).
+Separação de commits correta: testes em `d5d0878`/`ce91b88`/`930ccc8`, código em
+`bd3cdc7`/`1f9e65e`/`c696d1b`/`502966e`, nenhum commit de código toca teste.
+Critérios 1, 2, 3, 5, 6 e 7 conferidos contra o código e contra os testes, que
+chamam código de produção e falhariam sem a mudança. Contrato, `IpcDeps`,
+preload e `shared/ipc.ts` batem com o bloco `## Contrato` — sem creep.
+
+O que falta (**bloqueante, é por isso que volta para a etapa 2**):
+
+1. **Critério 4 / decisão 1 — o retry pós-re-login não conta drift.**
+   `background-sync.service.ts:110-114` devolve em qualquer código de erro:
+
+   ```ts
+   const retryCourses = await this.sigaaService.getCourses();
+   if (!retryCourses.success) {
+       log.error('Retry after re-login failed.', { error: retryCourses.error.message });
+       return;
+   }
+   ```
+
+   O ramo de cima (`:120-127`) chama `recordStructuralFailure` em
+   `SELECTOR_DRIFT`; este não. Sessão expirada é rotina no SIGAA, então este é
+   um caminho quente, e é **o único ramo do ciclo que faz login de verdade** —
+   exatamente o que o AC3 ("não repete login que possa bloquear a conta") existe
+   para cortar. Hoje, um portal que derivou e devolve `SESSION_EXPIRED` na
+   primeira sondagem faz login a cada ciclo, para sempre, sem nunca armar o
+   kill-switch. Fica dentro dos Primary files, mas precisa de teste novo — por
+   isso reabre em vez de virar correção da etapa 3.
+
+2. **Menor, decisão 5 — `onChange` pode repetir com o `state` igual.**
+   `portal-compatibility.service.ts:47-60` só guarda
+   `consecutiveFailures < STRUCTURAL_FAILURE_THRESHOLD`. Já `incompatible`, uma
+   4ª chamada persiste de novo e chama `onChange` outra vez, contra "só dispara
+   em mudança de `state`". Hoje é inalcançável (o gate do `syncNow` corta o
+   ciclo antes), então é dívida de contrato, não bug — mas o item 1 já abre o
+   arquivo ao lado; feche junto, com a asserção no teste de unidade.
+
+3. **Menor, robustez — `onChange` que lança quebra o "nunca lança".**
+   `main.ts:93` usa `win?.webContents.send(...)`; o `?.` cobre `null`, não
+   janela destruída, e `background-sync.service.ts:295` já usa o guarda certo
+   (`window && !window.isDestroyed()`). Como `recordStructuralFailure`/
+   `recordSuccess` chamam `onChange` fora de `try`, um throw sobe. Em
+   `background-sync.service.ts:284-288` isso cairia **antes** do push,
+   das notificações, do `lastBackgroundSync` e do `pendingCommits` — invertendo
+   a ordem que o DATA-003 fixa no comentário de `:329-331`. Alcançável só na
+   janela do quit (com `runInBackground` a janela é escondida, não destruída),
+   então é estreito. `isDestroyed()` no `main.ts` resolve.
+
+Fora de escopo, avaliado e **aceito**: o `catch`/`log` do `persist()`
+(`:94-103`) e o `catch` mudo do `readFromDisk()` (`:84-92`) chegam perto da
+regra 3, mas os dois são decisão documentada e exigida pelo critério 2 — o
+alternativo (propagar) quebraria o "nunca lança". O `onInvalid` que lança em
+`get-compatibility-status` segue o precedente do `get-app-settings`
+(`register-handlers.ts:252-258`). O ajuste em `ipc-validation.test.ts` é
+mecânico, declarado e ficou em commit de teste próprio.
 
 ## Comments
 
