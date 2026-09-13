@@ -1,6 +1,6 @@
 # OBS-003 — Gate raw HTML dumps, wire diagnostics clear, clean legacy logs
 Status: open
-Stage: to-review
+Stage: to-implement
 Priority: P2
 Blocked by: OBS-005
 
@@ -21,6 +21,8 @@ Blocked by: OBS-005
   - Editados: `tests/integration/clear-all-data.test.ts`,
     `tests/unit/diagnostics-redaction.test.ts` (se o contrato de `clear`
     mudar), `tests/e2e/clear-all.spec.ts`
+  - Editados (acrescentado pela revisão de 2026-09-12, 2ª reabertura):
+    `tests/unit/navigation-policy.test.ts` — só o mock de `app.getPath`
 
 Fatiado de `OBS-001` em 2026-09-08. É o seam "diagnóstico em disco": o que
 fica no `userData` além do log, quanto fica, e quem apaga.
@@ -358,3 +360,66 @@ verde, 4 passed.
 legados, nenhum novo). `npx vitest run` completo: 657 passed | 4 skipped
 (661) — um a mais que o baseline da revisão anterior (656), o teste novo
 deste critério.
+
+## Revisão da etapa 3 — critério 8 (2026-09-12)
+
+Veredito: **reabre**. Critério 8 ❌.
+
+Gate reconferido nesta sessão: `npm run quality` → 0 erros, 55 warnings
+(`no-explicit-any`, todos legados), **657 passed | 4 skipped (661)**.
+Separação de commits ok no `diff --stat`: `4e69bb3` só toca `tests/`,
+`a80d289` só toca `electron/main.ts`. Vermelho-verde do teste novo refeito,
+não aceito do relatório: `git revert --no-commit a80d289` → `npx vitest run
+tests/unit/legacy-log-cleanup.test.ts` → **1 failed | 3 passed**, pelo motivo
+certo (`expected false to be true` em `legacy-log-cleanup.test.ts:186`, a
+asserção de que o legado sobrevive ao import); restaurado, 4 passed.
+
+#### ❌ Critério 8 — a exclusão saiu do import e continua acontecendo
+
+A chamada mudou de escopo de módulo para dentro do `whenReady()`, mas
+`tests/unit/navigation-policy.test.ts` mocka `whenReady` para **disparar o
+callback na hora** (`:92`, `then: (cb) => { cb(); }`) e `app.getPath` para
+`os.tmpdir()` (`:85`). O import daquele módulo, portanto, ainda chama
+`removeLegacyLogs` contra o temp real do sistema — que é exatamente o que a
+decisão do humano ("exclusão de arquivo fora do repositório disparada por
+`npm test` não fica") proíbe, e também o que a letra do critério 8 proíbe
+("importar `electron/main` não chama `removeLegacyLogs` nem toca o
+filesystem").
+
+Medido, não deduzido: com `fs.appendFileSync` temporário na primeira linha de
+`removeLegacyLogs` gravando o `userDataPath` recebido, `npx vitest run
+tests/unit/navigation-policy.test.ts tests/unit/updater-consent.test.ts`
+deixou uma linha no arquivo de prova — `C:\Users\Lage\AppData\Local\Temp`.
+A instrumentação foi revertida; a árvore está limpa.
+
+Os outros dois importadores de `electron/main` estão limpos **por acidente**,
+não por construção: `updater-consent.test.ts:48` e o mock do topo de
+`legacy-log-cleanup.test.ts:56` usam `then: vi.fn()`, que nunca dispara o
+callback, e o teste novo do critério 8 captura o callback num `importRoot`
+próprio. Basta um deles passar a disparar o `whenReady` para o efeito voltar.
+
+Por que o teste do critério 8 passa mesmo assim: ele prova que a chamada saiu
+do escopo de módulo, com o `getPath` apontando para uma pasta própria. Ele não
+tem como ver o que outro arquivo da suíte faz. A cobertura que falta é sobre a
+suíte, não sobre `main.ts`.
+
+#### O que falta
+
+1. `tests/unit/navigation-policy.test.ts` deve mockar `app.getPath` para uma
+   pasta temporária própria do teste (padrão do `importRoot` que o critério 8
+   já usa), não para `os.tmpdir()` cru. É a correção mínima e fecha o caso
+   real.
+2. Cobertura que não dependa de alguém lembrar: um teste que falhe se algum
+   importador de `electron/main` rodar `removeLegacyLogs` contra
+   `os.tmpdir()`. Fica a critério da etapa 2 escrever isso em
+   `legacy-log-cleanup.test.ts` ou preferir só o item 1 e registrar aqui o
+   porquê.
+
+Não corrigido por esta etapa pela regra mecânica: a correção é em arquivo de
+teste fora do `Primary files`, e etapa 3 não escreve teste. `Primary files`
+foi estendido com `tests/unit/navigation-policy.test.ts` (só o mock de
+`app.getPath`) para a etapa 2 não ficar sem limite onde trabalhar. Escopo
+desta rodada: só o item acima; nada mais do ticket muda. A branch `obs-003`
+tem todo o resto e é onde o trabalho continua.
+
+Critérios 1 a 7: ✅, sem mudança desde a revisão anterior.
