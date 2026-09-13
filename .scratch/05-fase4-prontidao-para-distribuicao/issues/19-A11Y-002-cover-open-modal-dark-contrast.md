@@ -1,6 +1,6 @@
 # A11Y-002: Cobrir o modal aberto e corrigir o contraste dos metadados
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P2
 Blocked by: A11Y-001
 
@@ -27,13 +27,10 @@ fixture pelo controle real antes de chamar axe.
 1. ✅ Data e estado de notificação do modal atendem contraste AA nos dois temas.
 2. ✅ O scan do axe abre o modal nos temas claro e escuro e falha para violação
    crítica ou séria nesse estado.
-3. ❌ As quatro rotas já cobertas continuam sem violação crítica ou séria.
-   Abrir o modal tira o resto da página da árvore de acessibilidade: o
-   course-detail deixou de ser verificado no estado fechado. Ver a revisão de
-   2026-09-12.
-4. O scan cobre o course-detail **fechado e aberto** nos dois temas — o estado
-   aberto não substitui o fechado.
-5. `.news-notification` atende AA no tema claro.
+3. ✅ As quatro rotas já cobertas continuam sem violação crítica ou séria.
+4. ✅ O scan cobre o course-detail **fechado e aberto** nos dois temas — o
+   estado aberto não substitui o fechado.
+5. ✅ `.news-notification` atende AA no tema claro.
 
 #### Verification
 
@@ -115,3 +112,28 @@ que a linha de Primary files declarava. Os dois pontos entraram como critérios
 4 e 5, e o Primary files foi ampliado para `.news-notification`.
 
 O trabalho continua na branch `a11y-002`, que já tem os dois commits bons.
+
+### 2026-09-12 — retomada da etapa 2
+
+Critérios 4 e 5, na ordem que a revisão pediu.
+
+Teste (`17663af`): course-detail saiu do bloco que abria o modal antes do
+único `analyze()`, virou um scan de estado fechado igual às outras rotas, e
+ganhou um teste próprio de estado aberto por tema (fecha o modal no
+`finally`, sem vazar estado pro próximo teste da matriz). Vermelho
+reproduzido: `course-detail (tema light)` fecha e falha em
+`.news-notification`, 2,84:1, igual ao relato da revisão — o modal escuro e
+os dois testes de modal aberto já passavam, sem depender da correção.
+
+Código (`e31fa3b`): `.news-notification` no tema claro trocou `#28a745` por
+`#145c33`, o mesmo verde escurecido que `.btn-section-action--success` já usa
+neste arquivo para o mesmo tipo de violação — ~7,3:1 sobre `#e6f9e9`, contra
+os 2,84:1 antigos.
+
+`dist/` estava por trás de um `vite build` antigo: o primeiro rerun pós-fix
+ainda batia na cor velha porque o Electron de teste carrega o bundle, não o
+CSS fonte. Rebuild resolveu; vale lembrar em qualquer sessão futura que rode
+`test:e2e` sem ter acabado de buildar.
+
+`test:e2e -- accessibility`: 17 passed. `npm run quality`: 0 erro de lint,
+685 passed / 5 skipped.
