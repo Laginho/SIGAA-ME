@@ -1,6 +1,6 @@
 # DL-004: Identidade por id no caminho de download
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P1
 Blocked by: DL-003
 
@@ -185,6 +185,28 @@ dois e o usuário vê "falhou". Vale só se o `link` ficar; a alternativa do ach
 
 Os dois cabem em `file-validation.service.ts`, já Primary file. Voltaram para a
 etapa 2 e não para um fix de revisão porque precisam de teste novo.
+
+#### Implementação da rodada 2 (2026-09-13)
+
+Seguiu a direção sugerida acima: `finalizeDownload` troca `fs.promises.link` +
+`fs.promises.unlink(partPath)` por `fs.promises.open(filePath, 'wx')` (mesmo
+`O_CREAT|O_EXCL`, mesmo `EEXIST` alimentando o sufixo numerado) seguido de
+`fs.promises.rename(partPath, filePath)`. Os dois achados fecham com a mesma
+mudança: `open('wx')` não depende de hard link (resolve o achado 1) e o
+`rename` consome o `.part` no mesmo passo, então não sobra um `unlink`
+separado depois do sucesso para falhar (resolve o achado 2).
+
+Testes novos em `tests/unit/file-validation.test.ts`: um mock de
+`fs.promises.link` rejeitando com `EPERM` (achado 1) e um mock de
+`fs.promises.unlink` rejeitando com `EBUSY` (achado 2), os dois confirmando
+vermelho contra o `link`/`unlink` antigo antes da mudança — cada mock some do
+caminho de sucesso depois do fix, então o teste passa a provar que a falha
+simulada deixou de importar, não que o código ainda chama a função mockada.
+
+Verificado: `npx tsc --noEmit` limpo, `npx eslint .` 0 erros (55 warnings
+pré-existentes, nenhum nas linhas tocadas), `npx vitest run` 692 passed / 5
+skipped em 61 arquivos. Commits: `5ecf7a0` (testes, vermelho) e `5e91d2b`
+(implementação, verde), branch `dl-004`.
 
 ### Notas, sem virar critério
 
