@@ -1,6 +1,6 @@
 # PORTAL-004 — Live compatibility check, manual e pré-release
 Status: open
-Stage: to-implement
+Stage: blocked
 Priority: P1
 Blocked by: ARCH-001
 Tracker status at migration: `PARTIAL`
@@ -71,3 +71,5 @@ npm run quality         # bloco live pulado, "Test Environment" passa
 - 2026-09-12 Attempts 1 e 2 do loop pararam para perguntar conta de teste,
   canal de alerta e cadência. Respondido nas Decisões acima; contador de
   attempts zerado junto com a reescrita.
+
+- 2026-09-12 Review ended at reviewing (exit 0); branch portal-004 holds the review; left for a human
