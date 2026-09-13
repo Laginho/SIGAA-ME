@@ -49,6 +49,8 @@ function installApi(overrides: Partial<RendererApi> = {}) {
             unsubscribers.push(off);
             return off;
         }),
+        getCompatibilityStatus: vi.fn().mockResolvedValue({ state: 'ok' }),
+        onCompatibilityChanged: vi.fn(() => () => undefined),
         logout: vi.fn().mockResolvedValue(ok()),
         clearAllData: vi.fn().mockResolvedValue(ok()),
         ...overrides,
