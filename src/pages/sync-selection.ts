@@ -16,6 +16,27 @@ function isCourseLike(value: unknown): value is CourseSummary {
   return typeof candidate.id === 'string' && typeof candidate.name === 'string';
 }
 
+// Handle em módulo, cancelado se a rota mudar antes dele disparar (BUG-013):
+// sem isso, quem sai da tela de sync dentro dos 600ms é puxado de volta.
+let postSyncTimer: ReturnType<typeof setTimeout> | undefined;
+
+function cancelPostSyncNavigation() {
+  if (postSyncTimer === undefined) return;
+  clearTimeout(postSyncTimer);
+  postSyncTimer = undefined;
+  window.removeEventListener('hashchange', cancelPostSyncNavigation);
+}
+
+function schedulePostSyncNavigation() {
+  cancelPostSyncNavigation();
+  window.addEventListener('hashchange', cancelPostSyncNavigation);
+  postSyncTimer = setTimeout(() => {
+    window.removeEventListener('hashchange', cancelPostSyncNavigation);
+    postSyncTimer = undefined;
+    window.location.hash = '#/dashboard';
+  }, 600);
+}
+
 
 export function renderSyncSelectionPage(app: HTMLDivElement) {
   // Check if user has cached data (meaning they can go back)
@@ -242,7 +263,7 @@ async function startSync(app: HTMLDivElement, mode: 'fast' | 'full') {
     mergeCoursesIntoCache(coursesWithContent, { replaceSet: true });
 
     updateProgress(100, 'Finalizado!', `${courses.length} disciplinas sincronizadas.`);
-    setTimeout(() => { window.location.hash = '#/dashboard'; }, 600);
+    schedulePostSyncNavigation();
 
   } catch (error: any) {
     console.error('Sync failed:', error);
