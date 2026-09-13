@@ -81,8 +81,6 @@ export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
 
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 'public') : RENDERER_DIST
 
-void removeLegacyLogs(app.getPath('userData'));
-
 let win: BrowserWindow | null
 let tray: Tray | null = null
 const sigaaService = new SigaaService()
@@ -224,6 +222,8 @@ app.on('activate', () => {
 })
 
 app.whenReady().then(() => {
+  void removeLegacyLogs(app.getPath('userData'));
+
   try {
     // Chrome ausente não é erro: é o caso que estamos detectando. Por isso os
     // catch abaixo não engolem falha — a ausência É a informação, e ela vira o
