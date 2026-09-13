@@ -359,7 +359,7 @@ describe('SigaaService (Unit)', () => {
                 success: true,
                 data: {
                     downloaded: 1, skipped: 0, failed: 0,
-                    results: [{ fileName: 'doc.pdf', status: 'downloaded', filePath: '/mock/downloads/Math/doc.pdf' }]
+                    results: [{ fileId: '123', fileName: 'doc.pdf', status: 'downloaded', filePath: '/mock/downloads/Math/doc.pdf' }]
                 }
             });
             expect(mockPlaywright.downloadFile).toHaveBeenCalledTimes(1);
