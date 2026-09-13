@@ -18,6 +18,7 @@ import type { CacheService } from '../services/cache.service';
 import type { LoggerService } from '../services/logger.service';
 import { logger } from '../services/logger.service';
 import type { DiagnosticsService } from '../services/diagnostics.service';
+import type { PortalCompatibilityService } from '../services/portal-compatibility.service';
 import type { DownloadProgress } from '../../shared/ipc';
 import type { DownloadStatus } from '../../shared/domain';
 import { errorMessage, fail, ok } from '../../shared/errors';
@@ -58,6 +59,7 @@ export interface IpcDeps {
   cache: Pick<CacheService, 'clear'>;
   logger: Pick<LoggerService, 'clear'>;
   diagnostics: Pick<DiagnosticsService, 'clear'>;
+  compatibility: Pick<PortalCompatibilityService, 'status' | 'recordSuccess' | 'clear'>;
   userDataPath: string;
   clearBrowserStorage: () => Promise<void>;
   getWindow: () => BrowserWindow | null;
@@ -149,10 +151,21 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 
   handle('get-course-files', parseCourseRequest,
     async (req) => {
-      return await deps.sigaaService.getCourseFiles(req.courseId, req.courseName);
+      const result = await deps.sigaaService.getCourseFiles(req.courseId, req.courseName);
+      // Restauração do kill-switch (decisão 4, PORTAL-005): um manual bem-sucedido
+      // aqui cobre o fluxo real do usuário, que sempre chama get-course-files.
+      if (result.success) deps.compatibility.recordSuccess();
+      return result;
     },
     () => fail('INVALID_REQUEST', 'get-course-files: courseId/courseName inválidos'),
   );
+
+  // `status()` nunca lança; `onInvalid` é inalcançável — só existe para satisfazer o tipo.
+  handle('get-compatibility-status', noPayload, async () => {
+    return deps.compatibility.status();
+  }, () => {
+    throw new Error('get-compatibility-status: não recebe payload');
+  });
 
   handle('select-download-folder', noPayload, async () => {
     const win = deps.getWindow();
@@ -316,6 +329,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
     await attempt(() => deps.cache.clear(), failures, 'Limpar cache');
     await attempt(() => deps.persistence.reset(), failures, 'Limpar configurações');
     await attempt(() => deps.diagnostics.clear(), failures, 'Apagar diagnósticos salvos');
+    await attempt(() => deps.compatibility.clear(), failures, 'Limpar estado de compatibilidade');
     await attempt(() => deps.clearBrowserStorage(), failures, 'Limpar armazenamento do navegador');
 
     if (openAtLoginBefore) {
