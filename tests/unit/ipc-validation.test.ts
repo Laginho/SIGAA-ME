@@ -416,12 +416,12 @@ describe('registerIpcHandlers: remetente, validação e cópia limpa', () => {
         electronMock.handlers.clear();
         registerIpcHandlers(makeDeps({ isPackaged: true }));
         expect(electronMock.handlers.has('test-simulate-new-file')).toBe(false);
-        expect(electronMock.handlers.size).toBe(14);
+        expect(electronMock.handlers.size).toBe(15);
 
         electronMock.handlers.clear();
         registerIpcHandlers(makeDeps({ isPackaged: false }));
         expect(electronMock.handlers.has('test-simulate-new-file')).toBe(true);
-        expect(electronMock.handlers.size).toBe(15);
+        expect(electronMock.handlers.size).toBe(16);
     });
 
     it('cobre exatamente os canais conhecidos (novo canal aparece aqui)', () => {
@@ -440,9 +440,10 @@ describe('registerIpcHandlers: remetente, validação e cópia limpa', () => {
             'update-app-setting',
             'logout',
             'clear-all-data',
+            'get-compatibility-status',
             'test-simulate-new-file',
         ];
-        expect(electronMock.handlers.size).toBe(15);
+        expect(electronMock.handlers.size).toBe(16);
         for (const channel of expected) {
             expect(electronMock.handlers.has(channel)).toBe(true);
         }

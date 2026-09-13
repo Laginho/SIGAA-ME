@@ -11,6 +11,7 @@ import { cacheService } from './services/cache.service'
 import { logger } from './services/logger.service'
 import { getActiveAccount } from './services/account-context.service'
 import { diagnosticsService } from './services/diagnostics.service'
+import { PortalCompatibilityService } from './services/portal-compatibility.service'
 import { registerIpcHandlers } from './ipc/register-handlers'
 import { installNavigationGuard } from './security/navigation-policy'
 import { errorMessage } from '../shared/errors'
@@ -84,7 +85,14 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 
 let win: BrowserWindow | null
 let tray: Tray | null = null
 const sigaaService = new SigaaService()
-const backgroundSyncService = new BackgroundSyncService(sigaaService, () => win)
+// Ponto único de notificação (decisão 5, PORTAL-005): flip por sync em
+// background e restauração manual (get-course-files) passam pelo mesmo
+// onChange, porque é a mesma instância nos dois construtores abaixo.
+const portalCompatibilityService = new PortalCompatibilityService(
+  path.join(app.getPath('userData'), 'compatibility.json'),
+  status => { if (win && !win.isDestroyed()) win.webContents.send('compatibility-changed', status) },
+)
+const backgroundSyncService = new BackgroundSyncService(sigaaService, () => win, portalCompatibilityService)
 
 async function simulateNewFile(): Promise<boolean> {
   const accountId = getActiveAccount();
@@ -109,6 +117,7 @@ registerIpcHandlers({
   cache: cacheService,
   logger,
   diagnostics: diagnosticsService,
+  compatibility: portalCompatibilityService,
   userDataPath: app.getPath('userData'),
   clearBrowserStorage: () => session.defaultSession.clearStorageData(),
   getWindow: () => win,
