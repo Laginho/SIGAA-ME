@@ -135,6 +135,65 @@ afterEach(() => {
     fs.rmSync(root, { recursive: true, force: true });
 });
 
+describe('efeito colateral no import (critério 8)', () => {
+    const importRoot = path.join(os.tmpdir(), `sigaa-me-import-side-effect-${process.pid}`);
+
+    beforeEach(() => {
+        fs.rmSync(importRoot, { recursive: true, force: true });
+        fs.mkdirSync(importRoot, { recursive: true });
+        fs.writeFileSync(path.join(importRoot, 'sigaa-me.log'), 'legado');
+    });
+
+    afterEach(() => {
+        fs.rmSync(importRoot, { recursive: true, force: true });
+    });
+
+    it('importar electron/main não apaga o legado; só o whenReady apaga', async () => {
+        let readyCallback: (() => void | Promise<void>) | undefined;
+
+        vi.resetModules();
+        vi.doMock('child_process', () => ({ execSync: vi.fn() }));
+        vi.doMock('electron', () => ({
+            app: {
+                getPath: vi.fn(() => importRoot),
+                getName: vi.fn(() => 'test-app'),
+                setPath: vi.fn(),
+                getAppPath: vi.fn(() => '/tmp'),
+                isPackaged: true,
+                on: vi.fn(),
+                whenReady: vi.fn(() => ({ then: (cb: () => void | Promise<void>) => { readyCallback = cb; } })),
+                quit: vi.fn(),
+                setLoginItemSettings: vi.fn(),
+            },
+            BrowserWindow: vi.fn(function () {
+                return {
+                    webContents: { on: vi.fn(), send: vi.fn(), setWindowOpenHandler: vi.fn() },
+                    on: vi.fn(),
+                    loadURL: vi.fn(),
+                    loadFile: vi.fn(),
+                };
+            } as any),
+            ipcMain: { handle: vi.fn() },
+            dialog: harness.dialog,
+            Tray: vi.fn(function () { return { setToolTip: vi.fn(), setContextMenu: vi.fn(), on: vi.fn() }; } as any),
+            Menu: { buildFromTemplate: vi.fn(() => ({})) },
+            session: { defaultSession: { clearStorageData: vi.fn() } },
+            shell: { openExternal: vi.fn() },
+        }));
+
+        await import('../../electron/main');
+
+        expect(fs.existsSync(path.join(importRoot, 'sigaa-me.log'))).toBe(true);
+        expect(readyCallback).toBeDefined();
+
+        await readyCallback!();
+
+        await vi.waitFor(() => {
+            expect(fs.existsSync(path.join(importRoot, 'sigaa-me.log'))).toBe(false);
+        }, { timeout: 1000, interval: 10 });
+    });
+});
+
 describe('removeLegacyLogs', () => {
     it('apaga os cinco arquivos legados e não toca em nenhum dos outros', async () => {
         await removeLegacyLogs(root);
