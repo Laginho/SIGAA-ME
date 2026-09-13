@@ -309,7 +309,9 @@
     top: 1rem;
     right: 1rem;
     font-size: 0.85rem;
-    color: #28a745;
+    /* A11Y-002: #28a745 dava 2.84:1 no scan do axe (WCAG AA exige 4.5:1);
+       mesmo verde escurecido já usado em .btn-section-action--success. */
+    color: #145c33;
     background: #e6f9e9;
     padding: 0.2rem 0.5rem;
     border-radius: 12px;
@@ -474,6 +476,7 @@ dialog.modal-content::backdrop {
 
 [data-theme="dark"] .modal-content { background: var(--color-surface); }
 [data-theme="dark"] .modal-title { color: var(--color-primary); }
+[data-theme="dark"] .modal-meta { color: var(--color-text-muted); }
 [data-theme="dark"] .modal-body { color: var(--color-text-main); }
 [data-theme="dark"] .modal-close { color: var(--color-text-muted); }
 [data-theme="dark"] .modal-close:hover { color: var(--color-text-main); }

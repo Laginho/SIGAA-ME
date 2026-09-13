@@ -21,7 +21,7 @@ const COURSES = [
         id: 'c1', name: 'Estruturas de Dados', code: 'CK0210', period: '2026.1',
         fileCount: 1,
         files: [{ id: 'f1', name: 'Lista 1.pdf', type: 'file' }],
-        news: [{ id: 'n1', title: 'Prova adiada', date: '01/01/2026', notification: '', content: '<p>Conteúdo.</p>' }],
+        news: [{ id: 'n1', title: 'Prova adiada', date: '01/01/2026', notification: 'Sim', content: '<p>Conteúdo.</p>' }],
     },
 ];
 
@@ -202,6 +202,16 @@ test.describe('Acessibilidade', () => {
         // passa em branco (foi o que aconteceu com sync-selection.css).
         const THEMES = ['light', 'dark'] as const;
 
+        // `legacyMode`: o modo padrão roda a análise final numa página em
+        // branco à parte (`context.newPage()`) para escapar do CSP do app —
+        // e o Electron não suporta criar um novo target por CDP pra essa
+        // contexto (`Target.createTarget: Not supported`). Legacy roda tudo
+        // direto na própria página.
+        async function scanForSevereViolations() {
+            const results = await new AxeBuilder({ page: launched.page }).setLegacyMode(true).analyze();
+            return results.violations.filter(v => v.impact === 'critical' || v.impact === 'serious');
+        }
+
         for (const theme of THEMES) {
             for (const [hash, label] of ROUTES) {
                 test(`${label} (tema ${theme}) sem violação crítica/séria`, async () => {
@@ -217,16 +227,38 @@ test.describe('Acessibilidade', () => {
                     // da navegação, não que sobreviveu a ela — um render que
                     // resetasse `data-theme` passaria em branco (A11Y-001).
                     expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe(theme);
-                    // `legacyMode`: o modo padrão roda a análise final numa página em
-                    // branco à parte (`context.newPage()`) para escapar do CSP do
-                    // app — e o Electron não suporta criar um novo target por CDP
-                    // pra essa contexto (`Target.createTarget: Not supported`).
-                    // Legacy roda tudo direto na própria página.
-                    const results = await new AxeBuilder({ page: launched.page }).setLegacyMode(true).analyze();
-                    const severe = results.violations.filter(v => v.impact === 'critical' || v.impact === 'serious');
+                    // Estado fechado: abrir o modal aqui tiraria o resto do
+                    // documento da árvore de acessibilidade e esconderia
+                    // violações da própria página, como o badge
+                    // `.news-notification` (A11Y-002).
+                    const severe = await scanForSevereViolations();
                     expect(severe, JSON.stringify(severe, null, 2)).toEqual([]);
                 });
             }
+
+            test(`course-detail modal aberto (tema ${theme}) sem violação crítica/séria`, async () => {
+                const { page } = launched;
+                await page.emulateMedia({ reducedMotion: 'reduce' });
+                await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme);
+                await goto('#/course/c1');
+                expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe(theme);
+
+                // Abre o modal pelo controle real, não por `showModal()` direto:
+                // prova o mesmo caminho que um usuário de teclado ou mouse usa.
+                await page.locator('.news-item').first().click();
+                await expect(page.locator('#newsModal[open]')).toBeVisible();
+
+                let severe;
+                try {
+                    severe = await scanForSevereViolations();
+                } finally {
+                    // Fecha antes de sair para não vazar estado para o
+                    // próximo teste da matriz (A11Y-002).
+                    await page.keyboard.press('Escape');
+                    await expect(page.locator('#newsModal')).toBeHidden();
+                }
+                expect(severe, JSON.stringify(severe, null, 2)).toEqual([]);
+            });
         }
     });
 });
