@@ -60,6 +60,7 @@ export interface NewsDetailRequest extends CourseRequest {
 }
 
 export interface DownloadProgress {
+  fileId: DownloadToken
   fileName: string
   status: DownloadStatus
 }

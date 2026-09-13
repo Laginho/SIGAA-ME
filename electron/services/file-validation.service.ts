@@ -6,7 +6,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import mime from 'mime-types';
-import { sanitizeSegment, isInsideRoot } from './download-path';
+import { sanitizeSegment, isInsideRoot, withNumberedSuffix } from './download-path';
 
 // ponytail: 500 MiB cobre o maior material legítimo visto num portal de
 // disciplina (vídeo de aula, pacote zipado). Sobe por review se uma
@@ -223,12 +223,28 @@ export async function finalizeDownload(input: {
             };
         }
 
-        const filePath = path.join(dir, resolvedName);
+        let filePath = path.join(dir, resolvedName);
         if (!isInsideRoot(dir, filePath)) {
             throw new Error('Nome de arquivo/pasta inválido');
         }
 
-        await fs.promises.rename(partPath, filePath);
+        // `rename` sobrescreve em silêncio um destino existente; `link` falha com
+        // EEXIST sem tocar nele. Dois downloads de nomes colidentes (DL-004) então
+        // nunca se apagam — o segundo ganha um sufixo numerado em vez do lugar do
+        // primeiro.
+        for (let attempt = 0; ; attempt++) {
+            try {
+                await fs.promises.link(partPath, filePath);
+                break;
+            } catch (err) {
+                if ((err as NodeJS.ErrnoException).code !== 'EEXIST' || attempt >= 999) throw err;
+                filePath = path.join(dir, withNumberedSuffix(resolvedName, attempt + 1));
+                if (!isInsideRoot(dir, filePath)) {
+                    throw new Error('Nome de arquivo/pasta inválido');
+                }
+            }
+        }
+        await fs.promises.unlink(partPath);
         return { ok: true, filePath };
     } catch (err) {
         await cleanup();

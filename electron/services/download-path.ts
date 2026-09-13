@@ -52,6 +52,13 @@ export function isInsideRoot(root: string, candidate: string): boolean {
   return relStaysInside(path.relative(path.resolve(root), path.resolve(candidate)));
 }
 
+/** Insere ` (n)` antes da extensão: "a.txt" + 1 -> "a (1).txt". Achar um nome livre sem sobrescrever um existente (DL-004). */
+export function withNumberedSuffix(fileName: string, n: number): string {
+  const ext = path.extname(fileName);
+  const base = ext ? fileName.slice(0, -ext.length) : fileName;
+  return `${base} (${n})${ext}`;
+}
+
 /** `root/<turma>/<arquivo>` sanitizado e provado dentro de `root`. Lança se escapar. */
 export function resolveDownloadTarget(root: string, courseName: string, fileName: string): { dir: string; fullPath: string } {
   const dir = path.join(root, sanitizeSegment(courseName, 100));
