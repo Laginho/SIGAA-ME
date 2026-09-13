@@ -1,6 +1,6 @@
 # PORTAL-005 — Kill-switch de compatibilidade: estado no main, sync pausado
 Status: open
-Stage: implementing
+Stage: to-review
 Priority: P1
 Blocked by: OBS-003
 Tracker status at migration: `NOT STARTED`
@@ -186,8 +186,18 @@ npm run quality
 
 #### Implementation notes
 
-- Commit: —
+- Commits: `bd3cdc7` (`PortalCompatibilityService`), `1f9e65e` (gate +
+  contagem em `BackgroundSyncService`), `c696d1b` (handlers IPC), `502966e`
+  (preload + main); testes em `d5d0878`/`ce91b88`, sentinela de canal IPC em
+  `930ccc8`.
 - Trigger threshold: 3 ciclos consecutivos (decisão 1)
+- `npm run quality`: typecheck limpo, lint sem erro novo (só os warnings
+  `no-explicit-any` já existentes fora do escopo desta issue), 683 testes
+  verdes (60 arquivos).
+- `tests/unit/ipc-validation.test.ts` (fora dos Primary files) precisou de
+  ajuste mecânico: o novo canal `get-compatibility-status` mudou a contagem
+  que o teste fixa por nome — o próprio teste se chama "novo canal aparece
+  aqui". Nenhuma asserção de comportamento mudou, só o roster.
 
 ## Comments
 
