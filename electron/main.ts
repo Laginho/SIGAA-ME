@@ -100,7 +100,13 @@ async function simulateNewFile(): Promise<boolean> {
     log.info('[Dev] Nenhuma conta ativa para simular.');
     return false;
   }
-  const forgotten = cacheService.forgetLastFile(accountId);
+  let forgotten;
+  try {
+    forgotten = cacheService.forgetLastFile(accountId);
+  } catch (error) {
+    log.error('[Dev] forgetLastFile falhou', { error: errorMessage(error) });
+    return false;
+  }
   if (!forgotten) {
     log.info('[Dev] Nenhum arquivo em cache para simular.');
     return false;
