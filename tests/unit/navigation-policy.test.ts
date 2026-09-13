@@ -82,9 +82,13 @@ vi.mock('../../electron/services/logger.service', () => ({ logger: loggerHarness
 
 vi.mock('electron', async () => {
     const os = await import('node:os');
+    const path = await import('node:path');
     return {
         app: {
-            getPath: vi.fn(() => os.tmpdir()),
+            // Nunca o os.tmpdir() cru: whenReady dispara na hora (linha abaixo)
+            // e removeLegacyLogs(app.getPath('userData')) rodaria contra o temp
+            // real do sistema (OBS-003, critério 8).
+            getPath: vi.fn(() => path.join(os.tmpdir(), 'sigaa-me-navigation-policy-test')),
             getName: vi.fn(() => 'sigaa-me-test'),
             setPath: vi.fn(),
             getAppPath: vi.fn(() => '/app'),
