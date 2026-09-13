@@ -60,6 +60,12 @@ npm run test:e2e
 
 ## Comments
 
+- Da revisão do `PORTAL-004` (2026-09-12): o script `test:live` da lista
+  "Required scripts" **já existe** — `PORTAL-004` o adicionou como
+  `vitest run tests/integration/scraper.test.ts`, e o próprio teste trata
+  `npm_lifecycle_event === 'test:live'` como opt-in. Não redefina o script; o
+  que resta aqui é `test:unit`, `test:integration`, `coverage` e `audit:prod`.
+
 - Da revisão do `DL-005` (2026-09-11): `tests/unit/sync-selection.test.ts:259`
   (`expect(window.location.hash).not.toBe("#/dashboard")`) falhou uma vez num
   `npm run quality` completo e passou sozinho e na repetição imediata, sem

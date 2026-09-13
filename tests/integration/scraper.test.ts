@@ -8,16 +8,20 @@
  *   2. Fill in SIGAA_USER and SIGAA_PASS in `.env`
  *   3. Have Google Chrome installed
  *
- * Run explicitly with PowerShell:
- *   $env:RUN_LIVE_SIGAA_TESTS='true'; npx.cmd vitest run tests/integration/scraper.test.ts
+ * Run explicitly (one real login per run; manual, before a release — PORTAL-004):
+ *   npm run test:live
+ * or, from any shell, with RUN_LIVE_SIGAA_TESTS=true in the environment.
  *
- * These tests are opt-in: credentials and RUN_LIVE_SIGAA_TESTS=true are both
+ * These tests are opt-in: credentials and the explicit opt-in are both
  * required, so the default suite remains offline and CI-safe.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { config } from 'dotenv';
 import path from 'path';
+import type { SigaaService } from '../../electron/services/sigaa.service';
+import type { CourseSummary } from '../../shared/domain';
+import type { AppResult } from '../../shared/errors';
 
 // Load .env from the project root
 config({ path: path.resolve(process.cwd(), '.env') });
@@ -52,33 +56,40 @@ const SIGAA_PASS = process.env.SIGAA_PASS;
 
 const hasCredentials = !!SIGAA_USER && !!SIGAA_PASS
     && SIGAA_USER !== 'your_sigaa_username';
-const runLiveSmokeTests = process.env.RUN_LIVE_SIGAA_TESTS === 'true';
+// `npm run test:live` is the opt-in itself: npm names the running script here.
+const runLiveSmokeTests = process.env.RUN_LIVE_SIGAA_TESTS === 'true'
+    || process.env.npm_lifecycle_event === 'test:live';
 
 const describeOrSkip = hasCredentials && runLiveSmokeTests ? describe : describe.skip;
 
 // ============================================================
 // LIVE TESTS
 // ============================================================
+// The same entry points the app uses (SigaaService), in the order the app uses
+// them, in one login session. Portal classification is asserted through the
+// production validators (PORTAL-001): a structural change fails `getCourses` or
+// `getCourseFiles` with `SELECTOR_DRIFT`, and `unwrap` names that code.
+// Counts are never asserted — zero courses, files or news is a valid account.
 describeOrSkip('🌐 Live SIGAA Smoke Tests (requires .env)', () => {
-    // Import the real service
-    let PlaywrightLoginService: any;
-    let service: any;
+    let service: SigaaService;
+    let courses: CourseSummary[] = [];
 
     beforeAll(async () => {
-        const module = await import('../../electron/services/playwright-login.service');
-        PlaywrightLoginService = module.PlaywrightLoginService;
-        service = new PlaywrightLoginService();
+        const module = await import('../../electron/services/sigaa.service');
+        service = new module.SigaaService();
     });
 
     afterAll(async () => {
-        // Clean up the browser session
-        if (service) {
-            await service.close?.();
-        }
+        // logout() is asserted below; this only covers a run that failed before it.
+        await service?.logout();
     });
 
-    it('should reach the SIGAA login page', async () => {
-        // A quick check that the site is reachable before attempting login
+    function unwrap<T>(result: AppResult<T>): T {
+        if (!result.success) throw new Error(`${result.error.code}: ${result.error.message}`);
+        return result.data;
+    }
+
+    it('reaches the SIGAA login page', async () => {
         const { default: axios } = await import('axios');
         const response = await axios.get('https://si3.ufc.br/sigaa/verTelaLogin.do', {
             timeout: 10000,
@@ -87,29 +98,41 @@ describeOrSkip('🌐 Live SIGAA Smoke Tests (requires .env)', () => {
         expect(response.data).toContain('SIGAA');
     });
 
-    it('should successfully log in with stored credentials', async () => {
-        const result = await service.login(SIGAA_USER!, SIGAA_PASS!);
-        expect(result.success).toBe(true);
-        expect(result.cookies).toBeDefined();
-        expect(result.cookies!.length).toBeGreaterThan(0);
-    }, 30000); // 30s timeout for Playwright
+    it('logs in with the stored credentials', async () => {
+        const profile = unwrap(await service.login(SIGAA_USER!, SIGAA_PASS!));
+        expect(profile.id).toBeTruthy();
+        expect(profile.name).toBeTruthy();
+    }, 60000);
 
-    it('should fetch the list of courses after login', async () => {
-        const result = await service.getCourses();
-        expect(result.success).toBe(true);
-        expect(result.courses).toBeDefined();
-        // A real student should have at least one course
-        expect(result.courses!.length).toBeGreaterThan(0);
-    }, 30000);
-
-    it('fetched courses should have an id, code, and name', async () => {
-        const result = await service.getCourses();
-        if (result.success && result.courses!.length > 0) {
-            const firstCourse = result.courses![0];
-            expect(firstCourse.id).toBeDefined();
-            expect(firstCourse.code).toBeDefined();
-            expect(firstCourse.name).toBeDefined();
+    it('enumerates courses: recognised list, well-formed rows, any count', async () => {
+        courses = unwrap(await service.getCourses()).courses;
+        for (const course of courses) {
+            expect(course.id).toBeTruthy();
+            expect(typeof course.code).toBe('string');
+            expect(course.name).toBeTruthy();
+            expect(typeof course.period).toBe('string');
         }
+    }, 60000);
+
+    it('enters the first course and gets well-formed files and news', async () => {
+        if (courses.length === 0) return;
+        const { files, news } = unwrap(await service.getCourseFiles(courses[0].id, courses[0].name));
+        expect(Array.isArray(files)).toBe(true);
+        expect(Array.isArray(news)).toBe(true);
+        for (const file of files) {
+            expect(file.id).toBeTruthy();
+            expect(file.name).toBeTruthy();
+            expect(['file', 'link']).toContain(file.type);
+        }
+        for (const item of news) {
+            expect(item.id).toBeTruthy();
+            expect(item.title).toBeTruthy();
+            expect(typeof item.date).toBe('string');
+        }
+    }, 90000);
+
+    it('logs out and releases the browser', async () => {
+        await expect(service.logout()).resolves.toBeUndefined();
     }, 30000);
 });
 

@@ -28,6 +28,7 @@
     "quality": "npm run typecheck && npm run lint && npm test",
     "test:ui": "vitest --ui",
     "test:watch": "vitest",
+    "test:live": "vitest run tests/integration/scraper.test.ts",
     "test:e2e": "tsc && vite build && playwright test"
   },
   "devDependencies": {
