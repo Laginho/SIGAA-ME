@@ -157,6 +157,24 @@ describe('BackgroundSyncService.syncNow — contagem por ciclo (critério 4)', (
         expect(compatibility.recordSuccess).not.toHaveBeenCalled();
     });
 
+    it('SESSION_EXPIRED seguido de re-login e retry em SELECTOR_DRIFT também conta como falha estrutural', async () => {
+        const compatibility = makeCompatibility('ok');
+        const getCourses = vi.fn()
+            .mockResolvedValueOnce(fail('SESSION_EXPIRED', 'expired'))
+            .mockResolvedValueOnce(fail('SELECTOR_DRIFT', 'drift'));
+        const sigaaService = makeSigaaService({ getCourses });
+        const service = new BackgroundSyncService(sigaaService, () => makeWindow(), compatibility);
+
+        const p = service.syncNow();
+        await vi.runAllTimersAsync();
+        await p;
+
+        expect(sigaaService.login).toHaveBeenCalledTimes(1);
+        expect(getCourses).toHaveBeenCalledTimes(2);
+        expect(compatibility.recordStructuralFailure).toHaveBeenCalledTimes(1);
+        expect(compatibility.recordSuccess).not.toHaveBeenCalled();
+    });
+
     it('um ciclo com PORTAL_UNAVAILABLE não chama recordStructuralFailure nem recordSuccess', async () => {
         const compatibility = makeCompatibility('ok');
         const sigaaService = makeSigaaService({

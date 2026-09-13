@@ -71,6 +71,19 @@ describe('PortalCompatibilityService — limiar (critério 1)', () => {
         expect(onChange).toHaveBeenCalledTimes(1);
     });
 
+    it('já incompatible, uma falha a mais não chama onChange de novo (só dispara em mudança de state)', () => {
+        const onChange = vi.fn();
+        const service = new PortalCompatibilityService(filePath, onChange);
+
+        service.recordStructuralFailure('SELECTOR_DRIFT');
+        service.recordStructuralFailure('SELECTOR_DRIFT');
+        service.recordStructuralFailure('SELECTOR_DRIFT');
+        service.recordStructuralFailure('SELECTOR_DRIFT');
+
+        expect(service.status()).toMatchObject({ state: 'incompatible' });
+        expect(onChange).toHaveBeenCalledTimes(1);
+    });
+
     it('recordSuccess zera o contador sem virar incompatible; mais duas falhas continuam ok', () => {
         const onChange = vi.fn();
         const service = new PortalCompatibilityService(filePath, onChange);
