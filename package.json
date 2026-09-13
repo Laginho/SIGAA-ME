@@ -26,7 +26,6 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "quality": "npm run typecheck && npm run lint && npm test",
-    "test:ui": "vitest --ui",
     "test:watch": "vitest",
     "test:live": "vitest run tests/integration/scraper.test.ts",
     "test:e2e": "tsc && vite build && playwright test"
@@ -35,8 +34,6 @@
     "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "^1.59.1",
     "@types/mime-types": "^3.0.1",
-    "@vitest/browser": "^4.1.4",
-    "@vitest/ui": "^4.1.4",
     "dotenv": "^17.4.2",
     "electron": "^30.0.1",
     "electron-builder": "^24.13.3",
@@ -48,7 +45,7 @@
     "vite": "^6.4.3",
     "vite-plugin-electron": "^0.28.6",
     "vite-plugin-electron-renderer": "^0.14.5",
-    "vitest": "^4.1.4"
+    "vitest": "^4.1.11"
   },
   "main": "dist-electron/main.js",
   "dependencies": {

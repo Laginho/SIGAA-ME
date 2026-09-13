@@ -1,6 +1,6 @@
 # DEP-004: Remover @vitest/browser e @vitest/ui sem uso e alinhar o vitest
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P1
 Blocked by: nenhum
 
@@ -44,6 +44,16 @@ npm run quality
 
 #### Implementation notes
 
-- Commit: —
-- Versão do vitest: —
-- Testes antes/depois: —
+- Commit: (a seguir, branch `dep-004`)
+- Versão do vitest: 4.1.4 → 4.1.11 (`^4.1.11`); `@vitest/browser` e
+  `@vitest/ui` removidos de `devDependencies`, script `test:ui` removido.
+  `@vitest/ui` permanece só como peer opcional do próprio `vitest` (declarado
+  em `peerDependenciesMeta` no lock, não instalado) — `npm ls @vitest/browser
+  @vitest/ui` confirma árvore vazia.
+- Testes antes/depois: 60 arquivos, 685 passed | 5 skipped (690) em ambos —
+  nenhuma mudança de contagem.
+- `npm audit`: sem nenhuma linha `vitest`/`@vitest/*` (18 vulnerabilidades
+  remanescentes são de `electron-builder`/`undici`/outras, fora do escopo).
+- Não editado (fora de Primary files): `docs/PLANO.md:112` ainda cita
+  `test:ui` como script existente — ficou desatualizado por este ticket, mas
+  não está nos Primary files. Deixo nota aqui em vez de editar.
