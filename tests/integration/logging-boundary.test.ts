@@ -111,6 +111,21 @@ function readLog(): string {
     }
 }
 
+/**
+ * Ids de `[op:<id>]` das linhas `[BackgroundSync]`, na ordem em que aparecem.
+ * Falha nomeando a primeira linha sem id em vez de descartá-la em silêncio —
+ * um `filter(Boolean)` já deixou passar uma linha sem id (achado 6 da
+ * auditoria de 2026-09-07 citada no ticket OBS-002).
+ */
+function backgroundSyncOpIds(log: string): string[] {
+    const lines = log.split('\n').filter(line => line.includes('[BackgroundSync]'));
+    return lines.map(line => {
+        const match = line.match(/\[op:([0-9a-f]+)\]/);
+        expect(match, `linha [BackgroundSync] sem op id: ${line}`).not.toBeNull();
+        return match![1];
+    });
+}
+
 /** Página falsa no padrão de `download-boundary.test.ts`: só o que o ramo "download" toca. */
 function fakePage(body: Buffer | string, suggestedFilename: string) {
     const saveAs = vi.fn(async (p: string) => { writeFileSync(p, body); });
@@ -293,5 +308,25 @@ describe('BackgroundSyncService.syncNow', () => {
         const log = readLog();
         expect(log).toContain('[BackgroundSync]');
         expect(log).not.toContain('Prova Remarcada');
+    }, 10000);
+
+    it('um ciclo de syncNow carimba toda linha [BackgroundSync] com o mesmo op id; ciclos diferentes têm ids diferentes', async () => {
+        const sigaaService = makeSigaaService({
+            getCourseFiles: vi.fn(async () => ok({ files: [{ id: '1', name: 'f1.pdf' }], news: [] })),
+        });
+        const service = new BackgroundSyncService(sigaaService, () => null);
+
+        await service.syncNow();
+        await logger.flush();
+        const firstCycleIds = backgroundSyncOpIds(readLog());
+        expect(firstCycleIds.length).toBeGreaterThan(1);
+        expect(new Set(firstCycleIds).size).toBe(1);
+
+        await logger.clear();
+        await service.syncNow();
+        await logger.flush();
+        const secondCycleIds = backgroundSyncOpIds(readLog());
+        expect(new Set(secondCycleIds).size).toBe(1);
+        expect(secondCycleIds[0]).not.toBe(firstCycleIds[0]);
     }, 10000);
 });
