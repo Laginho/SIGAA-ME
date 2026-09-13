@@ -1,6 +1,6 @@
 # BUG-013: navegação pós-sync é disparada e esquecida, e puxa o usuário de volta
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P3
 Blocked by: nenhum
 
