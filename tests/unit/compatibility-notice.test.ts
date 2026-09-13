@@ -17,7 +17,9 @@ const ACCOUNT = { id: 'acc-portal-006', name: 'ALUNO' };
 const COURSE = { id: 'c1', name: 'Estruturas de Dados', code: 'CK0210', period: '2026.1', fileCount: 0, files: [], news: [] };
 
 const OK: CompatibilityStatus = { state: 'ok' };
-const INCOMPATIBLE: CompatibilityStatus = { state: 'incompatible', since: Date.UTC(2026, 8, 1), failures: 3, lastCode: 'SELECTOR_DRIFT' };
+// Meio-dia local, não meia-noite UTC: evita que o fuso da máquina que roda o
+// teste jogue a data formatada para o dia anterior.
+const INCOMPATIBLE: CompatibilityStatus = { state: 'incompatible', since: new Date(2026, 8, 1, 12).getTime(), failures: 3, lastCode: 'SELECTOR_DRIFT' };
 
 type CompatListener = (status: CompatibilityStatus) => void;
 
