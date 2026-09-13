@@ -1,6 +1,6 @@
 # PORTAL-005 — Kill-switch de compatibilidade: estado no main, sync pausado
-Status: open
-Stage: to-review
+Status: resolved
+Stage: done
 Priority: P1
 Blocked by: OBS-003
 Tracker status at migration: `NOT STARTED`
@@ -189,10 +189,10 @@ npm run quality
 
 #### Implementation notes
 
-- Commits: `bd3cdc7` (`PortalCompatibilityService`), `1f9e65e` (gate +
-  contagem em `BackgroundSyncService`), `c696d1b` (handlers IPC), `502966e`
-  (preload + main); testes em `d5d0878`/`ce91b88`, sentinela de canal IPC em
-  `930ccc8`.
+- Commits: `19d07c6` (`PortalCompatibilityService`), `160aa91` (gate +
+  contagem em `BackgroundSyncService`), `93348fc` (handlers IPC), `76c823c`
+  (preload + main); testes em `41d93be`/`dd6f963`, sentinela de canal IPC em
+  `964a1f8`.
 - Trigger threshold: 3 ciclos consecutivos (decisão 1)
 - `npm run quality`: typecheck limpo, lint sem erro novo (só os warnings
   `no-explicit-any` já existentes fora do escopo desta issue), 683 testes
@@ -204,7 +204,7 @@ npm run quality
 
 #### Segunda rodada (2026-09-12) — os 3 achados bloqueantes da revisão
 
-- Commits: `c0a1ee0` (testes, red pelo motivo certo), `03e51ff` (código).
+- Commits: `09e4f61` (testes, red pelo motivo certo), `54dae06` (código).
 - Achado 1 (bloqueante): `background-sync.service.ts:110-114`, o retry pós
   re-login agora chama `recordStructuralFailure('SELECTOR_DRIFT')` quando o
   `getCourses` do retry falha com esse código, espelhando o ramo de cima
@@ -227,8 +227,8 @@ npm run quality
 #### Review (2026-09-12) — reaberto
 
 Gate verde na branch (`683 passed | 4 skipped`, 60 arquivos, lint 0 erros).
-Separação de commits correta: testes em `d5d0878`/`ce91b88`/`930ccc8`, código em
-`bd3cdc7`/`1f9e65e`/`c696d1b`/`502966e`, nenhum commit de código toca teste.
+Separação de commits correta: testes em `41d93be`/`dd6f963`/`964a1f8`, código em
+`19d07c6`/`160aa91`/`93348fc`/`76c823c`, nenhum commit de código toca teste.
 Critérios 1, 2, 3, 5, 6 e 7 conferidos contra o código e contra os testes, que
 chamam código de produção e falhariam sem a mudança. Contrato, `IpcDeps`,
 preload e `shared/ipc.ts` batem com o bloco `## Contrato` — sem creep.
@@ -281,6 +281,54 @@ alternativo (propagar) quebraria o "nunca lança". O `onInvalid` que lança em
 `get-compatibility-status` segue o precedente do `get-app-settings`
 (`register-handlers.ts:252-258`). O ajuste em `ipc-validation.test.ts` é
 mecânico, declarado e ficou em commit de teste próprio.
+
+#### Review (2026-09-12) — segunda passada, aprovada
+
+Os três achados da reabertura estão fechados, e os dois que pediam teste têm
+teste que falha sem a correção.
+
+1. **Achado 1 (bloqueante) — fechado.** `background-sync.service.ts:113-115`
+   chama `recordStructuralFailure('SELECTOR_DRIFT')` quando o `getCourses` do
+   retry pós-re-login falha com esse código, espelhando o ramo de `:127-129`.
+   Os outros ramos do ciclo continuam certos pela decisão 1: login que falha
+   (`:106-109`) não conta nem zera, `isRetryable` (`:119-122`) idem, e o
+   fechamento do ciclo (`:287-291`) conta só com `structuralDriftCourses ===
+   courses.length`.
+2. **Achado 2 (menor) — fechado.** `portal-compatibility.service.ts:53` lê o
+   estado antes de gravar e `:62` só chama `onChange` na transição `ok` →
+   `incompatible`. A contagem e o `since` continuam sendo persistidos na 4ª
+   falha, que era o comportamento a preservar.
+3. **Achado 3 (menor) — fechado.** `main.ts:93` usa
+   `if (win && !win.isDestroyed())`, o mesmo guarda de
+   `background-sync.service.ts:298`. Sem teste, e aceito: `main.ts` não tem
+   suíte neste repositório.
+
+Prova red-green da segunda rodada, com `git revert --no-commit 54dae06` na
+árvore: `background-sync-compatibility.test.ts` falha com
+`recordStructuralFailure` "called 0 times" e `portal-compatibility.test.ts`
+falha com `onChange` "called 2 times". Com a correção, os dois passam.
+
+Separação de commits correta também aqui: `09e4f61` só toca teste, `54dae06` só
+toca código. Nada fora dos Primary files.
+
+#### Resolution (2026-09-12)
+
+- **Decisão:** aprovada e mesclada sem mudança de código na revisão.
+- **Arquivos:** `electron/services/portal-compatibility.service.ts` (novo),
+  `electron/services/background-sync.service.ts`,
+  `electron/ipc/register-handlers.ts`, `shared/ipc.ts`, `electron/preload.ts`,
+  `electron/main.ts`; testes em `tests/unit/portal-compatibility.test.ts`,
+  `tests/integration/background-sync-compatibility.test.ts`,
+  `tests/integration/clear-all-data.test.ts` e o roster de
+  `tests/unit/ipc-validation.test.ts`.
+- **Red-green:** primeira rodada provada em `41d93be`/`dd6f963`/`964a1f8` antes
+  do código; segunda rodada reprovada na revisão pelo revert acima.
+- **Gate:** `npm run quality` verde na branch — typecheck limpo, ESLint 0 erros
+  (55 warnings `no-explicit-any` pré-existentes), 685 testes passando + 4
+  skipped em 60 arquivos.
+- **Critérios:** 1 a 7 conferidos contra o código de produção. O critério 4
+  passou a valer inteiro com o ramo de retry; o resto já tinha sido conferido na
+  primeira passada e não foi tocado pela segunda rodada.
 
 ## Comments
 
