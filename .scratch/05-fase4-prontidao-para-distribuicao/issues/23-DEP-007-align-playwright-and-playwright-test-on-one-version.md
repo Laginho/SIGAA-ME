@@ -1,6 +1,6 @@
 # DEP-007: Alinhar playwright e @playwright/test numa só versão
 Status: open
-Stage: to-review
+Stage: to-merge
 Priority: P1
 Blocked by: nenhum
 
@@ -53,3 +53,29 @@ npx playwright test app.spec.ts
 - Live smoke: **pendente.** Critério 4 pede rodada manual do autor no Windows
   com `RUN_LIVE_SIGAA_TESTS=true` — não roda em agente/loop (ver CLAUDE.md,
   tiers de teste). Cole o resultado aqui antes de fechar o ticket.
+
+#### Review (2026-09-13, etapa 3)
+
+Verdito: **Needs your call** — critério 4 só o autor fecha.
+
+- Critério 1 ✅ `npm ls`: `@playwright/test@1.63.0` e `playwright@1.63.0`
+  (deduped), uma versão de cada.
+- Critério 2 ✅ `npm run quality` no Windows: 60 arquivos, 685 passed,
+  5 skipped; lint 0 erros, 55 warnings pré-existentes.
+- Critério 3 ✅ `npm run test:e2e` na suíte **inteira**: 39 passed, 3 skipped
+  (os credenciados). A etapa 2 tinha rodado só `visual` e `app`; os outros três
+  specs (`accessibility`, `clear-all`, `security-boundaries`) também passam.
+- Critério 4 ❌ pendente. É login real; agente não roda (CLAUDE.md, tiers).
+- Diff dentro dos Primary files. `playwright.config.ts` não foi tocado, e não
+  precisava. Lock honesto: o `fsevents` sumiu porque o 1.63.0 upstream não tem
+  mais `optionalDependencies`, não por ter sido gerado numa plataforma só.
+- `engines` subiu para `node >=20`; CI usa 22, sem `engines` no `package.json`.
+- `playwright` não tem install script, então `allowScripts` não muda.
+
+**Premissa errada no corpo deste ticket, corrigida aqui:** "Subir o Chromium que
+ele baixa muda o user-agent visto pelo portal" não vale. O app lança o Chrome do
+sistema (`channel: 'chrome'`, `playwright-login.service.ts:92,280,753,873`) e
+ainda sobrescreve o UA com string fixa (linha 97) — o Chromium empacotado do
+Playwright nunca é baixado nem usado. O live smoke continua valendo, por outro
+motivo: são quatro minors de mudança no `playwright-core`, que é o que dirige a
+sessão JSF.
