@@ -1,6 +1,6 @@
 # PORTAL-005 — Kill-switch de compatibilidade: estado no main, sync pausado
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P1
 Blocked by: OBS-003
 Tracker status at migration: `NOT STARTED`
@@ -142,12 +142,12 @@ compatibility: Pick<PortalCompatibilityService, 'status' | 'recordSuccess' | 'cl
    `incompatible`: `syncNow()` resolve sem chamar `sigaaService.getCourses`,
    `login` nem `downloadAllFiles`. Com `ok`, chama como hoje
    (`background-sync.test.ts` segue verde).
-4. ❌ **Contagem no ciclo.** Três ciclos com `getCourses` em
+4. **Contagem no ciclo.** Três ciclos com `getCourses` em
    `fail('SELECTOR_DRIFT', …)` chamam `recordStructuralFailure` três vezes.
    Ciclo com `PORTAL_UNAVAILABLE` não chama nem `recordStructuralFailure` nem
    `recordSuccess`. Ciclo com `getCourses` ok e 2 de 2 `getCourseFiles` em
    `SELECTOR_DRIFT` conta; com 1 de 2, chama `recordSuccess`.
-   **Falta o caminho de re-login:** ciclo em que o primeiro `getCourses` falha
+   Caminho de re-login: ciclo em que o primeiro `getCourses` falha
    com `SESSION_EXPIRED`, o `login` passa e o `getCourses` de retry falha com
    `SELECTOR_DRIFT` também conta como falha estrutural.
 5. **Restauração.** `get-course-files` com `sigaaService.getCourseFiles` ok
@@ -201,6 +201,28 @@ npm run quality
   ajuste mecânico: o novo canal `get-compatibility-status` mudou a contagem
   que o teste fixa por nome — o próprio teste se chama "novo canal aparece
   aqui". Nenhuma asserção de comportamento mudou, só o roster.
+
+#### Segunda rodada (2026-09-12) — os 3 achados bloqueantes da revisão
+
+- Commits: `c0a1ee0` (testes, red pelo motivo certo), `03e51ff` (código).
+- Achado 1 (bloqueante): `background-sync.service.ts:110-114`, o retry pós
+  re-login agora chama `recordStructuralFailure('SELECTOR_DRIFT')` quando o
+  `getCourses` do retry falha com esse código, espelhando o ramo de cima
+  (:120-127). Teste novo em `background-sync-compatibility.test.ts`:
+  `SESSION_EXPIRED` → `login` ok → retry em `SELECTOR_DRIFT` → 1 chamada de
+  `recordStructuralFailure`.
+- Achado 2 (menor): `portal-compatibility.service.ts` —
+  `recordStructuralFailure` só chama `onChange` na transição `ok` →
+  `incompatible`; falhas seguintes já `incompatible` atualizam o arquivo
+  (contagem, `since`) mas não notificam de novo. Teste novo em
+  `portal-compatibility.test.ts`: 4ª falha seguida chama `onChange` só 1 vez.
+- Achado 3 (menor): `main.ts:93` trocou `win?.webContents.send(...)` por
+  `if (win && !win.isDestroyed()) win.webContents.send(...)`, mesmo guarda de
+  `background-sync.service.ts:295`. Sem teste — `main.ts` não tem suíte neste
+  repositório (ponto de entrada do Electron).
+- `npm run quality`: typecheck limpo, lint 0 erros (55 warnings
+  `no-explicit-any`/pré-existentes, nenhum novo), 685 testes verdes + 4
+  skipped, 60 arquivos.
 
 #### Review (2026-09-12) — reaberto
 
