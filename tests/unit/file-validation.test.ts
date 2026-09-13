@@ -256,4 +256,19 @@ describe('finalizeDownload', () => {
             spy.mockRestore();
         }
     });
+
+    it('DL-004 achado 6: rename para o destino final falhando não deixa o placeholder de 0 byte nem o .part', async () => {
+        writeFileSync(part(), PDF);
+        const spy = vi.spyOn(fs.promises, 'rename').mockImplementation(async () => {
+            throw Object.assign(new Error('EBUSY: resource busy or locked'), { code: 'EBUSY' });
+        });
+
+        try {
+            await expect(finalizeDownload({ partPath: part(), dir, fileName: 'LISTA 1', contentType: 'application/octet-stream' })).rejects.toThrow();
+
+            expect(arquivos()).toEqual([]);
+        } finally {
+            spy.mockRestore();
+        }
+    });
 });
