@@ -1,6 +1,6 @@
 # DL-004: Identidade por id no caminho de download
 Status: open
-Stage: to-review
+Stage: to-merge
 Priority: P1
 Blocked by: DL-003
 
@@ -315,3 +315,63 @@ Verificado: `npx tsc --noEmit` limpo, `npx eslint .` 0 erros (55 warnings
 pré-existentes, nenhum nas linhas tocadas), `npx vitest run` 693 passed / 5
 skipped em 61 arquivos. Commits: `d2bc9dd` (teste, vermelho) e `62669f0`
 (implementação, verde), branch `dl-004`.
+
+## Revisão (2026-09-13, etapa 3, rodada 3) — Needs your call
+
+`npm run quality` verde na branch: tsc limpo, eslint 0 erros / 55 warnings
+pré-existentes, vitest 693 passed | 5 skipped em 61 arquivos. Vermelho provado:
+com `file-validation.service.ts` no estado de `d2bc9dd` e o teste novo no lugar,
+`tests/unit/file-validation.test.ts` dá 1 failed | 32 passed, e falha pelo motivo
+certo — `expected [ 'LISTA 1.pdf' ] to deeply equal []`, o placeholder de 0 byte
+sobrevivendo ao `rename` que rejeitou. Separação de commits correta: `d2bc9dd` só
+toca teste, `62669f0` só toca fonte.
+
+**Achado 6 fechado.** O `rename` ganhou `try` próprio; no `catch` o
+`unlink(filePath)` remove o placeholder que o `open('wx')` criou, e o `catch`
+externo segue limpando o `.part`. A remoção é segura porque o `open('wx')`
+provou que o arquivo não existia um instante antes — nunca é arquivo de
+terceiro. Os caminhos de falha anteriores (`too-large`, `validateHead`,
+`isInsideRoot`) ficam antes do `open` e não passam por esse `try`. O chamador
+(`http-scraper.service.ts:912`) já converte o throw em
+`{ success: false, error }`; `finalizeDownload` é o único ponto do repositório
+que cria placeholder (`grep 'wx'` volta só `:246`).
+
+Critérios: 1 ✅, 2 ✅, 3 ✅, 4 ✅ (todos inalterados desde a rodada 2), 5 ⚠️.
+
+### Por que não mergeio sozinho
+
+Critério 5 continua **não atendido como escrito**. Ele pede dedup "chaveada por
+id"; a entrega é ordenação de candidatos (`claimedPaths`), e o achado 3 mostra o
+caso que ela erra. As rodadas 1 e 2 marcaram ⚠️ e não reabriram por isso, com
+razão — o conserto é um índice persistido id → caminho, arquivo novo e decisão
+de etapa 1. Mas fechar `DL-004` como `done` grava um critério cumprido que não
+foi, e a nota do achado 3 evapora junto com o ticket.
+
+A pergunta é a mesma que a nota do `DL-005` deixou aqui em **2026-09-11** e que
+ninguém respondeu, agora pela terceira rodada: o índice persistido id → caminho
+vira ticket próprio, ou volta para cá como critério? Duas saídas, as duas suas:
+
+- **Ticket novo** (ex.: `DL-006`), critério 5 reescrito aqui para o que a
+  implementação de fato entrega, e `DL-004` fecha.
+- **Volta para etapa 1**, o critério 5 fica como está e `DL-004` reabre com o
+  índice no escopo.
+
+### Notas que seguem abertas, sem virar critério
+
+- **Resíduo do próprio achado 6.** O `unlink(filePath).catch(() => { })` é
+  best-effort: se o mesmo lock que derrubou o `rename` também recusar o
+  `unlink`, o placeholder fica. Vai de "vaza sempre" para "vaza só quando as
+  duas chamadas falham", e tem a mesma forma do `cleanup()` de `:191`. Não vale
+  código novo.
+- **Janela não atômica.** `open('wx')` + `rename` são dois passos; queda de
+  energia ou kill do processo entre eles ainda deixa o placeholder. Estrutural,
+  já registrado no achado 6.
+- **Achado 5** (cache do renderer não migra) e **achado 4** (dois arquivos fora
+  dos Primary files) seguem como registro das rodadas anteriores.
+- **Carry-over do `DL-003` continua aberto**: o descarte do `.part` no ramo
+  `writer.on('error')` (`http-scraper.service.ts:920-924`) segue sem teste. Três
+  rodadas editaram `file-validation.test.ts` e nenhuma o cobriu. Se sair ticket
+  novo, cabe nele.
+- **Teste do achado 1 é fraco.** Ele mocka `fs.promises.link`, que o código não
+  chama mais; passa por vacuidade e só serve de guarda contra reintroduzir o
+  `link`. Não vale reabrir, mas não conte como cobertura do caminho FAT.
