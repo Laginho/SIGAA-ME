@@ -21,7 +21,7 @@ const COURSES = [
         id: 'c1', name: 'Estruturas de Dados', code: 'CK0210', period: '2026.1',
         fileCount: 1,
         files: [{ id: 'f1', name: 'Lista 1.pdf', type: 'file' }],
-        news: [{ id: 'n1', title: 'Prova adiada', date: '01/01/2026', notification: '', content: '<p>Conteúdo.</p>' }],
+        news: [{ id: 'n1', title: 'Prova adiada', date: '01/01/2026', notification: 'Sim', content: '<p>Conteúdo.</p>' }],
     },
 ];
 
@@ -217,6 +217,12 @@ test.describe('Acessibilidade', () => {
                     // da navegação, não que sobreviveu a ela — um render que
                     // resetasse `data-theme` passaria em branco (A11Y-001).
                     expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe(theme);
+                    if (hash === '#/course/c1') {
+                        // Abre o modal pelo controle real, não por `showModal()` direto:
+                        // prova o mesmo caminho que um usuário de teclado ou mouse usa.
+                        await page.locator('.news-item').first().click();
+                        await expect(page.locator('#newsModal[open]')).toBeVisible();
+                    }
                     // `legacyMode`: o modo padrão roda a análise final numa página em
                     // branco à parte (`context.newPage()`) para escapar do CSP do
                     // app — e o Electron não suporta criar um novo target por CDP
