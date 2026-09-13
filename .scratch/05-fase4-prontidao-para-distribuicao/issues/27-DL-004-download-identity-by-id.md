@@ -1,6 +1,6 @@
 # DL-004: Identidade por id no caminho de download
 Status: open
-Stage: to-review
+Stage: to-implement
 Priority: P1
 Blocked by: DL-003
 
@@ -12,6 +12,8 @@ Blocked by: DL-003
   - `electron/services/download.service.ts` (dedup por `file.name` em `downloadCourseFiles`, `:332-346` — só se ainda existir; ver `CLEAN-003`)
   - `src/pages/course-detail.ts` (cache `downloadedFiles` e casamento do botão de progresso, `:277`, `:300`, `:340`, `:388`)
   - `tests/integration/audit-download-disk.test.ts` (acrescentar o `it.each` de colisão)
+  - `tests/unit/file-validation.test.ts` (acrescentado na revisão de 2026-09-13:
+    é onde os testes dos achados 1 e 2 cabem)
   - New: `tests/unit/audit-download-identity.test.ts`
 
 Achados Broken #2 e #3 de `docs/audits/2026-09-09-40a0d01.md`, passos 2 e 3 da
@@ -131,3 +133,84 @@ Já encaminhado no master: `CourseFile.id` e `DownloadToken` existem no pedido;
   skipped, `npx eslint .` 0 erros (55 warnings pré-existentes de
   `no-explicit-any`, nenhum nas linhas tocadas). Commits: `b41abea` (testes,
   vermelho) e `14ef21e` (implementação, verde), branch `dl-004`.
+
+## Revisão (2026-09-13, etapa 3) — reaberto
+
+`npm run quality` verde na branch: tsc limpo, eslint 0 erros / 55 warnings
+pré-existentes, vitest 690 passed | 5 skipped em 61 arquivos. Vermelho provado:
+com `electron/`, `shared/` e `src/` revertidos ao master e os testes da branch
+no lugar, os três arquivos tocados dão 6 failed | 2 passed. Separação de commits
+correta — `b41abea` só toca teste, `14ef21e` não toca nenhum.
+
+Critérios:
+
+1. ✅ Retry casa por id com dois `same.txt`; `downloadFile.mock.calls[2]` recebe
+   `'2'` e `SCRIPT_B`. O fallback Playwright (`sigaa.service.ts:578`) também
+   passou a casar por id, mas nenhum teste novo o exercita — o critério admite
+   "ou", então não segura o merge.
+2. ✅ `fileId` em `DownloadRecord` e `DownloadProgress`, renderer casando botão
+   e cache por id; `grep '\.name ===' electron/services/sigaa.service.ts` volta
+   vazio.
+3. ⚠️ Provado em disco real nos três casos de colisão. Vale só onde o sistema
+   de arquivos tem hard link — ver achado 1.
+4. ❌ Fora do NTFS "nunca sobrescreve" virou "nunca grava". Ver achado 1.
+5. ⚠️ Entregue como ordenação de candidatos, não como id, e a própria nota de
+   implementação diz por quê. Ver achado 3: não é trabalho desta rodada.
+
+### O que falta
+
+**Achado 1 — `fs.promises.link` não existe em FAT32/exFAT, e o laço só trata
+`EEXIST` (`file-validation.service.ts:235-246`).** A pasta de downloads é
+escolhida pelo usuário no diálogo; num pendrive ou cartão SD (exFAT é o padrão
+acima de 32 GB) o Windows recusa hard link e o Node devolve `EPERM`, que não é
+`EEXIST` e portanto sai pelo `throw`. O `catch` externo apaga o `.part` e o
+`http-scraper` resolve `{ success: false }`. Antes de `14ef21e` o `rename`
+funcionava nesses volumes: todo download passa a falhar onde antes passava, e
+nenhum teste pega isso porque a suíte grava em `tmp` no disco de sistema.
+
+Direção sugerida, não obrigatória: trocar o `link` por criação exclusiva mais
+`rename` — `fs.promises.open(filePath, 'wx')`, fechar, `rename(partPath,
+filePath)`. `wx` é `O_CREAT|O_EXCL`, dá o mesmo `EEXIST` que alimenta o sufixo
+numerado, funciona em FAT, e o `rename` sobre o placeholder de 0 byte que nós
+mesmos criamos não apaga arquivo de ninguém. Teste: `fs.promises.link` (ou o
+`open`) recusando com `EPERM` e o arquivo ainda chegando ao destino.
+
+**Achado 2 — `await fs.promises.unlink(partPath)` (`:247`) transforma download
+concluído em falha reportada.** Depois do `link` o arquivo final já está em
+disco; se o `unlink` do `.part` falhar (lock de antivírus ou indexador, comum no
+Windows), o `catch` externo relança, o chamador reporta erro e o retry baixa de
+novo — agora achando o nome ocupado e criando `nome (1).ext`. Um arquivo vira
+dois e o usuário vê "falhou". Vale só se o `link` ficar; a alternativa do achado
+1 dissolve o problema, porque o `rename` consome o `.part`.
+
+Os dois cabem em `file-validation.service.ts`, já Primary file. Voltaram para a
+etapa 2 e não para um fix de revisão porque precisam de teste novo.
+
+### Notas, sem virar critério
+
+**Achado 3 — critério 5 não é por id, e não pode ser sem estado novo.** O
+`claimedPaths` reserva candidatos na ordem do array `files`; se o usuário já
+baixou só o segundo homônimo, o primeiro id do lote reivindica o nome-base,
+acha o arquivo do outro no `existsSync` e sai `skipped` sem nunca ter baixado.
+Fica melhor que o master (que descartava os dois) e pior que o texto do
+critério. O conserto de verdade é um índice persistido id → caminho, que é
+arquivo novo e decisão de etapa 1 — mesma pergunta que a nota do `DL-005` já
+deixou aqui em 2026-09-11 e que ninguém respondeu. Se virar ticket, os dois
+achados são o mesmo.
+
+**Achado 4 — dois arquivos fora dos Primary files.**
+`electron/ipc/register-handlers.ts` (forçado pela assinatura de `onProgress`) e
+`electron/services/download-path.ts` (novo `withNumberedSuffix`). Ambos mínimos
+e necessários; nenhum foi declarado no relatório, como o `CLAUDE.md` pede. Não
+reverto nem reabro por isso — fica o registro.
+
+**Achado 5 — o cache do renderer não migra.** `downloadedFiles[courseId]` passa
+a ser chaveado por id; quem já usava o app perde o ✅ de tudo que baixou até
+hoje, e as chaves antigas por nome ficam órfãs (a poda é por caminho, então só
+somem se o arquivo sumir). É o que o critério 2 pede, e o id do JSF é o id do
+material no banco do SIGAA, estável entre sessões — a perda é única, não
+recorrente.
+
+**Carry-over do `DL-003` continua aberto.** O descarte do `.part` no ramo
+`writer.on('error')` segue sem teste; esta rodada editou
+`audit-download-disk.test.ts` e não o cobriu. Cabe junto com os achados 1 e 2.
