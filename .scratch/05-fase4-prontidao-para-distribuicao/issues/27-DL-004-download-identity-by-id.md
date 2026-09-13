@@ -1,6 +1,6 @@
 # DL-004: Identidade por id no caminho de download
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P1
 Blocked by: DL-003
 
@@ -296,3 +296,22 @@ caminhos.
 Cabe em `file-validation.service.ts` e `tests/unit/file-validation.test.ts`, os
 dois já Primary files. Voltou para a etapa 2 e não para um fix de revisão porque
 precisa de teste novo.
+
+#### Implementação da rodada 3 (2026-09-13)
+
+Achado 6: `finalizeDownload` agora separa o `rename(partPath, filePath)` num
+`try` próprio. Se rejeitar, o `catch` faz `fs.promises.unlink(filePath)` (o
+placeholder de 0 byte que o `open('wx')` criou) antes de relançar — o `catch`
+externo continua limpando `partPath` como já fazia. Caminhos de falha
+anteriores (`too-large`, `validateHead`) não são afetados: `filePath` só é
+criado depois deles, então nunca chegam a esse `try`.
+
+Teste novo em `tests/unit/file-validation.test.ts`: mock de
+`fs.promises.rename` rejeitando com `EBUSY`, confirmando vermelho contra o
+código antigo (placeholder ficava, `readdirSync` do destino devolvia
+`['LISTA 1.pdf']`) antes da mudança.
+
+Verificado: `npx tsc --noEmit` limpo, `npx eslint .` 0 erros (55 warnings
+pré-existentes, nenhum nas linhas tocadas), `npx vitest run` 693 passed / 5
+skipped em 61 arquivos. Commits: `d2bc9dd` (teste, vermelho) e `62669f0`
+(implementação, verde), branch `dl-004`.
