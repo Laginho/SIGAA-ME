@@ -1,6 +1,6 @@
 # OBS-003 — Gate raw HTML dumps, wire diagnostics clear, clean legacy logs
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P2
 Blocked by: OBS-005
 
@@ -421,5 +421,53 @@ foi estendido com `tests/unit/navigation-policy.test.ts` (só o mock de
 `app.getPath`) para a etapa 2 não ficar sem limite onde trabalhar. Escopo
 desta rodada: só o item acima; nada mais do ticket muda. A branch `obs-003`
 tem todo o resto e é onde o trabalho continua.
+
+Critérios 1 a 7: ✅, sem mudança desde a revisão anterior.
+
+## Nota da etapa 2 — critério 8, item 1 do achado da revisão anterior (2026-09-12)
+
+Escopo desta rodada: só o item 1 do "O que falta" (o mock de `getPath` em
+`navigation-policy.test.ts`). Dois commits na branch `obs-003`: teste vermelho
+(`543513d`), depois o ajuste do mock (`5922ddb`).
+
+`getPath: vi.fn(() => os.tmpdir())` virou
+`getPath: vi.fn(() => path.join(os.tmpdir(), 'sigaa-me-navigation-policy-test'))`,
+mesmo padrão do `importRoot` que `legacy-log-cleanup.test.ts` já usa. `path`
+passou a vir de `await import('node:path')` dentro do próprio factory do
+`vi.mock('electron', ...)`, ao lado do `os` que já estava lá — referenciar o
+`import path from 'path'` do topo do arquivo de dentro do factory arriscava o
+hoisting do `vi.mock`.
+
+Prova vermelho-verde antes deste relatório: com o teste novo já commitado e
+o mock ainda no `os.tmpdir()` cru, `npx vitest run
+tests/unit/navigation-policy.test.ts` → **1 failed | 73 passed (74)**, pelo
+motivo certo (`AssertionError: expected 'C:\Users\Lage\AppData\Local\Temp'
+not to be 'C:\Users\Lage\AppData\Local\Temp'`); com o mock ajustado, mesma
+suíte → **74 passed**. `npm run quality`: 0 erros, 55 warnings
+(`no-explicit-any`, todos legados, nenhum novo). `npx vitest run` completo:
+**658 passed | 4 skipped (662)** — um a mais que o baseline da revisão
+anterior (657/661), o teste novo deste critério.
+
+Item 2 do "O que falta" (cobertura que não dependa de alguém lembrar, contra
+qualquer importador futuro de `electron/main`) **não foi escrito**, decisão
+explicitamente deixada a critério desta etapa. Duas formas cogitadas e
+descartadas:
+
+- Varredura estática de `tests/unit/*.test.ts` por regex procurando a
+  combinação "`getPath` retorna `os.tmpdir()` cru" + "`whenReady` dispara o
+  callback". É acoplada à formatação exata do mock (o próprio anti-padrão
+  "implementation-coupled" que a skill `tdd` lista) e frágil a qualquer
+  reformatação — o oposto de uma rede de segurança confiável.
+- Plantar um arquivo-canário em `os.tmpdir()` de verdade para provar que
+  nada o apaga reproduz, em menor escala, exatamente o problema que a
+  decisão do humano baniu: gravação/exclusão na raiz do temp do sistema
+  disparada por `npm test`.
+
+O critério 8, como escrito, cobre o caso concreto que motivou a reabertura
+(`navigation-policy.test.ts`). Os outros dois importadores de
+`electron/main` (`updater-consent.test.ts`, e o mock do topo de
+`legacy-log-cleanup.test.ts`) continuam seguros por não disparar o callback
+do `whenReady` (`then: vi.fn()`), como a revisão anterior já registrou — sem
+mudança nesta rodada.
 
 Critérios 1 a 7: ✅, sem mudança desde a revisão anterior.
