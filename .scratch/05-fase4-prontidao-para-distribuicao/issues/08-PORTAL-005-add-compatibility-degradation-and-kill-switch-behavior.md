@@ -1,6 +1,6 @@
 # PORTAL-005 — Kill-switch de compatibilidade: estado no main, sync pausado
 Status: open
-Stage: to-implement
+Stage: implementing
 Priority: P1
 Blocked by: OBS-003
 Tracker status at migration: `NOT STARTED`
