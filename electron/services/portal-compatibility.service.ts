@@ -48,6 +48,9 @@ export class PortalCompatibilityService {
         this.consecutiveFailures++;
         if (this.consecutiveFailures < STRUCTURAL_FAILURE_THRESHOLD) return;
 
+        // onChange só dispara na transição ok -> incompatible (decisão 5); uma
+        // falha a mais já incompatible atualiza a contagem persistida, sem notificar de novo.
+        const alreadyIncompatible = this.status().state === 'incompatible';
         const next: CompatibilityStatus = {
             state: 'incompatible',
             since: Date.now(),
@@ -56,7 +59,7 @@ export class PortalCompatibilityService {
         };
         this.cached = next;
         this.persist(next);
-        this.onChange(next);
+        if (!alreadyIncompatible) this.onChange(next);
     }
 
     /** Zera o contador; se estava `incompatible`, volta a `ok` e chama `onChange`. Nunca lança. */
