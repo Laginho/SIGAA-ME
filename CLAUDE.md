@@ -163,7 +163,7 @@ Duas armadilhas medidas em 2026-08-05, ambas custam meia hora se você não soub
 | Parser contra fixture | `tests/integration/parser-real.test.ts` | nada | vitest |
 | Visual | `tests/e2e/visual.spec.ts` | nada | playwright |
 | E2E sem credencial | `tests/e2e/app.spec.ts` (2 testes) | nada | playwright |
-| Live smoke do scraper | `tests/integration/scraper.test.ts` | `.env` **+** `RUN_LIVE_SIGAA_TESTS=true` | vitest |
+| Live smoke do scraper | `tests/integration/scraper.test.ts` | `.env` **+** `npm run test:live` (ou `RUN_LIVE_SIGAA_TESTS=true`) | vitest |
 | E2E fluxo completo | `app.spec.ts` (3 testes) | `.env` | playwright |
 
 Regras que sustentam isso:
