@@ -1,6 +1,6 @@
 # BUG-012: `simulateNewFile` rejeita a invoke quando a escrita do cache falha
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P4
 Blocked by: nenhum
 
@@ -73,3 +73,23 @@ Fora do escopo, não corrigido: o item de tray "Sincronizar Agora" (`main.ts:285
 chama `backgroundSyncService.syncNow()` sem `void` e sem `catch`. Hoje é inócuo
 (`runSync` engole tudo no próprio `catch`, e o coordenador só rejeita se `fn`
 rejeitar), por isso não virou ticket.
+
+#### Etapa 2 (2026-09-13) — teste prescrito não discriminava
+
+O teste pedido (`testApi.simulateNewFile()` resolve `false` com
+`writeFileSync` lançando) foi escrito, mas revertendo só o `try/catch` do
+`main.ts` a suíte continuava verde: o `catch` do handler em
+`register-handlers.ts` (segunda linha de defesa, mesmo commit `dfdf4d8`) já
+cobre esse retorno sozinho. Um teste nesse seam não cai sem **os dois**
+catches — confirmado revertendo ambos os arquivos para `ab64846`, vermelho;
+restaurados, verde. Isso ainda cobre o critério 1 como está escrito (fala do
+retorno da `invoke`, não de qual camada garante), mas não toca o critério 2.
+
+Acrescentei um segundo teste no mesmo arquivo: acha o item de tray `[Dev]
+Simular Arquivo Novo` no template capturado, chama `.click()` direto, e
+escuta `process.on('unhandledRejection')`. Vermelho contra `ab64846` (a
+rejection escapa, ninguém no caminho do tray a captura), verde com o commit
+atual. Cobre o critério 2, que ficava sem teste algum.
+
+Nenhum arquivo em `electron/` mudou — só o teste, commit `5d9d609` em cima da
+`bug-012`.
