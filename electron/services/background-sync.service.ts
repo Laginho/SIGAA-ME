@@ -9,18 +9,23 @@ import type { CourseSnapshot, CourseSummary, NotificationItem } from '../../shar
 import type { BackgroundSyncUpdate } from '../../shared/ipc';
 import { isRetryable } from '../../shared/errors';
 import type { AppSettings } from '../../shared/ipc';
+import type { PortalCompatibilityService } from './portal-compatibility.service';
 
 const log = logger.scope('BackgroundSync');
+
+type CompatibilityDeps = Pick<PortalCompatibilityService, 'status' | 'recordStructuralFailure' | 'recordSuccess'>;
 
 export class BackgroundSyncService {
     private sigaaService: SigaaService;
     private intervalId: NodeJS.Timeout | null = null;
     private isSyncing = false;
     private getWindow: () => BrowserWindow | null;
+    private compatibility?: CompatibilityDeps;
 
-    constructor(sigaaService: SigaaService, getWindow?: () => BrowserWindow | null) {
+    constructor(sigaaService: SigaaService, getWindow?: () => BrowserWindow | null, compatibility?: CompatibilityDeps) {
         this.sigaaService = sigaaService;
         this.getWindow = getWindow || (() => null);
+        this.compatibility = compatibility;
     }
 
     public start() {
@@ -62,6 +67,13 @@ export class BackgroundSyncService {
 
         const settings = persistenceService.getSettings();
         if (!settings.runInBackground) return Promise.resolve();
+
+        // Gate aqui, não em start()/stop(): o timer continua rodando, e quando o
+        // estado voltar a `ok` o próximo tick já sincroniza sem precisar de restart.
+        if (this.compatibility?.status().state === 'incompatible') {
+            log.info('Compatibility kill-switch engaged; skipping this cycle.');
+            return Promise.resolve();
+        }
 
         this.isSyncing = true;
         return this.sigaaService.operations.run('background', signal => this.runSync(settings, signal));
@@ -109,6 +121,9 @@ export class BackgroundSyncService {
                 // Deriva de seletor, pedido inválido ou erro desconhecido: um
                 // login automatizado não tem chance de resolver. Aborta sem relogar.
                 log.error(`getCourses failed (${coursesResult.error.code}); aborting without re-login.`, { error: coursesResult.error.message });
+                if (coursesResult.error.code === 'SELECTOR_DRIFT') {
+                    this.compatibility?.recordStructuralFailure('SELECTOR_DRIFT');
+                }
                 return;
             }
 
@@ -124,6 +139,7 @@ export class BackgroundSyncService {
 
             if (courses.length === 0) {
                 log.info('No courses found to sync.');
+                this.compatibility?.recordSuccess();
                 return;
             }
 
@@ -131,6 +147,7 @@ export class BackgroundSyncService {
             let totalNewNews = 0;
             let coursesWithUpdates = 0;
             let singleCourseUpdateName = '';
+            let structuralDriftCourses = 0;
             const allCoursesData: CourseSnapshot[] = [];
             const newNotifications: NotificationItem[] = []; // Structured notifications for the bell
             const pendingCommits: { courseId: string; fileIds: string[]; newsIds: string[] }[] = [];
@@ -252,6 +269,7 @@ export class BackgroundSyncService {
                     });
                 } else {
                     log.warn('Failed to fetch content for course.', { courseName: course.name, error: contentResult.error.message });
+                    if (contentResult.error.code === 'SELECTOR_DRIFT') structuralDriftCourses++;
                 }
             }
 
@@ -259,6 +277,14 @@ export class BackgroundSyncService {
             if (signal.aborted) {
                 log.info('Cancelled; discarding this run before publish/commit.');
                 return;
+            }
+
+            // Ciclo completou: todas as disciplinas em drift é falha estrutural
+            // (decisão 1); sucesso total ou drift em só parte zera o contador.
+            if (structuralDriftCourses === courses.length) {
+                this.compatibility?.recordStructuralFailure('SELECTOR_DRIFT');
+            } else {
+                this.compatibility?.recordSuccess();
             }
 
             log.info('Sync complete.');
