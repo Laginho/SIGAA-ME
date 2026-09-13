@@ -26,9 +26,11 @@
  * Contrato e decisões: `.scratch/04-fase3-fronteiras-de-confianca/issues/04-SEC-003-*.md`.
  */
 import path from 'path';
+import * as os from 'os';
 import { pathToFileURL } from 'url';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ESLint } from 'eslint';
+import { app } from 'electron';
 
 const harness = vi.hoisted(() => {
     const windows: any[] = [];
@@ -138,6 +140,17 @@ import { classifyNavigation, installNavigationGuard } from '../../electron/secur
 import { RENDERER_DIST } from '../../electron/main';
 
 const root = process.cwd();
+
+// OBS-003, critério 8: este arquivo dispara o `whenReady` mockado na hora
+// (linha do mock de `electron` acima) para poder inspecionar a janela real
+// criada no import — e isso executa `removeLegacyLogs(app.getPath('userData'))`
+// de verdade. Se `getPath` apontasse para o `os.tmpdir()` literal, todo
+// `npm test` apagaria arquivos reais na raiz do temp do sistema.
+describe('critério 8 (OBS-003): o getPath mockado aqui não é o os.tmpdir() literal', () => {
+    it('getPath não pode ser o os.tmpdir() cru, senão removeLegacyLogs mira o temp real', () => {
+        expect(app.getPath('userData')).not.toBe(os.tmpdir());
+    });
+});
 
 const DEV_APP = 'http://localhost:5173/';
 const FILE_APP = 'file:///C:/Users/aluno/AppData/Local/Programs/SIGAA-ME/resources/app.asar/dist/index.html';
