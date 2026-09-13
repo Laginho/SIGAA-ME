@@ -1,6 +1,6 @@
 # PORTAL-004 — Live compatibility check, manual e pré-release
 Status: open
-Stage: to-review
+Stage: reviewing
 Priority: P1
 Blocked by: ARCH-001
 Tracker status at migration: `PARTIAL`
@@ -65,6 +65,54 @@ npm run quality         # bloco live pulado, "Test Environment" passa
 - Commit: —
 - Schedule: nenhum (decisão 1)
 - Alert destination: nenhum (decisão 1)
+
+#### Revisão (2026-09-12, etapa 3)
+
+Critérios, um a um, conferidos contra o código de produção:
+
+1. ✅ **Nunca exige credencial.** `describeOrSkip` só vira `describe` com
+   `hasCredentials && runLiveSmokeTests`. `npm run quality` completo:
+   **55 arquivos, 645 passaram, 5 pulados** — os 5 pulados são exatamente os
+   `it` do bloco live.
+2. ✅ **Pontos de entrada do app, uma sessão.** `SigaaService.login` →
+   `getCourses` → `getCourseFiles` → `logout`, nessa ordem, num arquivo só
+   (vitest roda os `it` de um arquivo em sequência). As assinaturas casam com
+   `sigaa.service.ts:76,112,123,143`; os campos assertados existem em
+   `shared/domain.ts` (`CourseSummary.period`, `CourseFile.type: 'file'|'link'`,
+   `NewsSummary.date`). O `afterAll` chamar `logout()` de novo é seguro:
+   `playwright-login.service.ts:1254` guarda em `this.browser`.
+3. ✅ **Classificação pelo código de produção.** `getCourses` extrai com os
+   seletores do adapter (`STUDENT_PORTAL`) e, se a lista de turmas não for
+   reconhecida, sai em `SELECTOR_DRIFT` com
+   `describeMissingCourseListSelectors` (`playwright-login.service.ts:394-405`).
+   `getCourseFiles` passa por `validateCourseListDocument` antes do clique
+   (`playwright-login.service.ts:509`) e por `validateCourseEntryEnd` na
+   resposta (`http-scraper.service.ts:242`). `failFromResult` preserva o código
+   na origem (`PORTAL-001`) e o `unwrap` do teste lança
+   `${error.code}: ${message}`. Nenhuma cópia de parsing no teste.
+4. ✅ **Sem número fixo.** Nenhum `toHaveLength`/`toBeGreaterThan` de contagem;
+   os laços sobre `courses`/`files`/`news` não executam com zero itens.
+   Observação, não achado: o ramo `if (courses.length === 0) return` é
+   inalcançável na produção de hoje — `playwright-login.service.ts:394` trata
+   zero `courseIdInput` como `SELECTOR_DRIFT`, então uma conta sem turma
+   nenhuma falha antes de chegar ao teste. É comportamento pré-existente, fora
+   do escopo deste ticket; a guarda no teste continua correta.
+5. ✅ **`npm run test:live` é o opt-in.** Script confinado a
+   `tests/integration/scraper.test.ts`. `npm_lifecycle_event` confirmado neste
+   Windows/npm com um `package.json` descartável fora do repo: imprimiu
+   `test:live`. Sem `.env`, `hasCredentials` é falso e o bloco continua pulado.
+
+Separação de commits correta: `6e1929b` só toca o teste, `b15ae5a` só o
+`package.json`. Sem vermelho-verde por decisão 3 do próprio ticket — nenhuma
+asserção aqui roda sem credencial.
+
+Dois achados, ambos fora dos Primary files, corrigidos nesta passada:
+
+- `CLAUDE.md:166` afirmava que o tier live exige `RUN_LIVE_SIGAA_TESTS=true`.
+  Depois deste ticket isso é uma de duas formas, e a tabela é onde uma sessão
+  futura procura o comando do canário. Linha atualizada.
+- `QA-001` lista `test:live` em "Required scripts". O script agora existe;
+  nota adicionada nos `## Comments` de lá para não ser redefinido.
 
 ## Comments
 
