@@ -7,7 +7,6 @@
  * arquivo em disco, não um mock dele.
  */
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
-import * as fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -16,6 +15,18 @@ const loggerSpy = vi.hoisted(() => ({ error: vi.fn() }));
 vi.mock('../../electron/services/logger.service', () => ({
     logger: { scope: () => loggerSpy },
 }));
+
+/**
+ * `vi.spyOn(fs, 'writeFileSync')` não funciona em ESM (namespace não é
+ * reconfigurável); mockar o módulo inteiro e encaminhar para o `writeFileSync`
+ * real por padrão dá o mesmo controle sem esse limite.
+ */
+const fsMock = vi.hoisted(() => ({ writeFileSync: vi.fn() }));
+vi.mock('fs', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('fs')>();
+    fsMock.writeFileSync.mockImplementation(actual.writeFileSync);
+    return { ...actual, writeFileSync: fsMock.writeFileSync };
+});
 
 import { PortalCompatibilityService, STRUCTURAL_FAILURE_THRESHOLD } from '../../electron/services/portal-compatibility.service';
 
@@ -103,17 +114,13 @@ describe('PortalCompatibilityService — persistência (critério 2)', () => {
     it('escrita falhando (EPERM) mantém o flip em memória e loga, mas não deixa o arquivo no disco', () => {
         const onChange = vi.fn();
         const service = new PortalCompatibilityService(filePath, onChange);
-        const write = vi.spyOn(fs, 'writeFileSync').mockImplementation(() => {
+        fsMock.writeFileSync.mockImplementationOnce(() => {
             throw Object.assign(new Error('EPERM'), { code: 'EPERM' });
         });
 
-        try {
-            service.recordStructuralFailure('SELECTOR_DRIFT');
-            service.recordStructuralFailure('SELECTOR_DRIFT');
-            service.recordStructuralFailure('SELECTOR_DRIFT');
-        } finally {
-            write.mockRestore();
-        }
+        service.recordStructuralFailure('SELECTOR_DRIFT');
+        service.recordStructuralFailure('SELECTOR_DRIFT');
+        service.recordStructuralFailure('SELECTOR_DRIFT');
 
         expect(service.status()).toMatchObject({ state: 'incompatible' });
         expect(onChange).toHaveBeenCalledTimes(1);
