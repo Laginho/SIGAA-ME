@@ -1,6 +1,6 @@
 # A11Y-002: Cobrir o modal aberto e corrigir o contraste dos metadados
 Status: open
-Stage: to-implement
+Stage: implementing
 Priority: P2
 Blocked by: A11Y-001
 
