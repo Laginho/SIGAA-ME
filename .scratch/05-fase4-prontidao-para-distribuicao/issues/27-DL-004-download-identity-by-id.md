@@ -1,6 +1,6 @@
 # DL-004: Identidade por id no caminho de download
 Status: open
-Stage: to-review
+Stage: to-implement
 Priority: P1
 Blocked by: DL-003
 
@@ -236,3 +236,63 @@ recorrente.
 **Carry-over do `DL-003` continua aberto.** O descarte do `.part` no ramo
 `writer.on('error')` segue sem teste; esta rodada editou
 `audit-download-disk.test.ts` e não o cobriu. Cabe junto com os achados 1 e 2.
+
+## Revisão (2026-09-13, etapa 3, rodada 2) — reaberto
+
+`npm run quality` verde na branch: tsc limpo, eslint 0 erros / 55 warnings
+pré-existentes, vitest 692 passed | 5 skipped em 61 arquivos. Vermelho provado
+de novo: com `file-validation.service.ts` no estado de `5ecf7a0` e os testes de
+`5ecf7a0` no lugar, `tests/unit/file-validation.test.ts` dá 2 failed | 30
+passed, e os dois falham pelo motivo certo (`EPERM` no `link`, `EBUSY` no
+`unlink`). Separação de commits correta — `5ecf7a0` só toca teste, `5e91d2b`
+não toca nenhum.
+
+Critérios: 1 ✅, 2 ✅ (inalterados desde a rodada 1), 3 ✅ (a ressalva "só onde
+há hard link" caiu junto com o `link`), 4 ✅ (`O_CREAT|O_EXCL` mantém a
+exclusividade e agora funciona em FAT), 5 ⚠️ (inalterado; achado 3 segue nota).
+Os achados 1 e 2 da rodada 1 estão fechados.
+
+**Reabro por um defeito que a própria correção da rodada 2 introduziu, não por
+critério que caiu.**
+
+### O que falta
+
+**Achado 6 — o placeholder de 0 byte vaza no destino quando o `rename` falha
+(`file-validation.service.ts:244-257`).** `open(filePath, 'wx')` cria um arquivo
+vazio e o `rename` só vem no passo seguinte. Se o `rename` rejeitar, o `catch`
+chama `cleanup()`, que apaga **só o `partPath`** (`:191`) — o arquivo de 0 byte
+fica no destino para sempre. Duas consequências:
+
+1. O chamador reporta falha e o retry baixa de novo; agora o `open('wx')` acha
+   o placeholder órfão, sai por `EEXIST` e o arquivo bom vai para
+   `nome (1).ext`, enquanto o de 0 byte fica com o nome certo. É o sintoma do
+   achado 2 — "um arquivo vira dois e o usuário vê falhou" — reentrando por
+   outra porta.
+2. O dedup do lote (`sigaa.service.ts:357`) decide por `existsSync` puro. Na
+   próxima sincronização o placeholder conta como baixado e o arquivo sai
+   `skipped`: o usuário nunca recebe o conteúdo e fica com um chamariz de 0
+   byte que parece pronto. Permanente.
+
+`rename` falhar aqui não é hipótese remota: destino e `.part` estão na mesma
+pasta (`http-scraper.service.ts:862`, `download.service.ts:183`), então não é
+`EXDEV`, mas um handle de antivírus, do indexador do Windows ou de um agente de
+sync (OneDrive/Dropbox numa pasta de Downloads) sobre o arquivo recém-criado dá
+`EPERM`/`EBUSY` — exatamente a classe de lock que motivou o achado 2.
+
+Estrutural, e vale registrar: o `link` era atômico — o arquivo final existia
+completo ou não existia. `open('wx')` + `rename` são dois passos com um estado
+intermediário visível, então até um fechamento limpo do app ou queda de energia
+nessa janela deixa o placeholder.
+
+Direção sugerida, não obrigatória: marcar que o placeholder foi criado por nós e,
+no `catch`, remover `filePath` quando o `rename` não chegou a acontecer — sem
+remover nos caminhos de falha anteriores (`too-large`, `validateHead`), onde
+`filePath` pode ser arquivo de outro. Teste: `fs.promises.rename` rejeitando com
+`EBUSY`, e a pasta de destino terminando vazia — sem 0 byte e sem `.part`.
+Alternativa mais cara: tentar `link` primeiro e cair para `open('wx')` + `rename`
+só em `EPERM`/`ENOSYS`, preservando a atomicidade no NTFS ao custo de dois
+caminhos.
+
+Cabe em `file-validation.service.ts` e `tests/unit/file-validation.test.ts`, os
+dois já Primary files. Voltou para a etapa 2 e não para um fix de revisão porque
+precisa de teste novo.
