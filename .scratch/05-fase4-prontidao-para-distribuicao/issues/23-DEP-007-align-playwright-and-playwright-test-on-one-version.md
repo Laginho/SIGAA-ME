@@ -1,6 +1,6 @@
 # DEP-007: Alinhar playwright e @playwright/test numa só versão
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P1
 Blocked by: nenhum
 
@@ -41,6 +41,15 @@ npx playwright test app.spec.ts
 
 #### Implementation notes
 
-- Commit: —
-- Versão escolhida: —
-- Live smoke: —
+- Commit: (na branch `dep-007`, ver commit de código)
+- Versão escolhida: 1.63.0 (`playwright` e `@playwright/test`)
+- `npm ls playwright @playwright/test`: uma versão só, 1.63.0 para os dois
+  (deduped) — critério 1 ok.
+- `npm run quality`: verde (0 erros, 55 warnings pré-existentes de
+  `no-explicit-any`/`no-empty`, nenhum novo) — critério 2 ok.
+- `npx playwright test visual.spec.ts`: 11 passed — critério 3 ok.
+- `npx playwright test app.spec.ts`: 2 passed, 3 skipped (os 3 com credencial,
+  esperado sem `.env` de conta real) — critério 3 ok.
+- Live smoke: **pendente.** Critério 4 pede rodada manual do autor no Windows
+  com `RUN_LIVE_SIGAA_TESTS=true` — não roda em agente/loop (ver CLAUDE.md,
+  tiers de teste). Cole o resultado aqui antes de fechar o ticket.
