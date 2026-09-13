@@ -4,19 +4,18 @@
  *
  * `electron` é mockado no padrão de `ipc-validation.test.ts` (o `ipcMain.handle`
  * guarda canal → handler num `Map`; o `dialog.showMessageBox` responde o que o
- * teste mandar). `fs` é um `Map` em memória, só com o que o handler precisa
- * para apagar os `debug_*` do `userData`. Todo serviço entra pelas deps como
+ * teste mandar). `fs` é um `Map` em memória. Todo serviço entra pelas deps como
  * espião que registra a ordem das chamadas — a ordem **é** o critério "clear-all
  * não pode correr com uma escrita em background": nada destrutivo antes de a
  * sessão estar fechada, e a credencial some antes de qualquer outra coisa,
  * para que nenhum sync novo consiga começar no intervalo.
  *
- * Vermelho hoje pelo motivo certo: os dois handlers só chamam
- * `clearCredentials` + `sigaaService.logout`, não abrem dialog, e `IpcDeps` não
- * tem `cache`, `logger`, `userDataPath`, `clearBrowserStorage`
- * nem `backgroundSync.cancel`.
+ * OBS-003: o handler não apaga mais `debug_*` por prefixo — quem apaga os
+ * diagnósticos crus e estruturais agora é `deps.diagnostics.clear()`, o mesmo
+ * espião que os outros serviços destrutivos.
  *
- * Contrato e decisões: `.scratch/04-fase3-fronteiras-de-confianca/issues/06-DATA-002-*.md`.
+ * Contrato e decisões: `.scratch/04-fase3-fronteiras-de-confianca/issues/06-DATA-002-*.md`,
+ * `.scratch/05-fase4-prontidao-para-distribuicao/issues/14-OBS-003-*.md`.
  */
 import path from 'path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -131,6 +130,7 @@ function makeDeps(overrides: { settings?: Record<string, unknown> } = {}) {
         },
         cache: { clear: vi.fn(() => { record('cache.clear'); }) },
         logger: { clear: vi.fn(async () => { await tick(); record('logger.clear'); }) },
+        diagnostics: { clear: vi.fn(async () => { await tick(); record('diagnostics.clear'); }) },
         userDataPath: USER_DATA,
         clearBrowserStorage: vi.fn(async () => { await tick(); record('clearBrowserStorage'); }),
         getWindow: () => WIN,
@@ -151,7 +151,7 @@ async function invoke(channel: string, payload: unknown = undefined) {
 
 const DESTRUCTIVE = [
     'cache.clear', 'persistence.reset', 'logger.clear',
-    'clearBrowserStorage',
+    'diagnostics.clear', 'clearBrowserStorage',
 ] as const;
 
 function destructiveCalls(deps: Deps) {
@@ -159,6 +159,7 @@ function destructiveCalls(deps: Deps) {
         'cache.clear': deps.cache.clear,
         'persistence.reset': deps.persistence.reset,
         'logger.clear': deps.logger.clear,
+        'diagnostics.clear': deps.diagnostics.clear,
         'clearBrowserStorage': deps.clearBrowserStorage,
     };
 }
@@ -259,7 +260,7 @@ describe('clear-all-data', () => {
     });
 
     describe('what is removed', () => {
-        it('removes every store, every diagnostic capture and the browser partition, once each, and returns ok', async () => {
+        it('removes every store, every diagnostic capture and the browser partition, once each, through the services — never by its own path loop', async () => {
             plantUserData();
 
             const result = await invoke('clear-all-data');
@@ -271,12 +272,10 @@ describe('clear-all-data', () => {
             expect(deps.sigaaService.logout).toHaveBeenCalledTimes(1);
             expect(deps.backgroundSync.start).toHaveBeenCalledTimes(1);
 
-            const removed = fsMock.unlinked.map(f => path.basename(f)).sort();
-            expect(removed).toEqual(['debug_courses.json', 'debug_login_page.html', 'debug_portal_fail_540316.html']);
+            // OBS-003: o handler não apaga `debug_*` por conta própria mais —
+            // isso é `deps.diagnostics.clear()`, já verificado acima.
+            expect(fsMock.unlinked).toEqual([]);
             expect(fsMock.files.has(path.join(USER_DATA, 'keep.txt'))).toBe(true);
-            // cache.json e settings.json são dos serviços (`cache.clear`,
-            // `persistence.reset`), não do handler: ele não os toca por caminho.
-            expect(fsMock.unlinked.some(f => /cache\.json|settings\.json/.test(f))).toBe(false);
         });
 
         it('a userData with no captures is not an error', async () => {
@@ -327,9 +326,20 @@ describe('clear-all-data', () => {
             for (const [name, fn] of Object.entries(destructiveCalls(deps))) {
                 expect(fn, `${name} deixou de rodar por causa do cache`).toHaveBeenCalledTimes(1);
             }
-            expect(fsMock.unlinked.map(f => path.basename(f)).sort()).toEqual([
-                'debug_courses.json', 'debug_login_page.html', 'debug_portal_fail_540316.html',
-            ]);
+        });
+
+        it('diagnostics.clear() rejeitando aparece agregado em STORAGE, e os outros passos ainda rodam', async () => {
+            deps.diagnostics.clear.mockImplementation(async () => { throw new Error('EPERM: diagnostics/ em uso'); });
+
+            const result = await invoke('clear-all-data');
+
+            expect(result.success).toBe(false);
+            if (result.success) return;
+            expect(result.error.code).toBe('STORAGE');
+            expect(result.error.message).toContain('EPERM: diagnostics/ em uso');
+            for (const [name, fn] of Object.entries(destructiveCalls(deps))) {
+                expect(fn, `${name} deixou de rodar por causa do diagnostics.clear`).toHaveBeenCalledTimes(1);
+            }
         });
 
         it('collects more than one failure in the same message', async () => {
