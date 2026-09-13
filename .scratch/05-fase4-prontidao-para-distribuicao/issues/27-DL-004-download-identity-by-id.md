@@ -1,6 +1,6 @@
 # DL-004: Identidade por id no caminho de download
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P1
 Blocked by: DL-003
 
@@ -103,3 +103,31 @@ Já encaminhado no master: `CourseFile.id` e `DownloadToken` existem no pedido;
   Arquivo truncado ou página de erro salva com o nome certo fica em disco para
   sempre, reportado como `skipped`. Chavear por id não resolve isso; é decisão
   de etapa 1 se vira critério aqui ou ticket próprio.
+
+- Implementação (2026-09-13): os commits `6aeb67c` e `16f9e2e`
+  (`codex/fix-audit-2026-09-09`) citados em "Tests stage 2 writes" não existem
+  neste repositório — checados branches, remotes, reflog e `git cat-file -t`
+  em ambos, `not a valid object name`. Os testes de critério 1 e 3/4 foram
+  escritos do zero a partir dos próprios critérios em vez de cherry-pick.
+  Nenhum seam mudou; só a fonte do texto do teste.
+
+  Critério 5 não tem, e não pode ter, um registro persistido de "este id já
+  baixou para este caminho" — o processo não guarda esse mapa em lugar
+  nenhum. A implementação resolve por ordem: `claimedPaths` reserva, na ordem
+  do array `files`, um candidato de caminho distinto por arquivo do lote
+  (nome-base, depois sufixo numerado); só o primeiro arquivo a reivindicar um
+  candidato é comparado contra o disco por ele. Isso garante que um homônimo
+  novo nunca é julgado pelo `existsSync` de um candidato que outro arquivo do
+  mesmo lote já reivindicou — mas **não** identifica de fato "qual id" gravou
+  o arquivo pré-existente; é a melhor atribuição possível sem um índice
+  persistido por id, e casa com o texto do critério ("não derrubar um
+  homônimo novo"), não com "provar que o arquivo em disco é do id X". Critério
+  3/4 (o caminho final exclusivo de verdade) não depende disso: roda em
+  `finalizeDownload`, sequencial por lote, contra o disco real, via
+  `fs.promises.link` (falha `EEXIST` em vez de sobrescrever, ao contrário de
+  `rename`) com sufixo numerado até achar um caminho livre.
+
+  Verificado: `npx tsc --noEmit` limpo, `npx vitest run` 690 passed / 5
+  skipped, `npx eslint .` 0 erros (55 warnings pré-existentes de
+  `no-explicit-any`, nenhum nas linhas tocadas). Commits: `b41abea` (testes,
+  vermelho) e `14ef21e` (implementação, verde), branch `dl-004`.
