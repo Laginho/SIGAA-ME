@@ -15,8 +15,11 @@ Blocked by: nenhum
 
 `@vitest/browser` é o único achado **critical** do audit e não é referenciado
 por nenhum config, script ou teste do repositório (`grep` em 2026-09-11 só
-acha `package.json`, o lock e documentos históricos). `@vitest/ui` idem: não há
-script `--ui`. Remova os dois em vez de atualizar.
+acha `package.json`, o lock e documentos históricos). `@vitest/ui` só é usado
+pelo script `test:ui` (`vitest --ui`), modo watch interativo que nunca entrou
+em nenhum fluxo (`docs/PLANO.md:112`). Remova os dois pacotes e o script
+`test:ui` em vez de atualizar. Correção de 2026-09-12: o texto original dizia
+"não há script `--ui`", premissa errada que parou a attempt 1.
 
 Depois suba `vitest` para o último 4.x fora da faixa `2.1.0-beta.1 - 4.1.10`
 (4.1.11 ou maior). **Não** suba para o 5.0.0: major fora do escopo deste
@@ -24,7 +27,8 @@ ticket, abra outro se quiser.
 
 #### Acceptance criteria
 
-1. `@vitest/browser` e `@vitest/ui` ausentes do `package.json` e do lock.
+1. `@vitest/browser` e `@vitest/ui` ausentes do `package.json` e do lock, e o
+   script `test:ui` removido do `package.json`.
 2. `npm audit` sem linhas `@vitest/*`, `vitest`, `@vitest/mocker`.
 3. `npm ls` sem árvore de peers inválida.
 4. `npm run quality` verde com a mesma contagem de testes de antes
