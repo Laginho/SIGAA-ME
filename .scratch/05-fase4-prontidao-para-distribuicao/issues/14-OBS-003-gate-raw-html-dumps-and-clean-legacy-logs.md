@@ -1,6 +1,6 @@
 # OBS-003 — Gate raw HTML dumps, wire diagnostics clear, clean legacy logs
-Status: open
-Stage: to-review
+Status: resolved
+Stage: done
 Priority: P2
 Blocked by: OBS-005
 
@@ -471,3 +471,89 @@ do `whenReady` (`then: vi.fn()`), como a revisão anterior já registrou — sem
 mudança nesta rodada.
 
 Critérios 1 a 7: ✅, sem mudança desde a revisão anterior.
+
+## Revisão da etapa 3 — critério 8, item 1 (2026-09-12)
+
+Veredito: **Approve**. Critério 8 ✅.
+
+Separação de commits no `diff --stat`: `543513d` só acrescenta a asserção (13
+linhas), `5922ddb` só muda o mock (5 linhas). Ambos em
+`tests/unit/navigation-policy.test.ts`, o único arquivo da rodada — dentro do
+`Primary files` estendido pela revisão anterior. O `describe` novo vai além da
+letra "só o mock de `app.getPath`", mas é o que torna a correção vermelho-verde:
+sem asserção não há vermelho.
+
+Vermelho-verde refeito nesta sessão, não aceito do relatório:
+`git revert --no-commit 5922ddb` → `npx vitest run
+tests/unit/navigation-policy.test.ts` → **1 failed | 73 passed (74)**, pelo
+motivo certo (`expected 'C:\Users\Lage\AppData\Local\Temp' not to be
+'C:\Users\Lage\AppData\Local\Temp'`, `navigation-policy.test.ts:151`);
+restaurado, `npm run quality` → 0 erros, 55 warnings (`no-explicit-any`, todos
+legados), **658 passed | 4 skipped (662)**.
+
+**Medido, não deduzido.** Com `fs.appendFileSync` temporário na primeira linha
+de `removeLegacyLogs` gravando o `userDataPath` recebido, `npx vitest run` sobre
+os quatro importadores de `electron/main` registrou exatamente três caminhos,
+todos em pasta dedicada:
+
+    C:\...\Temp\sigaa-me-import-side-effect-14216
+    C:\...\Temp\sigaa-me-legacy-cleanup-14216
+    C:\...\Temp\sigaa-me-navigation-policy-test
+
+Nenhuma raiz de temp do sistema. A instrumentação foi revertida; a árvore está
+limpa e nenhuma dessas pastas fica para trás depois da suíte (`removeLegacyLogs`
+não cria diretório: o `readdirSync` dá ENOENT e é ignorado). A condição do
+humano — "exclusão de arquivo fora do repositório disparada por `npm test` não
+fica" — está satisfeita.
+
+#### Correção do registro: são quatro importadores, não três
+
+As duas revisões anteriores enumeraram três importadores de `electron/main`.
+Existe um quarto, `tests/integration/dev-cache-mutation-boundary.test.ts:107`, e
+ele **dispara** o callback do `whenReady` (`:15`, `whenReady: () =>
+Promise.resolve()` — promise real, o `.then` agenda o callback). Não é vazamento:
+o `getPath` dele (`:11`) devolve `'dev-001-user-data'`, caminho relativo que
+resolve para `<repo>/dev-001-user-data`, que não existe — `readdirSync` dá
+ENOENT, os dois `unlink` dão ENOENT, nada é apagado, nada sai do repositório.
+Por isso ele não aparece na medição acima. Fica registrado para o próximo leitor
+não herdar a contagem errada.
+
+#### Risco residual aceito
+
+O item 2 do "O que falta" (guarda que não dependa de alguém lembrar) não foi
+escrito, e a revisão anterior autorizou explicitamente essa escolha desde que o
+porquê ficasse registrado — ficou, com duas alternativas descartadas por razão
+válida (varredura por regex é acoplada à formatação; canário no temp real
+reproduz o que o humano baniu). O que sobra: a asserção nova é estreita, compara
+com `os.tmpdir()` e nada mais. Um mock futuro que devolva `os.homedir()` ou
+`process.cwd()` passa por ela. Aceito — fechar o caso concreto era o escopo da
+rodada, e a alternativa custava mais fragilidade do que cobria.
+
+Critérios 1 a 7: ✅, sem mudança desde a revisão anterior. Nenhuma correção de
+código feita por esta etapa.
+
+#### Resolution (2026-09-12)
+
+Fechada com 13 commits em `obs-003`, três reaberturas (critério 8 duas vezes) e
+nenhuma mudança de código na revisão final.
+
+- **Decisão.** Dumps crus passam por `DiagnosticsService.saveRaw`, gateado por
+  `shouldCaptureRawArtifact`, com teto de 20 compartilhado com `record()`;
+  `clear-all-data` volta a apagar `diagnostics/` via `deps.diagnostics.clear()`;
+  `removeLegacyLogs` roda dentro do `whenReady()`, não no import do módulo.
+- **Arquivos.** `electron/services/diagnostics.service.ts`,
+  `electron/services/playwright-login.service.ts`,
+  `electron/services/http-scraper.service.ts`,
+  `electron/ipc/register-handlers.ts`, `electron/main.ts`; testes em
+  `tests/unit/diagnostics-raw.test.ts`, `tests/unit/legacy-log-cleanup.test.ts`,
+  `tests/unit/navigation-policy.test.ts`,
+  `tests/integration/clear-all-data.test.ts`,
+  `tests/unit/diagnostics-redaction.test.ts`, `tests/e2e/clear-all.spec.ts`.
+- **Vermelho-verde.** Rodada principal: `git revert --no-commit 24e0048` →
+  14 failed. Critério 8: `git revert --no-commit a80d289` → 1 failed. Item 1:
+  `git revert --no-commit 5922ddb` → 1 failed. Todos refeitos pelo revisor.
+- **Gate.** `npm run quality` → 0 erros, 55 warnings (`no-explicit-any`, todos
+  legados), 658 passed | 4 skipped (662).
+- **Desvio aceito.** Um `shouldCaptureRawArtifact` inline permanece em
+  `playwright-login.service.ts:333`, verificado na primeira revisão: sem ele,
+  `getCourses()` pagaria um `page.content()` extra em produção.
