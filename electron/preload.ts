@@ -2,6 +2,7 @@ import { ipcRenderer, contextBridge, type IpcRendererEvent } from 'electron'
 import type { CourseId } from '../shared/domain'
 import type {
   BackgroundSyncUpdate,
+  CompatibilityStatus,
   DownloadAllFilesPayload,
   DownloadFilePayload,
   DownloadProgress,
@@ -58,6 +59,14 @@ const api: RendererApi = {
     const subscription = (_event: IpcRendererEvent, data: BackgroundSyncUpdate) => callback(data)
     ipcRenderer.on('background-sync-update', subscription)
     return () => ipcRenderer.off('background-sync-update', subscription)
+  },
+
+  // Compatibility kill-switch (PORTAL-005)
+  getCompatibilityStatus: () => ipcRenderer.invoke('get-compatibility-status'),
+  onCompatibilityChanged: (callback: (status: CompatibilityStatus) => void) => {
+    const subscription = (_event: IpcRendererEvent, status: CompatibilityStatus) => callback(status)
+    ipcRenderer.on('compatibility-changed', subscription)
+    return () => ipcRenderer.off('compatibility-changed', subscription)
   }
 }
 
