@@ -19,7 +19,7 @@
  */
 import path from 'path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ok } from '../../shared/errors';
+import { fail, ok } from '../../shared/errors';
 import { registerIpcHandlers } from '../../electron/ipc/register-handlers';
 
 const electronMock = vi.hoisted(() => {
@@ -131,6 +131,11 @@ function makeDeps(overrides: { settings?: Record<string, unknown> } = {}) {
         cache: { clear: vi.fn(() => { record('cache.clear'); }) },
         logger: { clear: vi.fn(async () => { await tick(); record('logger.clear'); }) },
         diagnostics: { clear: vi.fn(async () => { await tick(); record('diagnostics.clear'); }) },
+        compatibility: {
+            status: vi.fn(() => ({ state: 'ok' as const })),
+            recordSuccess: vi.fn(() => { record('compatibility.recordSuccess'); }),
+            clear: vi.fn(async () => { await tick(); record('compatibility.clear'); }),
+        },
         userDataPath: USER_DATA,
         clearBrowserStorage: vi.fn(async () => { await tick(); record('clearBrowserStorage'); }),
         getWindow: () => WIN,
@@ -151,7 +156,7 @@ async function invoke(channel: string, payload: unknown = undefined) {
 
 const DESTRUCTIVE = [
     'cache.clear', 'persistence.reset', 'logger.clear',
-    'diagnostics.clear', 'clearBrowserStorage',
+    'diagnostics.clear', 'clearBrowserStorage', 'compatibility.clear',
 ] as const;
 
 function destructiveCalls(deps: Deps) {
@@ -161,6 +166,7 @@ function destructiveCalls(deps: Deps) {
         'logger.clear': deps.logger.clear,
         'diagnostics.clear': deps.diagnostics.clear,
         'clearBrowserStorage': deps.clearBrowserStorage,
+        'compatibility.clear': deps.compatibility.clear,
     };
 }
 
@@ -342,6 +348,20 @@ describe('clear-all-data', () => {
             }
         });
 
+        it('compatibility.clear() rejeitando aparece agregado em STORAGE, e os outros passos ainda rodam', async () => {
+            deps.compatibility.clear.mockImplementation(async () => { throw new Error('EPERM: compatibility.json em uso'); });
+
+            const result = await invoke('clear-all-data');
+
+            expect(result.success).toBe(false);
+            if (result.success) return;
+            expect(result.error.code).toBe('STORAGE');
+            expect(result.error.message).toContain('EPERM: compatibility.json em uso');
+            for (const [name, fn] of Object.entries(destructiveCalls(deps))) {
+                expect(fn, `${name} deixou de rodar por causa do compatibility.clear`).toHaveBeenCalledTimes(1);
+            }
+        });
+
         it('collects more than one failure in the same message', async () => {
             deps.persistence.reset.mockImplementation(() => { throw new Error('settings.json: EACCES'); });
             deps.logger.clear.mockImplementation(async () => { throw new Error('logs/: EBUSY'); });
@@ -382,6 +402,34 @@ describe('logout', () => {
         expect(result.error.message).toContain('credentials.json: EPERM');
         expect(deps.backgroundSync.cancel).toHaveBeenCalledTimes(1);
         expect(deps.sigaaService.logout).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('get-course-files', () => {
+    it('um fetch bem-sucedido restaura a compatibilidade chamando recordSuccess', async () => {
+        deps.sigaaService.getCourseFiles.mockResolvedValueOnce(ok({ files: [], news: [] }));
+
+        await invoke('get-course-files', { courseId: 'c1', courseName: 'Course 1' });
+
+        expect(deps.compatibility.recordSuccess).toHaveBeenCalledTimes(1);
+    });
+
+    it('um fetch com falha não mexe na compatibilidade', async () => {
+        deps.sigaaService.getCourseFiles.mockResolvedValueOnce(fail('SELECTOR_DRIFT', 'drift'));
+
+        await invoke('get-course-files', { courseId: 'c1', courseName: 'Course 1' });
+
+        expect(deps.compatibility.recordSuccess).not.toHaveBeenCalled();
+    });
+});
+
+describe('get-compatibility-status', () => {
+    it('devolve o que o serviço reporta', async () => {
+        deps.compatibility.status.mockReturnValue({ state: 'incompatible', since: 1, failures: 3, lastCode: 'SELECTOR_DRIFT' });
+
+        const result = await invoke('get-compatibility-status');
+
+        expect(result).toEqual({ state: 'incompatible', since: 1, failures: 3, lastCode: 'SELECTOR_DRIFT' });
     });
 });
 
