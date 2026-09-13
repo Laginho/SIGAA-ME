@@ -1,6 +1,6 @@
 # DEP-004: Remover @vitest/browser e @vitest/ui sem uso e alinhar o vitest
-Status: open
-Stage: to-review
+Status: resolved
+Stage: done
 Priority: P1
 Blocked by: nenhum
 
@@ -57,3 +57,40 @@ npm run quality
 - Não editado (fora de Primary files): `docs/PLANO.md:112` ainda cita
   `test:ui` como script existente — ficou desatualizado por este ticket, mas
   não está nos Primary files. Deixo nota aqui em vez de editar.
+
+#### Resolution (2026-09-13)
+
+Aprovado na revisão de etapa 3 sem nenhuma mudança de código. Merge por PR #18
+(`25ff364`), fast-forward de `b3812b1`.
+
+**Critérios, um a um, verificados no Windows nesta branch:**
+
+1. ✅ `@vitest/browser`, `@vitest/ui` e o script `test:ui` fora do
+   `package.json`. O que resta no lock são as declarações de
+   `peerDependencies`/`peerDependenciesMeta` dentro do manifesto do próprio
+   `vitest` (`package-lock.json:9419-9470`), com `optional: true` — metadado,
+   não pacote instalado. `npm explain @vitest/ui` não acha nada.
+2. ✅ `npm audit` sem nenhuma linha `vitest`/`@vitest/*`. Restam 18
+   vulnerabilidades (1 low, 16 high, 1 critical); a critical passou a ser
+   `tar <=7.5.20` via `electron-builder`, fora do escopo.
+3. ✅ `npm ls` limpo, 22 raízes, sem `UNMET`/`invalid`, `vitest@4.1.11`.
+4. ✅ `npm run quality` verde: ESLint `0 errors, 55 warnings` (todos
+   `no-explicit-any` preexistentes) e `Test Files 60 passed (60)`,
+   `Tests 685 passed | 5 skipped (690)` em `RUN v4.1.11` — idêntico ao antes,
+   como esperado, já que nenhum arquivo de teste foi tocado.
+
+**Sem commit de teste, e está certo.** Remoção de dependência não tem seam para
+testar; a prova do upgrade é a suíte inteira rodando em 4.1.11.
+
+**Checagens extras do revisor:** o lock confere devDep a devDep com o
+`package.json`, então o `npm ci` do CI resolve sem desvio; nada em `allowScripts`
+mudou, porque o diff do lock só mexe na família vitest e nas transitivas que
+saíram com ela (`@blazediff/core`, `@polka/url`, `fflate`, `mrmime`, `pngjs`,
+`sirv`, `totalist`, `ws`) — `electron` e `esbuild` intactos. O `ws` saiu da
+árvore e ninguém o pede (`npm explain ws` → nada): era transitiva do
+`@vitest/browser`, e o `jsdom@29` não depende dele. CI verde nos três jobs.
+
+**Sobre a nota de `docs/PLANO.md:112`:** conferido, não é achado. Aquela linha
+está na seção "Achados que a auditoria original não registrou", um registro
+datado de 2026-08-02, não uma descrição do estado atual dos scripts. Mesma
+leitura para `CODE_REVIEW.md:139` e `docs/AUDITORIA_COMPLEXIDADE.md:43`.
