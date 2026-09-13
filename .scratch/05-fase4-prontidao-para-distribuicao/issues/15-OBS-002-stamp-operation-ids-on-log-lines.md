@@ -1,6 +1,6 @@
 # OBS-002 — Stamp operation IDs on log lines
-Status: open
-Stage: to-review
+Status: resolved
+Stage: done
 Priority: P3
 Blocked by: OBS-004
 
@@ -78,6 +78,71 @@ parâmetro para documentar o call site).
   aceito; o teste não deve exigir id ali.
 - Nenhum parâmetro `operationId` novo em assinatura de método: se apareceu, o
   `AsyncLocalStorage` não está sendo usado.
+
+## Revisão da etapa 3 (Opus, 2026-09-12) — segunda passada, fechada
+
+Base `master` (`35248ae`), HEAD revisado `5ce5c50` mais o commit desta revisão.
+Escopo: o diff inteiro (`git diff master...obs-002`), porque a primeira passada
+caiu sobre o requisito que o humano cortou, não sobre o resto do código.
+
+#### Resolution (2026-09-12)
+
+Aprovada. Um achado de Standards corrigido nesta revisão — cabe nos Primary
+files e não pede teste novo, então é fix pequeno pela régua do loop.
+
+- ✅ **Critério 1, id dentro e só dentro da operação.**
+  `tests/unit/operation-id.test.ts:23-32` prova os dois lados: `seenInside`
+  definido, `currentOperationId()` de volta a `undefined` depois do resolve.
+  O store é um `AsyncLocalStorage` de módulo
+  (`session-operation-coordinator.service.ts:14`), separado do `this.context`
+  da fila, e o logger o lê por import de função
+  (`logger.service.ts:4,218-219`). A direção do import é a certa: o logger
+  importa o coordenador, o coordenador não importa o logger — sem ciclo.
+- ✅ **Critério 2, concorrência e aninhamento.**
+  `operation-id.test.ts:41-65` roda duas operações intercaladas por
+  `setTimeout(0)` e exige id estável em cada uma e diferente entre elas;
+  `:83-94` cobre o reentrante do `CONC-001`. O aninhado herda porque
+  `run()` devolve `fn(outer.controller.signal)` inline quando já há operação
+  viva (`session-operation-coordinator.service.ts:66-70`) — nunca chega em
+  `start()`, logo não cunha id novo.
+- ✅ **Critério 3, um ciclo de `syncNow` com um id só.**
+  `logging-boundary.test.ts:120-126` é o ponto que a auditoria de 2026-09-07
+  pediu: `backgroundSyncOpIds` faz `expect(match).not.toBeNull()` com a linha
+  na mensagem, em vez de `filter(Boolean)`. Re-rodado aqui contra o `master`
+  sem o patch, e ele falha nomeando exatamente a linha que era o risco:
+  `linha [BackgroundSync] sem op id: ... INFO [BackgroundSync] Triggering
+  background sync.`. O segundo ciclo prova id distinto.
+- ✅ **Contrato.** Assinaturas iguais às declaradas; formato
+  `[<scope>] [op:<id>] <message>` em `logger.service.ts:223`, com `opTag`
+  vazio fora de operação — por isso as linhas antigas não mudaram e as 56
+  suítes seguem verdes. `id` são 8 hex de `randomUUID()`.
+- ✅ **Nenhum `operationId` em assinatura.** `grep` no diff: nenhum parâmetro
+  novo. `background-sync.service.ts` não ganhou argumento — a linha de abertura
+  foi **movida** para dentro de `runSync`, que já roda dentro do
+  `operations.run`. O coordenador chama `fn` sempre, mesmo com o signal
+  abortado, então a linha não deixa de sair; ela só passa a sair depois da
+  fila admitir a operação.
+- ✅ **Achado de Standards corrigido.** `OperationIdContext.name` era escrito e
+  nunca lido. Com o requisito "name em meta" cortado, o campo é Speculative
+  Generality — removido neste commit. A assinatura `runOperation(name, fn)`
+  fica, como o humano decidiu, e o parâmetro é consumido por um `void name`
+  para não bater no `noUnusedParameters` do `tsconfig`.
+
+Os dois `AsyncLocalStorage.run` aninhados em `start()` ficam: são stores
+diferentes (`RunningOperation` para a reentrância do `CONC-001`, id de operação
+para o log) e juntá-los obrigaria o logger a importar a fila do coordenador.
+Não é duplicação acidental.
+
+Red-green re-executado nesta revisão, não herdado do relatório da etapa 2:
+com `electron/services/` de volta ao `master` e os testes da branch,
+`8 failed | 6 passed (14)`; com o patch, `npm run quality` verde —
+0 erros de ESLint (57 warnings herdados de `no-explicit-any`),
+`56 passed (56)` arquivos, `653 passed | 4 skipped (657)`.
+
+Fora do escopo, encaminhado: a nota do `OBS-005` sobre ~12 chamadas de
+`playwright-login.service.ts` que interpolam valor na mensagem foi copiada para
+os `## Comments` do `OBS-003`, que tem esse arquivo nos Primary files. Este
+ticket não tocou nenhuma daquelas linhas.
 
 ## Comments
 

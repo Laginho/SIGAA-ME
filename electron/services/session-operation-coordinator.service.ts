@@ -9,7 +9,6 @@ export type OperationKind = 'interactive' | 'background' | 'auth' | 'shutdown';
 
 interface OperationIdContext {
     id: string;
-    name: string;
 }
 
 const operationIdContext = new AsyncLocalStorage<OperationIdContext>();
@@ -18,9 +17,14 @@ const operationIdContext = new AsyncLocalStorage<OperationIdContext>();
  * Correlaciona as linhas de log de uma operação sem passar id por parâmetro
  * (OBS-002). `AsyncLocalStorage` de módulo, separado da fila do coordenador:
  * o logger lê `currentOperationId()` e o coordenador nunca importa o logger.
+ *
+ * `name` não é gravado em lugar nenhum: a linha de abertura que cada operação
+ * já emite diz o que está rodando (decisão de 2026-09-12). O parâmetro fica
+ * para documentar o call site.
  */
 export function runOperation<T>(name: string, fn: () => Promise<T>): Promise<T> {
-    return operationIdContext.run({ id: randomUUID().slice(0, 8), name }, fn);
+    void name;
+    return operationIdContext.run({ id: randomUUID().slice(0, 8) }, fn);
 }
 
 export function currentOperationId(): string | undefined {
