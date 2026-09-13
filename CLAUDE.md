@@ -47,9 +47,10 @@ Valem para qualquer papel, e principalmente para o implementador.
   fora do limite precisa mudar, diga no relatório em vez de mudar.
 - **Ninguém está assistindo.** Ação reversível coberta pelo pedido original
   (editar, rodar o gate, commitar na branch da tarefa) segue sem perguntar.
-  Parar para pedir permissão bloqueia o trabalho. Só pare em ação destrutiva,
-  ação externa (push, PR, mensagem) ou mudança de escopo. Autonomia sem o
-  limite acima vira creep de escopo; os dois andam juntos.
+  Parar para pedir permissão bloqueia o trabalho. Push, PR e merge dentro do
+  fluxo seguem o que a skill `ticket-flow` e a linha `Review:` do ticket mandam.
+  Só pare em ação destrutiva ou mudança de escopo. Autonomia sem o limite acima
+  vira creep de escopo; os dois andam juntos.
 - **Defina "pronto" antes de começar.** Pronto é: testes da issue passam,
   `npm run quality` verde, nada fora do limite tocado. Regra de estilo nenhuma
   substitui isso.
