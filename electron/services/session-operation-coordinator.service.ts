@@ -1,10 +1,35 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { randomUUID } from 'node:crypto';
 
 /**
  * `interactive`/`auth` abortam `background`; `shutdown` aborta tudo;
  * `background` não aborta ninguém (CONC-001, contrato na issue).
  */
 export type OperationKind = 'interactive' | 'background' | 'auth' | 'shutdown';
+
+interface OperationIdContext {
+    id: string;
+}
+
+const operationIdContext = new AsyncLocalStorage<OperationIdContext>();
+
+/**
+ * Correlaciona as linhas de log de uma operação sem passar id por parâmetro
+ * (OBS-002). `AsyncLocalStorage` de módulo, separado da fila do coordenador:
+ * o logger lê `currentOperationId()` e o coordenador nunca importa o logger.
+ *
+ * `name` não é gravado em lugar nenhum: a linha de abertura que cada operação
+ * já emite diz o que está rodando (decisão de 2026-09-12). O parâmetro fica
+ * para documentar o call site.
+ */
+export function runOperation<T>(name: string, fn: () => Promise<T>): Promise<T> {
+    void name;
+    return operationIdContext.run({ id: randomUUID().slice(0, 8) }, fn);
+}
+
+export function currentOperationId(): string | undefined {
+    return operationIdContext.getStore()?.id;
+}
 
 interface QueueEntry {
     kind: OperationKind;
@@ -77,7 +102,7 @@ export class SessionOperationCoordinator {
         this.running = operation;
 
         this.context.run(operation, () => {
-            fn(controller.signal).then(resolve, reject).finally(() => {
+            runOperation(kind, () => fn(controller.signal)).then(resolve, reject).finally(() => {
                 operation.finished = true;
                 this.running = null;
                 markDone();

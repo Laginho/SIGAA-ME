@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { app } from 'electron';
+import { currentOperationId } from './session-operation-coordinator.service';
 
 export type LogLevel = 'info' | 'warn' | 'error';
 export type LogMeta = Record<string, unknown>;
@@ -214,10 +215,12 @@ export class LoggerService implements ScopedLogger {
 
     private formatLine(level: 'INFO' | 'WARN' | 'ERROR', scope: string, message: string, meta?: LogMeta): string {
         const ts = new Date().toISOString();
+        const opId = currentOperationId();
+        const opTag = opId !== undefined ? ` [op:${opId}]` : '';
         const metaPart = meta !== undefined ? ` ${this.formatArg(meta)}` : '';
         // A quebra de linha entra depois do `redact`: o corte em MAX_LINE_CHARS
         // comeria o `\n` e colaria o registro seguinte na mesma linha.
-        const line = `${ts} ${level} [${scope}] ${redact(message)}${metaPart}`;
+        const line = `${ts} ${level} [${scope}]${opTag} ${redact(message)}${metaPart}`;
         return `${redact(line)}\n`;
     }
 

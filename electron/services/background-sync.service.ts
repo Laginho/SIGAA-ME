@@ -64,12 +64,14 @@ export class BackgroundSyncService {
         if (!settings.runInBackground) return Promise.resolve();
 
         this.isSyncing = true;
-        log.info('Triggering background sync.');
         return this.sigaaService.operations.run('background', signal => this.runSync(settings, signal));
     }
 
     private async runSync(settings: AppSettings, signal: AbortSignal): Promise<void> {
         try {
+            // Dentro do `runOperation` que `operations.run` já abre (OBS-002): esta é a
+            // primeira linha do ciclo, e precisa do mesmo op id que todas as outras.
+            log.info('Triggering background sync.');
             if (signal.aborted) return;
             // 1. Ensure logged in
             const creds = persistenceService.loadCredentials();
