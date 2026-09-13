@@ -147,6 +147,8 @@ export interface RendererApi {
     value: Extract<SettingUpdate, { key: K }>['value'],
   ) => Promise<AppResult>
   onBackgroundSyncUpdate: (callback: (data: BackgroundSyncUpdate) => void) => () => void
+  getCompatibilityStatus: () => Promise<CompatibilityStatus>
+  onCompatibilityChanged: (callback: (status: CompatibilityStatus) => void) => () => void
 }
 
 // ------------------------------------------------------------------- eventos
@@ -164,3 +166,12 @@ export interface BackgroundSyncUpdate {
   notifications: NotificationItem[]
   timestamp: number
 }
+
+/**
+ * Estado do kill-switch de compatibilidade (PORTAL-005). `since`/`failures` só
+ * existem no estado `incompatible` — é a mesma união discriminada que
+ * `AppResult`, para o mesmo motivo: estreitar sem campo opcional.
+ */
+export type CompatibilityStatus =
+  | { state: 'ok' }
+  | { state: 'incompatible'; since: number; failures: number; lastCode: 'SELECTOR_DRIFT' }
