@@ -228,13 +228,23 @@ export async function finalizeDownload(input: {
             throw new Error('Nome de arquivo/pasta inválido');
         }
 
-        // `rename` sobrescreve em silêncio um destino existente; `link` falha com
-        // EEXIST sem tocar nele. Dois downloads de nomes colidentes (DL-004) então
-        // nunca se apagam — o segundo ganha um sufixo numerado em vez do lugar do
-        // primeiro.
+        // `rename` sozinho sobrescreve em silêncio um destino existente. Por isso
+        // reservamos o nome primeiro com criação exclusiva (`wx` = O_CREAT|O_EXCL,
+        // falha com EEXIST sem tocar em nada) e só depois fazemos o `rename` de
+        // verdade. Dois downloads de nomes colidentes (DL-004) então nunca se
+        // apagam — o segundo ganha um sufixo numerado em vez do lugar do primeiro.
+        //
+        // `fs.promises.link` (hard link) fazia esse papel antes, mas FAT32/exFAT
+        // — comum em pendrive e cartão SD, e a pasta de destino é escolhida pelo
+        // usuário — não suporta hard link e rejeita com EPERM, não EEXIST; todo
+        // download passava a falhar nesses volumes. `rename` sobre o placeholder
+        // que acabamos de criar também consome o `.part`, então não sobra um
+        // `unlink` separado depois do sucesso para falhar por lock de antivírus/
+        // indexador e transformar um download concluído em erro reportado.
         for (let attempt = 0; ; attempt++) {
             try {
-                await fs.promises.link(partPath, filePath);
+                const handle = await fs.promises.open(filePath, 'wx');
+                await handle.close();
                 break;
             } catch (err) {
                 if ((err as NodeJS.ErrnoException).code !== 'EEXIST' || attempt >= 999) throw err;
@@ -244,7 +254,7 @@ export async function finalizeDownload(input: {
                 }
             }
         }
-        await fs.promises.unlink(partPath);
+        await fs.promises.rename(partPath, filePath);
         return { ok: true, filePath };
     } catch (err) {
         await cleanup();
