@@ -110,6 +110,9 @@ export class BackgroundSyncService {
                 const retryCourses = await this.sigaaService.getCourses();
                 if (!retryCourses.success) {
                     log.error('Retry after re-login failed.', { error: retryCourses.error.message });
+                    if (retryCourses.error.code === 'SELECTOR_DRIFT') {
+                        this.compatibility?.recordStructuralFailure('SELECTOR_DRIFT');
+                    }
                     return;
                 }
                 courses = retryCourses.data.courses;

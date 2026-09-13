@@ -90,7 +90,7 @@ const sigaaService = new SigaaService()
 // onChange, porque é a mesma instância nos dois construtores abaixo.
 const portalCompatibilityService = new PortalCompatibilityService(
   path.join(app.getPath('userData'), 'compatibility.json'),
-  status => win?.webContents.send('compatibility-changed', status),
+  status => { if (win && !win.isDestroyed()) win.webContents.send('compatibility-changed', status) },
 )
 const backgroundSyncService = new BackgroundSyncService(sigaaService, () => win, portalCompatibilityService)
 
