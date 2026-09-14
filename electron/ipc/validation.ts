@@ -82,6 +82,23 @@ export function parseDownloadAllFilesPayload(v: unknown): DownloadAllFilesPayloa
     if (id === null || name === null) return null;
     files.push({ id, name });
   }
+
+  // `known` é opcional: quem ainda não manda o índice (DL-006) continua
+  // funcionando, só sem o atalho de pular id já baixado.
+  if ('known' in v && v['known'] !== undefined) {
+    const rawKnown = v['known'];
+    if (!Array.isArray(rawKnown) || rawKnown.length > 500) return null;
+    const known: { fileId: string; path: string }[] = [];
+    for (const item of rawKnown) {
+      if (!isRecord(item)) return null;
+      const fileId = parseId(item['fileId']);
+      const path = parseText(item['path'], 4096);
+      if (fileId === null || path === null) return null;
+      known.push({ fileId, path });
+    }
+    return { courseId, courseName, files, known };
+  }
+
   return { courseId, courseName, files };
 }
 
