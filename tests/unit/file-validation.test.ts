@@ -6,10 +6,11 @@
  * rename/unlink do `.part`. Destino é um `mkdtemp`, removido no `afterEach`.
  */
 
+import * as fs from 'fs';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import os from 'os';
 import path from 'path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
     fileNameFromContentDisposition,
@@ -221,5 +222,53 @@ describe('finalizeDownload', () => {
 
         expect(existsSync(part())).toBe(false);
         expect(arquivos()).toEqual([]);
+    });
+
+    it('DL-004 achado 1: hard link recusado com EPERM (FAT32/exFAT não suporta) ainda entrega o arquivo no destino', async () => {
+        writeFileSync(part(), PDF);
+        const spy = vi.spyOn(fs.promises, 'link').mockImplementation(async () => {
+            throw Object.assign(new Error('EPERM: operation not permitted'), { code: 'EPERM' });
+        });
+
+        try {
+            const r = await finalizeDownload({ partPath: part(), dir, fileName: 'LISTA 1', contentType: 'application/octet-stream' });
+
+            expect(r).toEqual({ ok: true, filePath: path.join(dir, 'LISTA 1.pdf') });
+            expect(arquivos()).toEqual(['LISTA 1.pdf']);
+            expect(existsSync(part())).toBe(false);
+        } finally {
+            spy.mockRestore();
+        }
+    });
+
+    it('DL-004 achado 2: unlink do .part falhando depois do arquivo já estar no destino não derruba um download concluído', async () => {
+        writeFileSync(part(), PDF);
+        const spy = vi.spyOn(fs.promises, 'unlink').mockImplementation(async () => {
+            throw Object.assign(new Error('EBUSY: resource busy or locked'), { code: 'EBUSY' });
+        });
+
+        try {
+            const r = await finalizeDownload({ partPath: part(), dir, fileName: 'LISTA 1', contentType: 'application/octet-stream' });
+
+            expect(r).toEqual({ ok: true, filePath: path.join(dir, 'LISTA 1.pdf') });
+            expect(existsSync(path.join(dir, 'LISTA 1.pdf'))).toBe(true);
+        } finally {
+            spy.mockRestore();
+        }
+    });
+
+    it('DL-004 achado 6: rename para o destino final falhando não deixa o placeholder de 0 byte nem o .part', async () => {
+        writeFileSync(part(), PDF);
+        const spy = vi.spyOn(fs.promises, 'rename').mockImplementation(async () => {
+            throw Object.assign(new Error('EBUSY: resource busy or locked'), { code: 'EBUSY' });
+        });
+
+        try {
+            await expect(finalizeDownload({ partPath: part(), dir, fileName: 'LISTA 1', contentType: 'application/octet-stream' })).rejects.toThrow();
+
+            expect(arquivos()).toEqual([]);
+        } finally {
+            spy.mockRestore();
+        }
     });
 });

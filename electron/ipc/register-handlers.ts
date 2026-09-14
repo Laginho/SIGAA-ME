@@ -20,7 +20,7 @@ import { logger } from '../services/logger.service';
 import type { DiagnosticsService } from '../services/diagnostics.service';
 import type { PortalCompatibilityService } from '../services/portal-compatibility.service';
 import type { DownloadProgress } from '../../shared/ipc';
-import type { DownloadStatus } from '../../shared/domain';
+import type { DownloadStatus, DownloadToken } from '../../shared/domain';
 import { errorMessage, fail, ok } from '../../shared/errors';
 import {
   parseCourseRequest,
@@ -206,8 +206,8 @@ export function registerIpcHandlers(deps: IpcDeps): void {
     async (req) => {
       const root = deps.persistence.getSettings().lastDownloadPath;
       if (!root) return fail('INVALID_REQUEST', 'Nenhuma pasta de downloads definida');
-      const onProgress = (fileName: string, status: DownloadStatus) => {
-        const progress: DownloadProgress = { fileName, status };
+      const onProgress = (fileId: DownloadToken, fileName: string, status: DownloadStatus) => {
+        const progress: DownloadProgress = { fileId, fileName, status };
         deps.getWindow()?.webContents.send('download-progress', progress);
       };
 

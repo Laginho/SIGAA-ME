@@ -5,7 +5,7 @@ import { deriveAccountId, getActiveAccount, setActiveAccount } from './account-c
 import { SessionOperationCoordinator } from './session-operation-coordinator.service';
 import * as fs from 'fs';
 import * as path from 'path';
-import { resolveDownloadTarget, ensureDirInsideRoot, sanitizeSegment } from './download-path';
+import { resolveDownloadTarget, ensureDirInsideRoot, sanitizeSegment, withNumberedSuffix } from './download-path';
 import type {
     AccountProfile,
     CourseFile,
@@ -13,6 +13,7 @@ import type {
     DownloadRecord,
     DownloadResult,
     DownloadStatus,
+    DownloadToken,
     NewsDetail,
     NewsSummary,
 } from '../../shared/domain';
@@ -321,7 +322,7 @@ export class SigaaService {
         courseName: string,
         files: DownloadFileRef[],
         basePath: string,
-        onProgress?: (fileName: string, status: DownloadStatus) => void
+        onProgress?: (fileId: DownloadToken, fileName: string, status: DownloadStatus) => void
     ): Promise<AppResult<DownloadResult>> {
         return this.operations.run('interactive', async (signal) => {
             if (signal.aborted) return CANCELLED;
@@ -335,7 +336,7 @@ export class SigaaService {
         files: DownloadFileRef[],
         basePath: string,
         signal: AbortSignal,
-        onProgress?: (fileName: string, status: DownloadStatus) => void
+        onProgress?: (fileId: DownloadToken, fileName: string, status: DownloadStatus) => void
     ): Promise<AppResult<DownloadResult>> {
         try {
             log.info('=====================================');
@@ -353,22 +354,39 @@ export class SigaaService {
             let skipped = 0;
             let failed = 0;
 
-            // Filter out duplicates first — use sanitized final path for duplicate check (same as writer)
+            // Filter out duplicates first — use sanitized final path for duplicate check (same as writer).
+            // Homônimos no mesmo lote (id diferente, mesmo nome ou nome que sanitiza
+            // igual) não podem checar o mesmo candidato: o `claimedPaths` reserva,
+            // por ordem, o slot que cada arquivo do lote ocuparia — só o primeiro a
+            // reivindicar o nome-base é comparado contra o disco por ele; um
+            // homônimo novo cai no próximo sufixo livre e não é derrubado por um id
+            // que nunca baixou para lá (DL-004 critério 5).
+            const claimedPaths = new Set<string>();
             const queue = files.filter(file => {
-                // Check if file exists in the TARGET directory
-                let targetFilePath: string;
+                let dir: string;
+                let safeName: string;
                 try {
-                    const { fullPath } = resolveDownloadTarget(basePath, courseName || 'Unknown Course', file.name);
-                    targetFilePath = fullPath;
+                    const resolved = resolveDownloadTarget(basePath, courseName || 'Unknown Course', file.name);
+                    dir = path.dirname(resolved.fullPath);
+                    safeName = path.basename(resolved.fullPath);
                 } catch {
                     // invalid name will fail on download attempt; don't skip as duplicate
                     return true;
                 }
-                if (fs.existsSync(targetFilePath)) {
+
+                let candidateName = safeName;
+                let candidatePath = path.join(dir, candidateName);
+                for (let n = 1; claimedPaths.has(candidatePath); n++) {
+                    candidateName = withNumberedSuffix(safeName, n);
+                    candidatePath = path.join(dir, candidateName);
+                }
+                claimedPaths.add(candidatePath);
+
+                if (fs.existsSync(candidatePath)) {
                     log.info('Skipping duplicate (exists on disk).', { fileName: file.name });
                     skipped++;
-                    results.push({ fileName: file.name, status: 'skipped' });
-                    if (onProgress) onProgress(file.name, 'skipped');
+                    results.push({ fileId: file.id, fileName: file.name, status: 'skipped' });
+                    if (onProgress) onProgress(file.id, file.name, 'skipped');
                     return false;
                 }
                 return true;
@@ -455,8 +473,8 @@ export class SigaaService {
                 if (!targetScript) {
                     log.warn('Skipping file - not found on course page.', { fileName: file.name });
                     failed++;
-                    results.push({ fileName: file.name, status: 'failed' });
-                    if (onProgress) onProgress(file.name, 'failed');
+                    results.push({ fileId: file.id, fileName: file.name, status: 'failed' });
+                    if (onProgress) onProgress(file.id, file.name, 'failed');
                     continue;
                 }
 
@@ -466,13 +484,13 @@ export class SigaaService {
                 if (result.success && result.filePath) {
                     log.info(`Downloaded file ${file.id} successfully.`);
                     downloaded++;
-                    results.push({ fileName: file.name, status: 'downloaded', filePath: result.filePath });
-                    if (onProgress) onProgress(file.name, 'downloaded');
+                    results.push({ fileId: file.id, fileName: file.name, status: 'downloaded', filePath: result.filePath });
+                    if (onProgress) onProgress(file.id, file.name, 'downloaded');
                 } else {
                     log.error(`Failed to download file ${file.id}.`, { error: result.error });
                     failed++;
-                    results.push({ fileName: file.name, status: 'failed' });
-                    if (onProgress) onProgress(file.name, 'failed');
+                    results.push({ fileId: file.id, fileName: file.name, status: 'failed' });
+                    if (onProgress) onProgress(file.id, file.name, 'failed');
                 }
             }
 
@@ -495,7 +513,7 @@ export class SigaaService {
 
                     const failedFiles = results
                         .filter(r => r.status === 'failed')
-                        .map(r => files.find(f => f.name === r.fileName))
+                        .map(r => files.find(f => f.id === r.fileId))
                         .filter((f): f is DownloadFileRef => f !== undefined);
 
                     for (const file of failedFiles) {
@@ -520,11 +538,11 @@ export class SigaaService {
                                 downloaded++;
                                 failed--;
                                 // Update result in array
-                                const index = results.findIndex(r => r.fileName === file.name);
+                                const index = results.findIndex(r => r.fileId === file.id);
                                 if (index >= 0) {
-                                    results[index] = { fileName: file.name, status: 'downloaded', filePath: retryResult.filePath };
+                                    results[index] = { fileId: file.id, fileName: file.name, status: 'downloaded', filePath: retryResult.filePath };
                                 }
-                                if (onProgress) onProgress(file.name, 'downloaded');
+                                if (onProgress) onProgress(file.id, file.name, 'downloaded');
                                 retrySuccess = true;
                                 break; // Success!
                             } else {
@@ -557,8 +575,9 @@ export class SigaaService {
             for (let i = 0; i < results.length; i++) {
                 if (signal.aborted) return CANCELLED;
                 if (results[i].status !== 'failed') continue;
+                const fileId = results[i].fileId;
                 const fileName = results[i].fileName;
-                const originalFile = files.find(f => f.name === fileName);
+                const originalFile = files.find(f => f.id === fileId);
                 if (!originalFile) continue;
                 // Sem script, o Playwright procura o link pelo nome no DOM vivo.
                 const script = findScript(retryParsedFiles, originalFile)
@@ -568,8 +587,8 @@ export class SigaaService {
                 if (pwResult.success) {
                     downloaded++;
                     failed--;
-                    results[i] = { fileName, status: 'downloaded', filePath: pwResult.data.filePath };
-                    if (onProgress) onProgress(fileName, 'downloaded');
+                    results[i] = { fileId, fileName, status: 'downloaded', filePath: pwResult.data.filePath };
+                    if (onProgress) onProgress(fileId, fileName, 'downloaded');
                 }
             }
 

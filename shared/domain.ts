@@ -81,8 +81,8 @@ export type DownloadStatus = 'downloaded' | 'skipped' | 'failed'
 
 /** Resultado por arquivo de `downloadAllFiles`. `filePath` só existe quando baixou. */
 export type DownloadRecord =
-  | { fileName: string; status: 'downloaded'; filePath: string }
-  | { fileName: string; status: 'skipped' | 'failed' }
+  | { fileId: DownloadToken; fileName: string; status: 'downloaded'; filePath: string }
+  | { fileId: DownloadToken; fileName: string; status: 'skipped' | 'failed' }
 
 export interface DownloadResult {
   downloaded: number

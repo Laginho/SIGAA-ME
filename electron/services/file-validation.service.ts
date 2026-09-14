@@ -6,7 +6,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import mime from 'mime-types';
-import { sanitizeSegment, isInsideRoot } from './download-path';
+import { sanitizeSegment, isInsideRoot, withNumberedSuffix } from './download-path';
 
 // ponytail: 500 MiB cobre o maior material legítimo visto num portal de
 // disciplina (vídeo de aula, pacote zipado). Sobe por review se uma
@@ -223,12 +223,47 @@ export async function finalizeDownload(input: {
             };
         }
 
-        const filePath = path.join(dir, resolvedName);
+        let filePath = path.join(dir, resolvedName);
         if (!isInsideRoot(dir, filePath)) {
             throw new Error('Nome de arquivo/pasta inválido');
         }
 
-        await fs.promises.rename(partPath, filePath);
+        // `rename` sozinho sobrescreve em silêncio um destino existente. Por isso
+        // reservamos o nome primeiro com criação exclusiva (`wx` = O_CREAT|O_EXCL,
+        // falha com EEXIST sem tocar em nada) e só depois fazemos o `rename` de
+        // verdade. Dois downloads de nomes colidentes (DL-004) então nunca se
+        // apagam — o segundo ganha um sufixo numerado em vez do lugar do primeiro.
+        //
+        // `fs.promises.link` (hard link) fazia esse papel antes, mas FAT32/exFAT
+        // — comum em pendrive e cartão SD, e a pasta de destino é escolhida pelo
+        // usuário — não suporta hard link e rejeita com EPERM, não EEXIST; todo
+        // download passava a falhar nesses volumes. `rename` sobre o placeholder
+        // que acabamos de criar também consome o `.part`, então não sobra um
+        // `unlink` separado depois do sucesso para falhar por lock de antivírus/
+        // indexador e transformar um download concluído em erro reportado.
+        for (let attempt = 0; ; attempt++) {
+            try {
+                const handle = await fs.promises.open(filePath, 'wx');
+                await handle.close();
+                break;
+            } catch (err) {
+                if ((err as NodeJS.ErrnoException).code !== 'EEXIST' || attempt >= 999) throw err;
+                filePath = path.join(dir, withNumberedSuffix(resolvedName, attempt + 1));
+                if (!isInsideRoot(dir, filePath)) {
+                    throw new Error('Nome de arquivo/pasta inválido');
+                }
+            }
+        }
+        // O `open('wx')` acima já deixou o placeholder de 0 byte em `filePath`.
+        // Se o `rename` falhar (lock de antivírus/indexador/sync), esse
+        // placeholder ficaria para sempre com o nome certo — arquivo vira dois
+        // e o dedup do lote (existsSync) passaria a marcá-lo como já baixado.
+        try {
+            await fs.promises.rename(partPath, filePath);
+        } catch (err) {
+            await fs.promises.unlink(filePath).catch(() => { });
+            throw err;
+        }
         return { ok: true, filePath };
     } catch (err) {
         await cleanup();
