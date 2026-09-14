@@ -1,6 +1,6 @@
 # QA-001 — Add deterministic test, lint, coverage, and audit gates
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P1
 Blocked by: nenhum
 Tracker status at migration: `PARTIAL`
@@ -116,8 +116,29 @@ npm run test:e2e
 
 #### Implementation notes
 
-- Commit: —
-- Coverage thresholds: —
+- Commits: `de89cea` (testes, próprios) e `cf88787` (implementação:
+  `test:unit`, `test:integration`, `coverage`, `audit:prod`, thresholds).
+- Coverage thresholds (`vitest.config.ts`, escopo `include` nos 5 módulos):
+  lines 94, statements 89, functions 100, branches 84 — piso é a cobertura
+  real medida (94.5/89.79/100/85.08), com folga pequena para não ficar
+  frágil a variação de execução. `npm run coverage` falha se qualquer um
+  cair (provado: rodei com `--coverage.thresholds.statements=95` e o gate
+  falhou no valor real de 89.79%; revertido, sem diff).
+- `audit:prod` = `npm audit --omit=dev --audit-level=high`; hoje 0
+  vulnerabilidades em prod. Não simulei uma vulnerabilidade real para
+  provar o `--audit-level=high` — é comportamento documentado do próprio
+  `npm audit`, não lógica nova deste ticket.
+- `@vitest/coverage-v8@4.1.11` adicionado a devDependencies — já estava
+  pinado no lock como peer opcional do vitest, só não instalado.
+- Rodei em Windows (autoridade do projeto): `npm run quality` (64 arquivos,
+  712 passed, 5 skipped), `npm run test:unit` (45 arquivos, 557 passed),
+  `npm run test:integration` (19 arquivos, 155 passed, 5 skipped —
+  `scraper.test.ts` auto-skip sem live opt-in), `npm run coverage` (verde
+  nos thresholds acima), `npm run audit:prod` (0 vulnerabilidades),
+  `npm run test:e2e` (42 passed, incluindo os 3 com credencial — `.env`
+  presente nesta máquina).
+- `sync-selection.test.ts:259` (instabilidade registrada em Comment
+  2026-09-11) não apareceu em nenhuma das rodadas acima.
 
 ## Comments
 
