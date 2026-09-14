@@ -1,6 +1,6 @@
 # DEP-006: Subir electron-builder e electron-updater juntos
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P1
 Blocked by: DEP-005
 
@@ -47,6 +47,29 @@ npm run build
 #### Implementation notes
 
 - Commit: —
-- Versões escolhidas: —
-- Smoke do instalador: —
-- Audit residual: —
+- Versões escolhidas: `electron-builder@26.16.1`, `electron-updater@6.8.9` (latest
+  estável de cada linha em 2026-09-14, acima da faixa vulnerável do ticket).
+  `npm install` trouxe um install script bloqueado
+  (`electron-winstaller@5.4.0`, transitivo de `electron-builder`); aprovado com
+  `npm install-scripts approve electron-winstaller` + `npm rebuild
+  electron-winstaller`, pinado no `allowScripts`.
+- `npm ls`: limpo, sem UNMET/extraneous — critério 2 ok.
+- `npm audit`: sem `electron-builder*`, `electron-updater`, `app-builder-lib`,
+  `builder-util*`, `tar` — critério 1 ok. Sobraram 4 achados high
+  (`brace-expansion`, `js-yaml`, `nanoid`, `undici`, nenhum deles do
+  electron-builder/electron-updater); `npm audit fix` (sem `--force`) resolveu
+  os 4 — `npm audit` final: **0 vulnerabilidades**.
+- `npm run quality`: verde — 0 erros, 55 warnings pré-existentes
+  (`no-explicit-any`/`no-empty`, mesma contagem do baseline em `DEP-005`,
+  nenhum novo), 62 arquivos, 705 passed, 5 skipped.
+- `npm run build`: gerou `release/1.2.0/SIGAA-ME-Windows-1.2.0-Setup.exe` e
+  `...-Portable.exe` sem erro — critério 3 ok. Não bateu no problema de
+  privilégio do `7za`/`winCodeSign` que `DEP-005` viu numa outra máquina.
+- Smoke do instalador (critério 4): **pendente do autor** — instalar, abrir,
+  logar, navegar e baixar um arquivo é smoke manual com credencial real, mesmo
+  padrão do live smoke do `DEP-005` (critério 6). Não rodado nesta sessão.
+- Audit residual (critério 5): nenhum — os 4 achados que sobraram depois do
+  bump do electron-builder/electron-updater foram resolvidos por `npm audit
+  fix` sem `--force`, então não há nada para listar como "aceito porque…".
+- Diff confinado a `package.json` e `package-lock.json`. Nenhuma mudança em
+  `electron-builder.yml`/chave `build` — não foi necessária.
