@@ -767,7 +767,10 @@ export class HttpScraperService {
         basePath: string,
         script: string,
         onProgress?: (progress: number) => void
-    ): Promise<{ success: boolean; filePath?: string; error?: string; errorCode?: AppErrorCode }> {
+    ): Promise<
+        | { success: true; filePath: string }
+        | { success: false; error: string; errorCode?: AppErrorCode }
+    > {
         try {
             log.info(`Downloading file ${fileId} for course ${courseId}.`, { fileName });
 
