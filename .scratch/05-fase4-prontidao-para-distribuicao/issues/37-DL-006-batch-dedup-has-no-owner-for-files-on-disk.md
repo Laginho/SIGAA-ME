@@ -1,6 +1,6 @@
 # DL-006: o lote não sabe qual id gravou o arquivo que encontra no disco
 Status: open
-Stage: to-review
+Stage: to-merge
 Priority: P2
 Blocked by: nenhum
 
@@ -107,3 +107,88 @@ nem em confiança.
   esse método com até 5 argumentos posicionais e não são Primary files desta
   issue. Inserir no meio teria virado `known` recebendo a função de
   progresso por engano.
+
+#### Review (2026-09-14, Opus)
+
+Verdict: **Needs your call**. Os cinco critérios passam e a separação
+teste/código está correta; o que segura o merge é um efeito do critério 2 que
+nenhum critério previu — está no achado 1, e a decisão é do autor do ticket,
+não do revisor.
+
+Separação: `f17d31b` toca só `tests/` e a linha `Stage:`; `7b84709` não toca
+nenhum arquivo de teste.
+
+Red-green: em `f17d31b`, `npx vitest run tests/unit/audit-download-identity.test.ts
+tests/integration/audit-download-disk.test.ts` → **8 failed | 7 passed (15)**.
+Em `7b84709`, `npm run quality` → tsc limpo, ESLint **0 errors, 57 warnings**
+(todos `no-explicit-any` pré-existentes), vitest **62 files, 714 passed | 5
+skipped (719)**.
+
+- ✅ 1. `audit-download-identity.test.ts`, "skips only the id with a valid
+  registered path…" — com `existsSync` sempre verdadeiro e `known` só para o
+  id 2, o id 1 baixa e o id 2 pula. Era o inverso.
+- ✅ 2. "does not drop a new homonym…" — sem registro, `existsSync` verdadeiro
+  em todo candidato não gera `skipped`; os dois baixam, e o sufixo fica com o
+  `finalizeDownload`.
+- ✅ 3. `isReusableDownload` (`sigaa.service.ts:76-86`) reaproveita o
+  `validateHead` de verdade e rejeita antes dele o arquivo de 0 byte — o que o
+  `download.service.ts:71-89` **não** faz (`validateHead(Buffer vazio, '.pdf')`
+  devolve `ok`, porque `sigMatches` aceita prefixo). Divergir ali é o que o
+  critério 3 pede, não um desvio.
+- ✅ 4. `validation.ts:86-100` copia por allowlist, mesmo formato e mesmo teto
+  (500) do campo `files`; cinco testes de parse. Zero `any` novo em
+  `validation.ts`, `register-handlers.ts` ou `shared/ipc.ts`.
+- ✅ 5. O teste nasce verde, e é o certo: o `unlink` já existia, faltava o
+  teste. Provado por mutação — comentando
+  `await descartarParcial('erro de escrita')` em
+  `http-scraper.service.ts:923`, o teste fica vermelho em
+  `expect(existsSync(partPath)).toBe(false)`.
+
+Os quatro desvios declarados acima conferem e nenhum sai do limite: a validação
+mora mesmo em `validation.ts`, e `known` depois de `onProgress` evita que
+`background-sync.service.ts:235-240` passe a função de progresso na posição
+errada.
+
+**Achado 1 — download do sync em background vira duplicata no próximo lote
+manual (não é fix pequeno).** `background-sync.service.ts:233-241` chama
+`downloadAllFiles` sem `known` e **descarta o `AppResult`**; o índice
+`downloads` vive só no `localStorage` do renderer
+(`course-detail.ts:474-483`), e o `background-sync-update` não carrega caminho
+nenhum. Então todo arquivo que o sync baixa sozinho fica no disco sem registro.
+No próximo "Baixar todos", ele não tem `known`, não pula, e o `finalizeDownload`
+o grava como `X (1).pdf` — o `X.pdf` original fica órfão. Antes do `DL-006` o
+`existsSync` pulava. `autoDownloadUpdates` é `true` por padrão
+(`persistence.service.ts:25`), então é o caminho de configuração padrão, não
+um canto. Uma duplicata por arquivo, não um laço: a segunda cópia é registrada
+e daí em diante pula.
+
+Não conserto aqui porque não é fix pequeno pelos dois lados da regra: mexe em
+`background-sync.service.ts` (fora dos Primary files) e pede teste novo. E a
+causa não é a implementação — ela cumpre o critério 2 ao pé da letra. O buraco
+é do spec: o ticket escolheu o índice do renderer e o sync em background é
+exatamente o caso em que esse índice não existe. Quem decide é a etapa 1.
+Opções, da mais barata à mais cara: aceitar e registrar (como já se aceitou a
+perda da migração, logo acima); fazer o `background-sync` guardar os resultados
+e mandá-los ao renderer; ou mover o índice para o `userData`, que é o que o
+ticket descartou por custo.
+
+**Achado 2 — `any` no renderer (nota, não reprova).** `course-detail.ts:455-456`
+anota `[string, any]` duas vezes ao ler o índice do `localStorage`. O critério 4
+diz "nenhum `any` novo na fronteira", e a fronteira, pelo `CLAUDE.md`, é
+`preload.ts` + handlers IPC — lá não entrou nenhum. É estilo, e o arquivo já faz
+isso ao redor (`:488`). Um predicado de tipo no `filter` resolveria.
+
+**Achado 3 — leitura de cabeça agora tem três cópias (vira `CLEAN-006`).**
+`readKnownHead` (`sigaa.service.ts:63-72`) é byte a byte a mesma coisa que
+`readHeadSync` (`download.service.ts:22-31`), e `readHead`
+(`file-validation.service.ts:88-97`) é a versão async. O cabeçalho do
+`file-validation.service.ts:1-5` existe justamente porque duas cópias que
+precisam concordar já quebraram este repositório. Fora dos Primary files desta
+issue; parkado em `CLEAN-006`.
+
+**Notas, sem ação:** `known` só é provado dentro de `basePath`, não dentro da
+pasta da turma — um registro de outra turma sob a mesma raiz contaria. Na
+prática o renderer já monta `known` por turma (`downloadedFiles[courseId]`), e
+o pior caso é um `skipped` a mais. E `known` com mais de 500 itens derruba o
+payload inteiro com `INVALID_REQUEST` em vez de só ignorar o índice; nada poda
+esse índice, mas `files` tem o mesmo teto, então o limite é coerente.
