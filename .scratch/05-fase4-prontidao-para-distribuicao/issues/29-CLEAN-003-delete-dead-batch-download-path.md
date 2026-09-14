@@ -1,29 +1,36 @@
 # CLEAN-003: Apagar o caminho de download em lote morto
 Status: open
-Stage: blocked
+Stage: to-implement
 Priority: P3
-Blocked by: DL-004, OBS-003
+Blocked by: — (DL-004 e OBS-003 fechados)
 
-- Primary files:
-  - `electron/services/playwright-login.service.ts` (só `downloadAllFiles`, `:884` até o fim do método)
-  - `electron/services/download.service.ts` (só `downloadCourseFiles`, `:313` até o fim; e o comentário de cabeçalho `:1-9`)
-  - `electron/services/sigaa.service.ts` (só o comentário `ponytail:` em `:556`)
+- Primary files (linhas conferidas em 2026-09-14, depois de DL-004/CLEAN-005):
+  - `electron/services/playwright-login.service.ts` (só `downloadAllFiles`, `:851` até o fim do método)
+  - `electron/services/download.service.ts` (só `downloadCourseFiles`, `:316` até o fim; e o comentário de cabeçalho `:1-9`)
+  - `electron/services/sigaa.service.ts` (só o comentário `ponytail:` em `:574`)
 
 #### Leia antes: `downloadAllFiles` existe duas vezes
 
-- `SigaaService.downloadAllFiles` (`sigaa.service.ts:319`) — **vivo**: handler
-  IPC `register-handlers.ts:196`, `background-sync.service.ts:213`.
-- `PlaywrightLoginService.downloadAllFiles` (`playwright-login.service.ts:884`)
+- `SigaaService.downloadAllFiles` (`sigaa.service.ts:320`) — **vivo**: handler
+  IPC `register-handlers.ts:214`, `background-sync.service.ts:235`,
+  `preload.ts:34` e `src/pages/course-detail.ts:453`.
+- `PlaywrightLoginService.downloadAllFiles` (`playwright-login.service.ts:851`)
   — **morto**, nenhum chamador. É o único que alcança
-  `DownloadService.downloadCourseFiles` (`:972`).
+  `DownloadService.downloadCourseFiles` (`download.service.ts:316`), pelo
+  `await import('./download.service')` de `playwright-login.service.ts:870`.
 
 O fallback Playwright de download **está ligado**, por
-`PlaywrightLoginService.downloadFile:768` via
-`SigaaService.downloadViaPlaywright` (`sigaa.service.ts:189`, chamado de
-`:270`, `:311`, `:567`), que por sua vez carrega `DownloadService.downloadFile`
-(`playwright-login.service.ts:783`, `:855`). **Esses ficam.** O que morre é só a
+`PlaywrightLoginService.downloadFile:735` via
+`SigaaService.downloadViaPlaywright` (`sigaa.service.ts:190`, chamado de
+`:271`, `:312`, `:586`), que por sua vez carrega `DownloadService.downloadFile`
+(`download.service.ts:50`) pelo `await import('./download.service')` de
+`playwright-login.service.ts:750`. **Esses ficam.** O que morre é só a
 variante em lote. Um subagente errou isso em 2026-09-11 antes de subir a
 cadeia; não repita.
+
+As duas cadeias são gêmeas — mesmo import dinâmico, mesmo comentário "launch a
+dedicated browser" em `:752` e `:872`. A diferença é a aridade: a viva recebe um
+arquivo, a morta recebe uma lista. Apagar a morta não toca no fallback.
 
 #### What to build
 
@@ -57,11 +64,13 @@ fallback por-arquivo pelo lote que deixará de existir.
 
 ## Comments
 
-- Decisão pendente do autor: apagar tira a otimização anotada no `ponytail:`
-  (`sigaa.service.ts:556`) de trocar um browser por arquivo pelo lote quando o
-  retry falhar em massa. Se quiser guardar essa porta, este ticket vira
-  "documentar como morto" (comentário no topo de cada método citando este id)
-  em vez de apagar. Confirmar antes da etapa 2; o ticket assume **apagar**.
+- ~~Decisão pendente do autor~~ **RESOLVIDA em 2026-09-14: apagar.** O autor
+  confirmou depois de ver a cadeia traçada (as duas gêmeas, a viva por arquivo
+  e a morta por lista). Razão: as ~200 linhas nunca rodaram, não têm teste, e
+  já atravessaram os refactors de `DL-004` e `CLEAN-005` sem serem exercitadas
+  — não são vantagem inicial, seriam reverificação do zero. O conhecimento fica
+  no `ponytail:` reescrito. Etapa 2 liberada; duas tentativas anteriores
+  pararam aqui.
 - `docs/PLANO.md` seção 2.5 diz "não remover `download.service.ts`". Continua
   verdade para o arquivo (o `downloadFile` dele é o fallback vivo); só a
   variante em lote sai. Nada a editar no plano.
