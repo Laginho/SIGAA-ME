@@ -1,6 +1,6 @@
 # DEP-006: Subir electron-builder e electron-updater juntos
-Status: open
-Stage: to-merge
+Status: resolved
+Stage: done
 Priority: P1
 Blocked by: DEP-005
 
@@ -125,3 +125,14 @@ e logar com credencial real. A etapa 2 é um agente e não fecha esse critério;
 reabrir seria um loop sem saída. A decisão é sua: aceitar o critério 3 como
 cobertura suficiente do risco de empacotamento e mergear, ou rodar o
 `Setup.exe` uma vez antes.
+
+#### Fechamento (2026-09-14)
+
+Critério 4 fechado pelo autor, não por agente: `SIGAA-ME-Windows-1.2.0-Setup.exe`
+de `release/1.2.0/` instalado nesta máquina, app aberto pelo atalho instalado,
+login com credencial real, navegação por disciplina e download de um arquivo —
+tudo verde. É o artefato empacotado do `electron-builder 26.16.1`, que é
+exatamente o que o smoke da etapa 2 não alcançava. Os 5 critérios estão
+atendidos.
+
+Fechado em 2026-09-14 com o PR #25 mergeado.
