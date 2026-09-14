@@ -275,7 +275,7 @@ export class SigaaService {
             log.info(`Attempting fast HTTP download for file ${file.id}.`);
             const httpResult = await this.httpScraper.downloadFile(courseId, file.id, file.name, targetDir, targetScript);
 
-            if (httpResult.success && httpResult.filePath) {
+            if (httpResult.success) {
                 log.info('HTTP download successful.');
                 return ok({ filePath: httpResult.filePath });
             }
@@ -303,7 +303,7 @@ export class SigaaService {
             log.info('Retrying HTTP download for file.', { fileName: file.name });
             const retryHttpResult = await this.httpScraper.downloadFile(courseId, file.id, file.name, targetDir, retryScript);
 
-            if (retryHttpResult.success && retryHttpResult.filePath) {
+            if (retryHttpResult.success) {
                 log.info('HTTP retry successful.');
                 return ok({ filePath: retryHttpResult.filePath });
             }
@@ -481,7 +481,7 @@ export class SigaaService {
                 log.info(`Downloading file ${file.id}.`, { fileName: file.name });
                 const result = await this.httpScraper.downloadFile(courseId, file.id, file.name, targetDir, targetScript);
 
-                if (result.success && result.filePath) {
+                if (result.success) {
                     log.info(`Downloaded file ${file.id} successfully.`);
                     downloaded++;
                     results.push({ fileId: file.id, fileName: file.name, status: 'downloaded', filePath: result.filePath });
@@ -534,7 +534,7 @@ export class SigaaService {
 
                             const retryResult = await this.httpScraper.downloadFile(courseId, file.id, file.name, targetDir, retryScript);
 
-                            if (retryResult.success && retryResult.filePath) {
+                            if (retryResult.success) {
                                 downloaded++;
                                 failed--;
                                 // Update result in array
