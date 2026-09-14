@@ -1,6 +1,6 @@
 # DEP-005: Subir o Electron para fora da faixa vulnerável
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P1
 Blocked by: DEP-004, DEP-007
 
@@ -47,6 +47,32 @@ npx playwright test app.spec.ts
 
 #### Implementation notes
 
-- Commit: —
-- Electron escolhido e breaking changes que tocaram código: —
-- Live smoke: —
+- Commit: (na branch `dep-005`, ver commit de código)
+- Electron escolhido: `41.10.7`. A faixa vulnerável do `npm audit` mudou entre
+  o corpo do ticket e a execução: além de `<=40.10.2 || 41.0.0-alpha.1-41.7.1
+  || 42.0.0-alpha.1-42.3.3 || 43.0.0-alpha.1-43.0.0-beta.8` (a faixa original),
+  uma segunda entrada cobre `40.0.0-alpha.2 - 41.10.2` — `41.7.2` (a "menor
+  versão fora de toda a faixa" original) cai dentro dela. `41.10.7` é o último
+  patch do major 41 e escapa das duas.
+- Breaking changes que tocaram código: nenhuma. `electron/main.ts` e os demais
+  arquivos que importam de `'electron'` usam só API estável entre 30 e 41
+  (`app`, `BrowserWindow`, `dialog`, `session`, `shell`, `Tray`, `Menu`,
+  `safeStorage`, `Notification`, `ipcRenderer`, `contextBridge`, `ipcMain`) —
+  nada do que as breaking-changes notes do Electron 31–41 removem. Diff fora de
+  `package.json`/`package-lock.json`: nenhum.
+- `allowScripts`: `electron@30.5.1` → `electron@41.10.7`
+  (`npm install-scripts approve electron` + `npm rebuild electron`).
+- `npm ls`: limpo, `electron@41.10.7` deduped — critério 1 ok.
+- `npm audit`: sem linha `electron` — critério 1 ok.
+- `npm run quality`: verde (0 erros, 55 warnings pré-existentes de
+  `no-explicit-any`/`no-empty`, nenhum novo; 61 arquivos, 697 passed, 5
+  skipped) — critério 2 ok.
+- `npx playwright test visual.spec.ts`: 11 passed — critério 3 ok.
+- `npx playwright test app.spec.ts`: 5 passed (`.env` real presente nesta
+  máquina, então os 3 com credencial também rodaram, além dos 2 sem) —
+  critério 4 ok.
+- `allowScripts` atualizado para `electron@41.10.7` — critério 5 ok.
+- Live smoke (critério 6): **pendente, fica para o autor.** É login real no
+  SIGAA; o agente não roda esse tier (CLAUDE.md, tabela de tiers de teste).
+  Rodar `npm run test:live` (ou `RUN_LIVE_SIGAA_TESTS=true`) no Windows e colar
+  o resultado aqui antes de fechar.
