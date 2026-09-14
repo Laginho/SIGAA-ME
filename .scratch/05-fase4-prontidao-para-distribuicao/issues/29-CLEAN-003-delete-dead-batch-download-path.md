@@ -1,6 +1,6 @@
 # CLEAN-003: Apagar o caminho de download em lote morto
-Status: open
-Stage: reviewing
+Status: resolved
+Stage: done
 Priority: P3
 Blocked by: — (DL-004 e OBS-003 fechados)
 
@@ -99,3 +99,52 @@ fallback por-arquivo pelo lote que deixará de existir.
   0 errors/50 pre-existing warnings, 705 passed/5 skipped (criterion 3). Commit
   `c181232`, 3 files changed, 5 insertions(+), 244 deletions(-). `Stage:
   to-review`.
+
+#### Resolution (2026-09-14)
+
+Aprovado na primeira rodada de revisão, com uma correção só de comentário.
+
+**Decisão:** apagar, como o `## Comments` resolveu. Saíram
+`PlaywrightLoginService.downloadAllFiles` (`playwright-login.service.ts`, 118
+linhas) e `DownloadService.downloadCourseFiles` (`download.service.ts`, 125
+linhas), mais o cabeçalho `DOC-003` e o `ponytail:` que citavam a variante.
+
+**Arquivos:** `electron/services/playwright-login.service.ts`,
+`electron/services/download.service.ts`, `electron/services/sigaa.service.ts` —
+todos dentro dos Primary files. Nenhum arquivo de teste tocado no branch inteiro.
+
+**Critérios, conferidos pela revisão sem confiar no relatório da etapa 2:**
+
+1. ✅ `downloadCourseFiles` zera em `electron/`, `src/` e `tests/`.
+   `downloadAllFiles` em `electron/` volta só os sites vivos:
+   `sigaa.service.ts:320/329/333/343`, `register-handlers.ts:43/214`,
+   `preload.ts:34`, `background-sync.service.ts:235`.
+2. ✅ `sigaa-service.test.ts` e `download-boundary.test.ts` passam sem alteração;
+   `git diff master..clean-003 --stat` são 3 arquivos de código e o ticket.
+3. ✅ Nada órfão. `chromium`, `Browser`, `Page`, `FILES_MENU` e o privado
+   `navigateToCourse` continuam alcançados pelo `downloadFile` vivo
+   (`playwright-login.service.ts:748-795`); `fs`/`Page` seguem em uso no
+   `download.service.ts`. `tsc` limpo, eslint 0 erros.
+
+**As gêmeas:** a revisão refez a cadeia em vez de aceitar a do ticket. A viva
+recebe um arquivo, a morta recebia uma lista, e só a de lista alcançava
+`downloadCourseFiles`. O chamador não listado que a etapa 2 deveria esperar não
+apareceu.
+
+**Vermelho-verde:** não há. É remoção de código sem chamador e sem teste, como o
+ticket declara; o critério 2 é a rede pré-existente, intacta e verde.
+
+**Correção da revisão (`f6f018b`, só comentário):** o `c181232` manteve a prosa
+do `ponytail:` mas apagou o prefixo, e o compromisso anotado — um browser por
+arquivo no fallback de retry — continua existindo. `ponytail:` é o índice de
+compromissos conhecidos deste repositório (7 pontos no fonte; `BUG-004` e
+`DOC-003` citam o marcador pelo nome), então sem o prefixo este sumiria do grep.
+Prefixo restaurado, texto da etapa 2 mantido. Dentro dos Primary files e sem
+teste novo — pequena pelo teste mecânico, não voltou para a etapa 2.
+
+**Nota de processo, não achado:** a etapa 2 commitou `Stage: to-review` num
+commit de docs à parte (`8884e0b`) em vez do último commit de código.
+
+**Gate** (`npm run quality` no branch, depois da correção): typecheck limpo,
+eslint 0 erros / 50 warnings pré-existentes, **705 passed | 5 skipped (710)** em
+62 arquivos. CI do PR #28 verde nos três jobs.
