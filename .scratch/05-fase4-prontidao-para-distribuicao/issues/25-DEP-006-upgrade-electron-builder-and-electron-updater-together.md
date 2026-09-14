@@ -1,6 +1,6 @@
 # DEP-006: Subir electron-builder e electron-updater juntos
 Status: open
-Stage: to-review
+Stage: to-merge
 Priority: P1
 Blocked by: DEP-005
 
@@ -80,3 +80,48 @@ npm run build
   fix` sem `--force`, então não há nada para listar como "aceito porque…".
 - Diff confinado a `package.json` e `package-lock.json`. Nenhuma mudança em
   `electron-builder.yml`/chave `build` — não foi necessária.
+
+#### Review (2026-09-14, etapa 3)
+
+Veredito: **Needs your call** — critério 4 não foi cumprido como escrito.
+
+Tudo reverificado nesta máquina Windows, não lido das notas:
+
+1. ✅ `npm audit`: **0 vulnerabilidades**. Nenhuma linha
+   `electron-builder*`/`electron-updater`/`app-builder-lib`/`builder-util*`/`tar`.
+2. ✅ `npm ls`: limpo, sem UNMET/extraneous; versões resolvidas batem com o
+   `package.json` (`electron-builder@26.16.1`, `electron-updater@6.8.9`).
+3. ✅ `npm run build` reexecutado aqui: gerou `SIGAA-ME-Windows-1.2.0-Setup.exe`,
+   `...-Portable.exe` e `win-unpacked/` sem erro, com `electron-builder 26.16.1`
+   e `electron 41.10.7`. Sem o problema de privilégio do `7za`/`winCodeSign`.
+4. ⚠️ **Aberto.** O smoke rodou contra `dist-electron` via `electron.launch('.')`,
+   não contra o artefato empacotado. Isso cobre login/navega/baixa do *código*,
+   não do *instalador*. O critério pede o instalador instalado, e é a parte de
+   maior risco do ticket: um major do empacotador (24 → 26) quebra no
+   "instala e abre", não no "build passou" — o próprio log mostra
+   `updating asar integrity executable resource`, que é exatamente essa classe.
+   Critério 3 verde não substitui isso.
+5. ✅ Nada residual a documentar — `npm audit` em 0 fecha a cláusula
+   "documented or fixed" do `DEP-001`.
+
+Gate: `npm run quality` verde — 0 erros, 55 warnings pré-existentes (mesma
+contagem do baseline `DEP-005`, nenhum novo), 62 arquivos, 705 passed, 5 skipped.
+
+Padrões: nenhuma regra inviolável do `CLAUDE.md` se aplica — nenhuma linha de
+código-fonte mudou. `allowScripts` pinado por versão
+(`electron-winstaller@5.4.0`) segue o procedimento documentado. Diff dentro dos
+Primary files. Commits Conventional citando o id. Ausência de commit de teste
+próprio está correta: não há mudança de produção para testar.
+
+Sem correção pequena a fazer — não há achado de código.
+
+Nota fora do limite (não corrigida aqui, `CLAUDE.md` não está nos Primary
+files): o parágrafo do npm 12 no `CLAUDE.md` cita só `electron` e `esbuild` no
+`allowScripts`; agora há um terceiro, `electron-winstaller`. Uma linha de drift
+de doc para quem esbarrar em "install scripts blocked".
+
+Por que `to-merge` e não reabrir: o que falta é ação humana — instalar o `.exe`
+e logar com credencial real. A etapa 2 é um agente e não fecha esse critério;
+reabrir seria um loop sem saída. A decisão é sua: aceitar o critério 3 como
+cobertura suficiente do risco de empacotamento e mergear, ou rodar o
+`Setup.exe` uma vez antes.
