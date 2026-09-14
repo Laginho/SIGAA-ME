@@ -1,6 +1,6 @@
 # DL-006: o lote não sabe qual id gravou o arquivo que encontra no disco
 Status: open
-Stage: implementing
+Stage: to-review
 Priority: P2
 Blocked by: nenhum
 
@@ -85,3 +85,25 @@ nem em confiança.
 - `PlaywrightLoginService.downloadAllFiles` e
   `DownloadService.downloadCourseFiles` deduplicam por nome e continuam mortos
   (`CLEAN-003`). Não conserte, só não quebre o `tsc`.
+- Dois desvios do que os Primary files diziam ao pé da letra, ambos para não
+  quebrar teste fora do escopo desta issue:
+  - `electron/ipc/validation.ts` também foi editado — é onde
+    `parseDownloadAllFilesPayload` de fato mora; `register-handlers.ts` só
+    chama a função. Tratei os dois como a mesma fronteira.
+  - `known` no filtro do lote fica fora de `basePath` **ignorado dentro de
+    `sigaa.service.ts`**, não filtrado em `register-handlers.ts` antes de
+    chamar o serviço. Só assim o critério 4 (path fora da raiz) fica
+    testável pelo mesmo seam de `SigaaService.downloadAllFiles` que os
+    critérios 1-3 usam — testar via `register-handlers.ts` pediria o harness
+    de `ipcMain` de `tests/unit/ipc-validation.test.ts`, um seam que a issue
+    não citou. `register-handlers.ts` só repassa `req.known ?? []`.
+  - `readHeadSync` não foi importado de `download.service.ts` (privado lá, e
+    esse arquivo não é Primary file desta issue); `sigaa.service.ts` ganhou
+    uma leitura equivalente própria (`readKnownHead`) e reaproveita
+    `validateHead` de verdade, que é o que o critério 3 pede para não
+    duplicar.
+- `known` entra em `downloadAllFiles` depois de `onProgress`, não antes:
+  `background-sync.service.ts` e `tests/unit/sigaa-service.test.ts` chamam
+  esse método com até 5 argumentos posicionais e não são Primary files desta
+  issue. Inserir no meio teria virado `known` recebendo a função de
+  progresso por engano.
