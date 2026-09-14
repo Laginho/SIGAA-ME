@@ -3,6 +3,7 @@ import { h } from '../utils/dom';
 import { mergeCoursesIntoCache } from '../utils/ui-helpers';
 import { getActiveAccount, readAccountItem, setActiveAccount, writeAccountItem } from '../data/account-storage';
 import type { CourseSnapshot, CourseSummary } from '../../shared/domain';
+import type { CompatibilityStatus } from '../../shared/ipc';
 
 /**
  * Guarda de runtime por cima do tipo. O contrato diz `CourseSummary[]`, mas o
@@ -14,6 +15,50 @@ function isCourseLike(value: unknown): value is CourseSummary {
   if (typeof value !== 'object' || value === null) return false;
   const candidate = value as { id?: unknown; name?: unknown };
   return typeof candidate.id === 'string' && typeof candidate.name === 'string';
+}
+
+// Handle em módulo, cancelado se a rota mudar antes dele disparar (BUG-013):
+// sem isso, quem sai da tela de sync dentro dos 600ms é puxado de volta.
+let postSyncTimer: ReturnType<typeof setTimeout> | undefined;
+
+// Um listener vivo por vez (mesma disciplina do dashboard, PORTAL-006).
+let unsubscribeCompatibility: (() => void) | null = null;
+
+/**
+ * O aviso é um nó só quando `incompatible` (regra 1 do CLAUDE.md e AC do
+ * PORTAL-006: "nenhum nó do aviso existe no DOM" em `ok`) — não uma classe de
+ * visibilidade. Os botões de sync não são tocados: continuam habilitados.
+ */
+function renderCompatibilityNotice(status: CompatibilityStatus): void {
+  const container = document.querySelector('.sync-selection-container');
+  if (!container) return;
+  container.querySelector('.compatibility-notice')?.remove();
+  if (status.state !== 'incompatible') return;
+
+  const date = new Date(status.since).toLocaleDateString('pt-BR');
+  const notice = h(
+    'div',
+    { className: 'compatibility-notice' },
+    `O SIGAA mudou e a sincronização automática está pausada desde ${date}. Seus arquivos continuam disponíveis. Uma sincronização manual completa reativa.`
+  );
+  container.querySelector('.sync-header')?.after(notice);
+}
+
+function cancelPostSyncNavigation() {
+  if (postSyncTimer === undefined) return;
+  clearTimeout(postSyncTimer);
+  postSyncTimer = undefined;
+  window.removeEventListener('hashchange', cancelPostSyncNavigation);
+}
+
+function schedulePostSyncNavigation() {
+  cancelPostSyncNavigation();
+  window.addEventListener('hashchange', cancelPostSyncNavigation);
+  postSyncTimer = setTimeout(() => {
+    window.removeEventListener('hashchange', cancelPostSyncNavigation);
+    postSyncTimer = undefined;
+    window.location.hash = '#/dashboard';
+  }, 600);
 }
 
 
@@ -83,6 +128,12 @@ export function renderSyncSelectionPage(app: HTMLDivElement) {
   // Event Listeners
   document.getElementById('btnFastSync')?.addEventListener('click', () => startSync(app, 'fast'));
   document.getElementById('btnFullSync')?.addEventListener('click', () => startSync(app, 'full'));
+
+  // Aviso de incompatibilidade (PORTAL-006): estado no mount, evento pro
+  // resto. Some só pelo evento — nenhuma lógica local de "sync deu certo".
+  unsubscribeCompatibility?.();
+  unsubscribeCompatibility = window.api.onCompatibilityChanged(renderCompatibilityNotice);
+  window.api.getCompatibilityStatus().then(renderCompatibilityNotice);
 }
 
 async function startSync(app: HTMLDivElement, mode: 'fast' | 'full') {
@@ -242,7 +293,7 @@ async function startSync(app: HTMLDivElement, mode: 'fast' | 'full') {
     mergeCoursesIntoCache(coursesWithContent, { replaceSet: true });
 
     updateProgress(100, 'Finalizado!', `${courses.length} disciplinas sincronizadas.`);
-    setTimeout(() => { window.location.hash = '#/dashboard'; }, 600);
+    schedulePostSyncNavigation();
 
   } catch (error: any) {
     console.error('Sync failed:', error);

@@ -32,10 +32,10 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
-    "@playwright/test": "^1.59.1",
+    "@playwright/test": "^1.63.0",
     "@types/mime-types": "^3.0.1",
     "dotenv": "^17.4.2",
-    "electron": "^30.0.1",
+    "electron": "^41.10.7",
     "electron-builder": "^24.13.3",
     "eslint": "^9.20.0",
     "jsdom": "^29.0.2",
@@ -54,11 +54,11 @@
     "dompurify": "^3.4.14",
     "electron-updater": "^6.8.3",
     "mime-types": "^3.0.2",
-    "playwright": "^1.56.1",
+    "playwright": "^1.63.0",
     "sqlite": "^5.1.1"
   },
   "allowScripts": {
-    "electron@30.5.1": true,
-    "esbuild@0.25.12": true
+    "esbuild@0.25.12": true,
+    "electron@41.10.7": true
   }
 }
