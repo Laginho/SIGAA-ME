@@ -1,6 +1,6 @@
 # QA-001 — Add deterministic test, lint, coverage, and audit gates
 Status: open
-Stage: to-review
+Stage: to-merge
 Priority: P1
 Blocked by: nenhum
 Tracker status at migration: `PARTIAL`
@@ -140,7 +140,75 @@ npm run test:e2e
 - `sync-selection.test.ts:259` (instabilidade registrada em Comment
   2026-09-11) não apareceu em nenhuma das rodadas acima.
 
+#### Review (2026-09-14, etapa 3)
+
+Veredito: **Needs your call** — a implementação casa com o spec, mas o spec
+deixa os dois gates novos sem ninguém para executá-los. Detalhe no ponto 1.
+
+Critérios, um a um:
+
+1. ✅ PR roda checagem determinística sem credencial — `quality.yml` já fazia, e
+   agora carrega também as duas redes novas.
+2. ✅ Canário live continua separado e opt-in (`test:live`, `PORTAL-004`).
+3. ⚠️ Thresholds cobrem os 5 módulos e o `include` do `vitest.config.ts` casa
+   com eles (confirmei no `coverage-summary.json`: os 5 aparecem, sanitizer
+   incluído). Duas ressalvas abaixo.
+4. ✅ Publicar continua atrás do gate (`release.yml`, job `build`).
+5. ✅ Lint barra `any`/`as any` na zona de fronteira.
+
+Verificado nesta máquina (Windows), não copiado do relatório:
+
+- `npm run quality`: 64 arquivos, 712 passed, 5 skipped.
+- `npm run coverage`: verde — 89.79 stmts / 85.08 branches / 100 funcs /
+  94.5 lines contra 89/84/100/94.
+- `npm run audit:prod`: 0 vulnerabilidades.
+- Red-green refeito à mão nas duas redes, não aceito por relatório:
+  `no-explicit-any` de `error` para `warn` em `eslint.config.js:172` → 3 de 5
+  testes vermelhos; `npm test` movido para depois de `npm run release` em
+  `release.yml` → `expected 66 to be less than 59`. Revertidos os dois,
+  `git status` limpo, as duas redes verdes de novo (7 passed).
+- Lock: as ~10 entradas novas (`@vitest/coverage-v8`, `istanbul-lib-*`,
+  `magicast`, `ast-v8-to-istanbul`, `@babel/parser`, `@babel/types`) e o bump
+  de `@babel/helper-string-parser` 7.28.5→7.29.7 estão todas com
+  `"dev": true`. Superfície de dependência de produção não mudou.
+
+Três achados. Nenhum derruba critério; nenhum foi corrigido aqui, porque
+corrigir o primeiro exige critério novo e arquivo fora dos Primary files.
+
+1. **`coverage` e `audit:prod` não são chamados por nenhum workflow.** Os dois
+   scripts existem e funcionam, mas `quality.yml` roda typecheck/lint/`npm test`
+   e `release.yml` roda os mesmos três — nenhum dos dois chama `npm run coverage`
+   nem `npm run audit:prod`. Na prática: uma queda de cobertura nos 5 módulos, ou
+   uma vulnerabilidade `high` em dependência de produção, passa por todo o CI sem
+   falhar nada. O ticket se chama "gates" e o critério 1 fala em PR; um gate que
+   ninguém executa é exatamente o padrão "código que finge implementar algo" do
+   CLAUDE.md. **Não é falha da etapa 2** — o bloco "O que sobra" (reescrito pela
+   etapa 1 hoje) lista os scripts e a rede de regressão, e não pede o cabeamento
+   no CI. É buraco de spec, e fechar buraco de spec é trabalho da etapa 1:
+   precisa de critério numerado novo e de `quality.yml` nos Primary files (hoje
+   a lista cita `ci.yml`, que não existe). Daí o veredito.
+2. **Threshold é agregado, não por arquivo.** `validation.ts` está em 83.96%
+   stmts / 83.16% branches, os dois **abaixo** do piso global (89/84), e passa só
+   porque os outros quatro módulos puxam a média. Ou seja, o critério 3 protege o
+   conjunto, não cada módulo: `validation.ts` pode perder cobertura sem quebrar o
+   gate se outro módulo compensar. `thresholds.perFile` ou piso por glob resolve,
+   ao custo de reajustar os números.
+3. **Margem zero em `functions` (100 vs 100).** Qualquer função nova nos 5
+   módulos sem teste quebra o `npm run coverage`. É catraca, provavelmente
+   proposital — fica registrado para ninguém ser pego de surpresa. `lines` tem
+   0,5pp de folga, que é uma linha em 200.
+
+Nota menor, sem ação: o Implementation note diz que `@vitest/coverage-v8` "já
+estava pinado no lock, só não instalado". O lock ganhou ~10 pacotes e um bump
+transitivo — todos dev, então inofensivo, mas a frase subestima o diff.
+
 ## Comments
+
+- Da revisão do `QA-001` (2026-09-14): `npm run coverage` e `npm run audit:prod`
+  não são executados por nenhum workflow. Quem for abrir o ticket de
+  cabeamento: `quality.yml` precisa entrar nos Primary files, e a rede de
+  regressão natural é um teste irmão do `audit-release-gate.test.ts` lendo
+  `quality.yml`. Ver ponto 1 do bloco Review acima.
 
 - Da revisão do `PORTAL-004` (2026-09-12): o script `test:live` da lista
   "Required scripts" **já existe** — `PORTAL-004` o adicionou como
