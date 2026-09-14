@@ -36,7 +36,7 @@
     "@types/mime-types": "^3.0.1",
     "dotenv": "^17.4.2",
     "electron": "^41.10.7",
-    "electron-builder": "^24.13.3",
+    "electron-builder": "^26.16.1",
     "eslint": "^9.20.0",
     "jsdom": "^29.0.2",
     "standard-version": "^9.5.0",
@@ -52,13 +52,14 @@
     "axios": "^1.20.0",
     "cheerio": "^1.0.0",
     "dompurify": "^3.4.14",
-    "electron-updater": "^6.8.3",
+    "electron-updater": "^6.8.9",
     "mime-types": "^3.0.2",
     "playwright": "^1.63.0",
     "sqlite": "^5.1.1"
   },
   "allowScripts": {
     "esbuild@0.25.12": true,
-    "electron@41.10.7": true
+    "electron@41.10.7": true,
+    "electron-winstaller@5.4.0": true
   }
 }
