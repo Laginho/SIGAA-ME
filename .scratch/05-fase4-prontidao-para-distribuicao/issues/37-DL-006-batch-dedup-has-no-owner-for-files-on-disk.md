@@ -1,6 +1,6 @@
 # DL-006: o lote não sabe qual id gravou o arquivo que encontra no disco
 Status: open
-Stage: to-merge
+Stage: to-implement
 Priority: P2
 Blocked by: nenhum
 
@@ -13,6 +13,15 @@ Blocked by: nenhum
     chamada de `downloadAllFiles`)
   - `tests/unit/audit-download-identity.test.ts` (critérios 1-4)
   - `tests/integration/audit-download-disk.test.ts` (critério 5)
+  - Reabertura (critério 6):
+    - `electron/services/background-sync.service.ts` (`:235-241`, o
+      `downloadAllFiles` cujo `AppResult` é descartado; `:296-308`, onde o
+      `background-sync-update` é montado)
+    - `shared/ipc.ts` (`BackgroundSyncUpdate`, `:158-165`)
+    - `src/pages/dashboard.ts` (`handleBackgroundSyncUpdate`, `:54-80`)
+    - `src/pages/course-detail.ts` (`:466-483`, o laço que grava o índice —
+      vira a função compartilhada)
+    - `tests/integration/audit-background-sync-downloads.test.ts` (critério 6)
 
 Sai da revisão do `DL-004` (achado 3, repetido nas três rodadas) e da nota da
 revisão do `DL-005` de 2026-09-11. Os dois são a mesma raiz e por isso um
@@ -68,10 +77,50 @@ nem em confiança.
    (`http-scraper.service.ts:920-924`) ganha um teste onde o `.part` **existe**
    quando o writer falha, e a pasta de destino termina sem ele. O teste do
    `DL-003` apaga a pasta inteira antes, então o `unlink` nunca é exercitado.
+6. (Reabertura, achado 1 da revisão de 2026-09-14.) O que o sync em background
+   baixa entra no índice `downloads` do renderer, de modo que o próximo "Baixar
+   todos" o pula em vez de gravar `X (1).pdf`:
+   - `background-sync.service.ts` guarda o `AppResult` de `downloadAllFiles` e,
+     se `success`, põe os `DownloadRecord` com `status: 'downloaded'` (só
+     esses: `fileId`, `fileName`, `filePath`) num campo novo
+     `downloads: { courseId, records }[]` do `BackgroundSyncUpdate`. Falha do
+     download não derruba o ciclo: sem `success`, o curso simplesmente não
+     entra em `downloads`.
+   - `handleBackgroundSyncUpdate` (`dashboard.ts`) grava esses registros no
+     índice `downloads` por conta com **a mesma função** que
+     `course-detail.ts:466-483` usa hoje — extraia esse laço para
+     `src/data/account-storage` (`recordDownloads(courseId, records)` ou nome
+     equivalente) e chame dos dois lugares. Uma função, dois chamadores; não
+     é abstração para um caso.
+   - `background-sync-update` é canal main → renderer que já existe; o campo
+     novo é tipado em `shared/ipc.ts`, sem `any`. Não vai ViewState, cookie
+     nem URL do SIGAA — só `fileId`, `fileName`, `filePath`.
+   - Passe `known` também no `downloadAllFiles` do sync **só se** o main tiver
+     de onde tirá-lo sem estado novo; hoje não tem, então não passe. O
+     critério é o registro depois, não o `skip` durante.
+
+#### Tests stage 2 writes
+
+Critério 6, em `tests/integration/audit-background-sync-downloads.test.ts`,
+no mesmo molde dos `background-sync*.test.ts` existentes (mock do
+`sigaaService`, `getWindow` falso capturando o `webContents.send`):
+
+- `downloadAllFiles` mockado devolve `success: true` com um `downloaded` e um
+  `skipped`: o `background-sync-update` capturado tem `downloads` com **um**
+  registro, do arquivo `downloaded`, com `filePath`.
+- `downloadAllFiles` mockado devolve `success: false`: o ciclo termina, o
+  `background-sync-update` sai sem esse curso em `downloads`, e nada lança.
+- Renderer: `recordDownloads` sobre um índice vazio e depois sobre um índice
+  que já tem outro `fileId` do mesmo curso — os dois ficam, com `path` e
+  `downloadedAt`. Este teste chama a função de produção em
+  `src/data/account-storage`, não uma cópia.
+
+Vermelho antes: o primeiro falha porque `downloads` não existe no payload; o
+terceiro falha porque a função não existe.
 
 #### Verification
 
-    npx vitest run tests/unit/audit-download-identity.test.ts tests/integration/audit-download-disk.test.ts tests/unit/sigaa-service.test.ts
+    npx vitest run tests/unit/audit-download-identity.test.ts tests/integration/audit-download-disk.test.ts tests/integration/audit-background-sync-downloads.test.ts tests/unit/sigaa-service.test.ts
     npm run quality
 
 ## Comments
@@ -192,3 +241,12 @@ prática o renderer já monta `known` por turma (`downloadedFiles[courseId]`), e
 o pior caso é um `skipped` a mais. E `known` com mais de 500 itens derruba o
 payload inteiro com `INVALID_REQUEST` em vez de só ignorar o índice; nada poda
 esse índice, mas `files` tem o mesmo teto, então o limite é coerente.
+
+#### Reopen (2026-09-14, etapa 1)
+
+Achado 1 da revisão: opção 2 escolhida pelo humano — o `background-sync` manda
+os registros ao renderer no `background-sync-update`. Critérios 1-5 ✅ ficam
+como entregues em `f17d31b`/`7b84709`; só o critério 6 ❌ falta. O trabalho
+continua nesta branch; `Stage: to-implement`. Achado 2 (`[string, any]` em
+`course-detail.ts:455-456`) pode cair junto se a extração do laço passar por
+ali; não é critério. Achado 3 segue em `CLEAN-006`.
