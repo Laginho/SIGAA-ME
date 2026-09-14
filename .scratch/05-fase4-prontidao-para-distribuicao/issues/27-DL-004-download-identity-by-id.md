@@ -1,6 +1,6 @@
 # DL-004: Identidade por id no caminho de download
-Status: open
-Stage: to-merge
+Status: resolved
+Stage: done
 Priority: P1
 Blocked by: DL-003
 
@@ -385,3 +385,27 @@ vira ticket próprio, ou volta para cá como critério? Duas saídas, as duas su
 - **Teste do achado 1 é fraco.** Ele mocka `fs.promises.link`, que o código não
   chama mais; passa por vacuidade e só serve de guarda contra reintroduzir o
   `link`. Não vale reabrir, mas não conte como cobertura do caminho FAT.
+
+## Decisão e fechamento (2026-09-14)
+
+A pergunta aberta desde 2026-09-11 (nota do `DL-005`) e repetida nas três
+rodadas da etapa 3 foi respondida pelo humano: **saída 1**. O índice persistido
+id → caminho vira ticket próprio, o critério 5 passa a descrever o que a
+implementação entrega, e o `DL-004` fecha.
+
+- `DL-006` aberto (`f825bb1`). Leva o achado 3 **e** a nota do `DL-005` sobre o
+  `existsSync` puro — os dois são o mesmo filtro — e adota como critério 5 o
+  carry-over do `DL-003` (descarte do `.part` no `writer.on('error')`, três
+  rodadas sem teste).
+- Ao escrever o `DL-006` apareceu um caminho mais barato que o que a revisão
+  previa: o índice id → caminho **já existe** no renderer desde este ticket
+  (`downloads[courseId][fileId] = { downloadedAt, path }`,
+  `course-detail.ts:377-392`). Falta o main enxergá-lo, não um arquivo de
+  persistência novo.
+- Achados 4 e 5 (arquivos fora dos Primary files; cache do renderer não migra)
+  ficam como registro, aceitos.
+
+Fechado com `master` mergeado na branch antes do merge do PR (a branch estava 27
+commits atrás). Gate no Windows depois do merge: tsc limpo, eslint 0 erros / 55
+warnings pré-existentes, vitest 705 passed | 5 skipped em 62 arquivos. PR #20
+mergeado em `db22fcc`.
