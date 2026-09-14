@@ -1,6 +1,6 @@
 # DEP-005: Subir o Electron para fora da faixa vulnerável
-Status: open
-Stage: to-merge
+Status: resolved
+Stage: done
 Priority: P1
 Blocked by: DEP-004, DEP-007
 
@@ -47,7 +47,7 @@ npx playwright test app.spec.ts
 
 #### Implementation notes
 
-- Commit: (na branch `dep-005`, ver commit de código)
+- Commit: `a3e3c74`, `850d920`, PR #24 (merge `008b1ca`).
 - Electron escolhido: `41.10.7`. A faixa vulnerável do `npm audit` mudou entre
   o corpo do ticket e a execução: além de `<=40.10.2 || 41.0.0-alpha.1-41.7.1
   || 42.0.0-alpha.1-42.3.3 || 43.0.0-alpha.1-43.0.0-beta.8` (a faixa original),
@@ -72,10 +72,12 @@ npx playwright test app.spec.ts
   máquina, então os 3 com credencial também rodaram, além dos 2 sem) —
   critério 4 ok.
 - `allowScripts` atualizado para `electron@41.10.7` — critério 5 ok.
-- Live smoke (critério 6): **pendente, fica para o autor.** É login real no
-  SIGAA; o agente não roda esse tier (CLAUDE.md, tabela de tiers de teste).
-  Rodar `npm run test:live` (ou `RUN_LIVE_SIGAA_TESTS=true`) no Windows e colar
-  o resultado aqui antes de fechar.
+- Live smoke (critério 6): **verde**, rodado pelo autor no Windows em
+  2026-09-14 com `npm run test:live`, uma vez só. 6/6 passed em 21,36s
+  (`tests/integration/scraper.test.ts`): alcança a página de login (94ms),
+  loga com as credenciais (2538ms), enumera as disciplinas com linhas bem
+  formadas (8366ms), entra na primeira disciplina e traz arquivos e notícias
+  bem formados (9164ms), desloga e libera o browser (120ms). Critério 6 ok.
 
 #### Review (2026-09-13, etapa 3)
 
@@ -94,7 +96,7 @@ Verificado de forma independente nesta máquina, não lido das notas:
 4. ✅ `app.spec.ts` filtrado nos 2 sem credencial: 2 passed. Os 3 com
    credencial não foram repetidos de propósito — são login real.
 5. ✅ `allowScripts` = `electron@41.10.7`, casa com o instalado.
-6. ⏳ Live smoke: pendente com o autor.
+6. ✅ Live smoke: rodado pelo autor em 2026-09-14, 6/6 verde (ver notas).
 
 Sobre "nenhuma breaking change tocou código": confirmado. O levantamento do uso
 de `electron` no repo devolve só API estável entre 30 e 41 (`app`,
@@ -127,5 +129,4 @@ ticket. `electron/main.ts` não foi tocado, como o ticket previa. As 646 deleç�
 no lock são a subárvore do `@electron/get` 2 → 5, que troca a cadeia
 `got`/`cacheable-request`/`global-agent` por `undici`.
 
-O que falta para `done`: rodar o live smoke no Windows, colar o resultado nas
-notas e fazer o merge do PR.
+Fechado em 2026-09-14: live smoke verde pelo autor (6/6) e PR #24 mergeado.
