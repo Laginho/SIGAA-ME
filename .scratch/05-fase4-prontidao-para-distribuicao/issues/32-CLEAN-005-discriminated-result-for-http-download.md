@@ -1,6 +1,6 @@
 # CLEAN-005: `downloadFile` devolve campos opcionais, não união discriminada
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P3
 Blocked by: DL-004
 
