@@ -1,6 +1,6 @@
 # CLEAN-003: Apagar o caminho de download em lote morto
 Status: open
-Stage: to-implement
+Stage: blocked
 Priority: P3
 Blocked by: DL-004, OBS-003
 
@@ -70,3 +70,5 @@ fallback por-arquivo pelo lote que deixará de existir.
   em `download.service.ts:332-346`.
 
 - 2026-09-14 Attempt 1 failed: exit 0. Log tail: Both blockers on CLEAN-003 (DL-004, OBS-003) are closed, so the ticket is unblocked and its `Stage: to-implement` is current — no branch exists yet, so nothing stale to check. /  / Before dispatching to stage 2, there's an open decision in the ticket's `## Comments`: /  / > Apagar tira a otimização anotada no `ponytail:` (`sigaa.service.ts:556`) de trocar um browser por arquivo pelo lote quando o retry falhar em massa. Se quiser guardar essa porta, o ticket vira "documentar como morto" em vez de apagar. **Confirmar antes da etapa 2; o ticket assume apagar.** /  / The ticket defaults to **delete** the dead batch-download path (`PlaywrightLoginService.downloadAllFiles` and `DownloadService.downloadCourseFiles`, ~200 lines), rewriting the `ponytail:` comment instead of keeping it as a documented future optimization. /  / Confirm: proceed with **delete** (the ticket's default), or do you want to switch it to "document as dead" instead? /
+
+- 2026-09-14 Attempt 2 failed: exit 0; blocked after two attempts. Log tail: CLEAN-003 is unblocked (DL-004, OBS-003 both closed) and its `Stage: to-implement` is current — no branch exists yet. Stage 2 is Sonnet, which matches this session. /  / Before I dispatch to the `tdd` skill, the ticket has an open decision in `## Comments` that a previous run already stopped on: /  / > Apagar tira a otimização anotada no `ponytail:` (`sigaa.service.ts:556`) de trocar um browser por arquivo pelo lote quando o retry falhar em massa. Se quiser guardar essa porta, o ticket vira "documentar como morto" em vez de apagar. /  / The ticket defaults to **delete**: remove `PlaywrightLoginService.downloadAllFiles` and `DownloadService.downloadCourseFiles` (~200 lines), and rewrite the `ponytail:` comment at `sigaa.service.ts:556` instead of keeping it as a documented future optimization. /  / Confirm: proceed with **delete** (the ticket's default), or switch it to "document as dead" instead? /
