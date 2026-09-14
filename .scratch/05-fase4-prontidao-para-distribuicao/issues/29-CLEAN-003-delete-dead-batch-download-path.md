@@ -1,6 +1,6 @@
 # CLEAN-003: Apagar o caminho de download em lote morto
 Status: open
-Stage: to-implement
+Stage: reviewing
 Priority: P3
 Blocked by: — (DL-004 e OBS-003 fechados)
 
@@ -81,3 +81,21 @@ fallback por-arquivo pelo lote que deixará de existir.
 - 2026-09-14 Attempt 1 failed: exit 0. Log tail: Both blockers on CLEAN-003 (DL-004, OBS-003) are closed, so the ticket is unblocked and its `Stage: to-implement` is current — no branch exists yet, so nothing stale to check. /  / Before dispatching to stage 2, there's an open decision in the ticket's `## Comments`: /  / > Apagar tira a otimização anotada no `ponytail:` (`sigaa.service.ts:556`) de trocar um browser por arquivo pelo lote quando o retry falhar em massa. Se quiser guardar essa porta, o ticket vira "documentar como morto" em vez de apagar. **Confirmar antes da etapa 2; o ticket assume apagar.** /  / The ticket defaults to **delete** the dead batch-download path (`PlaywrightLoginService.downloadAllFiles` and `DownloadService.downloadCourseFiles`, ~200 lines), rewriting the `ponytail:` comment instead of keeping it as a documented future optimization. /  / Confirm: proceed with **delete** (the ticket's default), or do you want to switch it to "document as dead" instead? /
 
 - 2026-09-14 Attempt 2 failed: exit 0; blocked after two attempts. Log tail: CLEAN-003 is unblocked (DL-004, OBS-003 both closed) and its `Stage: to-implement` is current — no branch exists yet. Stage 2 is Sonnet, which matches this session. /  / Before I dispatch to the `tdd` skill, the ticket has an open decision in `## Comments` that a previous run already stopped on: /  / > Apagar tira a otimização anotada no `ponytail:` (`sigaa.service.ts:556`) de trocar um browser por arquivo pelo lote quando o retry falhar em massa. Se quiser guardar essa porta, o ticket vira "documentar como morto" em vez de apagar. /  / The ticket defaults to **delete**: remove `PlaywrightLoginService.downloadAllFiles` and `DownloadService.downloadCourseFiles` (~200 lines), and rewrite the `ponytail:` comment at `sigaa.service.ts:556` instead of keeping it as a documented future optimization. /  / Confirm: proceed with **delete** (the ticket's default), or switch it to "document as dead" instead? /
+
+- 2026-09-14 Attempt 3: the `## Comments` block already carried the resolution
+  ("RESOLVIDA em 2026-09-14: apagar") that the first two attempts were waiting
+  on, so this run proceeded straight to stage 2 on branch `clean-003`.
+  No new test: this ticket removes code with no caller and no existing test
+  (criterion 2 is the pre-existing regression net, unchanged). Removed
+  `PlaywrightLoginService.downloadAllFiles` (`playwright-login.service.ts`),
+  `DownloadService.downloadCourseFiles` (`download.service.ts`, plus its
+  now-stale header comment), and rewrote the `ponytail:` at
+  `sigaa.service.ts:574` to record that the batch path is gone rather than a
+  future swap target. Proof: `grep -rn "downloadCourseFiles" electron src
+  tests` returns nothing; `grep -rn "downloadAllFiles" electron` returns only
+  `SigaaService`/handler/preload/`background-sync` call sites (criterion 1).
+  `tests/unit/sigaa-service.test.ts` + `tests/integration/download-boundary.test.ts`:
+  37 passed, unchanged (criterion 2). `npm run quality`: typecheck clean, lint
+  0 errors/50 pre-existing warnings, 705 passed/5 skipped (criterion 3). Commit
+  `c181232`, 3 files changed, 5 insertions(+), 244 deletions(-). `Stage:
+  to-review`.
