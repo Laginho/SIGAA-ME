@@ -1,6 +1,6 @@
 # CLEAN-003: Apagar o caminho de download em lote morto
 Status: open
-Stage: to-review
+Stage: reviewing
 Priority: P3
 Blocked by: — (DL-004 e OBS-003 fechados)
 

@@ -571,9 +571,10 @@ export class SigaaService {
                 }
             }
 
-            // Um browser por arquivo no fallback de retry. O lote (playwrightLogin.downloadAllFiles)
-            // foi removido em CLEAN-003 por não ter chamador nem teste; se o volume de falhas
-            // justificar lote de novo, reconstruir do zero em vez de reviver o código antigo.
+            // ponytail: um browser por arquivo no fallback de retry. O lote
+            // (playwrightLogin.downloadAllFiles) foi removido em CLEAN-003 por não ter chamador
+            // nem teste; se o volume de falhas justificar lote de novo, reconstruir do zero em
+            // vez de reviver o código antigo.
             for (let i = 0; i < results.length; i++) {
                 if (signal.aborted) return CANCELLED;
                 if (results[i].status !== 'failed') continue;
