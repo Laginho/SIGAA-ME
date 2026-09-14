@@ -85,4 +85,27 @@ describe('audit download disk failures and collisions', () => {
         await expect(scraper.downloadFile('99999', '555', 'file.txt', destino, DOWNLOAD_SCRIPT))
             .resolves.toMatchObject({ success: false, error: expect.stringContaining('ENOENT') });
     });
+
+    // DL-004: dois arquivos de ids diferentes cujo nome colide (exato, ou
+    // sanitiza/trunca igual) não podem terminar como um arquivo só no disco —
+    // o segundo `rename` sobrescrevia o primeiro em silêncio.
+    it.each([
+        ['nomes idênticos', 'same.txt', 'same.txt'],
+        ['nomes que sanitizam para o mesmo segmento', 'Lista:1.txt', 'Lista/1.txt'],
+        ['nomes que truncam para o mesmo segmento de 150', 'a'.repeat(200) + '.txt', 'a'.repeat(200) + '_variante.txt'],
+    ])('preserva os dois downloads com nomes colidentes (%s)', async (_label, nameA, nameB) => {
+        vi.mocked(axios.post)
+            .mockResolvedValueOnce(resposta('conteudo-A', 'text/plain'))
+            .mockResolvedValueOnce(resposta('conteudo-B', 'text/plain'));
+
+        const resultA = await scraper.downloadFile('99999', '555', nameA, destino, DOWNLOAD_SCRIPT);
+        const resultB = await scraper.downloadFile('99999', '556', nameB, destino, DOWNLOAD_SCRIPT);
+
+        expect(resultA).toMatchObject({ success: true });
+        expect(resultB).toMatchObject({ success: true });
+        expect(resultA.filePath).not.toBe(resultB.filePath);
+
+        expect(readFileSync(resultA.filePath!, 'utf8')).toBe('conteudo-A');
+        expect(readFileSync(resultB.filePath!, 'utf8')).toBe('conteudo-B');
+    });
 });

@@ -74,7 +74,9 @@ describe('course-detail: falha de download', () => {
     it('renderiza a lista mesmo quando checkFilesExistence devolve INVALID_REQUEST (SEC-002)', async () => {
         // Há um download registrado, então a checagem de existência é chamada. Se o
         // main rejeitar o pedido, a poda do cache é pulada — a lista não pode sumir.
-        writeAccountItem('downloads', JSON.stringify({ c1: { 'Lista 3.pdf': { path: 'C:/Users/aluno/SIGAA/Lista 3.pdf' } } }));
+        // DL-004: a chave é o fileId, não o nome — dois arquivos de nomes iguais
+        // não podem compartilhar a mesma entrada de cache.
+        writeAccountItem('downloads', JSON.stringify({ c1: { '555': { path: 'C:/Users/aluno/SIGAA/Lista 3.pdf' } } }));
         (window as any).api.checkFilesExistence = vi.fn().mockResolvedValue(fail('INVALID_REQUEST', 'lista de caminhos inválida'));
         vi.spyOn(console, 'error').mockImplementation(() => undefined);
         const container = document.createElement('div');
