@@ -58,6 +58,8 @@ beforeEach(() => {
             },
         }),
         loadAllNews: vi.fn().mockResolvedValue({ success: true, data: [] }),
+        getCompatibilityStatus: vi.fn().mockResolvedValue({ state: 'ok' }),
+        onCompatibilityChanged: vi.fn(() => () => undefined),
     };
 });
 

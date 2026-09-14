@@ -82,6 +82,8 @@ describe('account isolation (renderer)', () => {
         (window as any).api = {
             getSettings: vi.fn().mockResolvedValue({ theme: 'light' }),
             onBackgroundSyncUpdate: vi.fn(() => () => undefined),
+            getCompatibilityStatus: vi.fn().mockResolvedValue({ state: 'ok' }),
+            onCompatibilityChanged: vi.fn(() => () => undefined),
             logout: vi.fn().mockResolvedValue({ success: true }),
             clearAllData: vi.fn().mockResolvedValue({ success: true }),
         };
@@ -185,6 +187,8 @@ describe('background sync updates are bound to an account', () => {
         (window as any).api = {
             getSettings: vi.fn().mockResolvedValue({ theme: 'light' }),
             onBackgroundSyncUpdate: vi.fn(() => () => undefined),
+            getCompatibilityStatus: vi.fn().mockResolvedValue({ state: 'ok' }),
+            onCompatibilityChanged: vi.fn(() => () => undefined),
         };
     });
 
