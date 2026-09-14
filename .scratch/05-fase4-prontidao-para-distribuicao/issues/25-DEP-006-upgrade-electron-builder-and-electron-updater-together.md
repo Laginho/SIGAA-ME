@@ -65,9 +65,16 @@ npm run build
 - `npm run build`: gerou `release/1.2.0/SIGAA-ME-Windows-1.2.0-Setup.exe` e
   `...-Portable.exe` sem erro — critério 3 ok. Não bateu no problema de
   privilégio do `7za`/`winCodeSign` que `DEP-005` viu numa outra máquina.
-- Smoke do instalador (critério 4): **pendente do autor** — instalar, abrir,
-  logar, navegar e baixar um arquivo é smoke manual com credencial real, mesmo
-  padrão do live smoke do `DEP-005` (critério 6). Não rodado nesta sessão.
+- Smoke do instalador (critério 4): **verde, rodado pelo autor em 2026-09-14**
+  — `npx playwright test app.spec.ts`, 5/5 passed: login page carrega, valida
+  input vazio, loga com credencial real e chega ao dashboard (3,5s), sincroniza
+  e interage com material de disciplina incluindo download (2,5min),
+  background sync atualiza o dashboard em tempo real. Cobre login/navega/baixa
+  do critério; **rodou contra o build de `dist-electron` via
+  `electron.launch('.')`, não contra o instalador empacotado**
+  (`release/1.2.0/win-unpacked`/`Setup.exe`) — essa parte fica para quem
+  revisar julgar se o `npm run build` limpo do critério 3 já cobre o risco de
+  empacotamento, ou se pede uma rodada extra contra o `.exe`.
 - Audit residual (critério 5): nenhum — os 4 achados que sobraram depois do
   bump do electron-builder/electron-updater foram resolvidos por `npm audit
   fix` sem `--force`, então não há nada para listar como "aceito porque…".
