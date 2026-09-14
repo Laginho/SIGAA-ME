@@ -57,7 +57,17 @@ Já encaminhado no master: `CourseFile.id` e `DownloadToken` existem no pedido;
    `isInsideRoot`. Nunca sobrescreve um arquivo existente que não seja o
    próprio `.part`.
 5. A deduplicação do lote (`:357`) continua pulando arquivo **já baixado e
-   presente no disco**, agora chaveada por id, sem derrubar um homônimo novo.
+   presente no disco**, sem derrubar um homônimo novo do mesmo lote: cada
+   arquivo da fila reserva, na ordem do array `files`, um candidato de caminho
+   distinto (nome-base, depois sufixo numerado) e só é comparado contra o
+   disco por esse candidato.
+
+   Reescrito em 2026-09-14, com o PR aberto. O texto original pedia dedup
+   "chaveada por id"; isso exige um índice persistido id → caminho, que o
+   processo não tem e que é arquivo novo — decisão de etapa 1, saiu como
+   `DL-006`. O critério passa a descrever o que a implementação entrega. O
+   caso que a ordenação erra está no achado 3 e foi levado para o `DL-006`,
+   não desapareceu com o fechamento deste ticket.
 
 #### Verification
 
