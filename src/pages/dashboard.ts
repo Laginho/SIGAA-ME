@@ -1,6 +1,6 @@
 import '../styles/dashboard.css';
 import type { AccountProfile } from '../../shared/domain';
-import type { BackgroundSyncUpdate } from '../../shared/ipc';
+import type { BackgroundSyncUpdate, CompatibilityStatus } from '../../shared/ipc';
 import { toast } from '../components/toast';
 import { clearActiveAccount, clearAllLocalData, getActiveAccount, readAccountItem } from '../data/account-storage';
 import { h } from '../utils/dom';
@@ -29,6 +29,27 @@ import {
  * vez por montagem ainda de pé.
  */
 let unsubscribeSync: (() => void) | null = null;
+let unsubscribeCompatibility: (() => void) | null = null;
+
+/**
+ * O aviso é um nó só quando `incompatible` (regra 1 do CLAUDE.md e AC do
+ * PORTAL-006: "nenhum nó do aviso existe no DOM" em `ok`) — não uma classe de
+ * visibilidade.
+ */
+function renderCompatibilityNotice(status: CompatibilityStatus): void {
+  const container = document.querySelector('.dashboard-container');
+  if (!container) return;
+  container.querySelector('.compatibility-notice')?.remove();
+  if (status.state !== 'incompatible') return;
+
+  const date = new Date(status.since).toLocaleDateString('pt-BR');
+  const notice = h(
+    'div',
+    { className: 'compatibility-notice' },
+    `O SIGAA mudou e a sincronização automática está pausada desde ${date}. Seus arquivos continuam disponíveis. Uma sincronização manual completa reativa.`
+  );
+  container.querySelector('.dashboard-header')?.after(notice);
+}
 
 export function handleBackgroundSyncUpdate(data: BackgroundSyncUpdate): void {
   const active = getActiveAccount();
@@ -196,6 +217,8 @@ export function renderDashboardPage(app: HTMLDivElement, account: AccountProfile
     if (!result.success) toast.error(result.error.message);
     unsubscribeSync?.();
     unsubscribeSync = null;
+    unsubscribeCompatibility?.();
+    unsubscribeCompatibility = null;
     clearActiveAccount();
     window.location.hash = '#/login';
   });
@@ -213,6 +236,8 @@ export function renderDashboardPage(app: HTMLDivElement, account: AccountProfile
     }
     unsubscribeSync?.();
     unsubscribeSync = null;
+    unsubscribeCompatibility?.();
+    unsubscribeCompatibility = null;
     clearAllLocalData();
     setTimeout(() => { window.location.hash = '#/login'; }, 2000);
   });
@@ -227,6 +252,12 @@ export function renderDashboardPage(app: HTMLDivElement, account: AccountProfile
   // um listener vivo por vez (DATA-002).
   unsubscribeSync?.();
   unsubscribeSync = window.api.onBackgroundSyncUpdate(handleBackgroundSyncUpdate);
+
+  // Aviso de incompatibilidade (PORTAL-006): estado no mount, evento pro
+  // resto — mesma disciplina de um listener vivo por vez do sync acima.
+  unsubscribeCompatibility?.();
+  unsubscribeCompatibility = window.api.onCompatibilityChanged(renderCompatibilityNotice);
+  window.api.getCompatibilityStatus().then(renderCompatibilityNotice);
 
   // Load courses from cache
   loadCoursesFromCache();

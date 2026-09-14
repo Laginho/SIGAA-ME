@@ -11,7 +11,7 @@
  * Uses a mocked window.api to simulate success, partial failure, and full failure.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { readAccountItem, setActiveAccount, writeAccountItem } from '../../src/data/account-storage';
 import { renderSyncSelectionPage } from '../../src/pages/sync-selection';
 
@@ -58,6 +58,8 @@ beforeEach(() => {
             },
         }),
         loadAllNews: vi.fn().mockResolvedValue({ success: true, data: [] }),
+        getCompatibilityStatus: vi.fn().mockResolvedValue({ state: 'ok' }),
+        onCompatibilityChanged: vi.fn(() => () => undefined),
     };
 });
 
@@ -318,5 +320,31 @@ describe('Sync: falha de disciplina preserva cache (ARCH-001 READ §1)', () => {
 
         const c2 = cached.find((c: any) => c.id === 'c2');
         expect(c2.files).toEqual([{ id: '200', name: 'Prova 1.pdf', type: 'file' }]);
+    });
+});
+
+describe('Sync: post-sync navigation is cancellable (BUG-013)', () => {
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    it('leaves no pending timer and does not navigate if the route changes within the 600ms post-sync window', async () => {
+        vi.useFakeTimers();
+        const app = buildApp();
+        renderSyncSelectionPage(app);
+
+        document.getElementById('btnFastSync')?.click();
+        for (let i = 0; i < 50; i++) await Promise.resolve();
+        // jsdom's localStorage.setItem schedules its own 0ms timers (storage
+        // event dispatch) — drain those so only the post-sync timer remains.
+        vi.advanceTimersByTime(0);
+
+        expect(vi.getTimerCount()).toBe(1);
+
+        window.dispatchEvent(new Event('hashchange'));
+
+        expect(vi.getTimerCount()).toBe(0);
+        vi.advanceTimersByTime(600);
+        expect(window.location.hash).not.toBe('#/dashboard');
     });
 });

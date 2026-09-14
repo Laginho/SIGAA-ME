@@ -35,6 +35,8 @@ beforeEach(() => {
         value: {
             getSettings: vi.fn().mockResolvedValue({ theme: 'light' }),
             onBackgroundSyncUpdate: vi.fn(() => () => undefined),
+            getCompatibilityStatus: vi.fn().mockResolvedValue({ state: 'ok' }),
+            onCompatibilityChanged: vi.fn(() => () => undefined),
         },
     });
 });

@@ -168,6 +168,8 @@ describe('dashboard: conteúdo do SIGAA não cria nó executável', () => {
         (window as any).api = {
             getSettings: vi.fn().mockResolvedValue({ ...baseSettings }),
             onBackgroundSyncUpdate: vi.fn(() => () => undefined),
+            getCompatibilityStatus: vi.fn().mockResolvedValue({ state: 'ok' }),
+            onCompatibilityChanged: vi.fn(() => () => undefined),
             logout: vi.fn().mockResolvedValue({ success: true }),
             clearAllData: vi.fn().mockResolvedValue({ success: true }),
         };

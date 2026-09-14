@@ -424,6 +424,14 @@ describe('registerIpcHandlers: remetente, validação e cópia limpa', () => {
         expect(electronMock.handlers.size).toBe(16);
     });
 
+    it('test-simulate-new-file devolve false em vez de rejeitar quando simulateNewFile lança', async () => {
+        electronMock.handlers.clear();
+        deps = makeDeps({ simulateNewFile: vi.fn(async () => { throw new Error('cache.json: disk full'); }) });
+        registerIpcHandlers(deps);
+        const result = await invoke('test-simulate-new-file');
+        expect(result).toBe(false);
+    });
+
     it('cobre exatamente os canais conhecidos (novo canal aparece aqui)', () => {
         const expected = [
             'login-request',
