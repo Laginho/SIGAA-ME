@@ -1,11 +1,9 @@
 // DOC-003: este arquivo não tem `import ... from` estático em lugar nenhum.
 // Ele é carregado por `await import('./download.service')` em
-// `playwright-login.service.ts` (`PlaywrightLoginService.downloadFile` e
-// `downloadAllFiles`). Cadeia real até um ponto de entrada:
+// `playwright-login.service.ts` (`PlaywrightLoginService.downloadFile`).
+// Cadeia real até um ponto de entrada:
 //   IPC `download-file` (main.ts) → SigaaService.downloadFile
 //   → SigaaService.downloadViaPlaywright (plano B, BUG-004) → PlaywrightLoginService.downloadFile → aqui
-// `PlaywrightLoginService.downloadAllFiles` também importa este arquivo, mas hoje
-// não tem chamador (ver o `ponytail:` em SigaaService.downloadAllFiles).
 // Busca por `import ... from` vai dizer que é código morto. Não é.
 import { Browser, Page } from 'playwright';
 import * as fs from 'fs';
@@ -312,126 +310,5 @@ export class DownloadService {
             return { success: false, error: error.message };
         }
     }
-
-    async downloadCourseFiles(
-        page: Page,
-        courseId: string,
-        courseName: string,
-        files: Array<{ name: string; url: string; script?: string }>,
-        basePath: string,
-        downloadedFiles: Record<string, any>,
-        onProgress?: (fileName: string, status: 'downloaded' | 'skipped' | 'failed') => void
-    ): Promise<{
-        downloaded: number;
-        skipped: number;
-        failed: number;
-        results: Array<{ fileName: string; status: 'downloaded' | 'skipped' | 'failed'; filePath?: string }>;
-    }> {
-        const results: Array<{ fileName: string; status: 'downloaded' | 'skipped' | 'failed'; filePath?: string }> = [];
-        let downloaded = 0;
-        let skipped = 0;
-        let failed = 0;
-
-        // Filter out duplicates first
-        const queue = files.filter(file => {
-            const courseDownloads = downloadedFiles[courseId] || {};
-            if (courseDownloads[file.name]) {
-                const existingPath = courseDownloads[file.name].path;
-                if (fs.existsSync(existingPath)) {
-                    log.info('Skipping duplicate.', { fileName: file.name });
-                    skipped++;
-                    results.push({ fileName: file.name, status: 'skipped', filePath: existingPath });
-                    if (onProgress) onProgress(file.name, 'skipped');
-                    return false;
-                }
-            }
-            return true;
-        });
-
-        log.info(`Starting parallel download for ${queue.length} files with 3 workers.`);
-
-        const courseUrl = page.url();
-        const CONCURRENCY = 3;
-        let globalError: string | null = null;
-
-        const processQueue = async (workerId: number) => {
-            // Worker 0 uses the main page, others create new pages
-            const workerPage = workerId === 0 ? page : await page.context().newPage();
-
-            try {
-                // If new page, navigate to course
-                if (workerId !== 0) {
-                    log.info(`Worker ${workerId} navigating to course.`);
-                    await workerPage.goto(courseUrl, { waitUntil: 'domcontentloaded' });
-                }
-
-                while (queue.length > 0) {
-                    const file = queue.shift();
-                    if (!file) break;
-
-                    if (globalError) {
-                        log.info(`Worker ${workerId} aborting nicely due to global error.`);
-                        break;
-                    }
-
-                    log.info(`Worker ${workerId} processing file.`, { fileName: file.name });
-
-                    // Ensure we are on the right page
-                    if (workerPage.url() !== courseUrl) {
-                        await workerPage.goto(courseUrl, { waitUntil: 'domcontentloaded' });
-                    }
-
-                    try {
-                        const result = await this.downloadFile(workerPage, file.url, file.name, courseName, basePath, file.script);
-
-                        if (result.success) {
-                            downloaded++;
-                            results.push({ fileName: file.name, status: 'downloaded', filePath: result.filePath });
-                            if (onProgress) onProgress(file.name, 'downloaded');
-                        } else {
-                            failed++;
-                            results.push({ fileName: file.name, status: 'failed' });
-                            if (onProgress) onProgress(file.name, 'failed');
-                        }
-                    } catch (e: any) {
-                        if (e.message === 'JSF_SESSION_EXPIRED') {
-                            globalError = 'JSF_SESSION_EXPIRED';
-                            // Put file back in queue so it can be retried by the upper layer if needed
-                            queue.unshift(file);
-                            log.info(`Worker ${workerId} detected session expiration. Aborting queue.`);
-                            break;
-                        } else {
-                            failed++;
-                            results.push({ fileName: file.name, status: 'failed' });
-                            if (onProgress) onProgress(file.name, 'failed');
-                        }
-                    }
-                }
-            } catch (e) {
-                log.error(`Worker ${workerId} error.`, { error: e });
-            } finally {
-                // Close extra pages
-                if (workerId !== 0) {
-                    await workerPage.close();
-                }
-            }
-        };
-
-        const workers = [];
-        const numWorkers = Math.min(CONCURRENCY, Math.max(1, queue.length));
-
-        for (let i = 0; i < numWorkers; i++) {
-            workers.push(processQueue(i));
-        }
-
-        await Promise.all(workers);
-
-        if (globalError === 'JSF_SESSION_EXPIRED') {
-            throw new Error('JSF_SESSION_EXPIRED');
-        }
-
-        return { downloaded, skipped, failed, results };
-    }
-
 
 }
