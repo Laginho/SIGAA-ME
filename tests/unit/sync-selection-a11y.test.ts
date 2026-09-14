@@ -8,7 +8,7 @@
  */
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderSyncSelectionPage } from '../../src/pages/sync-selection';
 
 function buildApp(): HTMLDivElement {
@@ -21,6 +21,10 @@ beforeEach(() => {
     document.body.innerHTML = '';
     localStorage.clear();
     sessionStorage.clear();
+    (window as any).api = {
+        getCompatibilityStatus: vi.fn().mockResolvedValue({ state: 'ok' }),
+        onCompatibilityChanged: vi.fn(() => () => undefined),
+    };
 });
 
 describe('sync-selection: cartões clicáveis são <button>', () => {
