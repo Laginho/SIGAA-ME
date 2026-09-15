@@ -36,7 +36,18 @@ function toCourseSummary(c: ParsedCourse): CourseSummary {
 }
 
 function toCourseFile(f: ParsedFile): CourseFile {
-    return { id: f.id, name: f.name, type: f.type, date: f.date };
+    return { id: f.id, name: f.name, type: f.type, date: f.date, url: extractLinkUrl(f) };
+}
+
+/** Só `http:`/`https:` absoluta atravessa; `javascript:`, relativa ou vazia fica para trás. */
+function extractLinkUrl(f: ParsedFile): string | undefined {
+    if (f.type !== 'link' || !f.url) return undefined;
+    try {
+        const parsed = new URL(f.url);
+        return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? f.url : undefined;
+    } catch {
+        return undefined;
+    }
 }
 
 function toNewsSummary(n: ParsedNews): NewsSummary {
