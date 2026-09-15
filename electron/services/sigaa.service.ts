@@ -587,7 +587,8 @@ export class SigaaService {
                 const fileName = results[i].fileName;
                 const originalFile = files.find(f => f.id === fileId);
                 if (!originalFile) continue;
-                // Sem script, o Playwright procura o link pelo nome no DOM vivo.
+                // O Playwright acha a linha do DOM vivo pelo id (DL-007); o
+                // script só serve de plano B quando o id não está mais lá.
                 const script = findScript(retryParsedFiles, originalFile)
                     ?? findScript(parsedFiles, originalFile)
                     ?? findScript(filesSectionFiles, originalFile);
