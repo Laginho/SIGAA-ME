@@ -275,11 +275,11 @@ async function fetchCourseFiles(courseId: string) {
       filesListElement.replaceChildren()
       for (const file of course.files) {
         const isDownloaded = !!courseDownloads[file.id];
-        const unread = !isItemRead('file', courseId, file.name);
+        const unread = !isItemRead('file', courseId, file.id);
 
         const row = h('div', {
           className: `file-item${unread ? ' file-item--unread' : ''}`,
-          dataset: { fileId: String(file.name ?? '') },
+          dataset: { fileId: String(file.id ?? '') },
         });
         if (unread) row.append(h('span', { className: 'item-unread-dot' }));
         row.append(h('div', { className: 'file-icon' }, '📄'));
@@ -313,8 +313,8 @@ async function fetchCourseFiles(courseId: string) {
 
       // Hover on an unread item clears its dot
       filesListElement.querySelectorAll('.file-item--unread').forEach(item => {
-        const fileName = item.getAttribute('data-file-id');
-        if (fileName) markSeenOnHover(item, 'file', courseId, fileName);
+        const fileId = item.getAttribute('data-file-id');
+        if (fileId) markSeenOnHover(item, 'file', courseId, fileId);
       });
 
       // Add event listeners for individual buttons
@@ -328,7 +328,7 @@ async function fetchCourseFiles(courseId: string) {
 
           if (fileName && fileId) {
             const fileItem = target.closest('.file-item');
-            if (fileItem) clearUnread(fileItem, 'file', courseId, fileName);
+            if (fileItem) clearUnread(fileItem, 'file', courseId, fileId);
 
             // Show spinner immediately
             target.textContent = '🔄';
