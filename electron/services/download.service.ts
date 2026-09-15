@@ -10,7 +10,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { logger } from './logger.service';
 import { resolveDownloadTarget, ensureDirInsideRoot } from './download-path';
-import { finalizeDownload, validateHead, readHeadSync, MAX_DOWNLOAD_BYTES } from './file-validation.service';
+import { finalizeDownload, MAX_DOWNLOAD_BYTES } from './file-validation.service';
 
 const log = logger.scope('Download');
 
@@ -37,6 +37,7 @@ export class DownloadService {
         fileName: string,
         courseName: string,
         basePath: string,
+        fileId: string,
         script?: string
     ): Promise<{ success: boolean; filePath?: string; error?: string }> {
         try {
@@ -45,39 +46,6 @@ export class DownloadService {
             // Nome já sanitizado por `resolveDownloadTarget`; reaproveitado como
             // base para o `.part` e para `finalizeDownload`.
             const safeFileName = path.basename(filePath);
-
-            let existingFileToUse = '';
-
-            // DL-002: decide por conteúdo (mesma validação do download), não
-            // por `includes('sigaa')` — isso apagava avisos legítimos que
-            // citavam o portal e via, ao rodar sobre o arquivo já existente
-            // ANTES de baixar, arquivo do usuário sem relação com o download.
-            const checkAndClearCorruptFile = (p: string) => {
-                if (!fs.existsSync(p)) return false;
-                try {
-                    const head = readHeadSync(p);
-                    const ext = path.extname(p).toLowerCase();
-                    const check = validateHead(head, ext);
-                    if (!check.ok) {
-                        log.info(`Discovered invalid cached file (${check.reason}). Deleting and forcing fresh download.`, { path: p });
-                        fs.unlinkSync(p);
-                        return false;
-                    }
-                } catch (e) {
-                    // Não deu para ler: não dá para afirmar que é válido. Força
-                    // download novo em vez de devolver um caminho ilegível (DL-005).
-                    log.error('Error inspecting existing file, forcing fresh download.', { path: p, error: e });
-                    return false;
-                }
-                return true;
-            };
-
-            if (checkAndClearCorruptFile(filePath)) existingFileToUse = filePath;
-
-            if (existingFileToUse) {
-                log.info('Valid file already exists.', { path: existingFileToUse });
-                return { success: true, filePath: existingFileToUse };
-            }
 
             if (page.url() === 'about:blank') {
                 throw new Error('Page lost context (about:blank)');
@@ -108,25 +76,27 @@ export class DownloadService {
             // Trigger action
             log.info('Looking for fresh download script.', { fileName });
 
-            const freshAction = await page.evaluate((fname) => {
+            // Casamento pelo id do `onclick` JSF (`,id,<valor>,` — o mesmo formato
+            // que `jsfParam` extrai no parser), nunca pelo texto da linha: "Aula 1"
+            // casava "Aula 10" via `includes`, e a linha errada era baixada
+            // (DL-007 item 9).
+            const freshAction = await page.evaluate((id) => {
                 const rows = Array.from(document.querySelectorAll('.item,.item-impar,.item-par, .form-baixar-arquivo'));
                 for (const row of rows) {
                     const link = row.tagName.toLowerCase() === 'a' ? row : row.querySelector('.form-baixar-arquivo, a[href]');
                     if (!link) continue;
 
-                    const desc = link.querySelector('.descricao-form-disciplina') || link;
-                    const text = (desc.textContent || '').trim().replace(/[\n\r]/g, '').trim();
+                    const onclick = link.getAttribute('onclick');
+                    const idMatch = onclick && onclick.match(/,id,([^,'"]+)/);
+                    if (!idMatch || idMatch[1] !== id) continue;
 
-                    if (text === fname || text.includes(fname) || fname.includes(text)) {
-                        const onclick = link.getAttribute('onclick');
-                        if (onclick) return { type: 'script', value: onclick };
+                    if (onclick) return { type: 'script', value: onclick };
 
-                        const href = link.getAttribute('href');
-                        if (href) return { type: 'href', value: href };
-                    }
+                    const href = link.getAttribute('href');
+                    if (href) return { type: 'href', value: href };
                 }
                 return null;
-            }, fileName);
+            }, fileId);
 
             if (freshAction) {
                 if (freshAction.type === 'script') {

@@ -16,6 +16,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { toast } from '../../src/components/toast';
 import { setActiveAccount, writeAccountItem } from '../../src/data/account-storage';
 import { renderCourseDetailPage } from '../../src/pages/course-detail';
+import { markAsRead } from '../../src/utils/notification-store';
 import { fail, ok } from '../../shared/errors';
 
 function flushAll() {
@@ -88,5 +89,107 @@ describe('course-detail: falha de download', () => {
         expect((window as any).api.checkFilesExistence).toHaveBeenCalledWith(['C:/Users/aluno/SIGAA/Lista 3.pdf']);
         expect(container.querySelectorAll('.file-item')).toHaveLength(1);
         expect(container.querySelector('.status-done')).not.toBeNull();
+    });
+});
+
+describe('course-detail: link externo (BUG-014)', () => {
+    beforeEach(() => {
+        document.body.innerHTML = '';
+        localStorage.clear();
+        sessionStorage.clear();
+        vi.restoreAllMocks();
+
+        setActiveAccount({ id: 'acc-test', name: 'ALUNO' });
+        writeAccountItem('courses', JSON.stringify([{
+            id: 'c1',
+            name: 'Cálculo I',
+            code: 'CB0001',
+            files: [
+                { name: 'Slides no Drive', type: 'link', id: 'link:1', url: 'https://drive.google.com/x' },
+                { name: 'Link antigo do cache', type: 'link', id: 'link:2' },
+            ],
+            news: [],
+        }]));
+
+        (window as any).api = {
+            getSettings: vi.fn().mockResolvedValue({ lastDownloadPath: 'C:/Users/aluno/SIGAA' }),
+            downloadFile: vi.fn(),
+            selectDownloadFolder: vi.fn(),
+            updateSetting: vi.fn(),
+            checkFilesExistence: vi.fn().mockResolvedValue(ok([])),
+            onDownloadProgress: vi.fn(() => () => undefined),
+        };
+    });
+
+    it('renderiza um link com url como controle abrível com nome acessível', async () => {
+        const container = document.createElement('div');
+        document.body.appendChild(container);
+
+        renderCourseDetailPage(container, 'c1');
+        for (let i = 0; i < 10; i++) await flushAll();
+
+        const link = container.querySelector<HTMLAnchorElement>('a[href="https://drive.google.com/x"]');
+        expect(link).not.toBeNull();
+        expect(link!.getAttribute('aria-label')).toBe('Abrir link externo Slides no Drive');
+    });
+
+    it('mantém o ícone inerte para link sem url, sem lançar erro (cache antigo)', async () => {
+        const container = document.createElement('div');
+        document.body.appendChild(container);
+
+        renderCourseDetailPage(container, 'c1');
+        for (let i = 0; i < 10; i++) await flushAll();
+
+        const rows = container.querySelectorAll('.file-item');
+        const inertIcon = rows[1].querySelector('[title="Link indisponível"]');
+        expect(inertIcon).not.toBeNull();
+        expect(inertIcon!.tagName).toBe('SPAN');
+    });
+});
+
+describe('course-detail: leitura de arquivo por id (BUG-015)', () => {
+    beforeEach(() => {
+        document.body.innerHTML = '';
+        localStorage.clear();
+        sessionStorage.clear();
+        vi.restoreAllMocks();
+
+        setActiveAccount({ id: 'acc-test', name: 'ALUNO' });
+        writeAccountItem('courses', JSON.stringify([{
+            id: 'c1',
+            name: 'Cálculo I',
+            code: 'CB0001',
+            files: [
+                { name: 'Lista.pdf', type: 'file', id: '10' },
+                { name: 'Lista.pdf', type: 'file', id: '11' },
+            ],
+            news: [],
+        }]));
+
+        (window as any).api = {
+            getSettings: vi.fn().mockResolvedValue({ lastDownloadPath: 'C:/Users/aluno/SIGAA' }),
+            downloadFile: vi.fn(),
+            selectDownloadFolder: vi.fn(),
+            updateSetting: vi.fn(),
+            checkFilesExistence: vi.fn().mockResolvedValue(ok([])),
+            onDownloadProgress: vi.fn(() => () => undefined),
+        };
+    });
+
+    it('distingue lido/não lido por id quando dois arquivos têm o mesmo nome', async () => {
+        markAsRead('file', 'c1', '10');
+
+        const container = document.createElement('div');
+        document.body.appendChild(container);
+
+        renderCourseDetailPage(container, 'c1');
+        for (let i = 0; i < 10; i++) await flushAll();
+
+        const rows = container.querySelectorAll('.file-item');
+        expect(rows).toHaveLength(2);
+        expect(rows[0].getAttribute('data-file-id')).toBe('10');
+        expect(rows[0].classList.contains('file-item--unread')).toBe(false);
+        expect(rows[1].getAttribute('data-file-id')).toBe('11');
+        expect(rows[1].classList.contains('file-item--unread')).toBe(true);
     });
 });

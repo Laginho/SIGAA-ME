@@ -739,6 +739,7 @@ export class PlaywrightLoginService {
         fileUrl: string,
         basePath: string,
         _downloadedFiles: Record<string, any>,
+        fileId: string,
         script?: string
     ): Promise<{ success: boolean; filePath?: string; error?: string }> {
         const maxRetries = 1;
@@ -825,6 +826,7 @@ export class PlaywrightLoginService {
                     fileName,
                     courseName,
                     basePath,
+                    fileId,
                     script
                 );
 
