@@ -46,6 +46,10 @@ const SIGNATURES: Record<string, string[]> = {
 const DETECT_ORDER = ['.pdf', '.png', '.jpg', '.gif', '.rar', '.7z', '.gz', '.zip'];
 
 function sigMatches(headHex: string, sig: string): boolean {
+    // Cabeça vazia casaria o prefixo de qualquer assinatura (`sig.startsWith('')`
+    // é sempre verdadeiro) — um arquivo de 0 bytes seria validado como o
+    // formato certo. Prefixo só conta se for prefixo de algo (DL-007 item 11).
+    if (headHex.length === 0) return false;
     return headHex.length >= sig.length ? headHex.startsWith(sig) : sig.startsWith(headHex);
 }
 
@@ -195,7 +199,7 @@ export async function finalizeDownload(input: {
     contentType?: string;
 }): Promise<
     | { ok: true; filePath: string }
-    | { ok: false; reason: 'html' | 'session-expired' | 'signature-mismatch' | 'too-large'; error: string }
+    | { ok: false; reason: 'html' | 'session-expired' | 'signature-mismatch' | 'too-large' | 'empty'; error: string }
 > {
     const { partPath, dir, hintFileName, contentType } = input;
 
@@ -210,6 +214,14 @@ export async function finalizeDownload(input: {
         const safeName = sanitizeSegment(input.fileName, 150);
 
         const stats = await fs.promises.stat(partPath);
+        // Vazio nunca é válido, qualquer que seja a extensão: sem isto, um
+        // `.part` de 0 bytes (ex.: `sigMatches` casando prefixo vazio) era
+        // finalizado como arquivo bom e o retry nunca mais baixava de novo
+        // (DL-007 item 11).
+        if (stats.size === 0) {
+            await cleanup();
+            return { ok: false, reason: 'empty', error: 'O arquivo baixado está vazio' };
+        }
         if (stats.size > MAX_DOWNLOAD_BYTES) {
             await cleanup();
             return { ok: false, reason: 'too-large', error: `Arquivo (${stats.size} bytes) excede o limite de ${MAX_DOWNLOAD_BYTES} bytes` };
@@ -280,5 +292,21 @@ export async function finalizeDownload(input: {
     } catch (err) {
         await cleanup();
         throw err;
+    }
+}
+
+/**
+ * Um registro de `known` (ou um caminho já em disco) só conta como reaproveitável
+ * se o arquivo existe, não está vazio e passa em `validateHead` — presença
+ * sozinha não basta (DL-006 critério 3, DL-007 item 11).
+ */
+export function isReusableDownload(filePath: string): boolean {
+    if (!fs.existsSync(filePath)) return false;
+    try {
+        const head = readHeadSync(filePath);
+        if (head.length === 0) return false;
+        return validateHead(head, path.extname(filePath).toLowerCase()).ok;
+    } catch {
+        return false;
     }
 }
