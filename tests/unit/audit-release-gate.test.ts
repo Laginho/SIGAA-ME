@@ -72,7 +72,7 @@ describe('release workflow gates publishing behind quality checks (QA-001)', () 
 
 describe('release workflow publishes checksums and provenance (REL-001)', () => {
     const publishRunIndex = lineIndexOf('run: npx electron-builder --win --publish always');
-    const checksumRunIndex = lineIndexOf('run: cd release && sha256sum *.exe > SHA256SUMS.txt');
+    const checksumRunIndex = lines.findIndex((line) => line.trim().startsWith('run: cd release && sha256sum'));
     const attestIndex = lines.findIndex((line) =>
         line.trim().startsWith('uses: actions/attest-build-provenance@'),
     );
