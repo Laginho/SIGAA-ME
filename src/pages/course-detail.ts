@@ -313,8 +313,8 @@ async function fetchCourseFiles(courseId: string) {
 
       // Hover on an unread item clears its dot
       filesListElement.querySelectorAll('.file-item--unread').forEach(item => {
-        const fileName = item.getAttribute('data-file-id');
-        if (fileName) markSeenOnHover(item, 'file', courseId, fileName);
+        const fileId = item.getAttribute('data-file-id');
+        if (fileId) markSeenOnHover(item, 'file', courseId, fileId);
       });
 
       // Add event listeners for individual buttons
