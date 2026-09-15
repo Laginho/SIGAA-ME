@@ -1,6 +1,6 @@
 # QA-001 — Add deterministic test, lint, coverage, and audit gates
-Status: open
-Stage: to-review
+Status: resolved
+Stage: done
 Priority: P1
 Blocked by: nenhum
 Tracker status at migration: `PARTIAL`
@@ -285,6 +285,35 @@ corrigir o primeiro exige critério novo e arquivo fora dos Primary files.
 Nota menor, sem ação: o Implementation note diz que `@vitest/coverage-v8` "já
 estava pinado no lock, só não instalado". O lock ganhou ~10 pacotes e um bump
 transitivo — todos dev, então inofensivo, mas a frase subestima o diff.
+
+#### Resolution (2026-09-15)
+
+Veredito da etapa 3, rodada 2: **Approve**. PR #29 mergeado em `0d7193d`
+(merge commit, sem squash). Revisão feita pelo Fable a pedido direto do
+autor; a binding dá a etapa a Opus.
+
+- Critério 6 ✅: `quality.yml` (job `gate`) e `release.yml` (job `build`,
+  antes do `npm run release`) trocaram `npm test` por `npm run coverage` e
+  ganharam `npm run audit:prod`. Sem job novo, `e2e` e `secrets` intactos.
+  Critérios 1–5 verificados na rodada de 2026-09-14; `de89cea`/`cf88787`
+  não mudaram.
+- Arquivos desta rodada: `.github/workflows/quality.yml`,
+  `.github/workflows/release.yml`, `tests/unit/audit-release-gate.test.ts`,
+  `tests/unit/audit-eslint-boundary.test.ts`. Todos nos Primary files.
+- Red-green refeito pela revisão: workflows de `414c35c` no lugar → 3 de 4
+  testes vermelhos (`expected -1 to be greater than 22` / `14`); workflows
+  da branch de volta → 4 passed, `git status` limpo.
+- Gate nesta máquina: `npm run quality` 65 arquivos, 728 passed, 5 skipped;
+  `npm run coverage` 90.03 stmts / 85.64 branches / 100 funcs / 94.83 lines
+  contra 89/84/100/94; `npm run audit:prod` 0 vulnerabilidades.
+- CI do PR em `729f4bb`: o job `gate` executou os dois passos novos — log
+  com a tabela de cobertura e `found 0 vulnerabilities`. E2E e gitleaks
+  verdes. `mergeable: MERGEABLE`, branch rebased em `master`.
+- Achados sem ação: `audit:prod` no CI depende do registry do npm (queda
+  externa derruba o `gate`); o regex de fim de job em `quality.yml`
+  (`/^\s{2}\S+:/`) leria errado um comentário `  #x:` entre jobs. Achados
+  2 e 3 da rodada 1 (threshold por arquivo, margem zero em `functions`)
+  seguem em aberto por decisão do spec; se voltarem, é ticket novo.
 
 ## Comments
 
