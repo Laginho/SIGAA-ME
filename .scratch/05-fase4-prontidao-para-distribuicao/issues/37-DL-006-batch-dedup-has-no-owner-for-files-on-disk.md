@@ -1,6 +1,6 @@
 # DL-006: o lote não sabe qual id gravou o arquivo que encontra no disco
 Status: open
-Stage: to-review
+Stage: to-implement
 Priority: P2
 Blocked by: nenhum
 
@@ -22,6 +22,8 @@ Blocked by: nenhum
     - `src/pages/course-detail.ts` (`:466-483`, o laço que grava o índice —
       vira a função compartilhada)
     - `tests/integration/audit-background-sync-downloads.test.ts` (critério 6)
+    - `tests/unit/dashboard-listener.test.ts` (rodada 2 da revisão: é onde
+      `handleBackgroundSyncUpdate` já é exercitado)
 
 Sai da revisão do `DL-004` (achado 3, repetido nas três rodadas) e da nota da
 revisão do `DL-005` de 2026-09-11. Os dois são a mesma raiz e por isso um
@@ -250,3 +252,69 @@ como entregues em `f17d31b`/`7b84709`; só o critério 6 ❌ falta. O trabalho
 continua nesta branch; `Stage: to-implement`. Achado 2 (`[string, any]` em
 `course-detail.ts:455-456`) pode cair junto se a extração do laço passar por
 ali; não é critério. Achado 3 segue em `CLEAN-006`.
+
+#### Review (2026-09-14, Opus — rodada 2, critério 6)
+
+Verdict: **reabrir**. O critério 6 ❌ não fecha: o código do lado do renderer
+está certo, mas nada prova que ele roda, e o laço novo derruba o handler no
+caso que o próprio arquivo já defende.
+
+Separação: `3c03bae` e `96cb156` tocam só `tests/` (e a linha `Stage:`);
+`e60f8b0` não toca nenhum arquivo de teste.
+
+Red-green: em `96cb156`, `npx vitest run
+tests/integration/audit-background-sync-downloads.test.ts
+tests/integration/background-sync.test.ts` → **3 failed | 11 passed (14)**,
+pelos motivos previstos (sem `downloads` no payload, sem `recordDownloads`).
+Em `e60f8b0`, `npm run quality` → tsc limpo, ESLint **0 errors, 57 warnings**
+(todos `no-explicit-any` pré-existentes), vitest **63 files, 717 passed | 5
+skipped (722)**. Confere com o que o commit diz.
+
+O que está certo e não volta a ser discutido: o `AppResult` deixou de ser
+descartado; o filtro em `background-sync.service.ts:242-246` manda só os
+`downloaded`, e o `DownloadRecord` dessa variante é exatamente
+`fileId`/`fileName`/`filePath` + o discriminante (`shared/domain.ts:84`) — nada
+de ViewState, cookie ou URL do SIGAA; falha do download não derruba o ciclo;
+`downloads` é tipado em `shared/ipc.ts` sem `any`; `known` não é passado no
+sync, como o ticket mandou; e `recordDownloads` tem um chamador de cada lado
+(`course-detail.ts:474`, `dashboard.ts:66`), uma função e dois chamadores.
+
+**Achado 1 — a metade do critério 6 que fecha o buraco não tem teste.**
+Apagando a chamada em `dashboard.ts:66` (substituída por `void courseId; void
+records;`), a suíte inteira fica verde: **63 files, 717 passed | 5 skipped**,
+os mesmos números de antes. Os três testes escritos provam as duas pontas
+isoladas — o main põe `downloads` no payload, e `recordDownloads` grava no
+índice — e nenhum prova o fio entre elas, que é o que o critério 6 pede
+("entra no índice `downloads` do renderer"). É o item 5 do "Antes de commitar"
+do `CLAUDE.md`: revertida a correção, nenhum teste falha. A lista "Tests stage
+2 writes" pedia exatamente esses três, e a implementação a cumpriu ao pé da
+letra — o buraco é da lista, não de quem a seguiu.
+Falta: um teste que chame `handleBackgroundSyncUpdate` com `downloads` no
+payload e verifique o índice `downloads` da conta depois.
+`tests/unit/dashboard-listener.test.ts` já monta esse cenário (conta ativa,
+jsdom, `localStorage` limpo) e agora está nos Primary files.
+
+**Achado 2 — o laço novo tira do ar o aviso de quota.** `recordDownloads`
+escreve no `localStorage` sem guarda, e está **antes** do `try/catch` de
+`mergeCoursesIntoCache` (`dashboard.ts:65-77`). Com a quota estourada, o
+`setItem` estoura para qualquer chave: a exceção sai de
+`handleBackgroundSyncUpdate`, sobe pelo `subscription` do `preload.ts:59` e
+mata o ciclo antes do `toast.error` — o usuário deixa de receber o aviso que o
+comentário de `:73-74` existe para garantir ("silently dropping a sync is how
+stale data masquerades as fresh"), e o merge das disciplinas nem é tentado.
+`tests/unit/dashboard-listener.test.ts:27-30` só não pega isso porque estreita
+o throw à chave `courses`; a quota real não estreita.
+Não conserto aqui: cabe nos Primary files, mas precisa de teste novo — pela
+regra, volta para a etapa 2. A ordem atual (registrar antes de tudo) é decisão
+defensável e não precisa mudar; o que falta é a guarda.
+
+**Notas, sem ação:** `downloads` é opcional em `BackgroundSyncUpdate` mas o
+main sempre manda (mesmo vazio) — o `?? []` do renderer cobre, e o teste de
+forma em `background-sync.test.ts:167` já exige a chave. E o sync continua sem
+`known`, então um download manual feito na janela entre o arquivo aparecer e o
+ciclo rodar ainda pode virar `X (1).pdf`; foi decisão explícita do último
+bullet do critério 6, fica registrada, não reaberta.
+
+Critérios 1-5 seguem ✅ como em `f17d31b`/`7b84709`: os três commits desta
+rodada não tocam em nada deles, e a suíte inteira passa. Falta só o critério 6,
+nesta mesma branch — os dois achados são o mesmo arquivo e o mesmo laço.
