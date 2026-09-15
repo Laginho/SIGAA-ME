@@ -89,9 +89,14 @@ jobs:
       # `.exe` de `release/` — só o que sai depois dele é o que o usuário
       # baixa, tanto com publish=false (arquivos do Build) quanto com
       # publish=true (arquivos que subiram).
+      # O `sha256sum` do Git Bash assume modo binário e escreve `<hash> *<arquivo>`.
+      # O `sed` troca esse ` *` pelos dois espaços do formato de texto, que é o
+      # que o `sha256sum -c` e a comparação manual com `Get-FileHash` esperam.
+      # Normalizar a separação em vez de usar `--text` porque o modo texto
+      # traduz quebra de linha, e num `.exe` isso mudaria o hash em silêncio.
       - name: Gerar checksums dos instaladores
         shell: bash
-        run: cd release && sha256sum *.exe > SHA256SUMS.txt
+        run: cd release && sha256sum *.exe | sed 's/ \*/  /' > SHA256SUMS.txt
 
       - name: Provar proveniência dos instaladores
         uses: actions/attest-build-provenance@v2

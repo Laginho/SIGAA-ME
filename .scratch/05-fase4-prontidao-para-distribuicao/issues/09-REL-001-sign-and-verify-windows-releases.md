@@ -1,6 +1,6 @@
 # REL-001: Verificar releases Windows sem assinatura de código
 Status: open
-Stage: to-review
+Stage: to-merge
 Blocked by: nenhum
 Review: human
 Priority: P1
@@ -135,3 +135,22 @@ até lá.
   sempre, e não só no publish, porque é do binário e é o que permite provar o
   step sem publicar; `Review: human` porque o diff muda o pipeline de release e
   o texto que o usuário lê antes de instalar.
+
+- 2026-09-15, etapa 3: um achado, corrigido aqui porque cabe nos Primary files
+  e não pede teste novo. O critério 1 exige `<hash>  <arquivo>` com dois
+  espaços; o `sha256sum` do Git Bash assume modo binário e escrevia
+  `<hash> *<arquivo>`. Medido nesta máquina (coreutils 8.32, o mesmo do
+  `windows-latest`). A correção normaliza o separador com `sed` em vez de usar
+  `--text`, porque o modo texto traduz quebra de linha e num `.exe` isso
+  mudaria o hash em silêncio — o oposto do que o ticket quer. Verificado:
+  formato com dois espaços, `sha256sum -c` passa, e o hash bate com
+  `Get-FileHash`.
+
+- Pendente até a primeira release depois do merge: o step do critério 3
+  (`gh release upload`) não roda com `publish=false`, como o próprio ticket
+  previu. A Resolution registra quando for provado.
+
+- Não bloqueia, fica como nota para quem reabrir: os testes provam que os steps
+  de checksum e atestado vêm **depois** do `Publish`, mas não que são
+  incondicionais. Um `if:` acrescentado a eles no futuro passaria verde e
+  tiraria o checksum do caminho `publish=false`.
