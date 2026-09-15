@@ -10,23 +10,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { logger } from './logger.service';
 import { resolveDownloadTarget, ensureDirInsideRoot } from './download-path';
-import { finalizeDownload, validateHead, MAX_DOWNLOAD_BYTES } from './file-validation.service';
+import { finalizeDownload, validateHead, readHeadSync, MAX_DOWNLOAD_BYTES } from './file-validation.service';
 
 const log = logger.scope('Download');
-
-const CHECK_HEAD_SIZE = 4096;
-
-/** Primeiros bytes de um arquivo já existente no disco — o bastante para `validateHead`. */
-function readHeadSync(filePath: string): Buffer {
-    const fd = fs.openSync(filePath, 'r');
-    try {
-        const buffer = Buffer.alloc(CHECK_HEAD_SIZE);
-        const bytesRead = fs.readSync(fd, buffer, 0, CHECK_HEAD_SIZE, 0);
-        return buffer.subarray(0, bytesRead);
-    } finally {
-        fs.closeSync(fd);
-    }
-}
 
 /**
  * O Playwright entrega o `.part` inteiro via `download.saveAs()` — sem

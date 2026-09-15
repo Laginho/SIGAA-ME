@@ -1,6 +1,6 @@
 # CLEAN-006: ler os primeiros bytes de um arquivo tem três cópias
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P3
 Blocked by: nenhum
 
