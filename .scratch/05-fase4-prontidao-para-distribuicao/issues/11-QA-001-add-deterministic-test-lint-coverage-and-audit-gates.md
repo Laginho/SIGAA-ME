@@ -1,6 +1,6 @@
 # QA-001 — Add deterministic test, lint, coverage, and audit gates
 Status: open
-Stage: to-merge
+Stage: to-implement
 Priority: P1
 Blocked by: nenhum
 Tracker status at migration: `PARTIAL`
@@ -12,7 +12,7 @@ Tracker status at migration: `PARTIAL`
   - `vitest.config.ts`
   - `playwright.config.ts`
   - New: `eslint.config.js`
-  - New: `.github/workflows/ci.yml`
+  - `.github/workflows/quality.yml`
   - `.github/workflows/release.yml`
   - Existing tests under `tests/`
 
@@ -43,6 +43,15 @@ O que sobra: `test:unit`, `test:integration`, `coverage` (com thresholds nos
 módulos críticos), `audit:prod`, e a rede de regressão abaixo. `DEP-001`
 fechou em 2026-09-14; o bloqueio caiu.
 
+Reaberto em 2026-09-15 (etapa 1), depois da etapa 3 devolver com veredito
+`Needs your call`. Os commits `de89cea` e `cf88787` na branch `qa-001` ficam
+como estão — os scripts, os thresholds e as duas redes de regressão foram
+verificados pela etapa 3 e não se refazem. O que falta é o critério 6 abaixo:
+`coverage` e `audit:prod` existem e ninguém os executa, então uma queda de
+cobertura nos 5 módulos ou uma vulnerabilidade `high` em dependência de
+produção atravessa o CI inteiro sem falhar nada. Era buraco de spec, não erro
+de implementação; está fechado agora.
+
 #### Required scripts
 
 - `test`
@@ -57,14 +66,29 @@ fechou em 2026-09-14; o bloqueio caiu.
 
 #### Acceptance criteria
 
-- Pull requests run deterministic checks without SIGAA credentials.
-- Live canary is separate and opt-in/scheduled.
-- Coverage thresholds protect sanitizer, IPC validation, account storage,
-  coordinator, and download path modules.
-- Publishing cannot start unless quality checks pass.
-- Lint prevents new unrestricted `any` usage in shared/security code.
+1. Pull requests run deterministic checks without SIGAA credentials.
+2. Live canary is separate and opt-in/scheduled.
+3. Coverage thresholds protect sanitizer, IPC validation, account storage,
+   coordinator, and download path modules.
+4. Publishing cannot start unless quality checks pass.
+5. Lint prevents new unrestricted `any` usage in shared/security code.
+6. Os dois gates novos são executados pelo CI, não só declarados no
+   `package.json`. Em `quality.yml` (job `gate`) e em `release.yml` (job
+   `build`, antes do `npm run release`), a cobertura com thresholds e a
+   auditoria de produção rodam e derrubam o job quando falham.
+
+   A forma barata: `npm run coverage` é `vitest run --coverage` — mesma
+   suíte, mesmos testes, só com os thresholds por cima. Então **troque** a
+   linha `npm test` por `npm run coverage` nos dois workflows em vez de
+   adicionar um passo que roda a suíte duas vezes, e acrescente um passo
+   `npm run audit:prod`. São ~6 linhas de YAML no total. Não crie workflow
+   novo, não crie job novo, não mexa no `e2e` nem no `secrets`.
 
 #### Tests stage 2 writes
+
+**Os itens 1 e 2 já estão entregues e verdes** (commit `de89cea`, red-green
+refeito à mão pela etapa 3). Ficam aqui como registro; não reescreva nenhum
+dos dois. O trabalho desta rodada é o item 3.
 
 Dois testes, os dois em `tests/unit/`. Ambos são rede de regressão sobre
 critérios que já estão de pé hoje, então **nascem verdes** — igual ao critério
@@ -95,6 +119,22 @@ release`), veja o vermelho, reverta, e registre isso no relatório.
    Índice de linha basta. Afirma também que o arquivo não tem
    `--publish always` fora desse job — hoje a flag vive só ali (`:63-67`).
 
+3. **(Esta rodada.)** Estenda o `tests/unit/audit-release-gate.test.ts` que
+   já existe — não crie arquivo novo. Ele já lê workflow como texto e compara
+   índice de linha; é o mesmo padrão:
+   - Em `release.yml`, job `build`: as linhas `run: npm run coverage` e
+     `run: npm run audit:prod` existem e vêm **antes** de
+     `run: npm run release`. As asserções de `typecheck` e `lint` continuam;
+     a de `run: npm test` sai junto com a linha que ela vigiava, já que o
+     critério 6 manda trocar `npm test` por `npm run coverage`.
+   - Em `quality.yml`, job `gate`: `run: npm run coverage` e
+     `run: npm run audit:prod` existem. Ordem entre eles não importa; o que
+     importa é que estejam no job que roda em PR.
+
+   Este nasce **vermelho** — os dois workflows não chamam nada disso hoje.
+   É o primeiro teste deste ticket que não precisa de quebra manual para
+   provar que sustenta peso: rode, veja o vermelho, depois faça passar.
+
 Os scripts novos (`test:unit`, `test:integration`, `coverage`, `audit:prod`)
 não ganham teste próprio: teste que lê `package.json` e confere que a chave
 existe é tautologia. A prova deles é o `Verification` — `npm run coverage`
@@ -103,6 +143,12 @@ tem de **falhar** se um threshold cair, e `npm run audit:prod` tem de ser
 
 Fora deste ticket: o `sync-selection.test.ts:259` instável (Comment de
 2026-09-11). Se aparecer no gate, registre e siga; não conserte aqui.
+
+Também fora, e por decisão explícita — são os achados 2 e 3 da etapa 3, os
+dois não bloqueantes: threshold por arquivo (`validation.ts` a 83.96% passa
+pela média dos outros) e a margem zero em `functions`. Mexer no primeiro
+exige número por módulo, o que é decisão nova e não cabe numa rodada de
+cabeamento. Não ajuste threshold nenhum aqui.
 
 #### Verification
 
@@ -113,6 +159,10 @@ npm run coverage
 npm run audit:prod
 npm run test:e2e
 ```
+
+O CI do próprio PR é parte da verificação desta rodada: o `quality.yml`
+alterado roda contra o PR #29, então o job `gate` verde já prova que os dois
+passos novos executam de verdade no runner do GitHub, não só na máquina local.
 
 #### Implementation notes
 
@@ -203,6 +253,16 @@ estava pinado no lock, só não instalado". O lock ganhou ~10 pacotes e um bump
 transitivo — todos dev, então inofensivo, mas a frase subestima o diff.
 
 ## Comments
+
+- 2026-09-15 etapa 1, decisão do humano sobre o `Needs your call`: **reabrir
+  QA-001 com critério novo**, não abrir ticket de cabeamento à parte. Razão:
+  a fiação é ~6 linhas de YAML, e um ticket separado custaria um segundo
+  ciclo de três etapas e um segundo PR por isso. Os critérios 1 e 4 que já
+  estavam no ticket só ficam verdadeiros com essa fiação de qualquer forma —
+  fechar sem ela seria fechar em cima de script que ninguém executa. Segue na
+  branch `qa-001` e no PR #29, em cima dos commits que já estão lá.
+  `master` andou depois do PR (`CLEAN-006`, PR #30) e o GitHub reporta
+  `mergeable: UNKNOWN` — rebase antes de continuar.
 
 - Da revisão do `QA-001` (2026-09-14): `npm run coverage` e `npm run audit:prod`
   não são executados por nenhum workflow. Quem for abrir o ticket de
