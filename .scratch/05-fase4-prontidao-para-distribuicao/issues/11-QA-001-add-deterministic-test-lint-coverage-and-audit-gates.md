@@ -1,6 +1,6 @@
 # QA-001 — Add deterministic test, lint, coverage, and audit gates
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P1
 Blocked by: nenhum
 Tracker status at migration: `PARTIAL`
@@ -189,6 +189,40 @@ passos novos executam de verdade no runner do GitHub, não só na máquina local
   presente nesta máquina).
 - `sync-selection.test.ts:259` (instabilidade registrada em Comment
   2026-09-11) não apareceu em nenhuma das rodadas acima.
+
+#### Implementation notes — rodada 2 (2026-09-15, critério 6)
+
+- Rebase em `origin/master` primeiro: a branch estava 15 commits atrás, e
+  `master` tinha somado 17 linhas ao `electron/ipc/validation.ts` (bloco
+  `known` do `DL-006`) — módulo dentro do `include` da cobertura e o mais
+  fraco dos cinco. Rebase limpo, sem conflito. **Cobertura remedida depois
+  dele**: 90.03 stmts / 85.64 branches / 100 funcs / 94.83 lines contra
+  89/84/100/94. Subiu, não caiu — as linhas novas vieram cobertas. Os
+  thresholds não foram tocados.
+- Commits: `7f314d2` (teste, próprio), `f8b265c` (workflows), `a9368d6`
+  (instância única do ESLint no teste de fronteira).
+- `quality.yml` job `gate` e `release.yml` job `build`: `npm test` virou
+  `npm run coverage` (mesma suíte, thresholds por cima — não roda duas
+  vezes) e ganharam passo `npm run audit:prod`.
+- O teste nasceu vermelho de verdade: `expected -1 to be greater than 22`
+  nos três casos novos, porque as linhas não existiam. Verde depois da
+  fiação.
+- Buraco fechado no próprio `audit-release-gate.test.ts`: ele provava que o
+  passo de publicar estava **dentro** do job `build`, não que vinha **depois**
+  dos gates. Mover o step `Publish` para cima do `Gate — typecheck` deixava a
+  suíte verde e publicava sem checagem. Quebrei à mão para provar a asserção
+  nova: `expected 54 to be greater than 66`. Revertido, `diff` contra a cópia
+  de antes: idêntico.
+- `audit-eslint-boundary.test.ts` criava cinco instâncias de `ESLint`, uma por
+  caso. Em disco frio o arquivo levou 52s e o primeiro caso estourou o
+  `testTimeout` de 30s (medido nesta máquina; o CI do PR #29 passou, então era
+  risco de flakiness, não falha fixa). Com uma instância, 4s.
+- Gate final no Windows: `npm run typecheck` limpo, `npm run lint` 0 erros /
+  52 avisos, `npm run coverage` 65 arquivos, 728 passed, 5 skipped, thresholds
+  verdes, `npm run audit:prod` 0 vulnerabilidades.
+
+Não tocado, por decisão do spec: threshold por arquivo e a margem zero em
+`functions` (achados 2 e 3 da etapa 3).
 
 #### Review (2026-09-14, etapa 3)
 
