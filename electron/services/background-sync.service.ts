@@ -207,11 +207,11 @@ export class BackgroundSyncService {
                         // Build notification items for the bell
                         for (const f of diff.newFiles) {
                             newNotifications.push({
-                                id: `file-${course.id}-${f.name}`,
+                                id: `file-${course.id}-${f.id}`,
                                 type: 'file',
                                 courseId: course.id,
                                 courseName: course.name,
-                                itemId: f.name,
+                                itemId: f.id,
                                 itemTitle: f.name,
                                 timestamp: Date.now(),
                                 read: false

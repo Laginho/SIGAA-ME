@@ -128,20 +128,25 @@ export function clearAllNotifications() {
   removeAccountItem('notifications');
 }
 
+// BUG-015: v1 seeded file reads by name; v2 keys by id instead. An account
+// still on v1 needs its files re-seeded once, by id, from the course cache.
+const READ_SEED_VERSION_KEY = 'read-items-seed-version';
+const READ_SEED_VERSION = 'v2';
+
 /**
  * Seed initial read state for items that existed BEFORE
  * the notification system was added (so old items don't
  * show as "new" after the update).
  */
 export function seedExistingItemsAsRead() {
-  if (readAccountItem('read-items')) return; // Already seeded
+  if (readAccountItem(READ_SEED_VERSION_KEY) === READ_SEED_VERSION) return;
 
   const raw = readAccountItem('courses');
   if (!raw) return;
 
   try {
     const courses = JSON.parse(raw);
-    const set = new Set<string>();
+    const set = getReadSet();
 
     for (const course of courses) {
       if (course.news) {
@@ -151,12 +156,13 @@ export function seedExistingItemsAsRead() {
       }
       if (course.files) {
         for (const f of course.files) {
-          set.add(itemKey('file', course.id, f.name));
+          set.add(itemKey('file', course.id, f.id));
         }
       }
     }
 
     saveReadSet(set);
+    writeAccountItem(READ_SEED_VERSION_KEY, READ_SEED_VERSION);
   } catch {
     // Ignore parse errors
   }
