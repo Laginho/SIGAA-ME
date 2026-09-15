@@ -166,7 +166,9 @@ describe('BackgroundSyncService.syncNow', () => {
         const payload = (window.webContents.send as any).mock.calls[0][1];
         expect(Object.keys(payload).sort()).toEqual(['accountId', 'courses', 'downloads', 'notifications', 'timestamp']);
         expect(payload.notifications).toHaveLength(1);
-        expect(payload.notifications[0]).toMatchObject({ type: 'file', id: 'file-c1-f2.pdf' });
+        // BUG-015: id/itemId seguem f.id, não f.name — dois arquivos reenviados
+        // com o mesmo nome não podem colidir no mesmo id de notificação.
+        expect(payload.notifications[0]).toMatchObject({ type: 'file', id: 'file-c1-2', itemId: '2', itemTitle: 'f2.pdf' });
     });
 
     it('commits the cache baseline only after delivering to the renderer, so a crash in between re-notifies next sync instead of losing the item', async () => {
