@@ -69,3 +69,5 @@ Promessas: a leitura inicial de settings em `src/main.ts:47` não tem `.catch`
 
 - O toast de erro do renderer já existe (`tests/unit/toast.test.ts`); use-o,
   não crie outro.
+
+- 2026-09-15 Attempt 1 failed: exit 0. Log tail: BUG-017 is already done — merged on `master` with verdict Approve, all criteria ✅, no findings reopened. Nothing to do; our current session branch (`sweatshop/2026-09-15-2032`) is just an ancestor of master and hasn't picked up that merge yet, so the local `.scratch` copy here still shows the stale `to-implement` state. No action needed on this ticket. /
