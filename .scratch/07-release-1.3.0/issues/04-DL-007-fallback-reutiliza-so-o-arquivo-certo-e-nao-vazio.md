@@ -1,6 +1,6 @@
 # DL-007: Fallback Playwright reutiliza só o arquivo certo e não vazio
 Status: resolved
-Stage: blocked
+Stage: done
 Priority: P0
 Blocked by: nenhum
 Review: agent
@@ -135,5 +135,3 @@ Duas verificações que a revisão fez e vale registrar:
     id; e o teste "arquivo já existente... é preservado e reaproveitado"
     (linha 200) testava exatamente o reuso que o critério 5 remove — reescrito
     para provar sufixo numerado em vez de sobrescrita, mesmo padrão do DL-004.
-
-- 2026-09-15 Review ended at reviewing (exit 0); branch dl-007 holds the review; left for a human

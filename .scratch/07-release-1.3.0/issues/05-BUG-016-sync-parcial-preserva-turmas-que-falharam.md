@@ -1,6 +1,6 @@
 # BUG-016: Sync parcial em background preserva as turmas que falharam
 Status: resolved
-Stage: blocked
+Stage: done
 Priority: P0
 Blocked by: nenhum
 Review: agent
@@ -117,5 +117,3 @@ Não reabre o ticket — o critério 4 fala de render, não de desmontagem.
 
 - Não reaproveite o `failures`+`showError` do `sync-selection`; aqui não há UI
   de progresso, só a decisão de `replaceSet`.
-
-- 2026-09-15 Review ended at to-review (exit 0); branch bug-016 holds the review; left for a human

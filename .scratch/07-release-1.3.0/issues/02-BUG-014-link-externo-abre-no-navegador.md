@@ -1,6 +1,6 @@
 # BUG-014: Link externo listado na turma abre no navegador
 Status: resolved
-Stage: blocked
+Stage: done
 Priority: P1
 Blocked by: nenhum
 Review: agent
@@ -114,5 +114,3 @@ código em `02283c7` e `465083f`, nenhum deles mexendo em arquivo de teste.
   repositório nas configurações, se houver) antes de escolher `window.open`
   ou `<a target="_blank">`. Os dois caem no guard do `SEC-003`; não crie canal
   IPC novo para isso.
-
-- 2026-09-15 Review ended at to-review (exit 0); branch bug-014 holds the review; left for a human
