@@ -193,6 +193,37 @@ describe('SigaaService (Unit)', () => {
             expect(JSON.stringify(result)).not.toContain('jsfcljs');
         });
 
+        it('keeps url for link files with an absolute http(s) url, drops it otherwise (BUG-014)', async () => {
+            mockPlaywright.enterCourseAndGetHTML.mockResolvedValue({
+                success: true,
+                html: '<html>...</html>'
+            });
+
+            mockHttp.getCourseFiles.mockResolvedValue({
+                success: true,
+                files: [
+                    { id: 'link:1', name: 'Slides no Drive', type: 'link', url: 'https://drive.google.com/x' },
+                    { id: 'link:2', name: 'Script malicioso', type: 'link', url: 'javascript:alert(1)' },
+                    { ...PARSED_DOC, url: 'https://example.com/should-be-dropped' },
+                ],
+                news: []
+            });
+
+            const result = await service.getCourseFiles('C1', 'Math');
+
+            expect(result).toEqual({
+                success: true,
+                data: {
+                    files: [
+                        { id: 'link:1', name: 'Slides no Drive', type: 'link', url: 'https://drive.google.com/x' },
+                        { id: 'link:2', name: 'Script malicioso', type: 'link' },
+                        { id: '123', name: 'doc.pdf', type: 'file' },
+                    ],
+                    news: []
+                }
+            });
+        });
+
         it('returns SESSION_EXPIRED if Playwright entry fails on session', async () => {
             mockPlaywright.enterCourseAndGetHTML.mockResolvedValue({
                 success: false,

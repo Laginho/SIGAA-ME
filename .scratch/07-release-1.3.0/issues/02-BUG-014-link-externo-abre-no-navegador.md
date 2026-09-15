@@ -1,6 +1,6 @@
 # BUG-014: Link externo listado na turma abre no navegador
 Status: open
-Stage: to-implement
+Stage: implementing
 Priority: P1
 Blocked by: nenhum
 Review: agent

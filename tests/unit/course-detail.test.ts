@@ -90,3 +90,58 @@ describe('course-detail: falha de download', () => {
         expect(container.querySelector('.status-done')).not.toBeNull();
     });
 });
+
+describe('course-detail: link externo (BUG-014)', () => {
+    beforeEach(() => {
+        document.body.innerHTML = '';
+        localStorage.clear();
+        sessionStorage.clear();
+        vi.restoreAllMocks();
+
+        setActiveAccount({ id: 'acc-test', name: 'ALUNO' });
+        writeAccountItem('courses', JSON.stringify([{
+            id: 'c1',
+            name: 'Cálculo I',
+            code: 'CB0001',
+            files: [
+                { name: 'Slides no Drive', type: 'link', id: 'link:1', url: 'https://drive.google.com/x' },
+                { name: 'Link antigo do cache', type: 'link', id: 'link:2' },
+            ],
+            news: [],
+        }]));
+
+        (window as any).api = {
+            getSettings: vi.fn().mockResolvedValue({ lastDownloadPath: 'C:/Users/aluno/SIGAA' }),
+            downloadFile: vi.fn(),
+            selectDownloadFolder: vi.fn(),
+            updateSetting: vi.fn(),
+            checkFilesExistence: vi.fn().mockResolvedValue(ok([])),
+            onDownloadProgress: vi.fn(() => () => undefined),
+        };
+    });
+
+    it('renderiza um link com url como controle abrível com nome acessível', async () => {
+        const container = document.createElement('div');
+        document.body.appendChild(container);
+
+        renderCourseDetailPage(container, 'c1');
+        for (let i = 0; i < 10; i++) await flushAll();
+
+        const link = container.querySelector<HTMLAnchorElement>('a[href="https://drive.google.com/x"]');
+        expect(link).not.toBeNull();
+        expect(link!.getAttribute('aria-label')).toBe('Abrir link externo Slides no Drive');
+    });
+
+    it('mantém o ícone inerte para link sem url, sem lançar erro (cache antigo)', async () => {
+        const container = document.createElement('div');
+        document.body.appendChild(container);
+
+        renderCourseDetailPage(container, 'c1');
+        for (let i = 0; i < 10; i++) await flushAll();
+
+        const rows = container.querySelectorAll('.file-item');
+        const inertIcon = rows[1].querySelector('[title="Link indisponível"]');
+        expect(inertIcon).not.toBeNull();
+        expect(inertIcon!.tagName).toBe('SPAN');
+    });
+});
