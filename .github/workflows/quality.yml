@@ -41,8 +41,16 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Unit e integration
-        run: npm test
+      # `npm run coverage` é `vitest run --coverage`: mesma suíte do `npm test`,
+      # com os thresholds do `vitest.config.ts` por cima. Rodar os dois seria
+      # executar a suíte duas vezes pelo mesmo resultado.
+      - name: Unit e integration (com thresholds de cobertura)
+        run: npm run coverage
+
+      # Só dependência de produção, só severidade `high` para cima. Dev-dep
+      # vulnerável não vai dentro do instalador.
+      - name: Auditoria de dependência de produção
+        run: npm run audit:prod
 
   e2e:
     name: E2E sem credencial
