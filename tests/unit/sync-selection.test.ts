@@ -323,6 +323,40 @@ describe('Sync: falha de disciplina preserva cache (ARCH-001 READ §1)', () => {
     });
 });
 
+describe('Sync: falha de loadAllNews no modo completo (BUG-017)', () => {
+    it('entra em failures, mescla a turma com os arquivos e não anuncia "Finalizado!"', async () => {
+        (window as any).api.getCourses = vi.fn().mockResolvedValue({
+            success: true,
+            data: { courses: [makeCourse('c1', 'Cálculo I')] },
+        });
+        (window as any).api.getCourseFiles = vi.fn().mockResolvedValue({
+            success: true,
+            data: {
+                files: [{ id: '1', name: 'Lista.pdf', type: 'file' }],
+                news: [{ id: 'n1', title: 'Aviso', date: '01/01/2026', notification: '' }],
+            },
+        });
+        (window as any).api.loadAllNews = vi.fn().mockResolvedValue({
+            success: false,
+            error: { code: 'PORTAL_UNAVAILABLE', message: 'Timeout ao ler notícias' },
+        });
+
+        const app = buildApp();
+        renderSyncSelectionPage(app);
+        document.getElementById('btnFullSync')?.click();
+        for (let i = 0; i < 20; i++) await flushAll();
+
+        const overlay = app.querySelector('.sync-progress-overlay');
+        expect(overlay?.textContent).toContain('Cálculo I');
+        expect(overlay?.textContent).toContain('Timeout ao ler notícias');
+        expect(overlay?.textContent).not.toContain('Finalizado!');
+
+        const cached = JSON.parse(readAccountItem('courses') || '[]');
+        expect(cached).toHaveLength(1);
+        expect(cached[0].files).toEqual([{ id: '1', name: 'Lista.pdf', type: 'file' }]);
+    });
+});
+
 describe('Sync: post-sync navigation is cancellable (BUG-013)', () => {
     afterEach(() => {
         vi.useRealTimers();
