@@ -26,6 +26,8 @@ jobs:
 
     permissions:
       contents: write # Needed to create releases
+      id-token: write # REL-001: exigido por actions/attest-build-provenance
+      attestations: write # REL-001: exigido por actions/attest-build-provenance
 
     steps:
       - name: Checkout Code
@@ -82,11 +84,41 @@ jobs:
           DEBUG: electron-builder
         run: npx electron-builder --win --publish always
 
+      # REL-001: hash e atestado saem daqui, depois do Publish, sem `if`. O
+      # `electron-builder` empacota de novo no passo acima e sobrescreve os
+      # `.exe` de `release/` — só o que sai depois dele é o que o usuário
+      # baixa, tanto com publish=false (arquivos do Build) quanto com
+      # publish=true (arquivos que subiram).
+      # O `sha256sum` do Git Bash assume modo binário e escreve `<hash> *<arquivo>`.
+      # O `sed` troca esse ` *` pelos dois espaços do formato de texto, que é o
+      # que o `sha256sum -c` e a comparação manual com `Get-FileHash` esperam.
+      # Normalizar a separação em vez de usar `--text` porque o modo texto
+      # traduz quebra de linha, e num `.exe` isso mudaria o hash em silêncio.
+      # Os `.exe` ficam em `release/<versão>/` (`directories.output` do
+      # `electron-builder.json5`), não em `release/` — daí o `$(node -p ...)` e o
+      # `release/*/` abaixo.
+      - name: Gerar checksums dos instaladores
+        shell: bash
+        run: cd "release/$(node -p "require('./package.json').version")" && sha256sum *.exe | sed 's/ \*/  /' > SHA256SUMS.txt
+
+      - name: Provar proveniência dos instaladores
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: release/*/*.exe
+
+      - name: Publicar SHA256SUMS.txt na release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        if: ${{ inputs.publish }}
+        run: gh release upload "v$(node -p "require('./package.json').version")" "release/$(node -p "require('./package.json').version")/SHA256SUMS.txt" --clobber
+
       - name: Guardar o instalador como artefato
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: windows-installer
-          path: release/**/*.exe
+          path: |
+            release/*/*.exe
+            release/*/SHA256SUMS.txt
           retention-days: 14
           if-no-files-found: warn
