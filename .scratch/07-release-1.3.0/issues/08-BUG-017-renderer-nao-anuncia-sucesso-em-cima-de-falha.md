@@ -1,6 +1,6 @@
 # BUG-017: Renderer não anuncia sucesso em cima de falha
 Status: open
-Stage: to-implement
+Stage: blocked
 Priority: P1
 Blocked by: nenhum
 Review: agent
@@ -71,3 +71,5 @@ Promessas: a leitura inicial de settings em `src/main.ts:47` não tem `.catch`
   não crie outro.
 
 - 2026-09-15 Attempt 1 failed: exit 0. Log tail: BUG-017 is already done — merged on `master` with verdict Approve, all criteria ✅, no findings reopened. Nothing to do; our current session branch (`sweatshop/2026-09-15-2032`) is just an ancestor of master and hasn't picked up that merge yet, so the local `.scratch` copy here still shows the stale `to-implement` state. No action needed on this ticket. /
+
+- 2026-09-15 Attempt 2 failed: exit 0; blocked after two attempts. Log tail: Confirmed: BUG-017 is merged and done on `master` (Stage: done, verdict Approve, PR #35). The previous attempt's report was accurate — this session branch (`sweatshop/2026-09-15-2032`) just predates that merge, so the local `.scratch` copy here is stale. Nothing to do on BUG-017. /
