@@ -1,6 +1,6 @@
 # CLEAN-006: ler os primeiros bytes de um arquivo tem três cópias
-Status: open
-Stage: to-review
+Status: resolved
+Stage: done
 Priority: P3
 Blocked by: nenhum
 
@@ -68,3 +68,37 @@ Isto é consolidação de duplicata existente, não abstração nova: a regra 7 
   — arquivo de 0 byte e arquivo menor que 4096 são os dois casos que valem.
 
 ## Comments
+
+#### Resolution (2026-09-14)
+
+Aprovado na primeira rodada da etapa 3, sem correção de revisão. Commit
+`dc34b28`, PR #30 (`8df5562`).
+
+**Decisão.** `readHeadSync` saiu do `download.service.ts` e virou `export` do
+`file-validation.service.ts` usando o `HEAD_SIZE` que já morava lá;
+`readKnownHead` e `KNOWN_HEAD_CHECK_SIZE` saíram do `sigaa.service.ts`. O
+`readHead` async continua privado, como o ticket pede. 16 inserções, 32
+remoções.
+
+**Arquivos.** `electron/services/file-validation.service.ts` (`:88-97`),
+`electron/services/download.service.ts`, `electron/services/sigaa.service.ts`.
+Nada fora dos Primary files.
+
+**Prova.** Não há teste novo, por desenho do critério 4 — e a revisão conferiu
+que a rede existente não é vácuo: `tests/unit/audit-download-identity.test.ts:29`
+faz `vi.mock('fs')` no nível do módulo, então o mock alcança o `import * as fs`
+do `file-validation.service` e os casos de `:163-216` (header PDF aceito, HTML
+rejeitado) passam a exercitar a função consolidada por dentro de
+`isReusableDownload`. Se o mock tivesse deixado de interceptar, o `openSync` real
+num caminho falso quebraria os testes. `grep` por `openSync` em
+`electron/services/` devolve um site só; `readKnownHead`, `readHeadSync` local,
+`CHECK_HEAD_SIZE` e `KNOWN_HEAD_CHECK_SIZE` não existem mais no código.
+
+**Gate.** `npm run quality` no Windows: typecheck limpo, ESLint 0 erros / 52
+warnings pré-existentes de `no-explicit-any`, vitest 63 arquivos,
+719 passed | 5 skipped. CI do PR verde nos três jobs.
+
+**Nota sem ação.** O `readHead` async fica adjacente ao síncrono com a mesma
+lógica. É o que o ticket decide, e a classe de falha que motivou o ticket
+(cópias com tamanho de cabeça divergente, sintoma sendo arquivo ruim passando em
+vez de erro) fecha mesmo assim, porque os dois leem o mesmo `HEAD_SIZE`.
