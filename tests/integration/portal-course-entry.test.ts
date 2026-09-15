@@ -182,4 +182,16 @@ describe('PORTAL-007 — getCourses falho ao relançar o browser dentro de enter
         expect(result.errorCode).toBe('SESSION_EXPIRED');
         expect(result.error).toBe('Session expired - please login again');
     });
+
+    it('nunca deixa a mensagem de um TypeError interno sair como error', async () => {
+        const service = new PlaywrightLoginService();
+        const internalMessage = "Cannot read properties of null (reading 'newPage')";
+        vi.spyOn(service, 'getCourses').mockRejectedValue(new TypeError(internalMessage));
+
+        const result = await service.enterCourseAndGetHTML('123', 'Algorithms');
+
+        expect(result.success).toBe(false);
+        expect(result.errorCode).toBe('UNKNOWN');
+        expect(result.error).not.toContain(internalMessage);
+    });
 });
