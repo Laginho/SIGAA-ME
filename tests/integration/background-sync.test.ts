@@ -164,7 +164,7 @@ describe('BackgroundSyncService.syncNow', () => {
         await p;
 
         const payload = (window.webContents.send as any).mock.calls[0][1];
-        expect(Object.keys(payload).sort()).toEqual(['accountId', 'courses', 'notifications', 'timestamp']);
+        expect(Object.keys(payload).sort()).toEqual(['accountId', 'courses', 'downloads', 'notifications', 'timestamp']);
         expect(payload.notifications).toHaveLength(1);
         expect(payload.notifications[0]).toMatchObject({ type: 'file', id: 'file-c1-f2.pdf' });
     });
