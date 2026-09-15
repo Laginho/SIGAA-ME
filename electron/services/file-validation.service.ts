@@ -84,6 +84,18 @@ function isHtml(head: Buffer): boolean {
     return start.startsWith('<!doctype') || start.startsWith('<html');
 }
 
+/** Primeiros bytes de um arquivo já existente no disco — o bastante para `validateHead`. */
+export function readHeadSync(filePath: string): Buffer {
+    const fd = fs.openSync(filePath, 'r');
+    try {
+        const buffer = Buffer.alloc(HEAD_SIZE);
+        const bytesRead = fs.readSync(fd, buffer, 0, HEAD_SIZE, 0);
+        return buffer.subarray(0, bytesRead);
+    } finally {
+        fs.closeSync(fd);
+    }
+}
+
 /** Primeiros bytes do arquivo, o suficiente para toda assinatura da tabela e para farejar HTML. */
 async function readHead(filePath: string): Promise<Buffer> {
     const handle = await fs.promises.open(filePath, 'r');
