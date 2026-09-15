@@ -30,6 +30,12 @@ import {
  */
 let unsubscribeSync: (() => void) | null = null;
 let unsubscribeCompatibility: (() => void) | null = null;
+/**
+ * Mesma disciplina do listener de sync acima (BUG-016 item 21): sem isto,
+ * cada montagem do dashboard soma outro `click` em `document`, e cada um
+ * fecha sobre o `dropdown` da montagem em que nasceu.
+ */
+let dropdownOutsideClickHandler: ((e: MouseEvent) => void) | null = null;
 
 /**
  * O aviso é um nó só quando `incompatible` (regra 1 do CLAUDE.md e AC do
@@ -77,7 +83,9 @@ export function handleBackgroundSyncUpdate(data: BackgroundSyncUpdate): void {
 
   if (data.courses.length > 0) {
     try {
-      mergeCoursesIntoCache(data.courses, { replaceSet: true }, data.timestamp);
+      // BUG-016: um ciclo incompleto só cobriu quem deu certo — substituir o
+      // conjunto inteiro apagaria do cache a turma que apenas falhou desta vez.
+      mergeCoursesIntoCache(data.courses, { replaceSet: !data.incomplete }, data.timestamp);
     } catch (error) {
       // Quota: the sync result could not be saved. The user must know —
       // silently dropping a sync is how stale data masquerades as fresh.
@@ -203,12 +211,16 @@ export function renderDashboardPage(app: HTMLDivElement, account: AccountProfile
   });
 
   // Close dropdown when clicking outside
-  document.addEventListener('click', (e) => {
+  if (dropdownOutsideClickHandler) {
+    document.removeEventListener('click', dropdownOutsideClickHandler);
+  }
+  dropdownOutsideClickHandler = (e) => {
     if (dropdown?.classList.contains('open') && !dropdown.contains(e.target as Node) && e.target !== bellBtn) {
       dropdown.classList.remove('open');
       bellBtn?.setAttribute('aria-expanded', 'false');
     }
-  });
+  };
+  document.addEventListener('click', dropdownOutsideClickHandler);
 
   markAllBtn?.addEventListener('click', (e) => {
     e.stopPropagation();

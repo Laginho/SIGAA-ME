@@ -18,6 +18,7 @@ export type AccountStorageKey =
     | 'downloads'
     | 'notifications'
     | 'read-items'
+    | 'read-items-seed-version'
     | 'photo'
     | 'sync-timestamp';
 

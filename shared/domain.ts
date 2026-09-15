@@ -75,6 +75,8 @@ export interface CourseFile {
   type: 'file' | 'link'
   /** `dd/mm/aaaa`, quando a timeline lateral registrou o upload. */
   date?: string
+  /** Só em `type: 'link'`, e só quando é `http:`/`https:` absoluta. */
+  url?: string
 }
 
 export type DownloadStatus = 'downloaded' | 'skipped' | 'failed'
@@ -131,7 +133,7 @@ export interface NotificationItem {
   type: 'file' | 'news'
   courseId: CourseId
   courseName: string
-  /** Nome do arquivo ou id da notícia. */
+  /** Id do material (arquivo ou notícia), nunca o nome. */
   itemId: string
   itemTitle: string
   timestamp: number
