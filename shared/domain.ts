@@ -75,6 +75,8 @@ export interface CourseFile {
   type: 'file' | 'link'
   /** `dd/mm/aaaa`, quando a timeline lateral registrou o upload. */
   date?: string
+  /** Só em `type: 'link'`, e só quando é `http:`/`https:` absoluta. */
+  url?: string
 }
 
 export type DownloadStatus = 'downloaded' | 'skipped' | 'failed'
