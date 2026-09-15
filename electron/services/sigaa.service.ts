@@ -3,10 +3,9 @@ import { PlaywrightLoginService, type ParsedCourse } from './playwright-login.se
 import { logger } from './logger.service';
 import { deriveAccountId, getActiveAccount, setActiveAccount } from './account-context.service';
 import { SessionOperationCoordinator } from './session-operation-coordinator.service';
-import * as fs from 'fs';
 import * as path from 'path';
 import { resolveDownloadTarget, ensureDirInsideRoot, isInsideRoot, sanitizeSegment } from './download-path';
-import { validateHead, readHeadSync } from './file-validation.service';
+import { isReusableDownload } from './file-validation.service';
 import type {
     AccountProfile,
     CourseFile,
@@ -67,21 +66,6 @@ function findScript(files: ParsedFile[] | undefined, file: DownloadFileRef): str
 
 /** Devolvido pelas checagens de cancelamento; texto livre, os testes só olham o código. */
 const CANCELLED = fail('CANCELLED', 'Operação cancelada.');
-
-/**
- * Um registro de `known` só conta se o arquivo existe, não está vazio e
- * passa em `validateHead` — presença sozinha não basta (DL-006 critério 3).
- */
-function isReusableDownload(filePath: string): boolean {
-    if (!fs.existsSync(filePath)) return false;
-    try {
-        const head = readHeadSync(filePath);
-        if (head.length === 0) return false;
-        return validateHead(head, path.extname(filePath).toLowerCase()).ok;
-    } catch {
-        return false;
-    }
-}
 
 export class SigaaService {
     private playwrightLogin: PlaywrightLoginService;
@@ -215,9 +199,9 @@ export class SigaaService {
      * `basePath`, não `targetDir`: o DownloadService cria a pasta da turma sozinho.
      */
     private async downloadViaPlaywright(
-        courseId: string, courseName: string, fileName: string, basePath: string, script?: string
+        courseId: string, courseName: string, fileName: string, basePath: string, fileId: string, script?: string
     ): Promise<AppResult<{ filePath: string }>> {
-        const result = await this.playwrightLogin.downloadFile(courseId, courseName, fileName, '', basePath, {}, script);
+        const result = await this.playwrightLogin.downloadFile(courseId, courseName, fileName, '', basePath, {}, fileId, script);
         if (result.success && result.filePath) return ok({ filePath: result.filePath });
         return fail('DOWNLOAD_FAILED', result.error || 'Playwright download failed');
     }
@@ -295,7 +279,7 @@ export class SigaaService {
             if (!targetScript) {
                 if (signal.aborted) return CANCELLED;
                 log.warn('File not in static parses; trying Playwright live-DOM lookup.', { fileName: file.name });
-                return await this.downloadViaPlaywright(courseId, courseName, file.name, basePath, undefined);
+                return await this.downloadViaPlaywright(courseId, courseName, file.name, basePath, file.id, undefined);
             }
 
             // 3. Use HTTP Scraper for fast download
@@ -336,7 +320,7 @@ export class SigaaService {
             }
             log.warn('HTTP download failed twice. Falling back to Playwright.', { fileName: file.name });
             if (signal.aborted) return CANCELLED;
-            return await this.downloadViaPlaywright(courseId, courseName, file.name, basePath, retryScript);
+            return await this.downloadViaPlaywright(courseId, courseName, file.name, basePath, file.id, retryScript);
 
         } catch (error) {
             log.error('Error downloading file.', { error });
@@ -607,7 +591,7 @@ export class SigaaService {
                 const script = findScript(retryParsedFiles, originalFile)
                     ?? findScript(parsedFiles, originalFile)
                     ?? findScript(filesSectionFiles, originalFile);
-                const pwResult = await this.downloadViaPlaywright(courseId, courseName, fileName, basePath, script);
+                const pwResult = await this.downloadViaPlaywright(courseId, courseName, fileName, basePath, fileId, script);
                 if (pwResult.success) {
                     downloaded++;
                     failed--;

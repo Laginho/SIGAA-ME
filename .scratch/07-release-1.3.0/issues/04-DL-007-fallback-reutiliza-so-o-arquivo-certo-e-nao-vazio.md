@@ -1,6 +1,6 @@
 # DL-007: Fallback Playwright reutiliza só o arquivo certo e não vazio
 Status: open
-Stage: implementing
+Stage: to-review
 Priority: P0
 Blocked by: nenhum
 Review: agent
