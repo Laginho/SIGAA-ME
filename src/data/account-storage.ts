@@ -9,7 +9,7 @@
  * Entra e sai `string`, como o `localStorage`: quem chama continua dono do
  * seu `JSON.parse` e do seu `try/catch`.
  */
-import type { AccountId, AccountProfile } from '../../shared/domain';
+import type { AccountId, AccountProfile, DownloadRecord } from '../../shared/domain';
 
 export const SESSION_ACCOUNT_KEY = 'sigaa-me:v2:session:account';
 
@@ -104,6 +104,26 @@ export function removeAccountItem(name: AccountStorageKey): void {
 
 export function purgeLegacyStorage(): void {
     for (const key of LEGACY_KEYS) localStorage.removeItem(key);
+}
+
+/**
+ * Grava os arquivos `downloaded` de `records` no índice `downloads` da conta
+ * ativa (DL-006) — chamado depois de um "Baixar todos" manual
+ * (`course-detail.ts`) e de um download automático em background
+ * (`dashboard.ts`), para os dois alimentarem o mesmo `known` que o próximo
+ * lote usa para não duplicar.
+ */
+export function recordDownloads(courseId: string, records: DownloadRecord[]): void {
+    const downloaded = records.filter(
+        (r): r is Extract<DownloadRecord, { status: 'downloaded' }> => r.status === 'downloaded'
+    );
+    if (downloaded.length === 0) return;
+    const downloads = JSON.parse(readAccountItem('downloads') || '{}');
+    if (!downloads[courseId]) downloads[courseId] = {};
+    for (const r of downloaded) {
+        downloads[courseId][r.fileId] = { downloadedAt: Date.now(), path: r.filePath };
+    }
+    writeAccountItem('downloads', JSON.stringify(downloads));
 }
 
 /** O botão 🗑️ do dashboard: apaga tudo de todas as contas nesta máquina. */
