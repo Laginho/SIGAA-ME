@@ -1,6 +1,6 @@
 # DL-006: o lote não sabe qual id gravou o arquivo que encontra no disco
-Status: open
-Stage: to-review
+Status: resolved
+Stage: done
 Priority: P2
 Blocked by: nenhum
 
@@ -318,3 +318,55 @@ bullet do critério 6, fica registrada, não reaberta.
 Critérios 1-5 seguem ✅ como em `f17d31b`/`7b84709`: os três commits desta
 rodada não tocam em nada deles, e a suíte inteira passa. Falta só o critério 6,
 nesta mesma branch — os dois achados são o mesmo arquivo e o mesmo laço.
+
+#### Resolution (2026-09-14)
+
+Verdict da rodada 3: **Approve**. Mergeada pela PR #27 (`ecd8993`).
+
+Decisão: os dois achados da rodada 2 eram o mesmo laço em `dashboard.ts`, e
+fecharam nele. O achado 1 não pedia código — `recordDownloads` já era chamado
+desde `e60f8b0`; pedia a prova, que agora existe e cai junto com a chamada. O
+achado 2 pedia guarda, e ela copia o padrão que o `ui-helpers.ts:152-161` já
+usava para a mesma classe de erro, em vez de inventar um segundo tratamento.
+
+Arquivos desta rodada: `tests/unit/dashboard-listener.test.ts` (`c070282`,
+dois testes) e `src/pages/dashboard.ts` (`34a7346`, `try/catch` por curso
+dentro do laço de `downloads`). Nada fora dos Primary files.
+
+Red-green:
+
+- Achado 2: com o `dashboard.ts` de `c070282` (pré-fix),
+  `npx vitest run tests/unit/dashboard-listener.test.ts` → **1 failed |
+  2 passed (3)**, em `expected [Function] to not throw an error but
+  'QuotaExceededError' was thrown`. Verde com o fix.
+- Achado 1: teste nasce verde, provado por mutação — trocando
+  `recordDownloads(courseId, records)` por `void courseId; void records;` em
+  `dashboard.ts:70`, o teste do fio fica vermelho
+  (`Cannot read properties of undefined (reading 'f1')`). É a mesma mutação
+  que na rodada 2 deixava a suíte inteira verde, e era esse o achado.
+
+Gate em `34a7346`, rebasado sobre `6bc77fb`: `tsc` limpo, ESLint **0 errors,
+57 warnings** (todos `no-explicit-any` pré-existentes), vitest **63 files,
+719 passed | 5 skipped (724)**. CI da PR verde nos três jobs (typecheck/lint/
+testes, E2E sem credencial, scanner de segredo).
+
+Seis critérios ✅: 1-5 como entregues em `f17d31b`/`7b84709`, 6 fechado nesta
+rodada.
+
+Notas que sobreviveram, sem ação:
+
+- `recordDownloads` (`account-storage.ts:121`) faz `JSON.parse` do índice sem
+  guarda. Índice corrompido dá `SyntaxError`, que não é quota e o `catch` novo
+  repassa — o ciclo morre antes do merge e do toast, a mesma forma do achado 2
+  com outro gatilho. Não é regressão (antes o laço não tinha guarda nenhuma) e
+  o único escritor da chave é o próprio `recordDownloads`, então a corrupção
+  teria de vir de fora do app. O `ui-helpers.ts:105-107` guarda o parse análogo
+  com `catch { existingCourses = [] }`; se incomodar, vira `CLEAN-*`.
+- Quota estourada com N cursos em `downloads` dá N toasts iguais, mais o do
+  merge. Cosmético.
+- `[string, any]` em `course-detail.ts:455-456` (achado 2 da rodada 1) segue
+  como nota: a extração do laço não passou por aquelas linhas.
+- Leitura de cabeça em três cópias segue em `CLEAN-006`.
+- O sync em background continua sem `known`, então um download manual feito na
+  janela entre o arquivo aparecer e o ciclo rodar ainda pode virar `X (1).pdf`.
+  Decisão explícita do último bullet do critério 6.
