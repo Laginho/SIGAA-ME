@@ -1,6 +1,6 @@
 # BUG-017: Renderer não anuncia sucesso em cima de falha
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P1
 Blocked by: nenhum
 Review: agent

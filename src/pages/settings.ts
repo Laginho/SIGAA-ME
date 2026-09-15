@@ -141,11 +141,16 @@ export async function renderSettingsPage(container: HTMLDivElement) {
   // Theme Toggle Logic
   const themeToggle = document.getElementById('themeToggle') as HTMLInputElement;
   themeToggle?.addEventListener('change', async (e) => {
-    const isDark = (e.target as HTMLInputElement).checked;
+    const target = e.target as HTMLInputElement;
+    const isDark = target.checked;
     const newTheme = isDark ? 'dark' : 'light';
 
-    // Update main process
-    await window.api.updateSetting('theme', newTheme);
+    const result = await window.api.updateSetting('theme', newTheme);
+    if (!result.success) {
+      target.checked = !isDark;
+      toast.error(result.error.message);
+      return;
+    }
 
     // Apply instantly
     document.documentElement.setAttribute('data-theme', newTheme);
@@ -155,7 +160,11 @@ export async function renderSettingsPage(container: HTMLDivElement) {
     // Clear Downloads Logic
   const clearDownloadsBtn = document.getElementById('clearDownloadsBtn');
   clearDownloadsBtn?.addEventListener('click', async () => {
-    await window.api.updateSetting('lastDownloadPath', null);
+    const result = await window.api.updateSetting('lastDownloadPath', null);
+    if (!result.success) {
+      toast.error(result.error.message);
+      return;
+    }
     toast.success('Preferência de download limpa. Perguntará novamente no próximo download.');
     renderSettingsPage(container); // Re-render to update UI
   });
@@ -170,9 +179,15 @@ export async function renderSettingsPage(container: HTMLDivElement) {
   const autoDownloadToggle = document.getElementById('autoDownloadToggle') as HTMLInputElement;
 
   runInBackgroundToggle?.addEventListener('change', async (e) => {
-    const isEnabled = (e.target as HTMLInputElement).checked;
-    await window.api.updateSetting('runInBackground', isEnabled);
-    
+    const target = e.target as HTMLInputElement;
+    const isEnabled = target.checked;
+    const result = await window.api.updateSetting('runInBackground', isEnabled);
+    if (!result.success) {
+      target.checked = !isEnabled;
+      toast.error(result.error.message);
+      return;
+    }
+
     // Toggle UI State
     if (isEnabled) {
       openAtLoginContainer?.classList.remove('disabled-item');
@@ -194,8 +209,14 @@ export async function renderSettingsPage(container: HTMLDivElement) {
   });
 
   openAtLoginToggle?.addEventListener('change', async (e) => {
-    const isEnabled = (e.target as HTMLInputElement).checked;
-    await window.api.updateSetting('openAtLogin', isEnabled);
+    const target = e.target as HTMLInputElement;
+    const isEnabled = target.checked;
+    const result = await window.api.updateSetting('openAtLogin', isEnabled);
+    if (!result.success) {
+      target.checked = !isEnabled;
+      toast.error(result.error.message);
+      return;
+    }
     if (isEnabled) {
       toast.success('SIGAA-ME iniciará com o Windows.');
     } else {
@@ -204,14 +225,28 @@ export async function renderSettingsPage(container: HTMLDivElement) {
   });
 
   syncIntervalSelect?.addEventListener('change', async (e) => {
-    const value = parseInt((e.target as HTMLSelectElement).value, 10);
-    await window.api.updateSetting('syncInterval', value);
+    const target = e.target as HTMLSelectElement;
+    const previousValue = String(settings.syncInterval);
+    const value = parseInt(target.value, 10);
+    const result = await window.api.updateSetting('syncInterval', value);
+    if (!result.success) {
+      target.value = previousValue;
+      toast.error(result.error.message);
+      return;
+    }
+    settings.syncInterval = value;
     toast.success('Intervalo de busca atualizado.');
   });
 
   autoDownloadToggle?.addEventListener('change', async (e) => {
-    const isEnabled = (e.target as HTMLInputElement).checked;
-    await window.api.updateSetting('autoDownloadUpdates', isEnabled);
+    const target = e.target as HTMLInputElement;
+    const isEnabled = target.checked;
+    const result = await window.api.updateSetting('autoDownloadUpdates', isEnabled);
+    if (!result.success) {
+      target.checked = !isEnabled;
+      toast.error(result.error.message);
+      return;
+    }
     if (isEnabled) {
       toast.success('Downloads automáticos ativados.');
     } else {
