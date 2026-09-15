@@ -16,7 +16,7 @@ import {
     pushNotifications,
     seedExistingItemsAsRead
 } from '../../src/utils/notification-store';
-import { setActiveAccount, writeAccountItem } from '../../src/data/account-storage';
+import { readAccountItem, setActiveAccount, writeAccountItem } from '../../src/data/account-storage';
 
 // DATA-001: notificações e lidos são por conta.
 const ACCOUNT = { id: 'acc-test', name: 'ALUNO' };
@@ -91,20 +91,53 @@ describe('notification-store', () => {
 
     it('seedExistingItemsAsRead is idempotent: a second call with different data changes nothing', () => {
         writeAccountItem('courses', JSON.stringify([
-            { id: 'c1', files: [{ name: 'old.pdf' }], news: [{ id: 'n1' }] }
+            { id: 'c1', files: [{ id: '1', name: 'old.pdf' }], news: [{ id: 'n1' }] }
         ]));
 
         seedExistingItemsAsRead();
-        expect(isItemRead('file', 'c1', 'old.pdf')).toBe(true);
-        expect(isItemRead('file', 'c1', 'new.pdf')).toBe(false);
+        expect(isItemRead('file', 'c1', '1')).toBe(true);
+        expect(isItemRead('file', 'c1', '2')).toBe(false);
 
         writeAccountItem('courses', JSON.stringify([
-            { id: 'c1', files: [{ name: 'new.pdf' }], news: [] }
+            { id: 'c1', files: [{ id: '2', name: 'new.pdf' }], news: [] }
         ]));
         seedExistingItemsAsRead();
 
-        expect(isItemRead('file', 'c1', 'old.pdf')).toBe(true);
-        expect(isItemRead('file', 'c1', 'new.pdf')).toBe(false);
+        expect(isItemRead('file', 'c1', '1')).toBe(true);
+        expect(isItemRead('file', 'c1', '2')).toBe(false);
+    });
+
+    it('keeps two entries for two new files that share a name but not an id', () => {
+        pushNotifications([
+            makeItem({ id: 'file-c1-101', itemId: '101', itemTitle: 'Lista.pdf' }),
+            makeItem({ id: 'file-c1-102', itemId: '102', itemTitle: 'Lista.pdf' })
+        ]);
+
+        expect(getAllNotifications()).toHaveLength(2);
+        expect(getAllNotifications().every(n => !n.read)).toBe(true);
+    });
+
+    it('re-seeds read state by id when the previous seed was keyed by name (v1 → v2 migration)', () => {
+        // v1: seeded before BUG-015, keyed by name, no version marker.
+        writeAccountItem('read-items', JSON.stringify(['file-c1-old.pdf']));
+        writeAccountItem('courses', JSON.stringify([
+            { id: 'c1', files: [{ id: '10', name: 'old.pdf' }, { id: '11', name: 'new.pdf' }], news: [] }
+        ]));
+
+        seedExistingItemsAsRead();
+
+        expect(isItemRead('file', 'c1', '10')).toBe(true);
+        expect(isItemRead('file', 'c1', '11')).toBe(true);
+        expect(readAccountItem('read-items-seed-version')).toBe('v2');
+
+        // Running again does not re-seed: a file added to the cache after the
+        // migration stays unread, same as the existing idempotency contract.
+        writeAccountItem('courses', JSON.stringify([
+            { id: 'c1', files: [{ id: '10', name: 'old.pdf' }, { id: '11', name: 'new.pdf' }, { id: '12', name: 'newer.pdf' }], news: [] }
+        ]));
+        seedExistingItemsAsRead();
+
+        expect(isItemRead('file', 'c1', '12')).toBe(false);
     });
 
     it('returns empty defaults instead of throwing when either scoped key holds corrupt JSON', () => {

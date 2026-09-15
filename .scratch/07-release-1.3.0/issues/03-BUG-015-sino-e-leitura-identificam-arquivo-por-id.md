@@ -1,6 +1,6 @@
 # BUG-015: Sino e estado de leitura identificam arquivo por id
-Status: open
-Stage: to-implement
+Status: resolved
+Stage: done
 Priority: P0
 Blocked by: nenhum
 Review: agent
@@ -66,4 +66,59 @@ lido. O seed precisa rodar de novo, por id, uma vez.
 ## Comments
 
 - O comentário em `shared/domain.ts:129` documenta o formato do `id`; ajuste
-  para dizer que `itemId` é o id do material, não o nome.
+  para dizer que `itemId` é o id do material, não o nome. ✅ feito.
+
+#### Resolution (2026-09-15)
+
+Verdict: Approve
+
+Uma identidade só (`f.id`) dos dois lados, e a migração do estado de leitura
+fecha o buraco que a troca de chave abriria.
+
+Critérios, um a um:
+
+1. ✅ `background-sync.service.ts:210-215`: `id: file-${course.id}-${f.id}`,
+   `itemId: f.id`, `itemTitle: f.name`.
+2. ✅ `course-detail.ts:278` (`isItemRead` por `file.id`), `:282`
+   (`dataset.fileId` com o id), `:331` (clique marca lido pelo `fileId` que já
+   estava em escopo). `pushNotifications` deduplica por `n.id`, que agora
+   carrega o `f.id` — nada a mudar lá, e o teste novo tranca isso.
+3. ✅ `notification-store.test.ts`, "keeps two entries for two new files that
+   share a name but not an id".
+4. ✅ `course-detail.test.ts`, "distingue lido/não lido por id quando dois
+   arquivos têm o mesmo nome".
+5. ✅ `read-items-seed-version` = `v2`; conta em v1 é re-semeada por id a
+   partir do cache, o seed passou a unir no set existente (`getReadSet()` em
+   vez de `new Set()`), então leitura manual de notícia sobrevive. Notícias
+   seguem por `n.id`, sem mudança.
+6. ✅ gate verde.
+
+Arquivos: `electron/services/background-sync.service.ts`, `shared/domain.ts`,
+`src/pages/course-detail.ts`, `src/utils/notification-store.ts`,
+`src/data/account-storage.ts`.
+
+Vermelho-verde: em `651cb66` (commit só de teste), os três arquivos dão
+`Test Files 3 failed (3) | Tests 4 failed | 21 passed (25)` — payload do sync
+ainda por `f.name`, `course-detail` consultando por nome, e o seed v2
+inexistente. Com `44c6fa5` por cima, os quatro passam.
+
+Gate em `35423b0`: `Test Files 65 passed (65)`,
+`Tests 739 passed | 5 skipped (744)`, ESLint `0 errors, 52 warnings`
+(`no-explicit-any` pré-existentes), `tsc` limpo.
+
+Correção do revisor: `course-detail.ts:316` lia `data-file-id` — que agora
+carrega o id — para uma local ainda chamada `fileName`. Comportamento já
+estava certo; renomeada para `fileId`, porque confusão nome/id neste arquivo é
+exatamente o BUG-015.
+
+Duas observações, nenhuma bloqueante:
+
+- `src/data/account-storage.ts` está fora dos Primary files e foi editado: uma
+  linha aditiva no union `AccountStorageKey`, sem a qual o critério 5 não
+  compila. Registrado, não revertido.
+- A migração deixa as chaves v1 por nome dentro do `read-items` (lixo inerte,
+  limitado ao que já existia) e não reescreve os ids das notificações antigas
+  já guardadas no sino. Efeito: uma entrada antiga do sino pode aparecer não
+  lida enquanto a linha correspondente em disciplina já está lida; clicar nela
+  resolve, e o histórico é limitado por `MAX_NOTIFICATIONS`. Não vale código
+  novo.
