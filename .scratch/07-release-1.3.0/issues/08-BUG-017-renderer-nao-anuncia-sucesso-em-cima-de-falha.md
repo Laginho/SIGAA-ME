@@ -1,6 +1,6 @@
 # BUG-017: Renderer não anuncia sucesso em cima de falha
-Status: open
-Stage: to-review
+Status: resolved
+Stage: done
 Priority: P1
 Blocked by: nenhum
 Review: agent
@@ -64,6 +64,37 @@ Promessas: a leitura inicial de settings em `src/main.ts:47` não tem `.catch`
   Vermelho porque hoje anuncia "Finalizado!".
 - Critérios 3 a 5 não têm teste unitário razoável (boot do renderer); a etapa
   3 confere por leitura. Não é motivo para pular a etapa 2 nos outros.
+
+#### Resolution (2026-09-15)
+
+Verdict: Approve
+
+PR #35, merge `86e6295`. Commits: `06e5d4a` (testes) e `d161c30` (correção).
+
+Decisão: os seis controles passaram a checar `result.success`, reverter o
+controle ao valor anterior e mostrar `toast.error(result.error.message)`, sem
+toast de sucesso. O `syncIntervalSelect` reverte para `settings.syncInterval` do
+mount e só atualiza esse campo no sucesso — a segunda tentativa reverte para o
+valor certo. No sync completo, `loadAllNews` falho entra em `failures`; a turma
+segue mesclada com seus arquivos e o `failures.length > 0` já existente bloqueia
+o `replaceSet` e cai no `showError`. As três promessas: `.catch` na leitura
+inicial de settings, `toast.error(errorMessage(error))` na rejeição do
+`tryAutoLogin` antes do `route()`, e o `.catch(console.error)` do rótulo
+cosmético do dashboard virou ignore comentado.
+
+Arquivos: `src/pages/settings.ts`, `src/pages/sync-selection.ts`, `src/main.ts`,
+`src/pages/dashboard.ts`, `tests/unit/settings-result.test.ts` (novo),
+`tests/unit/sync-selection.test.ts`. Nada fora de `Primary files`.
+
+Red-green: com o `src/` de `06e5d4a` e os testes de HEAD, `7 failed | 14 passed`
+— os seis controles e o sync completo. Em HEAD, `21 passed`.
+
+Gate: `npm run quality` verde — typecheck limpo, ESLint 0 erros (52 warnings de
+`no-explicit-any`, pré-existentes), `67 arquivos, 757 passed | 5 skipped (762)`.
+CI do PR verde nos três jobs.
+
+Critérios 1 a 6 ✅. Os critérios 3 a 5 foram conferidos por leitura, como o
+ticket previu. Nenhum achado de revisão; nada reaberto, nada parked em `CLEAN-*`.
 
 ## Comments
 
