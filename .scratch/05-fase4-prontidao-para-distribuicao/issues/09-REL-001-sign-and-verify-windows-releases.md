@@ -1,6 +1,6 @@
 # REL-001: Verificar releases Windows sem assinatura de código
-Status: open
-Stage: to-merge
+Status: resolved
+Stage: done
 Blocked by: nenhum
 Review: human
 Priority: P1
@@ -169,3 +169,30 @@ até lá.
   de checksum e atestado vêm **depois** do `Publish`, mas não que são
   incondicionais. Um `if:` acrescentado a eles no futuro passaria verde e
   tiraria o checksum do caminho `publish=false`.
+
+#### Resolution (2026-09-15)
+
+Veredito da revisão humana: **Approve com correção**. PR #31 mergeado em
+`154c931` (merge commit, sem squash). Revisão feita pelo Fable a pedido direto
+do autor, que também mandou aplicar a correção e rodar o workflow.
+
+- Critérios 1–4 ✅ em `release.yml`: checksum, atestado, upload gated em
+  `inputs.publish` e artefato com `SHA256SUMS.txt`. Critérios 5–7 ✅ em
+  `README.md` e `RELEASE_GUIDE.md`. Critério 8 ✅: `npm run quality` 65
+  arquivos, 733 passed, 5 skipped.
+- Arquivos: `.github/workflows/release.yml`, `README.md`, `RELEASE_GUIDE.md`,
+  `tests/unit/audit-release-gate.test.ts`. Todos nos Primary files.
+- Red-green da etapa 2: `74534f2` (5 testes vermelhos) → `c645a68`
+  (verde). Correções da etapa 3: `906682d` (separador de dois espaços) e
+  `7981b6e` (diretório `release/<versão>/`, ver Comments).
+- Prova no runner: run `34983638322` em `rel-001` com `publish=false`,
+  verde em todos os steps. Artefato baixado: `sha256sum -c` OK nos dois
+  `.exe`, `Get-FileHash` bate, `gh attestation verify --owner Laginho`
+  passa para os dois e aponta para `release.yml@refs/heads/rel-001`,
+  commit `7981b6e`.
+- Pendente, como o ticket previu: o step `gh release upload` (critério 3)
+  só roda com `publish=true` e é provado na primeira release depois deste
+  merge. Quem publicar a próxima versão confere os três checks do
+  `## ✅ Depois de publicar` no `RELEASE_GUIDE.md`.
+- Achado sem ação: os testes provam a ordem dos steps, não que são
+  incondicionais; um `if:` futuro passaria verde. Se voltar, é ticket novo.
