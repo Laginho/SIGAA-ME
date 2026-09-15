@@ -1,6 +1,6 @@
 # BUG-016: Sync parcial em background preserva as turmas que falharam
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P0
 Blocked by: nenhum
 Review: agent
