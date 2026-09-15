@@ -54,6 +54,12 @@ function findScript(files: ParsedFile[] | undefined, file: DownloadFileRef): str
     return files.find(f => f.id === file.id)?.script;
 }
 
+/** Par do arquivo na página fresca, casado só pelo id — usado para checar `type` antes de baixar. */
+function findParsedFile(files: ParsedFile[] | undefined, file: DownloadFileRef): ParsedFile | undefined {
+    if (!files || !file.id) return undefined;
+    return files.find(f => f.id === file.id);
+}
+
 /** Devolvido pelas checagens de cancelamento; texto livre, os testes só olham o código. */
 const CANCELLED = fail('CANCELLED', 'Operação cancelada.');
 
@@ -404,6 +410,12 @@ export class SigaaService {
 
             log.info(`Queue after filtering: ${queue.length} files to download.`);
 
+            // Fila vazia (só duplicatas conhecidas) não precisa da turma —
+            // entrar por nada, offline, derrubaria os `skipped` já apurados (SEC-004 item 15).
+            if (queue.length === 0) {
+                return ok({ downloaded, skipped, failed, results });
+            }
+
             // 1. Ensure httpScraper has course session data (viewState, form inputs, etc.)
             // This is REQUIRED for downloads to work - without it, downloadFile returns
             // "Course session data not found" error
@@ -479,7 +491,16 @@ export class SigaaService {
                 if (signal.aborted) return CANCELLED;
                 log.info('Processing file.', { fileName: file.name });
 
-                const targetScript = findScript(parsedFiles, file) ?? findScript(filesSectionFiles, file);
+                const matched = findParsedFile(parsedFiles, file) ?? findParsedFile(filesSectionFiles, file);
+                if (matched?.type === 'link') {
+                    log.info('Skipping file - external link, not downloadable via JSF.', { fileName: file.name });
+                    skipped++;
+                    results.push({ fileId: file.id, fileName: file.name, status: 'skipped' });
+                    if (onProgress) onProgress(file.id, file.name, 'skipped');
+                    continue;
+                }
+
+                const targetScript = matched?.script;
                 if (!targetScript) {
                     log.warn('Skipping file - not found on course page.', { fileName: file.name });
                     failed++;
