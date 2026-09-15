@@ -24,6 +24,9 @@ vi.mock('fs', () => ({
     existsSync: vi.fn(() => false),
     mkdirSync: vi.fn(),
     realpathSync: vi.fn((p: string) => p),
+    openSync: vi.fn(() => 0),
+    readSync: vi.fn(() => 0),
+    closeSync: vi.fn(),
 }));
 
 // 1. Mock the dependencies before importing the service
@@ -76,12 +79,15 @@ vi.mock('electron', () => ({
     }
 }));
 
+import * as fs from 'fs';
 import { SigaaService } from '../../electron/services/sigaa.service';
 import { deriveAccountId, getActiveAccount, setActiveAccount } from '../../electron/services/account-context.service';
 
 const SCRIPT = "jsfcljs(document.getElementById('formAva'),'formAva:j_id_jsp_1,formAva:j_id_jsp_1,id,123,key,abc','');";
 const PARSED_DOC = { id: '123', name: 'doc.pdf', type: 'file', key: 'abc', script: SCRIPT };
 const DOC_REF = { id: '123', name: 'doc.pdf' };
+const PARSED_LINK = { id: 'L1', name: 'Slide do professor', type: 'link', url: 'https://drive.google.com/x' };
+const LINK_REF = { id: 'L1', name: 'Slide do professor' };
 
 describe('SigaaService (Unit)', () => {
     let service: SigaaService;
@@ -410,6 +416,46 @@ describe('SigaaService (Unit)', () => {
 
             expect(mockPlaywright.navigateToFilesSection).not.toHaveBeenCalled();
             expect(mockHttp.downloadFile).toHaveBeenCalledTimes(1);
+        });
+
+        it('does not enter the course when every file is already known and valid on disk (SEC-004 item 15)', async () => {
+            vi.mocked(fs.existsSync).mockReturnValue(true);
+            vi.mocked(fs.readSync).mockImplementation(((_fd: number, buffer: Buffer) => {
+                const bytes = Buffer.from('%PDF-1.4\n');
+                bytes.copy(buffer);
+                return bytes.length;
+            }) as typeof fs.readSync);
+
+            const known = [{ fileId: '123', path: '/mock/downloads/Math/doc.pdf' }];
+            const result = await service.downloadAllFiles('C1', 'Math', [DOC_REF], '/mock/downloads', undefined, known);
+
+            expect(mockPlaywright.enterCourseAndGetHTML).not.toHaveBeenCalled();
+            expect(result).toEqual({
+                success: true,
+                data: {
+                    downloaded: 0, skipped: 1, failed: 0,
+                    results: [{ fileId: '123', fileName: 'doc.pdf', status: 'skipped' }]
+                }
+            });
+        });
+
+        it('skips a material whose parsed pair on the page is a link, without touching the HTTP or Playwright fallback (SEC-004)', async () => {
+            mockPlaywright.enterCourseAndGetHTML.mockResolvedValue({ success: true, html: '<html></html>' });
+            mockHttp.getCourseFiles.mockResolvedValue({ success: true, files: [PARSED_LINK] });
+            mockPlaywright.navigateToFilesSection.mockResolvedValue({ success: false });
+            mockPlaywright.downloadFile.mockResolvedValue({ success: false, error: 'should not be reached' });
+
+            const result = await service.downloadAllFiles('C1', 'Math', [LINK_REF], '/mock/downloads');
+
+            expect(result).toEqual({
+                success: true,
+                data: {
+                    downloaded: 0, skipped: 1, failed: 0,
+                    results: [{ fileId: 'L1', fileName: 'Slide do professor', status: 'skipped' }]
+                }
+            });
+            expect(mockHttp.downloadFile).not.toHaveBeenCalled();
+            expect(mockPlaywright.downloadFile).not.toHaveBeenCalled();
         });
     });
 
