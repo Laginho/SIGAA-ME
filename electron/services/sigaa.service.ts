@@ -6,7 +6,7 @@ import { SessionOperationCoordinator } from './session-operation-coordinator.ser
 import * as fs from 'fs';
 import * as path from 'path';
 import { resolveDownloadTarget, ensureDirInsideRoot, isInsideRoot, sanitizeSegment } from './download-path';
-import { validateHead } from './file-validation.service';
+import { validateHead, readHeadSync } from './file-validation.service';
 import type {
     AccountProfile,
     CourseFile,
@@ -57,20 +57,6 @@ function findScript(files: ParsedFile[] | undefined, file: DownloadFileRef): str
 /** Devolvido pelas checagens de cancelamento; texto livre, os testes só olham o código. */
 const CANCELLED = fail('CANCELLED', 'Operação cancelada.');
 
-const KNOWN_HEAD_CHECK_SIZE = 4096;
-
-/** Primeiros bytes de um candidato a reaproveitamento — mesma leitura de `download.service.ts:22-31` (DL-006: só a leitura, sem duplicar `validateHead`). */
-function readKnownHead(filePath: string): Buffer {
-    const fd = fs.openSync(filePath, 'r');
-    try {
-        const buffer = Buffer.alloc(KNOWN_HEAD_CHECK_SIZE);
-        const bytesRead = fs.readSync(fd, buffer, 0, KNOWN_HEAD_CHECK_SIZE, 0);
-        return buffer.subarray(0, bytesRead);
-    } finally {
-        fs.closeSync(fd);
-    }
-}
-
 /**
  * Um registro de `known` só conta se o arquivo existe, não está vazio e
  * passa em `validateHead` — presença sozinha não basta (DL-006 critério 3).
@@ -78,7 +64,7 @@ function readKnownHead(filePath: string): Buffer {
 function isReusableDownload(filePath: string): boolean {
     if (!fs.existsSync(filePath)) return false;
     try {
-        const head = readKnownHead(filePath);
+        const head = readHeadSync(filePath);
         if (head.length === 0) return false;
         return validateHead(head, path.extname(filePath).toLowerCase()).ok;
     } catch {
