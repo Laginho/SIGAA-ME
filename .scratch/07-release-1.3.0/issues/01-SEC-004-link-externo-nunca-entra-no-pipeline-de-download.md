@@ -1,6 +1,6 @@
 # SEC-004: Material `link` nunca entra no pipeline de download
 Status: open
-Stage: implementing
+Stage: to-review
 Priority: P0
 Blocked by: nenhum
 Review: human
