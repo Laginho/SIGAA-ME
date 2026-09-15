@@ -2,7 +2,7 @@ import '../styles/dashboard.css';
 import type { AccountProfile } from '../../shared/domain';
 import type { BackgroundSyncUpdate, CompatibilityStatus } from '../../shared/ipc';
 import { toast } from '../components/toast';
-import { clearActiveAccount, clearAllLocalData, getActiveAccount, readAccountItem } from '../data/account-storage';
+import { clearActiveAccount, clearAllLocalData, getActiveAccount, readAccountItem, recordDownloads } from '../data/account-storage';
 import { h } from '../utils/dom';
 import { formatSyncLabel, mergeCoursesIntoCache } from '../utils/ui-helpers';
 import {
@@ -59,6 +59,22 @@ export function handleBackgroundSyncUpdate(data: BackgroundSyncUpdate): void {
   }
 
   console.log('[Dashboard] Received background sync update:', data.courses.length, 'courses');
+
+  // O que o sync baixou sozinho entra no índice antes de tudo — se o download
+  // do curso quebrar por outro motivo abaixo, o registro não se perde. Uma
+  // quota estourada aqui não pode derrubar o merge de disciplinas nem o toast
+  // de notificação abaixo — por isso o catch próprio, e não um só por cima da
+  // função inteira.
+  for (const { courseId, records } of data.downloads ?? []) {
+    try {
+      recordDownloads(courseId, records);
+    } catch (error) {
+      const err = error as { name?: string; message?: string };
+      if (err?.name !== 'QuotaExceededError') throw error;
+      toast.error('Cache local cheio (armazenamento do navegador) — ' + err.message);
+    }
+  }
+
   if (data.courses.length > 0) {
     try {
       mergeCoursesIntoCache(data.courses, { replaceSet: true }, data.timestamp);

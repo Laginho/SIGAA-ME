@@ -5,7 +5,8 @@ import { deriveAccountId, getActiveAccount, setActiveAccount } from './account-c
 import { SessionOperationCoordinator } from './session-operation-coordinator.service';
 import * as fs from 'fs';
 import * as path from 'path';
-import { resolveDownloadTarget, ensureDirInsideRoot, sanitizeSegment, withNumberedSuffix } from './download-path';
+import { resolveDownloadTarget, ensureDirInsideRoot, isInsideRoot, sanitizeSegment } from './download-path';
+import { validateHead } from './file-validation.service';
 import type {
     AccountProfile,
     CourseFile,
@@ -17,7 +18,7 @@ import type {
     NewsDetail,
     NewsSummary,
 } from '../../shared/domain';
-import type { DownloadFileRef } from '../../shared/ipc';
+import type { DownloadFileRef, KnownDownload } from '../../shared/ipc';
 import { type AppResult, errorMessage, fail, failFromMessage, failFromResult, ok } from '../../shared/errors';
 
 const log = logger.scope('Sigaa');
@@ -55,6 +56,35 @@ function findScript(files: ParsedFile[] | undefined, file: DownloadFileRef): str
 
 /** Devolvido pelas checagens de cancelamento; texto livre, os testes só olham o código. */
 const CANCELLED = fail('CANCELLED', 'Operação cancelada.');
+
+const KNOWN_HEAD_CHECK_SIZE = 4096;
+
+/** Primeiros bytes de um candidato a reaproveitamento — mesma leitura de `download.service.ts:22-31` (DL-006: só a leitura, sem duplicar `validateHead`). */
+function readKnownHead(filePath: string): Buffer {
+    const fd = fs.openSync(filePath, 'r');
+    try {
+        const buffer = Buffer.alloc(KNOWN_HEAD_CHECK_SIZE);
+        const bytesRead = fs.readSync(fd, buffer, 0, KNOWN_HEAD_CHECK_SIZE, 0);
+        return buffer.subarray(0, bytesRead);
+    } finally {
+        fs.closeSync(fd);
+    }
+}
+
+/**
+ * Um registro de `known` só conta se o arquivo existe, não está vazio e
+ * passa em `validateHead` — presença sozinha não basta (DL-006 critério 3).
+ */
+function isReusableDownload(filePath: string): boolean {
+    if (!fs.existsSync(filePath)) return false;
+    try {
+        const head = readKnownHead(filePath);
+        if (head.length === 0) return false;
+        return validateHead(head, path.extname(filePath).toLowerCase()).ok;
+    } catch {
+        return false;
+    }
+}
 
 export class SigaaService {
     private playwrightLogin: PlaywrightLoginService;
@@ -322,11 +352,15 @@ export class SigaaService {
         courseName: string,
         files: DownloadFileRef[],
         basePath: string,
-        onProgress?: (fileId: DownloadToken, fileName: string, status: DownloadStatus) => void
+        onProgress?: (fileId: DownloadToken, fileName: string, status: DownloadStatus) => void,
+        // Depois de `onProgress`, não antes: os dois já têm chamadores
+        // posicionais (background-sync.service.ts, testes) que param nos 4-5
+        // primeiros argumentos e não podem virar `known` por engano.
+        known: KnownDownload[] = []
     ): Promise<AppResult<DownloadResult>> {
         return this.operations.run('interactive', async (signal) => {
             if (signal.aborted) return CANCELLED;
-            return this._downloadAllFilesInternal(courseId, courseName, files, basePath, signal, onProgress);
+            return this._downloadAllFilesInternal(courseId, courseName, files, basePath, signal, onProgress, known);
         });
     }
 
@@ -336,7 +370,8 @@ export class SigaaService {
         files: DownloadFileRef[],
         basePath: string,
         signal: AbortSignal,
-        onProgress?: (fileId: DownloadToken, fileName: string, status: DownloadStatus) => void
+        onProgress: ((fileId: DownloadToken, fileName: string, status: DownloadStatus) => void) | undefined,
+        known: KnownDownload[]
     ): Promise<AppResult<DownloadResult>> {
         try {
             log.info('=====================================');
@@ -354,36 +389,25 @@ export class SigaaService {
             let skipped = 0;
             let failed = 0;
 
-            // Filter out duplicates first — use sanitized final path for duplicate check (same as writer).
-            // Homônimos no mesmo lote (id diferente, mesmo nome ou nome que sanitiza
-            // igual) não podem checar o mesmo candidato: o `claimedPaths` reserva,
-            // por ordem, o slot que cada arquivo do lote ocuparia — só o primeiro a
-            // reivindicar o nome-base é comparado contra o disco por ele; um
-            // homônimo novo cai no próximo sufixo livre e não é derrubado por um id
-            // que nunca baixou para lá (DL-004 critério 5).
-            const claimedPaths = new Set<string>();
+            // Dedup por identidade, não por adivinhação de caminho (DL-006).
+            // Só pula um arquivo se `known` (o índice id → caminho que o
+            // renderer já mantinha) tem um registro para aquele id, e esse
+            // registro aponta para um arquivo que ainda existe e é válido —
+            // presença de um nome igual no disco, por si só, nunca basta
+            // (critérios 1-3). Registro fora de `basePath` é ignorado, como
+            // se não existisse (critério 4). Sem registro, o arquivo sempre
+            // entra na fila; a colisão de nome no disco, se houver, é
+            // resolvida no `finalizeDownload` (sufixo numerado, DL-004), não
+            // aqui.
+            const knownByFileId = new Map(
+                known
+                    .filter(entry => isInsideRoot(basePath, entry.path))
+                    .map(entry => [entry.fileId, entry.path])
+            );
             const queue = files.filter(file => {
-                let dir: string;
-                let safeName: string;
-                try {
-                    const resolved = resolveDownloadTarget(basePath, courseName || 'Unknown Course', file.name);
-                    dir = path.dirname(resolved.fullPath);
-                    safeName = path.basename(resolved.fullPath);
-                } catch {
-                    // invalid name will fail on download attempt; don't skip as duplicate
-                    return true;
-                }
-
-                let candidateName = safeName;
-                let candidatePath = path.join(dir, candidateName);
-                for (let n = 1; claimedPaths.has(candidatePath); n++) {
-                    candidateName = withNumberedSuffix(safeName, n);
-                    candidatePath = path.join(dir, candidateName);
-                }
-                claimedPaths.add(candidatePath);
-
-                if (fs.existsSync(candidatePath)) {
-                    log.info('Skipping duplicate (exists on disk).', { fileName: file.name });
+                const knownPath = knownByFileId.get(file.id);
+                if (knownPath && isReusableDownload(knownPath)) {
+                    log.info('Skipping duplicate (registered and valid on disk).', { fileName: file.name });
                     skipped++;
                     results.push({ fileId: file.id, fileName: file.name, status: 'skipped' });
                     if (onProgress) onProgress(file.id, file.name, 'skipped');

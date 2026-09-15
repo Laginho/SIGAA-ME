@@ -5,7 +5,7 @@ import { cacheService } from './cache.service';
 import { getActiveAccount } from './account-context.service';
 import { logger } from './logger.service';
 import * as path from 'path';
-import type { CourseSnapshot, CourseSummary, NotificationItem } from '../../shared/domain';
+import type { CourseSnapshot, CourseSummary, DownloadRecord, NotificationItem } from '../../shared/domain';
 import type { BackgroundSyncUpdate } from '../../shared/ipc';
 import { isRetryable } from '../../shared/errors';
 import type { AppSettings } from '../../shared/ipc';
@@ -153,6 +153,7 @@ export class BackgroundSyncService {
             let structuralDriftCourses = 0;
             const allCoursesData: CourseSnapshot[] = [];
             const newNotifications: NotificationItem[] = []; // Structured notifications for the bell
+            const downloads: { courseId: string; records: Extract<DownloadRecord, { status: 'downloaded' }>[] }[] = [];
             const pendingCommits: { courseId: string; fileIds: string[]; newsIds: string[] }[] = [];
 
             for (const course of courses) {
@@ -232,12 +233,20 @@ export class BackgroundSyncService {
                         // Auto-download new files
                         if (settings.autoDownloadUpdates && diff.newFiles.length > 0 && settings.lastDownloadPath) {
                             log.info('Auto-downloading new files.');
-                            await this.sigaaService.downloadAllFiles(
+                            const downloadResult = await this.sigaaService.downloadAllFiles(
                                 course.id,
                                 course.name,
                                 diff.newFiles,
                                 settings.lastDownloadPath
                             );
+                            // Falha não derruba o ciclo (decisão do reopen): sem
+                            // `success`, o curso só não entra em `downloads`.
+                            if (downloadResult.success) {
+                                const downloaded = downloadResult.data.results.filter(
+                                    (r): r is Extract<DownloadRecord, { status: 'downloaded' }> => r.status === 'downloaded'
+                                );
+                                if (downloaded.length > 0) downloads.push({ courseId: course.id, records: downloaded });
+                            }
                         }
 
                         // Auto-fetch news content for offline access
@@ -300,6 +309,7 @@ export class BackgroundSyncService {
                         accountId,
                         courses: allCoursesData,
                         notifications: newNotifications,
+                        downloads,
                         timestamp: Date.now()
                     };
                     window.webContents.send('background-sync-update', update);

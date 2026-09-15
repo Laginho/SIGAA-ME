@@ -19,6 +19,7 @@ import type {
   CourseId,
   CourseSnapshot,
   CourseSummary,
+  DownloadRecord,
   DownloadStatus,
   DownloadResult,
   DownloadToken,
@@ -51,8 +52,16 @@ export interface DownloadFilePayload extends CourseRequest {
 /** Só id e nome atravessam — nunca o objeto inteiro do cache, que pode carregar campos antigos. */
 export type DownloadFileRef = Pick<CourseFile, 'id' | 'name'>
 
+/** Um id já baixado, segundo o índice que o renderer mantém em `localStorage` — entrada não confiável (DL-006). */
+export interface KnownDownload {
+  fileId: DownloadToken
+  path: string
+}
+
 export interface DownloadAllFilesPayload extends CourseRequest {
   files: DownloadFileRef[]
+  /** Índice id → caminho já baixado. Opcional para quem ainda não manda o índice; sem ele, ninguém pula por identidade. */
+  known?: KnownDownload[]
 }
 
 export interface NewsDetailRequest extends CourseRequest {
@@ -165,6 +174,12 @@ export interface BackgroundSyncUpdate {
   accountId: AccountId
   courses: CourseSnapshot[]
   notifications: NotificationItem[]
+  /**
+   * Arquivos que o próprio sync baixou (DL-006). Sem isto o índice de
+   * download do renderer nunca soube deles, e o próximo "Baixar todos"
+   * gravava uma segunda cópia por não ter `known` para aquele id.
+   */
+  downloads?: { courseId: CourseId; records: Extract<DownloadRecord, { status: 'downloaded' }>[] }[]
   timestamp: number
 }
 
