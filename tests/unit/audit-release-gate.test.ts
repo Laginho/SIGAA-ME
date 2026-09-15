@@ -72,7 +72,7 @@ describe('release workflow gates publishing behind quality checks (QA-001)', () 
 
 describe('release workflow publishes checksums and provenance (REL-001)', () => {
     const publishRunIndex = lineIndexOf('run: npx electron-builder --win --publish always');
-    const checksumRunIndex = lines.findIndex((line) => line.trim().startsWith('run: cd release && sha256sum'));
+    const checksumRunIndex = lines.findIndex((line) => line.trim().startsWith('run: cd "release/') && line.includes('sha256sum'));
     const attestIndex = lines.findIndex((line) =>
         line.trim().startsWith('uses: actions/attest-build-provenance@'),
     );
@@ -117,7 +117,7 @@ describe('release workflow publishes checksums and provenance (REL-001)', () => 
         expect(artifactNameIndex).toBeGreaterThan(-1);
 
         const pathBlock = lines.slice(artifactNameIndex, artifactNameIndex + 6).join('\n');
-        expect(pathBlock).toContain('release/SHA256SUMS.txt');
+        expect(pathBlock).toContain('SHA256SUMS.txt');
     });
 });
 

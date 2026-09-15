@@ -94,20 +94,23 @@ jobs:
       # que o `sha256sum -c` e a comparação manual com `Get-FileHash` esperam.
       # Normalizar a separação em vez de usar `--text` porque o modo texto
       # traduz quebra de linha, e num `.exe` isso mudaria o hash em silêncio.
+      # Os `.exe` ficam em `release/<versão>/` (`directories.output` do
+      # `electron-builder.json5`), não em `release/` — daí o `$(node -p ...)` e o
+      # `release/*/` abaixo.
       - name: Gerar checksums dos instaladores
         shell: bash
-        run: cd release && sha256sum *.exe | sed 's/ \*/  /' > SHA256SUMS.txt
+        run: cd "release/$(node -p "require('./package.json').version")" && sha256sum *.exe | sed 's/ \*/  /' > SHA256SUMS.txt
 
       - name: Provar proveniência dos instaladores
         uses: actions/attest-build-provenance@v2
         with:
-          subject-path: release/*.exe
+          subject-path: release/*/*.exe
 
       - name: Publicar SHA256SUMS.txt na release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         if: ${{ inputs.publish }}
-        run: gh release upload "v$(node -p "require('./package.json').version")" release/SHA256SUMS.txt --clobber
+        run: gh release upload "v$(node -p "require('./package.json').version")" "release/$(node -p "require('./package.json').version")/SHA256SUMS.txt" --clobber
 
       - name: Guardar o instalador como artefato
         if: always()
@@ -115,7 +118,7 @@ jobs:
         with:
           name: windows-installer
           path: |
-            release/**/*.exe
-            release/SHA256SUMS.txt
+            release/*/*.exe
+            release/*/SHA256SUMS.txt
           retention-days: 14
           if-no-files-found: warn
