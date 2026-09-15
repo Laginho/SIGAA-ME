@@ -1,6 +1,6 @@
 # DL-007: Fallback Playwright reutiliza só o arquivo certo e não vazio
-Status: open
-Stage: reviewing
+Status: resolved
+Stage: done
 Priority: P0
 Blocked by: nenhum
 Review: agent
@@ -68,6 +68,47 @@ reutilizável, o que bloqueia o retry para sempre.
   existir com o critério 5. Reescrever como "arquivo existente no caminho, legível
   ou não, não impede o download" ou apagar, no mesmo commit vermelho, com a
   justificativa na mensagem.
+
+#### Resolution (2026-09-15)
+
+Verdict: Approve
+
+Critérios 1 a 6 cumpridos. Etapa 3 fez um único conserto, dentro dos Primary
+files e sem teste novo: o comentário em `sigaa.service.ts:590` ainda dizia que
+sem script o Playwright procura o link pelo nome no DOM vivo — falso depois do
+critério 4 (`84ccc94`).
+
+Arquivos da mudança: `download.service.ts` (reuso por caminho removido,
+`freshAction` casa `,id,<valor>` do `onclick`), `file-validation.service.ts`
+(`sigMatches` recusa cabeça vazia, `finalizeDownload` recusa `.part` de 0 bytes
+com `reason: 'empty'`, `isReusableDownload` movido para cá),
+`playwright-login.service.ts` e `sigaa.service.ts` (id repassado até o
+fallback).
+
+Red-green. Em `a369ca0` (commit só de teste, código antigo): 4 arquivos, 8
+testes vermelhos — `validateHead` com cabeça vazia, `.part` vazio,
+`isReusableDownload` (3), identidade por id em `audit-download-fallback-identity`,
+e os dois casos de reuso reescritos em `audit-download-inspect` e
+`download-boundary`. Em `c0ac3fd` todos passam.
+
+Gate em `84ccc94`: `npm run quality` verde — eslint 0 erros / 52 warnings
+(`no-explicit-any` preexistente), vitest 66 arquivos, 747 passed, 5 skipped.
+
+Duas verificações que a revisão fez e vale registrar:
+
+- O ramo "não achei a linha" de `download.service.ts:112` continua executando o
+  `script` em cache em vez de falhar direto, e isso **não** contradiz o critério
+  4: o `script` vem de `findScript`, que casa por `f.id === file.id` desde o
+  `DL-004`, nos três chamadores (`:282` sem script, `:323` `retryScript`, `:594`
+  do lote de retry). Não existe caminho em que o script em cache seja de outro
+  material. O `page.goto(fileUrl)` logo abaixo é inalcançável — o único chamador
+  passa `fileUrl: ''`; o `CLEAN-009` remove o parâmetro.
+- O segundo teste de `audit-download-fallback-identity.test.ts` ("sem linha com o
+  id... sem goto") passava já em `a369ca0`, por acidente: com a assinatura antiga
+  o `'999'` caía no parâmetro `script`, e o stub de linha não tem `querySelector`,
+  então o código antigo lançava antes de casar por texto. Ele discrimina o código
+  novo (tirar a checagem de id o deixa vermelho), então fica — mas não foi
+  vermelho pelo motivo do ticket. O primeiro teste do arquivo foi.
 
 ## Comments
 
