@@ -146,6 +146,21 @@ até lá.
   formato com dois espaços, `sha256sum -c` passa, e o hash bate com
   `Get-FileHash`.
 
+- 2026-09-15, revisão humana com Fable: bloqueio achado e corrigido em
+  `7981b6e`. O `electron-builder.json5` tem `directories.output:
+  release/${version}`, então `cd release && sha256sum *.exe` e
+  `subject-path: release/*.exe` não achavam nada — o workflow falharia em
+  todo run. O critério 1 dizia "cada `.exe` em `release/`" por leitura do
+  glob do `upload-artifact`, não da config. Correção: `$(node -p ...)` no
+  checksum e no upload, `release/*/` no atestado e no artefato (o glob mais
+  estreito também tira o `win-unpacked/SIGAA-ME.exe` do artefato). Teste
+  ajustado para o novo prefixo. O run de verificação do ticket, que a etapa 3
+  não tinha executado, rodou: run `34983638322` em `rel-001` com
+  `publish=false`, verde. Artefato baixado; `sha256sum -c` OK nos dois
+  `.exe`, `Get-FileHash` bate, `gh attestation verify --owner Laginho`
+  passa para os dois e aponta para `release.yml@refs/heads/rel-001`, commit
+  `7981b6e`.
+
 - Pendente até a primeira release depois do merge: o step do critério 3
   (`gh release upload`) não roda com `publish=false`, como o próprio ticket
   previu. A Resolution registra quando for provado.
