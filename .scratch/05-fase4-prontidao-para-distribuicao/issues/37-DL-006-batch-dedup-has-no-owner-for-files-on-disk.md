@@ -1,6 +1,6 @@
 # DL-006: o lote não sabe qual id gravou o arquivo que encontra no disco
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P2
 Blocked by: nenhum
 

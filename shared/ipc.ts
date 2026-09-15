@@ -19,6 +19,7 @@ import type {
   CourseId,
   CourseSnapshot,
   CourseSummary,
+  DownloadRecord,
   DownloadStatus,
   DownloadResult,
   DownloadToken,
@@ -173,6 +174,12 @@ export interface BackgroundSyncUpdate {
   accountId: AccountId
   courses: CourseSnapshot[]
   notifications: NotificationItem[]
+  /**
+   * Arquivos que o próprio sync baixou (DL-006). Sem isto o índice de
+   * download do renderer nunca soube deles, e o próximo "Baixar todos"
+   * gravava uma segunda cópia por não ter `known` para aquele id.
+   */
+  downloads?: { courseId: CourseId; records: Extract<DownloadRecord, { status: 'downloaded' }>[] }[]
   timestamp: number
 }
 

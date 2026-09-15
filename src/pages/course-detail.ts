@@ -4,7 +4,7 @@ import { sanitizeNewsHtml } from '../security/html-sanitizer'
 import { h } from '../utils/dom'
 import { isNewsCached, mergeCoursesIntoCache } from '../utils/ui-helpers'
 import { isItemRead, markAsRead } from '../utils/notification-store'
-import { readAccountItem, writeAccountItem } from '../data/account-storage'
+import { readAccountItem, recordDownloads, writeAccountItem } from '../data/account-storage'
 import type { CourseSnapshot } from '../../shared/domain'
 
 export function renderCourseDetailPage(container: HTMLDivElement, courseId: string) {
@@ -471,16 +471,7 @@ async function testDownloadAll(courseId: string) {
         toast.error(`${downloaded} baixados, ${failed} falharam. Tente novamente mais tarde.`);
       }
 
-      results.forEach((r) => {
-        if (r.status === 'downloaded') {
-          if (!downloadedFiles[courseId]) downloadedFiles[courseId] = {};
-          downloadedFiles[courseId][r.fileId] = {
-            downloadedAt: Date.now(),
-            path: r.filePath
-          };
-        }
-      });
-      writeAccountItem('downloads', JSON.stringify(downloadedFiles));
+      recordDownloads(courseId, results);
     } else {
       toast.error('Falha no download: ' + result.error.message);
     }
