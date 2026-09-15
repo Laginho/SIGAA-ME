@@ -181,6 +181,14 @@ export interface BackgroundSyncUpdate {
    */
   downloads?: { courseId: CourseId; records: Extract<DownloadRecord, { status: 'downloaded' }>[] }[]
   timestamp: number
+  /**
+   * `true` quando ao menos uma turma não fechou o ciclo (falha, timeout ou
+   * cancelamento) — `courses` então só cobre quem deu certo (BUG-016). O
+   * dashboard usa isto para decidir `replaceSet`: substituir o cache inteiro
+   * apagaria a turma que só falhou desta vez, como se ela tivesse saído da
+   * matrícula.
+   */
+  incomplete?: boolean
 }
 
 /**

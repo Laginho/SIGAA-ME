@@ -151,6 +151,7 @@ export class BackgroundSyncService {
             let coursesWithUpdates = 0;
             let singleCourseUpdateName = '';
             let structuralDriftCourses = 0;
+            let anyCourseFailed = false;
             const allCoursesData: CourseSnapshot[] = [];
             const newNotifications: NotificationItem[] = []; // Structured notifications for the bell
             const downloads: { courseId: string; records: Extract<DownloadRecord, { status: 'downloaded' }>[] }[] = [];
@@ -282,6 +283,7 @@ export class BackgroundSyncService {
                 } else {
                     log.warn('Failed to fetch content for course.', { courseName: course.name, error: contentResult.error.message });
                     if (contentResult.error.code === 'SELECTOR_DRIFT') structuralDriftCourses++;
+                    anyCourseFailed = true;
                 }
             }
 
@@ -310,7 +312,8 @@ export class BackgroundSyncService {
                         courses: allCoursesData,
                         notifications: newNotifications,
                         downloads,
-                        timestamp: Date.now()
+                        timestamp: Date.now(),
+                        ...(anyCourseFailed ? { incomplete: true } : {})
                     };
                     window.webContents.send('background-sync-update', update);
                     log.info(`Pushed ${allCoursesData.length} courses and ${newNotifications.length} notifications to renderer.`);
