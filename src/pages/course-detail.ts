@@ -275,11 +275,11 @@ async function fetchCourseFiles(courseId: string) {
       filesListElement.replaceChildren()
       for (const file of course.files) {
         const isDownloaded = !!courseDownloads[file.id];
-        const unread = !isItemRead('file', courseId, file.name);
+        const unread = !isItemRead('file', courseId, file.id);
 
         const row = h('div', {
           className: `file-item${unread ? ' file-item--unread' : ''}`,
-          dataset: { fileId: String(file.name ?? '') },
+          dataset: { fileId: String(file.id ?? '') },
         });
         if (unread) row.append(h('span', { className: 'item-unread-dot' }));
         row.append(h('div', { className: 'file-icon' }, '📄'));
@@ -328,7 +328,7 @@ async function fetchCourseFiles(courseId: string) {
 
           if (fileName && fileId) {
             const fileItem = target.closest('.file-item');
-            if (fileItem) clearUnread(fileItem, 'file', courseId, fileName);
+            if (fileItem) clearUnread(fileItem, 'file', courseId, fileId);
 
             // Show spinner immediately
             target.textContent = '🔄';

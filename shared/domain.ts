@@ -133,7 +133,7 @@ export interface NotificationItem {
   type: 'file' | 'news'
   courseId: CourseId
   courseName: string
-  /** Nome do arquivo ou id da notícia. */
+  /** Id do material (arquivo ou notícia), nunca o nome. */
   itemId: string
   itemTitle: string
   timestamp: number
