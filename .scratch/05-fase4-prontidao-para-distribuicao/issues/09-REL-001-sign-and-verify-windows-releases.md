@@ -1,6 +1,6 @@
 # REL-001: Verificar releases Windows sem assinatura de código
 Status: open
-Stage: implementing
+Stage: to-review
 Blocked by: nenhum
 Review: human
 Priority: P1

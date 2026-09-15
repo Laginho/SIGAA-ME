@@ -25,13 +25,29 @@ Aplicativo desktop para o SIGAA da UFC, que visa proporcionar uma experiência m
 1. Vá para a página de [**Releases**](https://github.com/Laginho/SIGAA-ME/releases).
 2. Baixe o arquivo mais recente `SIGAA-ME-Windows-X.X.X-Setup.exe`.
 3. Execute o instalador.
-4. Se o Windows mostrar o aviso "O Windows protegeu seu computador", clique em **"Mais informações"** → **"Executar assim mesmo"**. Isso é normal para apps que ainda não possuem um certificado pago.
+4. O Windows vai mostrar o aviso "O Windows protegeu seu computador" — isso
+   acontece porque o app não tem certificado pago, não porque há algo errado.
+   Antes de continuar, confira o arquivo como a seção **🔐 Verificando o
+   download** (logo abaixo) explica. Depois, clique em **"Mais informações"**
+   → **"Executar assim mesmo"**.
 5. O app abrirá. Insira suas credenciais do SIGAA UFC e pronto.
 
 > O app confere se há uma nova versão a cada abertura, mas nunca baixa ou
 > instala nada sem perguntar: ele avisa a versão disponível e pede
 > confirmação antes de baixar, e pede confirmação de novo antes de reiniciar
 > para instalar.
+
+---
+
+## 🔐 Verificando o download
+
+O instalador sai do GitHub Actions, com log público apontando o commit. Confira o hash antes de instalar:
+
+```powershell
+Get-FileHash .\SIGAA-ME-Windows-X.X.X-Setup.exe -Algorithm SHA256
+```
+
+Compare com a linha correspondente em `SHA256SUMS.txt`, publicado junto na release. Opcional: `gh attestation verify .\SIGAA-ME-Windows-X.X.X-Setup.exe --owner Laginho` confirma a proveniência.
 
 ---
 
