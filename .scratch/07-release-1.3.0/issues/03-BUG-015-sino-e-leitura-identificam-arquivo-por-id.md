@@ -1,6 +1,6 @@
 # BUG-015: Sino e estado de leitura identificam arquivo por id
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P0
 Blocked by: nenhum
 Review: agent
