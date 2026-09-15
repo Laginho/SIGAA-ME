@@ -144,7 +144,7 @@ describe('DownloadService.downloadFile — caminho Playwright usa a mesma valida
     };
 
     const baixar = (page: Page, fileName = 'LISTA 1') =>
-        new DownloadService(null).downloadFile(page, '', fileName, COURSE, destino, DOWNLOAD_SCRIPT);
+        new DownloadService(null).downloadFile(page, '', fileName, COURSE, destino, '555', DOWNLOAD_SCRIPT);
 
     it('texto com suggestedFilename .html não vira .pdf e não é apagado', async () => {
         // O redirect JSF faz o Chrome sugerir `.html`; o código antigo trocava
@@ -197,19 +197,25 @@ describe('DownloadService.downloadFile — caminho Playwright usa a mesma valida
         expect(arquivosNaTurma()).toEqual([]);
     });
 
-    it('arquivo já existente no destino que menciona o SIGAA é preservado e reaproveitado', async () => {
+    it('arquivo já existente no destino não intercepta nem é sobrescrito — o download vira um sufixo numerado (DL-007 critério 5)', async () => {
+        // O reuso por caminho saiu: quem chega aqui já passou pela dedup por
+        // id do lote (`known`/`isReusableDownload`), então o fallback sempre
+        // baixa e finaliza pelo mesmo caminho único de `finalizeDownload`
+        // (sufixo numerado em vez de sobrescrever, DL-004).
         mkdirSync(pastaTurma(), { recursive: true });
         const existente = path.join(pastaTurma(), 'Avisos.txt');
-        const conteudo = 'Avisos do SIGAA: prova dia 12.\n';
-        writeFileSync(existente, conteudo);
-        const { page, saveAs } = fakePage('conteúdo novo que não deve ser gravado', 'Avisos.txt');
+        const conteudoAntigo = 'Avisos do SIGAA: prova dia 12.\n';
+        writeFileSync(existente, conteudoAntigo);
+        const conteudoNovo = 'conteúdo novo do download';
+        const { page, saveAs } = fakePage(conteudoNovo, 'Avisos.txt');
 
         const result = await baixar(page, 'Avisos.txt');
 
-        expect(result).toEqual({ success: true, filePath: existente });
-        expect(readFileSync(existente, 'utf8')).toBe(conteudo);
-        expect(saveAs).not.toHaveBeenCalled();
-        expect(arquivosNaTurma()).toEqual(['Avisos.txt']);
+        expect(result.success).toBe(true);
+        expect(saveAs).toHaveBeenCalled();
+        expect(readFileSync(existente, 'utf8')).toBe(conteudoAntigo);
+        expect(arquivosNaTurma()).toEqual(['Avisos (1).txt', 'Avisos.txt']);
+        if (result.success) expect(readFileSync(result.filePath!, 'utf8')).toBe(conteudoNovo);
     });
 
     it('arquivo acima do teto é recusado e o .part removido', async () => {

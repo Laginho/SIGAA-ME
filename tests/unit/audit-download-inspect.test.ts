@@ -1,12 +1,15 @@
 /**
- * `DL-005` — arquivo em cache que não dá para inspecionar força download novo.
+ * `DL-007` critério 5 — o fallback Playwright não reaproveita mais arquivo por
+ * caminho: quem chega aqui já passou pela dedup por id do lote (`known`,
+ * `isReusableDownload`), então sempre baixa e finaliza por `finalizeDownload`.
+ * Um arquivo (ou pasta) já existente no caminho de destino, legível ou não,
+ * nunca mais intercepta o download nem é apagado por este método — a decisão
+ * de pular um arquivo já baixado é só do chamador (`SigaaService`), antes de
+ * chegar aqui.
  *
- * Chama `DownloadService.downloadFile` de verdade. O "arquivo" já existente é
- * um diretório no caminho resolvido: `existsSync` diz sim e `readHeadSync`
- * lança `EISDIR`, sem depender de permissão de arquivo (que o Windows ignora
- * para o dono). O `Page` falso está em `about:blank`, então se o serviço seguir
- * para o download ele falha com "Page lost context" — é assim que se prova que
- * ele **não** reaproveitou o caminho ilegível.
+ * Chama `DownloadService.downloadFile` de verdade. O `Page` falso está em
+ * `about:blank`, então o download sempre falha com "Page lost context" — é
+ * assim que se prova que o arquivo pré-existente não foi nem lido nem tocado.
  */
 
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
@@ -29,26 +32,26 @@ let destino: string;
 beforeEach(() => { destino = mkdtempSync(path.join(os.tmpdir(), 'sigaa-me-inspect-')); });
 afterEach(() => { rmSync(destino, { recursive: true, force: true }); });
 
-it('an existing path that cannot be inspected is not reported as a valid download', async () => {
+it('pasta já existente no caminho de destino não intercepta o download', async () => {
     const { fullPath } = resolveDownloadTarget(destino, COURSE, 'aviso.pdf');
     mkdirSync(fullPath, { recursive: true });
     const page = { url: () => 'about:blank' } as unknown as Page;
 
-    const result = await new DownloadService(null).downloadFile(page, '', 'aviso.pdf', COURSE, destino);
+    const result = await new DownloadService(null).downloadFile(page, '', 'aviso.pdf', COURSE, destino, '10');
 
     expect(result.success).toBe(false);
     expect(result.error).toContain('Page lost context');
 });
 
-it('an existing file with an invalid signature is deleted instead of reused', async () => {
+it('arquivo inválido já existente no caminho de destino não intercepta o download nem é apagado', async () => {
     const { fullPath } = resolveDownloadTarget(destino, COURSE, 'aviso.pdf');
     mkdirSync(path.dirname(fullPath), { recursive: true });
     writeFileSync(fullPath, 'not a real pdf');
     const page = { url: () => 'about:blank' } as unknown as Page;
 
-    const result = await new DownloadService(null).downloadFile(page, '', 'aviso.pdf', COURSE, destino);
+    const result = await new DownloadService(null).downloadFile(page, '', 'aviso.pdf', COURSE, destino, '10');
 
     expect(result.success).toBe(false);
     expect(result.error).toContain('Page lost context');
-    expect(existsSync(fullPath)).toBe(false);
+    expect(existsSync(fullPath)).toBe(true);
 });

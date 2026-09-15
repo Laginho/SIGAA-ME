@@ -15,6 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
     fileNameFromContentDisposition,
     finalizeDownload,
+    isReusableDownload,
     resolveFileName,
     validateHead,
 } from '../../electron/services/file-validation.service';
@@ -127,6 +128,17 @@ describe('validateHead — assinaturas', () => {
 
     it('arquivo menor que a assinatura não é rejeitado por isso', () => {
         expect(validateHead(Buffer.from('ok'), '.txt')).toEqual({ ok: true });
+    });
+
+    it('cabeça vazia não casa nenhuma assinatura, mesmo por prefixo (DL-007 item 11)', () => {
+        // `sig.startsWith('')` é sempre verdadeiro — sem esta rejeição,
+        // qualquer extensão registrada "passaria" com um arquivo de 0 bytes.
+        expect(validateHead(Buffer.alloc(0), '.pdf')).toEqual({ ok: false, reason: 'signature-mismatch' });
+        expect(validateHead(Buffer.alloc(0), '.zip')).toEqual({ ok: false, reason: 'signature-mismatch' });
+    });
+
+    it('prefixo não vazio da assinatura continua passando', () => {
+        expect(validateHead(hex('25'), '.pdf')).toEqual({ ok: true });
     });
 });
 
@@ -270,5 +282,39 @@ describe('finalizeDownload', () => {
         } finally {
             spy.mockRestore();
         }
+    });
+
+    it('".part" vazio devolve "empty", apaga o .part e não deixa arquivo final (DL-007 item 11)', async () => {
+        writeFileSync(part(), Buffer.alloc(0));
+
+        const r = await finalizeDownload({ partPath: part(), dir, fileName: 'LISTA 1' });
+
+        expect(r).toEqual({ ok: false, reason: 'empty', error: expect.any(String) });
+        expect(arquivos()).toEqual([]);
+    });
+});
+
+describe('isReusableDownload', () => {
+    let dir: string;
+
+    beforeEach(() => { dir = mkdtempSync(path.join(os.tmpdir(), 'sigaa-me-reusable-')); });
+    afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
+
+    it('arquivo inexistente não é reutilizável', () => {
+        expect(isReusableDownload(path.join(dir, 'nao-existe.pdf'))).toBe(false);
+    });
+
+    it('arquivo de 0 bytes no disco não é reutilizável (DL-006 critério 3 / DL-007 item 11)', () => {
+        const p = path.join(dir, 'a.pdf');
+        writeFileSync(p, Buffer.alloc(0));
+
+        expect(isReusableDownload(p)).toBe(false);
+    });
+
+    it('arquivo válido no disco é reutilizável', () => {
+        const p = path.join(dir, 'a.pdf');
+        writeFileSync(p, PDF);
+
+        expect(isReusableDownload(p)).toBe(true);
     });
 });

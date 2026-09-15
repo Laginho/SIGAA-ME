@@ -1,6 +1,6 @@
 # DL-007: Fallback Playwright reutiliza só o arquivo certo e não vazio
 Status: open
-Stage: to-implement
+Stage: implementing
 Priority: P0
 Blocked by: nenhum
 Review: agent
@@ -82,3 +82,15 @@ reutilizável, o que bloqueia o retry para sempre.
   critério 4, o `href` só é seguido para a linha casada por id.
 - `CLEAN-009` remove os parâmetros mortos (`fileUrl`, `_downloadedFiles`) da
   mesma assinatura; por isso ele espera este ticket. Aqui só acrescente o id.
+- Primary files não listava todo o raio de alcance dos critérios 4 e 5:
+  passar o id por `DownloadService.downloadFile`/`playwrightLogin.downloadFile`
+  muda a aridade das duas assinaturas, e o critério 5 apaga um comportamento
+  que outros testes já afirmavam. Sem isso, o gate ficava vermelho com a
+  mudança aprovada. Toquei, fora do Primary files declarado:
+  - `tests/unit/sigaa-service.test.ts`: 3 `toHaveBeenCalledWith` só ganharam o
+    novo argumento posicional (id), nenhuma asserção nova.
+  - `tests/integration/logging-boundary.test.ts`: mesma coisa, 1 chamada.
+  - `tests/integration/download-boundary.test.ts`: o helper `baixar` ganhou o
+    id; e o teste "arquivo já existente... é preservado e reaproveitado"
+    (linha 200) testava exatamente o reuso que o critério 5 remove — reescrito
+    para provar sufixo numerado em vez de sobrescrita, mesmo padrão do DL-004.
