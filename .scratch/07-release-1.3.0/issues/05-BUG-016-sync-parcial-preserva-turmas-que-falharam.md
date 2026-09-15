@@ -1,6 +1,6 @@
 # BUG-016: Sync parcial em background preserva as turmas que falharam
-Status: open
-Stage: to-review
+Status: resolved
+Stage: done
 Priority: P0
 Blocked by: nenhum
 Review: agent
@@ -61,6 +61,57 @@ o `dropdown` antigo.
   um só listener de `click` em `document` (espião em
   `document.addEventListener`/`removeEventListener`, ou comportamento: um
   clique fora fecha o dropdown uma vez). Vermelho em (a) e (c).
+
+#### Resolution (2026-09-15)
+
+Verdict: Approve
+
+Decisão: um contador `anyCourseFailed` no laço de disciplinas carimba
+`incomplete: true` no payload, e o dashboard passa `replaceSet: !data.incomplete`
+ao `mergeCoursesIntoCache`. Nada de `failures`+`showError`, como o comentário
+pedia. O campo é omitido quando o ciclo fecha completo — por isso o
+`...(anyCourseFailed ? { incomplete: true } : {})`, que mantém verde a asserção
+de chaves exatas do payload em `background-sync.test.ts:167`.
+
+Cobertura de `incomplete` conferida subindo a cadeia, não pela prosa do ticket:
+no laço, toda disciplina ou entra em `allCoursesData` ou marca
+`anyCourseFailed` (`:277` vs `:286`) — timeout e drift chegam como
+`contentResult.error`. Os três caminhos de cancelamento (`:171`, `:257`, `:291`)
+dão `return` antes de publicar, então nenhum payload pode mentir "completo" por
+cancelamento. `preload.ts:58` repassa o payload inteiro, sem allowlist de
+campos: o campo novo chega mesmo ao renderer.
+
+Arquivos: `electron/services/background-sync.service.ts` (+5/-1),
+`shared/ipc.ts` (+8), `src/pages/dashboard.ts` (+18/-3),
+`tests/unit/dashboard-listener.test.ts` (+84/-2),
+`tests/integration/background-sync.test.ts` (+5). Nada fora dos Primary files;
+`ui-helpers.ts` e `merge-courses-cache.test.ts` não precisaram mudar — o
+`replaceSet: false` que já existia bastou.
+
+Vermelho, no commit só de testes (4efa24c, com o código ainda antigo):
+
+    npx vitest run tests/unit/dashboard-listener.test.ts tests/integration/background-sync.test.ts
+    Test Files  2 failed (2)
+         Tests  3 failed | 14 passed (17)
+    - payload.incomplete → expected undefined to be true
+    - turma B some do cache no ciclo incompleto
+    - listener de click: expected 3 to be 1
+
+Verde, gate completo em b0ebaa7..360d2ef:
+
+    npm run quality
+    eslint: 0 errors, 52 warnings (no-explicit-any, pré-existentes)
+    Test Files  66 passed (66)
+         Tests  750 passed | 5 skipped (755)
+
+Critérios 1 a 5: ✓.
+
+Observação, fora dos critérios e sem teste: `logoutBtn` e `clearDataBtn`
+(`dashboard.ts:246`, `:265`) derrubam `unsubscribeSync` e
+`unsubscribeCompatibility`, mas não removem o `dropdownOutsideClickHandler`.
+Sobra um listener em `document` depois do logout; ele fecha sobre um dropdown
+já destacado, então não faz nada, e o próximo render do dashboard o substitui.
+Não reabre o ticket — o critério 4 fala de render, não de desmontagem.
 
 ## Comments
 
