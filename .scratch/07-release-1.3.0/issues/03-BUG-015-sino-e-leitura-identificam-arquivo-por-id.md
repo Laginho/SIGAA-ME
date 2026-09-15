@@ -1,6 +1,6 @@
 # BUG-015: Sino e estado de leitura identificam arquivo por id
 Status: resolved
-Stage: done
+Stage: blocked
 Priority: P0
 Blocked by: nenhum
 Review: agent
@@ -122,3 +122,5 @@ Duas observações, nenhuma bloqueante:
   lida enquanto a linha correspondente em disciplina já está lida; clicar nela
   resolve, e o histórico é limitado por `MAX_NOTIFICATIONS`. Não vale código
   novo.
+
+- 2026-09-15 Review ended at reviewing (exit 0); branch bug-015 holds the review; left for a human
