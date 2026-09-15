@@ -250,7 +250,7 @@ async function fetchCourseFiles(courseId: string) {
           const existenceResults = await window.api.checkFilesExistence(filePaths);
           // Poda do cache é best-effort: rejeição vai para o catch abaixo e a lista renderiza mesmo assim.
           if (!existenceResults.success) throw new Error(existenceResults.error.message);
-          let changed = false;
+          const staleKeys: string[] = [];
 
           existenceResults.data.forEach((res) => {
             if (!res.exists) {
@@ -258,14 +258,19 @@ async function fetchCourseFiles(courseId: string) {
               const key = Object.keys(courseDownloads).find(k => courseDownloads[k].path === res.path);
               if (key) {
                 delete courseDownloads[key];
-                changed = true;
+                staleKeys.push(key);
               }
             }
           });
 
-          if (changed) {
-            downloadedFiles[courseId] = courseDownloads;
-            writeAccountItem('downloads', JSON.stringify(downloadedFiles));
+          if (staleKeys.length > 0) {
+            // Relê depois do await: um download concorrente pode ter gravado
+            // enquanto esperávamos checkFilesExistence (CONC-002).
+            const freshDownloads = JSON.parse(readAccountItem('downloads') || '{}');
+            const freshCourseDownloads = freshDownloads[courseId] || {};
+            for (const key of staleKeys) delete freshCourseDownloads[key];
+            freshDownloads[courseId] = freshCourseDownloads;
+            writeAccountItem('downloads', JSON.stringify(freshDownloads));
           }
         } catch (e) {
           console.error('Failed to verify files:', e);
@@ -381,8 +386,6 @@ async function downloadSingleFile(course: CourseSnapshot, fileId: string, fileNa
       }
     }
 
-    const downloadedFiles = JSON.parse(readAccountItem('downloads') || '{}');
-
     const result = await window.api.downloadFile({
       courseId: course.id,
       courseName: course.name,
@@ -391,12 +394,9 @@ async function downloadSingleFile(course: CourseSnapshot, fileId: string, fileNa
     });
 
     if (result.success) {
-      if (!downloadedFiles[course.id]) downloadedFiles[course.id] = {};
-      downloadedFiles[course.id][fileId] = {
-        downloadedAt: Date.now(),
-        path: result.data.filePath
-      };
-      writeAccountItem('downloads', JSON.stringify(downloadedFiles));
+      recordDownloads(course.id, [
+        { fileId, fileName, status: 'downloaded', filePath: result.data.filePath }
+      ]);
 
       const span = document.createElement('span');
       span.className = 'status-done';
