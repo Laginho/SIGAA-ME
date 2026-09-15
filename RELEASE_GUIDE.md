@@ -31,7 +31,9 @@ Use these for testing new features before the official launch.
 3. **Git Tagging**: It creates a tag (e.g., `v1.2.0-beta.0`).
 4. **Push**: The command pushes the commit and the tag to GitHub.
 
-O push **não publica nada** — ver abaixo.
+O push **não publica nada** — ver abaixo. O workflow (`release.yml`) também
+gera `SHA256SUMS.txt` e um atestado de proveniência (`attest-build-provenance`)
+para cada `.exe`, depois do build (`REL-001`).
 
 ---
 
@@ -65,6 +67,17 @@ Agora o fluxo é:
 
 `npm run release` na sua máquina compila e **não** publica (`--publish never`).
 A flag que publica existe só dentro do `release.yml`.
+
+---
+
+## ✅ Depois de publicar
+
+Três checks antes de considerar a release boa (`REL-001`):
+
+- O hash do `.exe` baixado da release bate com a linha correspondente em
+  `SHA256SUMS.txt`.
+- `gh attestation verify <arquivo> --owner Laginho` passa.
+- O run do Actions que publicou aponta para o commit da tag.
 
 ### Comportamento do cliente desde a tarefa `006`
 
