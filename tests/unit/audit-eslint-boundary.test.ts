@@ -14,8 +14,12 @@ import { describe, expect, it } from 'vitest';
 const ROOT = process.cwd();
 const CODE = 'const a: any = 1; export const b = (a as any).c;';
 
+// Uma instância para os cinco casos: cada `new ESLint()` recarrega
+// `eslint.config.js` e o typescript-eslint inteiro. Com cinco, a primeira
+// execução em disco frio passou de 50s e estourou o `testTimeout` de 30s.
+const eslint = new ESLint({ cwd: ROOT });
+
 async function lint(relativePath: string) {
-    const eslint = new ESLint({ cwd: ROOT });
     const [result] = await eslint.lintText(CODE, { filePath: path.join(ROOT, relativePath) });
     return result.messages;
 }
