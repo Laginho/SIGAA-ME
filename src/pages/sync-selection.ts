@@ -267,6 +267,8 @@ async function startSync(app: HTMLDivElement, mode: 'fast' | 'full') {
         const contentResult = await window.api.loadAllNews(course.id, course.name);
         if (contentResult.success) {
           news = contentResult.data;
+        } else {
+          failures.push({ name: course.name, message: contentResult.error.message });
         }
       }
 

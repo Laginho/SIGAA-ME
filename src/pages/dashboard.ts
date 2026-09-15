@@ -380,7 +380,9 @@ function loadCoursesFromCache() {
         if (settings.lastBackgroundSync && syncStatusAuto) {
           syncStatusAuto.textContent = `Sync automático: ${formatSyncLabel(settings.lastBackgroundSync).replace('hoje às ', '')}`;
         }
-      }).catch(console.error);
+      }).catch(() => {
+        // Rótulo cosmético: sem settings, o dashboard segue sem o horário do sync automático.
+      });
 
     } else {
       // Should normally be handled by main.ts redirect, but just in case:
