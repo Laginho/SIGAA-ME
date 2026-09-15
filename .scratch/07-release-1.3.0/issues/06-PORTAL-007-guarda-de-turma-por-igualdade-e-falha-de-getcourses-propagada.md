@@ -1,6 +1,6 @@
 # PORTAL-007: Entrada na turma: guarda por igualdade e falha de `getCourses` propagada
 Status: open
-Stage: implementing
+Stage: to-review
 Priority: P1
 Blocked by: nenhum
 Review: agent
