@@ -70,6 +70,57 @@ describe('release workflow gates publishing behind quality checks (QA-001)', () 
     });
 });
 
+describe('release workflow publishes checksums and provenance (REL-001)', () => {
+    const publishRunIndex = lineIndexOf('run: npx electron-builder --win --publish always');
+    const checksumRunIndex = lineIndexOf('run: cd release && sha256sum *.exe > SHA256SUMS.txt');
+    const attestIndex = lines.findIndex((line) =>
+        line.trim().startsWith('uses: actions/attest-build-provenance@'),
+    );
+
+    it('generates SHA256SUMS.txt for the installers after Publish, unconditionally', () => {
+        expect(publishRunIndex).toBeGreaterThan(-1);
+        expect(checksumRunIndex).toBeGreaterThan(publishRunIndex);
+    });
+
+    it('attests build provenance for the installers after Publish', () => {
+        expect(attestIndex).toBeGreaterThan(publishRunIndex);
+    });
+
+    it('grants the build job the permissions attest-build-provenance needs', () => {
+        const permissionsIndex = lines.findIndex((line) => line.trim() === 'permissions:');
+        expect(permissionsIndex).toBeGreaterThan(-1);
+
+        const stepsIndex = lines.findIndex((line, i) => i > permissionsIndex && /^\s{4}steps:/.test(line));
+        expect(stepsIndex).toBeGreaterThan(-1);
+
+        for (const permission of ['contents: write', 'id-token: write', 'attestations: write']) {
+            const permissionIndex = lines.findIndex(
+                (line, i) => i > permissionsIndex && i < stepsIndex && line.trim().startsWith(permission),
+            );
+            expect(permissionIndex, permission).toBeGreaterThan(-1);
+        }
+    });
+
+    it('uploads SHA256SUMS.txt to the draft release, gated on publish, after checksums and attestation', () => {
+        const uploadIndex = lines.findIndex((line) => line.trim().includes('gh release upload'));
+        expect(uploadIndex).toBeGreaterThan(-1);
+        expect(uploadIndex).toBeGreaterThan(checksumRunIndex);
+        expect(uploadIndex).toBeGreaterThan(attestIndex);
+
+        // "sem condição" para os outros dois; este é o único que fica atrás de
+        // um `if`, porque só faz sentido depois que a release existe.
+        expect(lines[uploadIndex - 1]?.trim()).toBe('if: ${{ inputs.publish }}');
+    });
+
+    it('includes SHA256SUMS.txt in the uploaded artifact alongside the installers', () => {
+        const artifactNameIndex = lineIndexOf('name: windows-installer');
+        expect(artifactNameIndex).toBeGreaterThan(-1);
+
+        const pathBlock = lines.slice(artifactNameIndex, artifactNameIndex + 6).join('\n');
+        expect(pathBlock).toContain('release/SHA256SUMS.txt');
+    });
+});
+
 describe('quality workflow runs the coverage and audit gates on every PR (QA-001)', () => {
     const qualityLines = workflowLines('quality.yml');
 
