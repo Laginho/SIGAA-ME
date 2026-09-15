@@ -57,7 +57,7 @@ it('refuses to navigate to a fresh href that points outside si3.ufc.br', async (
 it('navigates when the fresh href resolves to si3.ufc.br itself', async () => {
     const { page } = fakePage('https://si3.ufc.br/sigaa/verArquivo?idArquivo=123');
 
-    const result = await new DownloadService(null).downloadFile(page, '', 'aviso.pdf', COURSE, destino);
+    const result = await new DownloadService(null).downloadFile(page, '', 'aviso', COURSE, destino);
 
     expect(page.goto).toHaveBeenCalled();
     expect(result.success).toBe(true);
