@@ -18,11 +18,28 @@
  * repositório. Chamar `getCourseFiles()` com a fixture é o que a produção faz.
  */
 
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'fs';
 import os from 'os';
 import path from 'path';
 import { Readable } from 'stream';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+/**
+ * `vi.spyOn(fs, 'createWriteStream')` não funciona em ESM (namespace não é
+ * reconfigurável); mockar o módulo inteiro e encaminhar para o real por
+ * padrão dá o mesmo controle sem esse limite (mesmo padrão de
+ * `tests/unit/portal-compatibility.test.ts`).
+ */
+const fsMock = vi.hoisted(() => ({
+    createWriteStream: vi.fn(),
+    real: null as any,
+}));
+vi.mock('fs', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('fs')>();
+    fsMock.real = actual.createWriteStream;
+    fsMock.createWriteStream.mockImplementation(actual.createWriteStream);
+    return { ...actual, createWriteStream: fsMock.createWriteStream };
+});
 
 vi.mock('electron', () => {
     // O construtor do serviço abre um WriteStream de log em `userData`, então a
@@ -76,6 +93,9 @@ beforeEach(async () => {
 
 afterEach(() => {
     rmSync(sandbox, { recursive: true, force: true });
+    // O writer-error test troca a implementação de `createWriteStream`; sem
+    // isto, os testes seguintes herdariam um `writer` que se autodestrói.
+    fsMock.createWriteStream.mockImplementation(fsMock.real);
 });
 
 describe('audit download disk failures and collisions', () => {
@@ -84,6 +104,32 @@ describe('audit download disk failures and collisions', () => {
         rmSync(destino, { recursive: true });
         await expect(scraper.downloadFile('99999', '555', 'file.txt', destino, DOWNLOAD_SCRIPT))
             .resolves.toMatchObject({ success: false, error: expect.stringContaining('ENOENT') });
+    });
+
+    // DL-003 carry-over: o teste acima apaga `destino` inteiro antes de
+    // baixar, então o `createWriteStream` nunca chega a abrir o `.part` — o
+    // `unlink` de `descartarParcial` erra em silêncio contra um arquivo que
+    // nunca existiu. Aqui o `.part` chega a existir de verdade no disco e só
+    // depois o `writer` emite `error`; a prova é que ele some depois.
+    it('discards a `.part` that reached disk when the writer errors mid-write', async () => {
+        vi.mocked(axios.post).mockResolvedValue(resposta('contents', 'text/plain'));
+        const partPath = path.join(destino, 'file.txt.part');
+        let partExistedAtErrorTime = false;
+
+        fsMock.createWriteStream.mockImplementation((...args: unknown[]) => {
+            const stream = fsMock.real(...args);
+            stream.once('open', () => {
+                partExistedAtErrorTime = existsSync(partPath);
+                stream.destroy(Object.assign(new Error('erro de escrita simulado'), { code: 'EACCES' }));
+            });
+            return stream;
+        });
+
+        const result = await scraper.downloadFile('99999', '555', 'file.txt', destino, DOWNLOAD_SCRIPT);
+
+        expect(result).toMatchObject({ success: false, error: expect.stringContaining('erro de escrita simulado') });
+        expect(partExistedAtErrorTime).toBe(true);
+        expect(existsSync(partPath)).toBe(false);
     });
 
     // DL-004: dois arquivos de ids diferentes cujo nome colide (exato, ou

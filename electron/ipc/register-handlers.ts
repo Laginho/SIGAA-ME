@@ -217,6 +217,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
         req.files,
         root,
         onProgress,
+        req.known ?? [],
       );
     },
     () => fail('INVALID_REQUEST', 'download-all-files: courseId/courseName/files inválidos'),

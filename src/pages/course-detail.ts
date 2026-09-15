@@ -4,7 +4,7 @@ import { sanitizeNewsHtml } from '../security/html-sanitizer'
 import { h } from '../utils/dom'
 import { isNewsCached, mergeCoursesIntoCache } from '../utils/ui-helpers'
 import { isItemRead, markAsRead } from '../utils/notification-store'
-import { readAccountItem, writeAccountItem } from '../data/account-storage'
+import { readAccountItem, recordDownloads, writeAccountItem } from '../data/account-storage'
 import type { CourseSnapshot } from '../../shared/domain'
 
 export function renderCourseDetailPage(container: HTMLDivElement, courseId: string) {
@@ -449,12 +449,18 @@ async function testDownloadAll(courseId: string) {
     });
 
     const downloadedFiles = JSON.parse(readAccountItem('downloads') || '{}');
+    const courseDownloads = downloadedFiles[courseId] || {};
+    // O que já baixamos antes, id → caminho — o main decide se ainda serve (DL-006).
+    const known = Object.entries(courseDownloads)
+      .filter(([, rec]: [string, any]) => typeof rec?.path === 'string')
+      .map(([fileId, rec]: [string, any]) => ({ fileId, path: rec.path as string }));
 
     const result = await window.api.downloadAllFiles({
       courseId: course.id,
       courseName: course.name,
       // Só id e nome: o cache antigo pode carregar `script`, e script não atravessa o IPC.
-      files: course.files.filter(f => f.type !== 'link').map(f => ({ id: f.id, name: f.name }))
+      files: course.files.filter(f => f.type !== 'link').map(f => ({ id: f.id, name: f.name })),
+      known
     });
 
     if (result.success) {
@@ -465,16 +471,7 @@ async function testDownloadAll(courseId: string) {
         toast.error(`${downloaded} baixados, ${failed} falharam. Tente novamente mais tarde.`);
       }
 
-      results.forEach((r) => {
-        if (r.status === 'downloaded') {
-          if (!downloadedFiles[courseId]) downloadedFiles[courseId] = {};
-          downloadedFiles[courseId][r.fileId] = {
-            downloadedAt: Date.now(),
-            path: r.filePath
-          };
-        }
-      });
-      writeAccountItem('downloads', JSON.stringify(downloadedFiles));
+      recordDownloads(courseId, results);
     } else {
       toast.error('Falha no download: ' + result.error.message);
     }

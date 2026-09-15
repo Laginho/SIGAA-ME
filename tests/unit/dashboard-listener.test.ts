@@ -43,4 +43,47 @@ describe('handleBackgroundSyncUpdate', () => {
     expect(readAccountItem('sync-timestamp')).toBeNull();
     expect(getAllNotifications()).toEqual([]);
   });
+
+  it('wires a downloads payload into the account downloads index (DL-006 critério 6)', () => {
+    handleBackgroundSyncUpdate({
+      accountId: ACCOUNT.id,
+      courses: [],
+      notifications: [],
+      timestamp: Date.now(),
+      downloads: [
+        {
+          courseId: 'c1',
+          records: [{ fileId: 'f1', fileName: 'lista.pdf', status: 'downloaded', filePath: '/downloads/Course 1/lista.pdf' }],
+        },
+      ],
+    });
+
+    const stored = JSON.parse(readAccountItem('downloads') || '{}');
+    expect(stored.c1.f1.path).toBe('/downloads/Course 1/lista.pdf');
+  });
+
+  it('a quota error recording downloads does not stop the course merge or the notification toast (DL-006 achado 2)', () => {
+    const quotaError = new Error('QuotaExceededError');
+    quotaError.name = 'QuotaExceededError';
+    const downloadsKey = accountKey(ACCOUNT.id, 'downloads');
+    const originalSetItem = Storage.prototype.setItem;
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (key: string, value: string) {
+      if (key === downloadsKey) throw quotaError;
+      return originalSetItem.call(this, key, value);
+    });
+    const toastInfo = vi.spyOn(toast, 'info');
+
+    expect(() => handleBackgroundSyncUpdate({
+      accountId: ACCOUNT.id,
+      courses: [{ id: 'C1', news: [] }],
+      notifications: [{ id: 'N1', title: 'New item', read: false }],
+      timestamp: Date.now(),
+      downloads: [
+        { courseId: 'c1', records: [{ fileId: 'f1', fileName: 'lista.pdf', status: 'downloaded', filePath: '/downloads/Course 1/lista.pdf' }] },
+      ],
+    })).not.toThrow();
+
+    expect(readAccountItem('sync-timestamp')).not.toBeNull();
+    expect(toastInfo).toHaveBeenCalledWith('1 nova(s) atualização(ões) encontrada(s).');
+  });
 });
