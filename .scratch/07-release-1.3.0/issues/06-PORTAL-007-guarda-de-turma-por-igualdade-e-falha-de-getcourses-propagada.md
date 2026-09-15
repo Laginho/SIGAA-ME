@@ -1,6 +1,6 @@
 # PORTAL-007: Entrada na turma: guarda por igualdade e falha de `getCourses` propagada
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P1
 Blocked by: nenhum
 Review: agent
@@ -115,3 +115,9 @@ Não é achado, fica registrado:
 - Reaberto em 2026-09-15 pela revisão acima. O trabalho continua na branch
   `portal-007`: falta só o teste do critério 3, em commit de teste próprio,
   vermelho antes.
+- Critério 3 fechado em 2026-09-15 (`14304c0`): teste novo em
+  `tests/integration/portal-course-entry.test.ts` mocka `getCourses`
+  rejeitando com `TypeError`; vermelho comprovado localmente removendo o
+  guard `instanceof TypeError` (não commitado) e verde com ele de volta.
+  `npm run quality`: 0 erros de lint (52 warnings pré-existentes), 754
+  passed, 5 skipped. Stage: to-review.
