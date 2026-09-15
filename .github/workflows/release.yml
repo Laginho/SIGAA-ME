@@ -45,7 +45,7 @@ jobs:
       # PIPE-004: o gate roda aqui dentro, antes do build.
       #
       # Não é `needs:` do job do `quality.yml` — o GitHub não permite depender de
-      # um job de outro workflow. Repetir os três comandos é a forma barata; a
+      # um job de outro workflow. Repetir os mesmos comandos é a forma barata; a
       # alternativa (workflow reutilizável com `workflow_call`) é mais máquina do
       # que este projeto precisa hoje.
       #
@@ -56,8 +56,11 @@ jobs:
       - name: Gate — lint
         run: npm run lint
 
-      - name: Gate — testes
-        run: npm test
+      - name: Gate — testes e cobertura
+        run: npm run coverage
+
+      - name: Gate — auditoria de produção
+        run: npm run audit:prod
 
       # `--publish always` vive aqui, e só aqui. Fora do `package.json`,
       # `npm run release` na sua máquina compila e **não** publica: a flag que
