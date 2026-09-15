@@ -23,17 +23,22 @@
     "release:beta": "standard-version --prerelease beta && git push --follow-tags origin HEAD",
     "preview": "npm run build && start .\\release\\%npm_package_version%\\win-unpacked\\SIGAA-ME.exe",
     "test": "vitest run",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "quality": "npm run typecheck && npm run lint && npm test",
     "test:watch": "vitest",
     "test:live": "vitest run tests/integration/scraper.test.ts",
-    "test:e2e": "tsc && vite build && playwright test"
+    "test:e2e": "tsc && vite build && playwright test",
+    "coverage": "vitest run --coverage",
+    "audit:prod": "npm audit --omit=dev --audit-level=high"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "^1.63.0",
     "@types/mime-types": "^3.0.1",
+    "@vitest/coverage-v8": "^4.1.11",
     "dotenv": "^17.4.2",
     "electron": "^41.10.7",
     "electron-builder": "^26.16.1",
