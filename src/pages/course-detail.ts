@@ -290,8 +290,15 @@ async function fetchCourseFiles(courseId: string) {
         const action = h('div', { className: 'file-action' });
         if (isDownloaded) {
           action.append(h('span', { className: 'status-done', title: 'Baixado' }, '✅'));
+        } else if (file.type === 'link' && file.url) {
+          action.append(h('a', {
+            className: 'btn-open-link',
+            href: file.url,
+            title: 'Abrir link externo',
+            ariaLabel: `Abrir link externo ${file.name ?? ''}`,
+          }, '🔗'));
         } else if (file.type === 'link') {
-          action.append(h('span', { className: 'status-done', title: 'Link externo' }, '🔗'));
+          action.append(h('span', { className: 'status-done', title: 'Link indisponível' }, '🔗'));
         } else {
           action.append(h('button', {
             className: 'btn-download-file',
