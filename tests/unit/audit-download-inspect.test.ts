@@ -37,7 +37,7 @@ it('pasta já existente no caminho de destino não intercepta o download', async
     mkdirSync(fullPath, { recursive: true });
     const page = { url: () => 'about:blank' } as unknown as Page;
 
-    const result = await new DownloadService().downloadFile(page, '', 'aviso.pdf', COURSE, destino, '10');
+    const result = await new DownloadService().downloadFile(page, 'aviso.pdf', COURSE, destino, '10');
 
     expect(result.success).toBe(false);
     expect(result.error).toContain('Page lost context');
@@ -49,7 +49,7 @@ it('arquivo inválido já existente no caminho de destino não intercepta o down
     writeFileSync(fullPath, 'not a real pdf');
     const page = { url: () => 'about:blank' } as unknown as Page;
 
-    const result = await new DownloadService().downloadFile(page, '', 'aviso.pdf', COURSE, destino, '10');
+    const result = await new DownloadService().downloadFile(page, 'aviso.pdf', COURSE, destino, '10');
 
     expect(result.success).toBe(false);
     expect(result.error).toContain('Page lost context');
