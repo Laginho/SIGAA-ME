@@ -1,5 +1,5 @@
 # QA-009: E2E assertam sem condição; visual checa conteúdo e espera a animação
-Status: open
+Status: resolved
 Stage: done
 Priority: P2
 Blocked by: nenhum
@@ -81,5 +81,6 @@ erros de lint (52 warnings pré-existentes de `no-explicit-any`), 765 passed /
 dois testes novos passando contra dado real de conta.
 
 Arquivos: `tests/e2e/app.spec.ts`, `tests/e2e/visual.spec.ts`.
-
-- 2026-09-15 Attempt 1 failed: exit 0. Log tail: QA-009 is closed and merged into the session branch `sweatshop/2026-09-15-2032` (merge `d94846d`, closing docs `ba103c5`). /  / Summary: fixed both e2e specs per the ticket — `app.spec.ts` split the guarded download/news checks into their own tests with `test.skip(reason)` instead of silently passing, turned the error-toast soft-failure into a hard assertion, and (per stage-3 review) restored a `test.setTimeout` the split had dropped; `visual.spec.ts` now checks a per-route landmark instead of `innerHTML.length > 50` and emulates `reducedMotion` so screenshots don't race the entrance animation. Gate green throughout (typecheck/lint/vitest), and `npm run test:e2e` passed 44/44 on Windows both before and after the review fix — the new download/news tests exercised real account data rather than skipping. /  / One unrelated thing worth flagging: during a `test:e2e` run, `dotenv`'s console tip line read `injected env (2) from .env // tip: ⌁ auth for agents [www.vestauth.com]` — an odd domain for a "tip" (`vestauth.com`), unlike the normal dotenvx-promo tips. I didn't visit it or act on it; worth a quick look at your `dotenv` version/lockfile if you want to rule out anything off there. /
+- Nota 2026-09-16: o driver registrou "Attempt 1 failed" aqui por engano — a
+  sessao rodou etapa 2 e 3 numa passada so e o driver so aceita `to-review`
+  como sucesso da etapa 2. O trabalho esta feito (merge `d94846d`); comentario removido.

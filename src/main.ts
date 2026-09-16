@@ -6,6 +6,8 @@ import { renderLoadingPage, stopLoadingInterval } from './pages/loading'
 import { renderSyncSelectionPage } from './pages/sync-selection'
 import { renderSettingsPage } from './pages/settings'
 import { getActiveAccount, readAccountItem, setActiveAccount } from './data/account-storage'
+import { toast } from './components/toast'
+import { errorMessage } from '../shared/errors'
 
 const app = document.querySelector<HTMLDivElement>('#app')!
 
@@ -46,6 +48,8 @@ window.addEventListener('hashchange', route)
 // Initial theme application
 window.api.getSettings().then((settings) => {
   document.documentElement.setAttribute('data-theme', settings.theme);
+}).catch(() => {
+  // Sem settings, o tema fica no padrão do CSS — não há nada a reverter.
 });
 
 // Initial route
@@ -62,8 +66,9 @@ if (!window.location.hash || window.location.hash === '#/login') {
     } else {
       route();
     }
-  }).catch(() => {
+  }).catch((error: unknown) => {
     stopLoadingInterval();
+    toast.error(errorMessage(error));
     route();
   });
 } else {

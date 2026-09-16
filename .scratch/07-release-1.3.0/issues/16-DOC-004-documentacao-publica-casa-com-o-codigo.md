@@ -1,5 +1,5 @@
 # DOC-004: Documentação pública casa com o código
-Status: open
+Status: resolved
 Stage: done
 Priority: P2
 Blocked by: nenhum
@@ -113,5 +113,6 @@ das três majors mais recentes do Electron também fica para o autor confirmar.
   commit `ebf3698`.
 - Gate: `npx tsc --noEmit` limpo; `npx eslint .` 0 erros/52 warnings
   pré-existentes; `npx vitest run` 768 passed, 5 skipped, 69 arquivos.
-
-- 2026-09-15 Attempt 1 failed: exit 0. Log tail: DOC-004 done — merged into the session branch `sweatshop/2026-09-15-2032` at `712c9e7`, `Stage: done`, ledger updated. Gate is green (768 passed, 5 skipped, 52 pre-existing lint warnings, 0 errors). /  / Verdict: **Needs your call** on two things left for you, noted in the ticket's Resolution block: / 1. Whether Electron 41.10.7 is still within the three most recent supported majors (DÉBITO-01 updated with current version, not closed). / 2. Whether to actually build the nightly live-compatibility canary, now documented as "design, not implemented" instead of a running process. /  / Stage-3 review caught a real gap in my first pass — a stale `parser.test.ts` citation I'd missed in `tests/fixtures/README.md:20`, and a contradiction where the Layer-4 fix said the canary doesn't exist but the runbook/contract sections still treated it as mandatory. Both fixed in a follow-up commit before merge. /
+- Nota 2026-09-16: o driver registrou "Attempt 1 failed" aqui por engano — a
+  sessao rodou etapa 2 e 3 numa passada so e o driver so aceita `to-review`
+  como sucesso da etapa 2. O trabalho esta feito (fechamento `712c9e7`); comentario removido.

@@ -169,3 +169,36 @@ describe('PORTAL-001 — invalidação do estado JSF quando a atualização lan�
         expect(runtime.axios.post).not.toHaveBeenCalled();
     });
 });
+
+describe('PORTAL-007 — getCourses falho ao relançar o browser dentro de enterCourseAndGetHTML', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it('propaga o errorCode de getCourses em vez de estourar TypeError em this.context!.newPage()', async () => {
+        const service = new PlaywrightLoginService();
+        vi.spyOn(service, 'getCourses').mockResolvedValue({
+            success: false,
+            error: 'Session expired - please login again',
+            errorCode: 'SESSION_EXPIRED'
+        });
+
+        const result = await service.enterCourseAndGetHTML('123', 'Algorithms');
+
+        expect(result.success).toBe(false);
+        expect(result.errorCode).toBe('SESSION_EXPIRED');
+        expect(result.error).toBe('Session expired - please login again');
+    });
+
+    it('nunca deixa a mensagem de um TypeError interno sair como error', async () => {
+        const service = new PlaywrightLoginService();
+        const internalMessage = "Cannot read properties of null (reading 'newPage')";
+        vi.spyOn(service, 'getCourses').mockRejectedValue(new TypeError(internalMessage));
+
+        const result = await service.enterCourseAndGetHTML('123', 'Algorithms');
+
+        expect(result.success).toBe(false);
+        expect(result.errorCode).toBe('UNKNOWN');
+        expect(result.error).not.toContain(internalMessage);
+    });
+});
