@@ -60,7 +60,6 @@ const B = 'b'.repeat(64);
 
 const DEFAULTS = {
     theme: 'light',
-    autoSync: true,
     lastDownloadPath: null,
     runInBackground: true,
     syncInterval: 60,
@@ -180,7 +179,6 @@ describe('PersistenceService — settings.json versioned and validated', () => {
         storage.files.set(settingsFile, JSON.stringify({
             schemaVersion: 1,
             theme: 'neon',
-            autoSync: 'yes',
             lastDownloadPath: 5,
             runInBackground: 1,
             syncInterval: '60',

@@ -752,7 +752,7 @@ export class PlaywrightLoginService {
 
                 // Launch a dedicated browser for this download to avoid concurrency issues
                 localBrowser = await chromium.launch({ channel: 'chrome', headless: false });
-                const downloadService = new DownloadService(localBrowser);
+                const downloadService = new DownloadService();
 
                 const context = await localBrowser.newContext();
                 // Inject stored cookies

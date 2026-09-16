@@ -55,7 +55,7 @@ export interface IpcDeps {
     | 'loadCredentials'
     | 'reset'
   >;
-  backgroundSync: Pick<BackgroundSyncService, 'restart' | 'stop' | 'start' | 'cancel'>;
+  backgroundSync: Pick<BackgroundSyncService, 'stop' | 'start' | 'cancel'>;
   cache: Pick<CacheService, 'clear'>;
   logger: Pick<LoggerService, 'clear'>;
   diagnostics: Pick<DiagnosticsService, 'clear'>;
@@ -276,7 +276,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
         });
       }
       if (req.key === 'runInBackground' || req.key === 'syncInterval') {
-        deps.backgroundSync.restart();
+        deps.backgroundSync.start();
       }
       return ok();
     },
