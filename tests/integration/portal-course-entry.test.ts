@@ -170,6 +170,23 @@ describe('PORTAL-001 — invalidação do estado JSF quando a atualização lan�
     });
 });
 
+describe('PORTAL-011 — redirect por URL para a tela de login antes do documento do portal', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it('devolve errorCode SESSION_EXPIRED quando a navegação inicial já redireciona para a tela de login', async () => {
+        const { service, page } = await authenticatedService();
+        page.url.mockReturnValue('https://si3.ufc.br/sigaa/verTelaLogin.jsf');
+
+        const result = await service.enterCourseAndGetHTML('123', 'Algorithms');
+
+        expect(result.success).toBe(false);
+        expect(result.errorCode).toBe('SESSION_EXPIRED');
+        expect(result.error).toBe('Session expired - please login again');
+    });
+});
+
 describe('PORTAL-007 — getCourses falho ao relançar o browser dentro de enterCourseAndGetHTML', () => {
     beforeEach(() => {
         vi.clearAllMocks();

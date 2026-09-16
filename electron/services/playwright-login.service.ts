@@ -515,7 +515,7 @@ export class PlaywrightLoginService {
                     log.warn('Playwright: Redirected to login page. Session expired.');
                     // Don't close page - we might need to re-login and reuse it
                     this.page = null;
-                    return { success: false, error: 'Session expired - please login again' };
+                    return { success: false, error: 'Session expired - please login again', errorCode: 'SESSION_EXPIRED' };
                 }
 
                 // Click on "Menu Discente" link
