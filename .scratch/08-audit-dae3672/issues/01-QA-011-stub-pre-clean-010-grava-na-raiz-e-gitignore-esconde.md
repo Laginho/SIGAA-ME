@@ -85,3 +85,5 @@ ou `.pdf` que alguém tentasse versionar. Nenhum teste grava fora de
 - Resolução do `CLEAN-010` já registrou que `tsconfig.json` não inclui `tests/`,
   então erro de tipo em teste é invisível ao gate. Este ticket é o segundo
   efeito daquilo; não resolve o problema de fundo, só o sintoma.
+
+- 2026-09-16 Attempt 1 failed: exit 0. Log tail: QA-011 is already done: master's tip (`4abbff5`) is "chore(scratch): close QA-011, approved and merged (QA-011)", merged via PR #41. Nothing to do. /
