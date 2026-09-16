@@ -1,6 +1,6 @@
 # PORTAL-009: Relogin decide por texto da mensagem, não por `errorCode`
-Status: open
-Stage: to-review
+Status: resolved
+Stage: done
 Priority: P2
 Blocked by: nenhum
 Review: human
@@ -98,3 +98,65 @@ diff maior e mexe em caminho de download, então é escolha, não obviedade.
   Caminho A consertaria só o `downloadAllFiles`, o menos visível dos oito, e
   deixaria o mesmo sintoma nos outros sete. Critério 2 reescrito para o helper;
   o critério 3 (uma tentativa só) vale dentro dele.
+
+- **Achado da revisão (2026-09-16), fora dos Primary files — para a etapa 1
+  abrir ticket.** `playwright-login.service.ts:518` é o único `return` do
+  `enterCourseAndGetHTML` **sem** `errorCode`: é o caminho do redirect para a
+  tela de login (`verTelaLogin`/`logar.do`), que devolve
+  `{ success: false, error: 'Session expired - please login again' }` e nada
+  mais. O helper deste ticket decide por `errorCode === 'SESSION_EXPIRED'`, então
+  esse caminho — o sinal mais direto de sessão expirada que o método tem — não
+  dispara relogin. Os outros três caminhos de saída classificam certo (`:490`
+  propaga o do `getCourses`, `:551` o do `validateCourseListDocument`, `:648` o
+  do `classifyMessage`). Conserto é uma linha (`errorCode: 'SESSION_EXPIRED'` no
+  `:518`) mais um teste, e o arquivo não está nos Primary files deste ticket.
+
+#### Resolution (2026-09-16)
+
+Verdict: Needs your call: os quatro critérios passam e o gate está verde, mas
+`playwright-login.service.ts:518` devolve sessão expirada **sem** `errorCode`, e
+o helper deste ticket decide por `errorCode` — esse caminho não relogga. Fora dos
+Primary files; registrado acima em `## Comments` para a etapa 1.
+
+Decisão: aprovado como está, sem correção do revisor. O achado acima precisa de
+teste novo e de arquivo fora dos Primary files, então não é "small fix" — vira
+ticket da etapa 1, não conserto aqui.
+
+Arquivos: `electron/services/sigaa.service.ts` (helper `enterCourseWithRelogin`
+em `:207`, sete call sites roteados), `tests/unit/sigaa-service.test.ts`
+(3 testes novos).
+
+Critérios:
+
+1. ✅ A condição é `errorCode !== 'SESSION_EXPIRED'` (`sigaa.service.ts:211`). O
+   `error?.includes('not found in portal')` saiu; o descarte é explícito no
+   docblock do helper, que nomeia `NOT_FOUND` entre as falhas que devolvem a
+   primeira tentativa como está.
+2. ✅ Caminho B. `grep -n 'enterCourseAndGetHTML' electron/services/sigaa.service.ts`
+   não acha chamada direta fora do helper: `:167`, `:274`, `:331`, `:446`,
+   `:536`, `:584` e `:664` passam por ele, e nenhum ficou com relogin próprio. O
+   `background-sync.service.ts` não foi tocado.
+3. ✅ Uma tentativa só, provado por teste: `does not retry relogin a second time
+   when the retried entry expires again (criterion 3)` — entrada expira duas
+   vezes, `reloginWithStoredCredentials` chamado 1x, `enterCourseAndGetHTML` 2x,
+   e o erro final sai com `code: 'SESSION_EXPIRED'`.
+4. ✅ Gate verde.
+
+Red-green:
+
+    git checkout 5b6eb81 -- electron/services/sigaa.service.ts
+    npx vitest run tests/unit/sigaa-service.test.ts
+    # Tests  3 failed | 31 passed (34)
+    #   - getCourseFiles: relogs in and retries course entry (PORTAL-009)
+    #   - downloadAllFiles: relogs in and retries course entry (PORTAL-009)
+    #   - downloadAllFiles: does not retry relogin a second time (criterion 3)
+    # AssertionError: expected "vi.fn()" to be called 1 times, but got 0 times
+
+    git checkout HEAD -- electron/services/sigaa.service.ts
+    npm run quality
+    # eslint: 40 problems (0 errors, 40 warnings)
+    # Test Files  72 passed (72)
+    #      Tests  796 passed | 5 skipped (801)
+
+Separação de commits: `5b6eb81` toca só `tests/unit/sigaa-service.test.ts`;
+`546da7c` toca só `electron/services/sigaa.service.ts`.
