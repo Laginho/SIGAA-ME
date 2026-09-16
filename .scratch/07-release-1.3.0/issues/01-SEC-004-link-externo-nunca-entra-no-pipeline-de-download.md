@@ -19,13 +19,23 @@ Itens 7 e 15 do gabarito (`docs/audits/release-1.3.0/README.md`); detalhe em
 #### What to build
 
 Com `autoDownloadUpdates` ligado (padrão), um material novo do tipo `link`
-numa turma não pode abrir um Chrome visível nem navegar para a URL que o
-professor colou. Hoje `diff.newFiles` vai inteiro a `downloadAllFiles`; o link
-não tem script e vira `failed`; o retry HTTP pula por falta de script; o laço de
-último recurso chama `downloadViaPlaywright`, que abre o navegador com
-`headless: false` e faz `page.goto(href)` na URL externa, esperando até 65 s por
-um download que não vem. O caminho manual já filtra
-(`course-detail.ts:462`); o background não.
+numa turma não pode abrir um Chrome visível. Hoje `diff.newFiles` vai inteiro a
+`downloadAllFiles`; o link não tem script e vira `failed`; o retry HTTP pula por
+falta de script; o laço de último recurso chama `downloadViaPlaywright`, que
+abre o navegador com `headless: false`, navega pela turma, não acha a linha e
+lança `Link not found and no script provided in fallback` depois do overhead
+todo. O caminho manual já filtra (`course-detail.ts:462`); o background não.
+
+**Correção (revisão do PR #32):** a versão original deste parágrafo dizia que o
+fallback fazia `page.goto(href)` na URL externa que o professor colou. Não faz —
+o ramo `href` do `freshAction` é inalcançável (`download.service.ts:90` exige um
+`onclick` casando por id antes de olhar o `href`, e linha de `link` não tem
+`onclick`), e o outro `page.goto` do fallback (`else if (fileUrl && ...)`)
+recebe sempre `fileUrl: ''` de `downloadViaPlaywright`
+(`sigaa.service.ts:204`). O dano real é o browser visível, a navegação na turma
+e a espera. O P0 continua de pé pelo comportamento em background; só o pior caso
+estava descrito errado. O critério 4 vira defesa em profundidade: fecha o ramo
+antes que `DL-007` (casamento por id) o torne alcançável.
 
 Junto, o item 15: uma fila que esvazia inteira por `skipped` ainda entra na
 turma (`enterCourseAndGetHTML`), e offline isso devolve erro e descarta os
