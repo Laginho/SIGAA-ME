@@ -197,9 +197,15 @@ Example registry entry:
 }
 ```
 
-The page-state classifier must distinguish “valid empty course list” from
-“selector disappeared.” This requires a separate stable empty-state or portal
-landmark rather than assuming zero course inputs always means drift.
+The page-state classifier still distinguishes “valid empty course list” from
+“selector disappeared” at the document level — `validateCourseListDocument`
+returns `null` for an authenticated page with zero course rows, same as a
+populated one. What changed (PORTAL-010) is what `getCourses` does with that
+`null`: it no longer treats a zero-row result as a legitimate empty list. An
+authenticated account with zero courses is effectively nonexistent in the
+real user population — a student with none does not install the app — so
+`getCourses` now reports it as an error (`NOT_FOUND`, not `SELECTOR_DRIFT`)
+instead of succeeding silently with `courses: []`.
 
 ## Structural fingerprints
 
