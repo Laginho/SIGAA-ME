@@ -387,17 +387,26 @@ export class PlaywrightLoginService {
 
             const { courses, selectorDiagnostics } = courseExtraction;
             if (selectorDiagnostics.courseIdInputs === 0 || selectorDiagnostics.virtualClassroomLinks === 0) {
-                this.recordDiagnostic(
-                    await page.content().catch(() => ''),
-                    page.url(),
-                    selectorDiagnostics
-                );
-                await this.close();
-                return {
-                    success: false,
-                    errorCode: 'SELECTOR_DRIFT',
-                    error: describeMissingCourseListSelectors(selectorDiagnostics.courseIdInputs, selectorDiagnostics.virtualClassroomLinks)
-                };
+                const html = await page.content().catch(() => '');
+                // Zero linhas de turma sozinho não é drift: pode ser conta
+                // autenticada sem turmas (fim de semestre, calouro), manutenção
+                // programada ou acesso negado — `validateCourseListDocument`
+                // distingue os quatro pelo landmark/heading da página (PORTAL-008).
+                const portalCheck = validateCourseListDocument(html);
+                if (portalCheck === null) {
+                    log.info('Playwright: authenticated portal with zero course rows; treating as an empty list.');
+                } else if (portalCheck.code === 'SELECTOR_DRIFT') {
+                    this.recordDiagnostic(html, page.url(), selectorDiagnostics);
+                    await this.close();
+                    return {
+                        success: false,
+                        errorCode: 'SELECTOR_DRIFT',
+                        error: describeMissingCourseListSelectors(selectorDiagnostics.courseIdInputs, selectorDiagnostics.virtualClassroomLinks)
+                    };
+                } else {
+                    await this.close();
+                    return { success: false, errorCode: portalCheck.code, error: portalCheck.message };
+                }
             }
 
             log.info(`Playwright: Found ${courses.length} courses.`);
