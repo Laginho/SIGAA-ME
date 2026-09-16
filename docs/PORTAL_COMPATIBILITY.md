@@ -299,11 +299,12 @@ must occur outside the repository before the fixture is added.
 
 ### Layer 4 — Live compatibility canary
 
-- Runs nightly and on demand.
-- Uses a dedicated minimum-privilege account.
-- Is read-only unless a separate download test is explicitly enabled.
-- Never runs as part of ordinary PR checks.
-- Reports compatibility evidence and safe diagnostics.
+Not implemented yet. No nightly workflow exists (see `.github/workflows/`);
+the live smoke test (`tests/integration/scraper.test.ts`, gated by
+`npm run test:live`/`RUN_LIVE_SIGAA_TESTS=true`) is the manual equivalent
+today. Design, if built: a dedicated minimum-privilege account, read-only
+unless a separate download test is explicitly enabled, never part of
+ordinary PR checks, reporting compatibility evidence and safe diagnostics.
 
 ### Layer 5 — Manual release verification
 

@@ -179,12 +179,13 @@ Regras que sustentam isso:
 - **Os tiers com credencial não entram em loop.** São login real na conta do
   usuário no portal da universidade: rodar em ciclo é dezenas de logins
   automatizados e risco de bloqueio. Manual, antes de release.
-- **Teste não espelha implementação.** `tests/unit/parser.test.ts` declara que
-  suas funções "mirror the parsing logic in the service" — ele testa uma cópia,
-  e a cópia não tem a detecção de selector drift que o serviço real tem. Foi
-  assim que um `/['"](\\d+)['"]/` (barra invertida literal, não dígito) ficou
-  quebrado no parser real com 14 testes verdes em cima. Teste novo chama o
-  código de produção; ver `tests/fixtures/README.md`.
+- **Teste não espelha implementação.** O teste unitário do parser, removido,
+  declarava que suas funções "mirror the parsing logic in the service" — ele
+  testava uma cópia, e a cópia não tinha a detecção de selector drift que o
+  serviço real tem. Foi assim que um `/['"](\\d+)['"]/` (barra invertida
+  literal, não dígito) ficou quebrado no parser real com 14 testes verdes em
+  cima. `tests/integration/parser-real.test.ts` chama o código de produção; ver
+  `tests/fixtures/README.md`.
 
 O que este loop **não** cobre: empacotamento, assinatura, e qualquer coisa que
 dependa de sync real contra o `si3.ufc.br`.

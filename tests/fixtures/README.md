@@ -5,10 +5,10 @@ rede e sem credencial.
 
 ## Por que isto existe
 
-`tests/unit/parser.test.ts` testa uma **cópia** do parser: o próprio arquivo
-declara que suas funções "mirror the parsing logic in the service". Uma cópia
-não regride junto com o original, então aqueles testes podem ficar verdes
-enquanto o `HttpScraperService` real quebra.
+O teste unitário do parser, removido, testava uma **cópia** do parser: o
+próprio arquivo declarava que suas funções "mirror the parsing logic in the
+service". Uma cópia não regride junto com o original, então aqueles testes
+podiam ficar verdes enquanto o `HttpScraperService` real quebrava.
 
 `tests/integration/parser-real.test.ts` chama o parser **de verdade**, passando
 estes arquivos pelo parâmetro `preFetchedHtml` de `getCourseFiles()`, que
@@ -16,8 +16,9 @@ curto-circuita a rede. É o mesmo caminho de código que roda em produção.
 
 ## Procedência: estas fixtures ainda são sintéticas
 
-Os três arquivos atuais foram extraídos dos literais que estavam embutidos em
-`parser.test.ts`. São HTML **escrito à mão** imitando o SIGAA — pequenos e
+Os três arquivos atuais foram extraídos dos literais que estavam embutidos no
+teste unitário do parser, removido. São HTML **escrito à mão** imitando o
+SIGAA — pequenos e
 plausíveis, não gravados do portal. Eles provam que o parser real funciona
 contra a estrutura que **achamos** que o SIGAA tem.
 

@@ -1,6 +1,6 @@
 # DOC-004: Documentação pública casa com o código
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P2
 Blocked by: nenhum
 Review: human

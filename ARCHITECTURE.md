@@ -2,8 +2,10 @@
 
 ## Active engineering documents
 
-- [Hardening Tracker](docs/HARDENING_TRACKER.md) — implementation status,
-  dependencies, acceptance criteria, verification, and multi-agent handoff.
+- [Issue tracker](docs/agents/issue-tracker.md) — how tickets are laid out in
+  `.scratch/`, IDs, states, and the ledger. Implementation status and
+  acceptance criteria live in the ticket files themselves, not in a single
+  tracker document.
 - [Portal Compatibility Playbook](docs/PORTAL_COMPATIBILITY.md) — selector
   registry, state classification, fixtures, live canary, diagnostics, and SIGAA
   drift response.
@@ -99,10 +101,21 @@ The current hybrid works because:
 
 ```
 electron/services/
-├── sigaa.service.ts           # Orchestrator
-├── playwright-login.service.ts # Browser automation (~1000 lines)
-├── http-scraper.service.ts     # HTTP requests (~950 lines)
-└── logger.service.ts           # Logging utility
+├── sigaa.service.ts                       # Orchestrator: picks Playwright vs HTTP per operation
+├── playwright-login.service.ts            # Browser automation (login, navigation, JSF)
+├── http-scraper.service.ts                # Fast HTTP requests borrowing the Playwright session
+├── background-sync.service.ts             # Periodic sync loop, notifies the renderer of updates
+├── cache.service.ts                       # Per-account cache of known course/file/news ids
+├── persistence.service.ts                 # Settings and encrypted credentials in userData
+├── account-context.service.ts             # Derives and tracks the active account id
+├── session-operation-coordinator.service.ts # Serializes/cancels concurrent sync operations
+├── portal-compatibility.service.ts        # Kill-switch when SIGAA selectors drift
+├── diagnostics.service.ts                 # Privacy-safe structural diagnostics on scrape failure
+├── download.service.ts                    # Playwright fallback download path
+├── download-path.ts                       # Sanitizes and resolves on-disk download targets
+├── file-validation.service.ts             # Validates downloaded file signatures and finalizes them
+├── atomic-write.ts                        # Crash-safe JSON writes (tmp file + rename)
+└── logger.service.ts                      # Scoped file logger with redaction
 ```
 
 ## Logging and diagnostics
