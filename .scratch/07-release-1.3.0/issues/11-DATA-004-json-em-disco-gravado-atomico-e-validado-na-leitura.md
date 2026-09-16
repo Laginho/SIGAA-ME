@@ -1,6 +1,6 @@
 # DATA-004: JSON em disco gravado atômico e validado na leitura
-Status: open
-Stage: to-review
+Status: resolved
+Stage: done
 Priority: P2
 Blocked by: nenhum
 Review: agent
@@ -71,3 +71,49 @@ inteiro 15..1440. `settings.json` editado com `0.001` vira `setInterval` de
   somente leitura também não serve no Windows.
 - `renameSync` por cima de arquivo existente substitui no Windows (Node usa
   `MoveFileEx` com replace). Não precisa de `unlink` antes.
+
+#### Resolution (2026-09-15)
+
+Verdict: Approve
+
+Commits: `7ee28c1` (testes, vermelho), `3518036` (helper), `77e7013` (os
+quatro pontos de escrita + validador + warns), merge `35c6d46`.
+
+Critérios, um a um:
+
+1. ✅ `electron/services/atomic-write.ts` grava `<path>.tmp` e faz
+   `renameSync`. Falha no `writeFileSync` remove o `.tmp` e relança —
+   os chamadores mantêm o tratamento do `DATA-003`.
+2. ✅ Os quatro pontos usam o helper (`persistence.service.ts` settings e
+   credenciais, `cache.service.ts`, `portal-compatibility.service.ts`).
+   `grep -rn writeFileSync electron/` só devolve o helper e o
+   `diagnostics.service.ts`, que o ticket manda deixar como está.
+3. ✅ `VALIDATORS.syncInterval` agora é `isFiniteNumber && Number.isInteger
+   && >= 15 && <= 1440` — idêntico a `electron/ipc/validation.ts:144`. As
+   quatro opções da UI (15/30/60/120) continuam válidas.
+4. ✅ `warn` com `{ file: '<nome>.json' }` e sem conteúdo nos três loaders,
+   antes do padrão.
+5. ✅ `npm run quality`: tsc limpo, ESLint 0 erros / 52 warnings
+   (`no-explicit-any` pré-existentes), vitest **68 arquivos, 759 passando,
+   5 skipped**.
+
+Prova vermelho-verde: em `7ee28c1` (só testes) os cinco arquivos da
+verificação falham — 5 failed files, 4 failed / 40 passed; o
+`atomic-write.test.ts` nem coleta, porque o módulo ainda não existe. Em
+`77e7013` a suíte inteira passa.
+
+Dois registros, nenhum bloqueante:
+
+- O commit de teste mexeu em três arquivos fora de Primary files
+  (`tests/integration/dev-cache-mutation-boundary.test.ts`,
+  `tests/integration/persistence-auth-recovery.test.ts`,
+  `tests/unit/userdata-late-binding.test.ts`). São mocks de `fs` com
+  factory explícita: sem `renameSync`/`unlinkSync` eles quebrariam. Ajuste
+  mecânico forçado pela implementação, não ampliação de escopo — nenhum
+  arquivo de produção saiu do limite.
+- **Resíduo:** o helper não faz `fsync` no `.tmp` antes do `rename`. O
+  rename é atômico no namespace, então crash de processo está coberto; em
+  queda de energia o conteúdo pode não ter chegado ao disco e o destino
+  fica truncado sob o nome bom. O critério 1 não pede `fsync` e foi
+  cumprido como escrito, mas a motivação do ticket cita queda de energia.
+  Fechar isso é ticket novo (precisa de teste novo).
