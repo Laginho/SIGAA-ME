@@ -1,6 +1,6 @@
 # BUG-019: Link `http://` renderiza um controle que não abre nada
 Status: open
-Stage: to-implement
+Stage: blocked
 Priority: P2
 Blocked by: nenhum
 Review: human
@@ -125,3 +125,5 @@ dois caminhos; o outro vira "não fazer".
   fallback estoura "Link not found and no script provided in fallback", onde
   antes o casamento por texto devolvia o `href` e o `goto` baixava. Não é do
   tema deste ticket; entrou aqui porque é pequeno e ninguém mais o carrega.
+
+- 2026-09-16 Attempt 1 stopped to ask: BUG-019 is reopened (`Stage: to-implement`, reviewed 2026-09-16) with only criterion 5 left; branch `bug-019` already checked out. The review's Resolution block leaves an explicit decision for you before stage 2 can proceed: /  / **Criterion 5** — the id-match in `download.service.ts:96` compares against the raw `href` attribute, but the parser builds ids from the *resolved* URL (`http-scraper.service.ts:282`). So relative `href`s never match, and the fallback still breaks the way it did before this ticket. /  / Two ways forward, per the review: /  / 1. **Fix it** — resolve both sides the same way (or match against `baseUrl + href` too), plus a new red test for a relative `href`. This is stage 2 work, continuing the existing seam. / 2. **Delete it** — the review also found nothing in production ever calls `downloadFile` with a `link:` id (no download button renders for `type === 'link'`, and `sigaa.service.ts:496` skips it explicitly). If that makes the whole `href` branch not worth keeping, criterion 5 and its Primary-files entry get removed from the ticket — that's a stage 1 edit, not stage 2. /  / Which do you want — fix the id-matching, or drop criterion 5 and the dead `href` branch? /
