@@ -201,7 +201,7 @@ export class SigaaService {
     private async downloadViaPlaywright(
         courseId: string, courseName: string, fileName: string, basePath: string, fileId: string, script?: string
     ): Promise<AppResult<{ filePath: string }>> {
-        const result = await this.playwrightLogin.downloadFile(courseId, courseName, fileName, '', basePath, {}, fileId, script);
+        const result = await this.playwrightLogin.downloadFile(courseId, courseName, fileName, basePath, fileId, script);
         if (result.success && result.filePath) return ok({ filePath: result.filePath });
         return fail('DOWNLOAD_FAILED', result.error || 'Playwright download failed');
     }
