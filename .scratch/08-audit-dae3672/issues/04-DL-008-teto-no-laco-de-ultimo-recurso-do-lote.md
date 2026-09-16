@@ -1,6 +1,6 @@
 # DL-008: Teto no laço de último recurso do lote: N falhas seguidas do fallback Playwright encerram a rodada
 Status: open
-Stage: implementing
+Stage: to-review
 Priority: P2
 Blocked by: nenhum
 Review: agent
