@@ -1,6 +1,6 @@
 # QA-010: O mock de `fs.existsSync` vaza para os testes seguintes
 Status: open
-Stage: implementing
+Stage: to-review
 Priority: P3
 Blocked by: nenhum
 Review: agent
