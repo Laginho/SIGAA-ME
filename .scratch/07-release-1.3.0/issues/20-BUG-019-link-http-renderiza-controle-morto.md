@@ -1,6 +1,6 @@
 # BUG-019: Link `http://` renderiza um controle que não abre nada
-Status: blocked
-Stage: blocked
+Status: open
+Stage: to-implement
 Priority: P2
 Blocked by: nenhum
 Review: human
@@ -33,12 +33,25 @@ dois caminhos; o outro vira "não fazer".
 
 #### Acceptance criteria
 
-1. **Depende da resposta em `## Comments`.** Caminho A: `extractLinkUrl`
-   estreita para `https:`, e o material `http://` cai no ícone inerte com
-   `title` "Link indisponível" do critério 3 do `BUG-014`. Caminho B:
+1. **Caminho B** (decidido pelo autor em 2026-09-16, ver `## Comments`).
    `classifyNavigation` passa a classificar `http:` como
-   `{ kind: 'external', trusted: false }` — sempre com confirmação, nunca
-   `trusted` — e o teste de contrato do `navigation-policy` muda junto.
+   `{ kind: 'external', trusted: false }` — **sempre** com confirmação, nunca
+   `trusted`, nem para host `.ufc.br` — e `navigation-policy.test.ts:218`, que
+   fixa o contrato antigo do `SEC-003`, muda junto com este ID no nome.
+
+   A checagem de credencial embutida (`url.username`/`url.password`) hoje roda
+   **depois** do teste de esquema, então só vê `https:`. Ela tem que passar a
+   cobrir `http:` também: `http://si3.ufc.br@evil.example/` continua `blocked`.
+   A forma menor é a ordem abaixo, mas quem implementa escolhe:
+
+       if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+           return { kind: 'blocked', reason: `esquema ${url.protocol}` }
+       }
+       if (url.username !== '' || url.password !== '') {
+           return { kind: 'blocked', reason: 'credencial embutida na URL' }
+       }
+       if (url.protocol === 'http:') return { kind: 'external', trusted: false }
+       return { kind: 'external', trusted: isTrustedHost(url) }
 2. `.btn-open-link` ganha regra em `src/styles/course-detail.css`, tema claro e
    escuro, com o mesmo alvo de clique do `.btn-download-file` ao lado (40px,
    redondo) e sem o sublinhado azul que o `<a>` sem estilo herda do Chromium.
@@ -56,11 +69,15 @@ dois caminhos; o outro vira "não fazer".
 
 ## Tests stage 2 writes (own commit, red)
 
-- Caminho A — `tests/unit/sigaa-service.test.ts`: `toCourseFile` com
-  `http://exemplo.br/x` omite `url`. Vermelho porque hoje ela é preservada.
-- Caminho B — `tests/unit/navigation-policy.test.ts`: `classifyNavigation` de
+- Critério 1 — `tests/unit/navigation-policy.test.ts`: `classifyNavigation` de
   um `http://` fora do app devolve `external` com `trusted: false`. Vermelho
   porque hoje devolve `blocked`, e a linha 218 afirma o contrário.
+- Critério 1 — `tests/unit/navigation-policy.test.ts`: `http://algo.ufc.br/x`
+  devolve `trusted: false`, não `true`. Vermelho se a implementação deixar o
+  `http:` cair no `isTrustedHost` — é o teste que segura o "nunca `trusted`".
+- Critério 1 — `tests/unit/navigation-policy.test.ts`:
+  `http://si3.ufc.br@evil.example/` devolve `blocked`. Vermelho se a checagem
+  de credencial embutida continuar valendo só para `https:`.
 - Critério 4 — `tests/unit/sigaa-service.test.ts`: `toCourseFile` de um material
   `link` com `https://si3.ufc.br/sigaa/...` omite `url`. Vermelho porque hoje
   ela é preservada.
@@ -70,13 +87,26 @@ dois caminhos; o outro vira "não fazer".
 
 ## Comments
 
-- **Pergunta para a etapa 1 (é o que trava este ticket):** vale a pena abrir
-  `http:` no navegador do SO, ou material `http://` fica sem abrir? O caminho B
-  afrouxa uma política de segurança que o `SEC-003` escreveu de propósito e que
-  tem teste de contrato em cima; o caminho A deixa um material inacessível pelo
-  app, ainda que o usuário possa copiar a URL de outro lugar. O caminho A é o
-  padrão se ninguém decidir. Responda aqui, dobre a resposta no critério 1,
-  ponha `Stage: to-implement` e commite.
+- **Pergunta que travava o ticket, respondida em 2026-09-16 pelo autor:** vale
+  a pena abrir `http:` no navegador do SO, ou material `http://` fica sem
+  abrir? **Resposta: caminho B, abrir.** Motivos, na ordem em que pesaram:
+
+  1. A UFC e os professores têm muito link antigo em `http:`. O caminho A
+     deixaria esses materiais mortos dentro do app.
+  2. O app **não carrega** a página. Um verdict `external` vai para
+     `shell.openExternal`, ou seja, para o navegador padrão do SO, que já faz
+     HTTPS-First e avisa em página insegura. A proteção contra conteúdo
+     inseguro é do navegador, não nossa.
+  3. O que o guard do `SEC-003` realmente compra é barrar `file:`,
+     `javascript:`, `smb:` e handlers de protocolo registrados chegando ao
+     `openExternal` — esses executam coisa. `http:` não é dessa classe; estava
+     bloqueado como dano colateral do `!== https:`, não por decisão sobre
+     `http:`.
+  4. O dano restante seria arquivo malicioso postado por professor, que não
+     acontece na prática, e o SIGAA provavelmente nem hospeda.
+
+  O custo aceito é um diálogo de confirmação a cada clique em `http:`. O
+  critério 1 já está dobrado com a resposta; este ticket está `to-implement`.
 - O critério 2 é cosmético e independe da resposta: pode ir junto, em commit
   próprio.
 - **Critério 4 (revisão do PR da sessão):** `extractLinkUrl` só olha o
