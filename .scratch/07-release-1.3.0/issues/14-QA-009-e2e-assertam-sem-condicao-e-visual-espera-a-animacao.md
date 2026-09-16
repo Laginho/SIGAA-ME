@@ -1,6 +1,6 @@
 # QA-009: E2E assertam sem condição; visual checa conteúdo e espera a animação
 Status: open
-Stage: reviewing
+Stage: done
 Priority: P2
 Blocked by: nenhum
 Review: agent
@@ -70,3 +70,14 @@ entrada, então os PNGs em `_agent_tmp/shots/` variam sem mudança de código.
   no início do teste (`tests/e2e/app.spec.ts:154`). Gate depois do fix:
   `npx tsc --noEmit`, `npx eslint tests/e2e/app.spec.ts` limpos; `npm run
   test:e2e` 44 passed (2.4min).
+
+#### Resolution (2026-09-15)
+
+Verdict: Approve
+
+Merge na sessão: `d94846d`. `npm run quality` na sessão depois do merge: 0
+erros de lint (52 warnings pré-existentes de `no-explicit-any`), 765 passed /
+5 skipped no vitest. `npm run test:e2e` no Windows, 44 passed, incluindo os
+dois testes novos passando contra dado real de conta.
+
+Arquivos: `tests/e2e/app.spec.ts`, `tests/e2e/visual.spec.ts`.
