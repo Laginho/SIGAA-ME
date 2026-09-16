@@ -1,6 +1,6 @@
 # PORTAL-008: Zero turmas, manutenção e acesso negado não são drift
 Status: open
-Stage: implementing
+Stage: to-review
 Priority: P1
 Blocked by: PORTAL-007
 Review: agent
