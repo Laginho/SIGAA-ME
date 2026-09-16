@@ -1,6 +1,6 @@
 # CLEAN-008: `http-scraper`: caminhos sem chamador e cookie por rótulo
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P3
 Blocked by: nenhum
 Review: agent
@@ -53,28 +53,24 @@ que a URL virar configurável.
    — O piso numérico segurou (`http-scraper.service.ts` nem está no
    `coverage.include`), mas a intenção da segunda metade falhou fora do
    `portal-adapter.test.ts`. Vira o critério 7.
-6. ✅ `npm run quality` verde — 70 arquivos, 771 passed, 5 skipped, 0 erro de
-   lint. Verde, mas dois testes agora passam pelo motivo errado (critério 7).
-7. `tests/integration/logging-boundary.test.ts:184` e
-   `tests/integration/portal-course-entry.test.ts:150` chamam
-   `HttpScraperService.getCourseFiles` com dois argumentos. Com
-   `preFetchedHtml` obrigatório, `preFetchedHtml.length` (`:184` do serviço)
-   lança `TypeError` dentro do `try` e o `catch` devolve `{ success: false }`
-   — a asserção passa sem executar nada do que o teste arma. Cada um dos dois
-   volta a exercitar o caminho vivo, ou é removido com justificativa escrita.
-   O de `logging-boundary` é o grave: ele prova que o cookie de sessão de um
-   `AxiosError` nunca vai para o log, e hoje `axios.get` não é mais alcançável
-   em `http-scraper.service.ts` (só `axios.post`, em `downloadFile:494`), então
-   o `AxiosError` armado nunca é produzido e o `expect(log).not.toContain('SEGREDO123')`
-   é vácuo.
-8. `ARCHITECTURE.md:51` e `:86` ainda descrevem o `getNewsDetail` HTTP do
-   `HttpScraperService`, que este ticket apagou. Atualizar.
-9. `findCourseRow`, `validateCourseEntryEnd` (`portal-adapter.ts`),
-   `missingViewStateBeforePostMessage` (idem) e `formByName` (`selectors.ts`)
-   ficaram com zero chamadores de produção depois da remoção do
-   `enterCourseHTTP`. Aplique a eles a mesma regra do critério 1: grep sobe até
-   um handler IPC, `main.ts` ou chamador de produção; sem nenhum, apague, e os
-   testes de `portal-adapter.test.ts` que os exercitam saem junto.
+6. ✅ `npm run quality` verde — 70 arquivos, 769 passed, 5 skipped, 0 erro de
+   lint (recontagem pós-reopen: -2 pela poda do critério 9).
+7. ✅ `logging-boundary.test.ts` agora chama `downloadFile` (que de fato usa
+   `axios.post:494`) para armar o `AxiosError` com o cookie; prova de vermelho
+   feita revertendo `sanitizeError` para espalhar o erro cru (vazou `config`,
+   restaurado). `portal-course-entry.test.ts` troca o `axios.get` morto por um
+   `vi.spyOn(diagnosticsService, 'saveRaw')` lançando uma vez — chamador real
+   dentro de `getCourseFiles`, não um bug de aridade; vermelho provado
+   removendo `this.courseData.delete(courseId)` do catch, restaurado.
+8. ✅ `ARCHITECTURE.md` não menciona mais o `getNewsDetail` HTTP do
+   `HttpScraperService`.
+9. ✅ `findCourseRow`, `validateCourseEntryEnd`, `missingViewStateBeforePostMessage`
+   (`portal-adapter.ts`) e `formByName` (`selectors.ts`) removidos — grep
+   confirma zero chamadores fora de `tests/`. `courseIdInputWithValue` e
+   `JSF.linkPattern`, únicos usados por `findCourseRow`, foram junto.
+   `portal-adapter.test.ts` perdeu as duas asserções que os exercitavam;
+   `validateCourseListDocument` (chamador real em
+   `playwright-login.service.ts:490`) continua coberto.
 
 #### Verification
 
