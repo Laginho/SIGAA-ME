@@ -227,13 +227,15 @@ export class BackgroundSyncService {
                             });
                         }
 
-                        // Auto-download new files
-                        if (settings.autoDownloadUpdates && diff.newFiles.length > 0 && settings.lastDownloadPath) {
+                        // Auto-download new files — `link` é material externo postado pelo
+                        // professor, sem download via JSF (SEC-004); nunca entra no pipeline.
+                        const downloadableFiles = diff.newFiles.filter(f => f.type === 'file');
+                        if (settings.autoDownloadUpdates && downloadableFiles.length > 0 && settings.lastDownloadPath) {
                             log.info('Auto-downloading new files.');
                             const downloadResult = await this.sigaaService.downloadAllFiles(
                                 course.id,
                                 course.name,
-                                diff.newFiles,
+                                downloadableFiles,
                                 settings.lastDownloadPath
                             );
                             // Falha não derruba o ciclo (decisão do reopen): sem

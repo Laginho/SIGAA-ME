@@ -102,8 +102,13 @@ export class DownloadService {
                         func();
                     }, freshAction.value);
                 } else if (freshAction.type === 'href') {
+                    const resolvedUrl = new URL(freshAction.value, page.url());
+                    if (resolvedUrl.protocol !== 'https:' || resolvedUrl.hostname !== 'si3.ufc.br') {
+                        log.warn('Refusing to navigate to a link outside si3.ufc.br.', { url: resolvedUrl.href });
+                        return { success: false, error: 'Link externo ao SIGAA; download recusado.' };
+                    }
                     log.info('Navigating to direct URL from current DOM.');
-                    await page.goto(freshAction.value, { waitUntil: 'networkidle', timeout: 30000 });
+                    await page.goto(resolvedUrl.href, { waitUntil: 'networkidle', timeout: 30000 });
                 }
             } else {
                 log.info('Failed to find fresh action. Fallback to cached original script.');
