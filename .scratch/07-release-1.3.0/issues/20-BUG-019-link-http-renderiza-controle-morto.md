@@ -1,6 +1,6 @@
 # BUG-019: Link `http://` renderiza um controle que não abre nada
 Status: open
-Stage: to-implement
+Stage: to-merge
 Priority: P2
 Blocked by: nenhum
 Review: human
@@ -258,3 +258,56 @@ disso.
   Primary files, que era o que faltava para o stage 2 poder tocá-lo.
   O texto do `SEC-004` ("fecha o ramo antes que o `DL-007` o torne alcançável")
   descreve um risco que some com o ramo.
+
+- **2026-09-16, stage 2, criterio 5 implementado (`89a9174`):** o `page.evaluate`
+  de `download.service.ts` volta a devolver só o `onclick` (string) quando o id
+  casa via JSF, sem o campo `type`. O ramo `href`/`goto`/checagem
+  `https:`+`si3.ufc.br` some inteiro; `freshAction` no branch `if` chama o
+  script direto, sem `if/else` por tipo.
+
+#### Revisão 2 (2026-09-16)
+
+Verdict: Approve.
+
+Critérios 1–5: ✅. Os critérios 1, 2 e 4 já tinham sido aprovados na revisão
+anterior e não mudaram desde então; o que esta revisão fecha é o critério 5,
+reescrito como deleção, mais o critério 3 rodado de novo depois do rebase.
+
+**Critério 5** (`5143761`, era `89a9174` antes do rebase). O `page.evaluate` da
+busca por id devolve `onclick` cru (string) e o consumidor chama o script direto.
+Sumiram: o `return { type: 'href' }`, o `else if (freshAction.type === 'href')`,
+o `new URL(..., page.url())`, o `if https:`+`si3.ufc.br` do `SEC-004` e o
+`page.goto` que ele protegia. Bate linha a linha com o que o critério manda.
+
+Deletar não abriu buraco, e isto foi verificado, não deduzido do texto do
+ticket: depois da remoção sobra **um** `page.goto` em `download.service.ts`
+(`:106`, `page.goto(fileUrl)`), e o único chamador de
+`DownloadService.downloadFile` passa `fileUrl` **literalmente `''`**
+(`playwright-login.service.ts:847-855`). Com `fileUrl` falsy o ramo nunca roda:
+o método ficou sem navegação alcançável nenhuma. É estritamente mais forte que a
+checagem do `SEC-004`, como o autor previu. O `:106` continua sendo o `CLEAN-010`.
+
+Prova do vermelho, para a parte que é deleção de teste: restaurando
+`tests/unit/audit-download-external-url.test.ts` do `master` sobre o código novo,
+`npx vitest run tests/unit/audit-download-external-url.test.ts` dá **2 failed** —
+os dois casos montam `page.evaluate` devolvendo `{ type: 'href' }`, forma que o
+código não produz mais, e o segundo (`navigates when the fresh href resolves to
+si3.ufc.br itself`) exige um `page.goto` que não existe. Teste que descreve um
+ramo apagado; apagá-lo é a correção, não uma perda de cobertura.
+
+Separação de commits verde no rebase inteiro: `7251c9d`, `f36a02a`, `5338af7` e
+`9ab61b1` tocam só `tests/`; `175a5b2`, `a7e2d8c` e `5143761` só `electron/` e
+`src/`. Nada fora dos Primary files.
+
+Gate no `master` rebasado (`npm run quality`, Windows): `tsc --noEmit` limpo,
+ESLint 0 erros / 40 warnings, vitest **71 arquivos, 796 passed | 5 skipped**.
+Critério 3: `npm run test:e2e -- accessibility` **17 passed**, rodado de novo
+depois do rebase porque o `master` mexeu em `src/pages/course-detail.ts`.
+
+Nota de rebase: os quatro commits de doc da branch (`9cb1e2e`, `dfa44ad`,
+`598bbde`, `b5014ea`) foram descartados — o `master` já tinha o mesmo texto pelo
+`bd3e77f`, e replicá-los só gerava conflito. Os sete commits de código e teste
+foram preservados um a um.
+
+`Review: human`: o PR fica aberto para você. O `Stage` vai a `done` e a linha do
+ledger entra quando você fizer o merge.
