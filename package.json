@@ -26,7 +26,7 @@
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings 52",
     "quality": "npm run typecheck && npm run lint && npm test",
     "test:watch": "vitest",
     "test:live": "vitest run tests/integration/scraper.test.ts",
