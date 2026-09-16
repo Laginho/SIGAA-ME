@@ -1,6 +1,6 @@
 # PORTAL-012: Falha de verificação de turma: mensagem literal e `errorCode` explícito
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P1
 Blocked by: nenhum
 Review: agent
