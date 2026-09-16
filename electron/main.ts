@@ -285,7 +285,7 @@ app.whenReady().then(() => {
     { label: 'Sincronizar Agora', click: () => backgroundSyncService.syncNow() },
     ...(app.isPackaged ? [] : [{ type: 'separator' } as const, { label: '[Dev] Simular Arquivo Novo', click: () => { void simulateNewFile(); } } as const]),
     { type: 'separator' },
-    { label: 'Sair', click: () => { isQuitting = true; app.quit(); } }
+    { label: 'Sair', click: () => { app.quit(); } }
   ]);
   tray.setToolTip('SIGAA-ME Background Sync');
   tray.setContextMenu(contextMenu);
