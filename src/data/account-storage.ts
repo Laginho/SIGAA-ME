@@ -107,6 +107,10 @@ export function purgeLegacyStorage(): void {
     for (const key of LEGACY_KEYS) localStorage.removeItem(key);
 }
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 /**
  * Grava os arquivos `downloaded` de `records` no índice `downloads` da conta
  * ativa (DL-006) — chamado depois de um "Baixar todos" manual
@@ -119,10 +123,12 @@ export function recordDownloads(courseId: string, records: DownloadRecord[]): vo
         (r): r is Extract<DownloadRecord, { status: 'downloaded' }> => r.status === 'downloaded'
     );
     if (downloaded.length === 0) return;
-    const downloads = JSON.parse(readAccountItem('downloads') || '{}');
-    if (!downloads[courseId]) downloads[courseId] = {};
+    const parsed: unknown = JSON.parse(readAccountItem('downloads') || '{}');
+    const downloads: Record<string, unknown> = isPlainObject(parsed) ? parsed : {};
+    if (!isPlainObject(downloads[courseId])) downloads[courseId] = {};
+    const courseDownloads = downloads[courseId] as Record<string, unknown>;
     for (const r of downloaded) {
-        downloads[courseId][r.fileId] = { downloadedAt: Date.now(), path: r.filePath };
+        courseDownloads[r.fileId] = { downloadedAt: Date.now(), path: r.filePath };
     }
     writeAccountItem('downloads', JSON.stringify(downloads));
 }

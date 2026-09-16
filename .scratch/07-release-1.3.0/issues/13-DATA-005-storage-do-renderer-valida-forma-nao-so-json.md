@@ -1,6 +1,6 @@
 # DATA-005: Storage do renderer valida forma, não só JSON
 Status: open
-Stage: to-implement
+Stage: reviewing
 Priority: P2
 Blocked by: nenhum
 Review: agent
