@@ -7,19 +7,26 @@ import { diagnosticsService } from './diagnostics.service';
 import { sanitizeSegment, isInsideRoot } from './download-path';
 import { MAX_DOWNLOAD_BYTES, fileNameFromContentDisposition, finalizeDownload } from './file-validation.service';
 import type { AppErrorCode } from '../../shared/errors';
-import { AVA, FILES_MENU, JSF, NEWS, formByName, jsfParam } from '../sigaa/selectors';
+import { AVA, JSF, NEWS, jsfParam } from '../sigaa/selectors';
 import {
     COURSE_FILES_SESSION_EXPIRED_MESSAGE,
     describeMissingAvaForm,
-    findCourseRow,
     isLoginDocument,
-    missingViewStateBeforePostMessage,
-    parseAvaForm,
-    validateCourseEntryEnd,
-    validateCourseListDocument
+    parseAvaForm
 } from '../sigaa/portal-adapter';
 
 const log = logger.scope('HttpScraper');
+
+/** Estratégias 1 e 2 de `getCourseFiles` reconheciam o mesmo arquivo por esta regex, duas vezes. */
+const FILE_EXTENSION_PATTERN = /\.(pdf|doc|docx|ppt|pptx|xls|xlsx|zip|rar|txt|png|jpg|jpeg)$/i;
+
+/**
+ * Item 22 (CLEAN-008): `endsWith` puro aceitava `notsi3.ufc.br` como dono de
+ * um cookie de `si3.ufc.br` — precisa do rótulo inteiro, não só do sufixo.
+ */
+export function cookieDomainMatches(requestHost: string, cookieDomain: string): boolean {
+    return requestHost === cookieDomain || requestHost.endsWith(`.${cookieDomain}`);
+}
 
 /**
  * Arquivo como o parser o vê, com o que o main precisa para baixar. `script` e
@@ -87,7 +94,7 @@ export class HttpScraperService {
         const validCookies = this.cookies.filter(cookie => {
             if (cookie.path && !urlObj.pathname.startsWith(cookie.path)) return false;
             const requestDomain = urlObj.hostname;
-            if (!requestDomain.endsWith(cookie.domain)) return false;
+            if (!cookieDomainMatches(requestDomain, cookie.domain)) return false;
             if (cookie.expires && cookie.expires < new Date()) return false;
             return true;
         });
@@ -167,228 +174,29 @@ export class HttpScraperService {
         return { success: false, error, errorCode };
     }
 
-    async enterCourseHTTP(courseId: string): Promise<{ success: boolean; html?: string; error?: string; errorCode?: AppErrorCode }> {
-        try {
-            log.info(`Entering course ${courseId} via HTTP.`);
-
-            // 1. Get Portal Page to find the form
-            const portalUrl = `${this.baseUrl}/sigaa/verPortalDiscente.do`;
-            const portalResponse = await axios.get(portalUrl, {
-                headers: {
-                    'Cookie': this.getCookieHeader(portalUrl),
-                    'User-Agent': this.userAgent,
-                    'Referer': `${this.baseUrl}/sigaa/paginaInicial.do`,
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-                    'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7'
-                }
-            });
-            this.updateCookies(portalResponse);
-
-            // 2. Validate the document actually is the student portal before trusting anything in it.
-            const listCheck = validateCourseListDocument(portalResponse.data);
-            if (listCheck) {
-                log.warn(`Portal document rejected: ${listCheck.code}`);
-                return { success: false, error: listCheck.message, errorCode: listCheck.code };
-            }
-
-            // 3. Find the course row and its JSF link parameters.
-            const lookup = findCourseRow(portalResponse.data, courseId);
-            if (lookup.status === 'not_found') {
-                log.warn(`Course ${courseId} not found in recognized portal.`);
-                diagnosticsService.saveRaw(`debug_portal_fail_${courseId}.html`, portalResponse.data);
-                return { success: false, error: `Course ${courseId} not found in portal`, errorCode: 'NOT_FOUND' };
-            }
-            if (lookup.status === 'malformed') {
-                return {
-                    success: false,
-                    error: 'SIGAA portal selector drift: could not extract the JSF link parameters for the requested course.',
-                    errorCode: 'SELECTOR_DRIFT'
-                };
-            }
-
-            // 4. Construct Form Data
-            const $ = cheerio.load(portalResponse.data);
-            const formData = new URLSearchParams();
-            formData.append(lookup.formName, lookup.formName);
-            formData.append(AVA.viewStateField, ($(AVA.viewStateSelector).val() as string) || '');
-            formData.append(lookup.paramKey, lookup.paramValue);
-            formData.append('idTurma', courseId);
-
-            // 5. Post to enter course
-            const actionUrl = `${this.baseUrl}${lookup.formAction}`;
-            log.info('Posting to enter course.');
-
-            const enterResponse = await axios.post(actionUrl, formData.toString(), {
-                headers: {
-                    'Cookie': this.getCookieHeader(actionUrl),
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'User-Agent': this.userAgent,
-                    'Origin': this.baseUrl,
-                    'Referer': portalUrl
-                },
-                maxRedirects: 5
-            });
-            this.updateCookies(enterResponse);
-
-            // 6. Validate the end state — a generic `id="conteudo"` alone is not proof of entry.
-            const entryCheck = validateCourseEntryEnd(enterResponse.data);
-            if (entryCheck) {
-                log.warn(`Course entry response rejected: ${entryCheck.code}`);
-                diagnosticsService.saveRaw(`debug_http_entry_${courseId}.html`, enterResponse.data);
-                return { success: false, error: entryCheck.message, errorCode: entryCheck.code };
-            }
-
-            log.info('Successfully entered course via HTTP.');
-            return { success: true, html: enterResponse.data };
-
-        } catch (error: any) {
-            log.error('HTTP entry failed.', { error });
-            return { success: false, error: error.message };
-        }
-    }
-
-
-
-    async getCourseFiles(courseId: string, courseName?: string, preFetchedHtml?: string): Promise<{ success: boolean; files?: ParsedFile[]; news?: ParsedNews[]; error?: string; errorCode?: AppErrorCode }> {
+    async getCourseFiles(courseId: string, courseName: string | undefined, preFetchedHtml: string): Promise<{ success: boolean; files?: ParsedFile[]; news?: ParsedNews[]; error?: string; errorCode?: AppErrorCode }> {
         try {
             if (this.cookies.length === 0) {
                 return this.failCourse(courseId, 'SESSION_EXPIRED', 'No session cookies. Please login first.');
             }
 
             log.info(`Fetching course page for course ${courseId}.`, { courseName });
+            log.info(`Using pre-fetched HTML from Playwright. Length: ${preFetchedHtml.length}`);
 
-            let coursePageData = '';
-            const currentUrl = `${this.baseUrl}/sigaa/ava/index.jsf`;
-
-            if (preFetchedHtml) {
-                log.info(`Using pre-fetched HTML from Playwright. Length: ${preFetchedHtml.length}`);
-                coursePageData = preFetchedHtml;
-
-                const $debug = cheerio.load(coursePageData);
-                log.info('Pre-fetched page title.', { title: $debug('title').text().trim() });
-            } else {
-                log.warn('No pre-fetched HTML provided. Falling back to HTTP entry.');
-
-                const dashboardUrl = `${this.baseUrl}/sigaa/portais/discente/discente.jsf`;
-                const dashboardResponse = await axios.get(dashboardUrl, {
-                    headers: {
-                        'Cookie': this.getCookieHeader(dashboardUrl),
-                        'User-Agent': this.userAgent,
-                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9',
-                        'Accept-Language': 'pt-BR,pt;q=0.9',
-                        'Referer': `${this.baseUrl}/sigaa/verPortalDiscente.do`,
-                        'Connection': 'keep-alive'
-                    },
-                    timeout: 10000
-                });
-
-                this.updateCookies(dashboardResponse);
-                coursePageData = dashboardResponse.data;
-            }
-
+            const coursePageData = preFetchedHtml;
             const $ = cheerio.load(coursePageData);
-            let filesPageData = coursePageData;
-            let conteudoLink: any = null;
+            log.info('Pre-fetched page title.', { title: $('title').text().trim() });
+
+            const filesPageData = coursePageData;
 
             if (isLoginDocument(coursePageData)) {
                 return this.failCourse(courseId, 'SESSION_EXPIRED', COURSE_FILES_SESSION_EXPIRED_MESSAGE);
             }
 
-            // Skip navigation if using Playwright HTML (already navigated)
-            if (preFetchedHtml) {
-                diagnosticsService.saveRaw(`debug_playwright_${courseId}.html`, preFetchedHtml);
-                log.info('Using Playwright HTML directly.');
-            } else {
-                // Strategy 1: Look for "Conteúdo" in menu
-                $(FILES_MENU.itemMenu).each((_, el) => {
-                    const text = $(el).text().trim();
-                    if (text.includes(' Conte') || text.includes('nteudo')) {
-                        log.info('Found potential link.');
-                        conteudoLink = $(el).parent('a');
-                        return false;
-                    }
-                });
+            diagnosticsService.saveRaw(`debug_playwright_${courseId}.html`, preFetchedHtml);
+            log.info('Using Playwright HTML directly.');
 
-                // Strategy 2: Look for "Materiais" header
-                if (!conteudoLink) {
-                    log.info('Strategy 1 failed. Trying Strategy 2 (Materiais header).');
-                    const materiaisHeader = $(FILES_MENU.itemMenuHeaderMateriais);
-                    if (materiaisHeader.length > 0) {
-                        const contentExterior = materiaisHeader.parent().find('.rich-panelbar-content-exterior');
-                        const firstLink = contentExterior.find('a').first();
-                        if (firstLink.length > 0) {
-                            log.info('Found first link under Materiais.');
-                            conteudoLink = firstLink;
-                        }
-                    }
-                }
-
-                if (conteudoLink) {
-                    log.info('Found "Conteúdo" link in sidebar. Navigating to files.');
-                    const onclick = conteudoLink.attr('onclick');
-                    const match = onclick?.match(JSF.linkPattern);
-
-                    if (match) {
-                        const formName = match[1];
-                        const paramsStr = match[2];
-
-                        // Não envia o POST de Conteúdo sem um ViewState reconhecido no
-                        // documento de partida — um POST incompleto parece avançar a
-                        // sessão sem de fato avançar (critério de aceite do PORTAL-001).
-                        const startForm = parseAvaForm(coursePageData);
-                        if (!startForm) {
-                            return this.failCourse(courseId, 'SELECTOR_DRIFT', missingViewStateBeforePostMessage());
-                        }
-
-                        const form = $(formByName(formName));
-                        const formData = new URLSearchParams();
-
-                        form.find('input').each((_, el) => {
-                            const name = $(el).attr('name');
-                            const value = $(el).attr('value');
-                            if (name && value) formData.append(name, value);
-                        });
-
-                        if (!formData.has(AVA.viewStateField)) {
-                            formData.append(AVA.viewStateField, startForm.viewState);
-                        }
-
-                        const params = paramsStr.split(',');
-                        for (let i = 0; i < params.length; i += 2) {
-                            if (params[i] && params[i + 1]) {
-                                formData.append(params[i], params[i + 1]);
-                            }
-                        }
-
-                        log.info('Sending POST to open files.');
-
-                        const filesResponse = await axios.post(`${this.baseUrl}/sigaa/ava/index.jsf`, formData.toString(), {
-                            headers: {
-                                'Cookie': this.getCookieHeader(`${this.baseUrl}/sigaa/ava/index.jsf`),
-                                'Content-Type': 'application/x-www-form-urlencoded',
-                                'User-Agent': this.userAgent,
-                                'Referer': currentUrl,
-                                'Connection': 'keep-alive'
-                            },
-                            timeout: 10000
-                        });
-                        this.updateCookies(filesResponse);
-                        filesPageData = filesResponse.data;
-
-                        // Login na resposta do POST é sessão expirada mesmo quando o
-                        // documento anterior era válido — reavalia antes de interpretar.
-                        if (isLoginDocument(filesPageData)) {
-                            return this.failCourse(courseId, 'SESSION_EXPIRED', COURSE_FILES_SESSION_EXPIRED_MESSAGE);
-                        }
-                    } else {
-                        log.warn('Could not parse onclick for "Conteúdo" link.');
-                    }
-                } else {
-                    log.info('"Conteúdo" link not found in sidebar. Scanning current page.');
-                }
-            }
-
-            // --- Common logic for parsing files page (whether from Playwright or Axios) ---
+            // --- Common logic for parsing files page ---
             const $files = cheerio.load(filesPageData);
 
             // O formulário AVA precisa ser reconhecido por nome, com ViewState não
@@ -434,7 +242,7 @@ export class HttpScraperService {
                             cells.each((_, cell) => {
                                 const cellText = $files(cell).text().trim();
                                 // If the cell contains a file extension, it's likely the filename
-                                if (cellText.match(/\.(pdf|doc|docx|ppt|pptx|xls|xlsx|zip|rar|txt|png|jpg|jpeg)$/i)) {
+                                if (cellText.match(FILE_EXTENSION_PATTERN)) {
                                     fileName = cellText;
                                     return false; // break
                                 }
@@ -451,7 +259,7 @@ export class HttpScraperService {
                     }
                 }
                 // Strategy 2: Detect files by explicit filename patterns (legacy)
-                else if (text && (text.match(/\.(pdf|doc|docx|ppt|pptx|xls|xlsx|zip|rar|txt|png|jpg|jpeg)$/i) ||
+                else if (text && (text.match(FILE_EXTENSION_PATTERN) ||
                     text.toLowerCase().includes('lista') ||
                     text.toLowerCase().includes('exerc') ||
                     text.toLowerCase().includes('arquivo') ||
@@ -620,142 +428,6 @@ export class HttpScraperService {
             // Sem `errorCode`, para `failFromResult` ainda classificar timeout de
             // rede como PORTAL_UNAVAILABLE pela mensagem.
             this.courseData.delete(courseId);
-            return { success: false, error: error.message };
-        }
-    }
-
-    async getNewsDetail(courseId: string, newsId: string, script?: string): Promise<{ success: boolean; news?: any; error?: string; errorCode?: AppErrorCode }> {
-        try {
-            log.info(`Fetching news detail ${newsId} for course ${courseId}.`);
-
-            // 1. Check if we have session data for this course
-            const courseInfo = this.courseData.get(courseId);
-            if (!courseInfo) {
-                return { success: false, error: 'Course session data not found. Please refresh the course list.', errorCode: 'SESSION_EXPIRED' };
-            }
-
-            // 2. Prepare Form Data
-            const formData = new URLSearchParams();
-
-            // Add inputs from cached session
-            if (courseInfo.inputs) {
-                Object.entries(courseInfo.inputs).forEach(([key, value]) => {
-                    formData.append(key, value);
-                });
-            }
-
-            // Add ViewState
-            formData.set(AVA.viewStateField, courseInfo.viewState);
-
-            // Add Form Name
-            if (!formData.has(courseInfo.formName)) {
-                formData.append(courseInfo.formName, courseInfo.formName);
-            }
-
-            // 3. Parse Script (Onclick) to get specific parameters
-            // Example: jsfcljs(document.forms['formAva'],'formAva:noticias:0:visualizar,formAva:noticias:0:visualizar,id,12345','');
-            if (script) {
-                log.info('Using provided script.', { script });
-                const match = script.match(JSF.scriptParamsPattern);
-                if (match) {
-                    const paramsStr = match[1];
-                    const params = paramsStr.split(',');
-                    // Add all params from script
-                    for (let i = 0; i < params.length; i += 2) {
-                        if (params[i] && params[i + 1]) {
-                            formData.append(params[i], params[i + 1]);
-                        }
-                    }
-                    // Ensure the main component ID is sent (often the first param is the trigger)
-                    const componentId = params[0];
-                    formData.append(componentId, componentId);
-                }
-            } else {
-                // Fallback (guessing parameter names - risky)
-                log.warn('No script provided. Attempting generic fetch.');
-                formData.append('id', newsId);
-            }
-
-            log.info('Posting to fetch news.');
-
-            const newsResponse = await axios.post(`${this.baseUrl}${courseInfo.action}`, formData.toString(), {
-                headers: {
-                    'Cookie': this.getCookieHeader(`${this.baseUrl}${courseInfo.action}`),
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'User-Agent': this.userAgent,
-                    'Referer': `${this.baseUrl}${courseInfo.action}`,
-                    'Connection': 'keep-alive'
-                },
-                timeout: 10000
-            });
-
-            this.updateCookies(newsResponse);
-
-            // DEBUG: Save the news page
-            diagnosticsService.saveRaw(`debug_news_content_${newsId}.html`, newsResponse.data);
-
-            const $news = cheerio.load(newsResponse.data);
-
-            // Parsing Logic
-            const getTextAfterLabel = (label: string) => {
-                let result = '';
-                $news('td, th, label, span, div, strong, b').each((_, el) => {
-                    const text = $news(el).text().trim().replace(':', '');
-                    if (text === label) {
-                        // Try next sibling
-                        const next = $news(el).next();
-                        if (next.length > 0) {
-                            result = next.text().trim();
-                            return false;
-                        }
-                        // Try parent's next sibling (table structure)
-                        const parentTd = $news(el).closest('td');
-                        if (parentTd.length && parentTd.next().length) {
-                            result = parentTd.next().text().trim();
-                            return false;
-                        }
-                    }
-                });
-                return result;
-            };
-
-            const getContent = () => {
-                let result = '';
-                $news('td, th, label, span, div, strong, b').each((_, el) => {
-                    const text = $news(el).text().trim().replace(':', '');
-                    if (text === 'Texto') {
-                        const parentTd = $news(el).closest('td');
-                        if (parentTd.length && parentTd.next().length) {
-                            // Get inner HTML of the content cell
-                            result = parentTd.next().html() || '';
-                            return false;
-                        }
-                    }
-                });
-                return result;
-            };
-
-            const title = getTextAfterLabel('Título') || getTextAfterLabel('Assunto');
-            const date = getTextAfterLabel('Data') || getTextAfterLabel('Data de Cadastro');
-            const content = getContent();
-
-            log.info(`Parsed news. ContentLength=${content.length}.`, { title });
-
-            if (!content) {
-                return { success: false, error: 'Could not extract news content from response' };
-            }
-
-            const newsDetail = {
-                title,
-                date,
-                content,
-                notification: getTextAfterLabel('Notificação')
-            };
-
-            return { success: true, news: newsDetail };
-
-        } catch (error: any) {
-            log.error('News fetch failed.', { error });
             return { success: false, error: error.message };
         }
     }
