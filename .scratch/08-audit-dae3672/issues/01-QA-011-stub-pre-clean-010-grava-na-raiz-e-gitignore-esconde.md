@@ -1,6 +1,6 @@
 # QA-011: Stub pré-`CLEAN-010` grava PDF na raiz do repo a cada `npm test`, e o `.gitignore` esconde
 Status: open
-Stage: to-implement
+Stage: blocked
 Priority: P1
 Blocked by: nenhum
 Review: agent
@@ -87,3 +87,5 @@ ou `.pdf` que alguém tentasse versionar. Nenhum teste grava fora de
   efeito daquilo; não resolve o problema de fundo, só o sintoma.
 
 - 2026-09-16 Attempt 1 failed: exit 0. Log tail: QA-011 is already done: master's tip (`4abbff5`) is "chore(scratch): close QA-011, approved and merged (QA-011)", merged via PR #41. Nothing to do. /
+
+- 2026-09-16 Attempt 2 failed: exit 0; blocked after two attempts. Log tail: QA-011 is already closed — merged into `master` via PR #41 (`4abbff5`, `0bea343`, `3f68462`), confirming the ticket's own "Attempt 1 failed" note. The session branch `sweatshop/2026-09-16-1800` just hasn't rebased over it yet, so the local ticket copy still reads `Stage: to-implement`. Nothing to do here. /
