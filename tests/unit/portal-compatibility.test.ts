@@ -11,7 +11,7 @@ import os from 'os';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const loggerSpy = vi.hoisted(() => ({ error: vi.fn() }));
+const loggerSpy = vi.hoisted(() => ({ error: vi.fn(), warn: vi.fn() }));
 vi.mock('../../electron/services/logger.service', () => ({
     logger: { scope: () => loggerSpy },
 }));
@@ -37,6 +37,7 @@ beforeEach(() => {
     tmp = mkdtempSync(path.join(os.tmpdir(), 'sigaa-me-portal-compat-'));
     filePath = path.join(tmp, 'compatibility.json');
     loggerSpy.error.mockClear();
+    loggerSpy.warn.mockClear();
 });
 
 afterEach(() => {
@@ -122,6 +123,15 @@ describe('PortalCompatibilityService — persistência (critério 2)', () => {
         const service = new PortalCompatibilityService(filePath, vi.fn());
 
         expect(service.status()).toEqual({ state: 'ok' });
+    });
+
+    it('arquivo com JSON inválido loga um warn com o nome do arquivo, sem o conteúdo', () => {
+        writeFileSync(filePath, '{not json');
+        const service = new PortalCompatibilityService(filePath, vi.fn());
+
+        service.status();
+
+        expect(loggerSpy.warn).toHaveBeenCalledWith(expect.any(String), { file: 'compatibility.json' });
     });
 
     it('escrita falhando (EPERM) mantém o flip em memória e loga, mas não deixa o arquivo no disco', () => {

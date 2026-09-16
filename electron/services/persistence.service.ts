@@ -1,6 +1,7 @@
 import { app, safeStorage } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
+import { writeJsonAtomicSync } from './atomic-write';
 import { logger } from './logger.service';
 
 const log = logger.scope('Persistence');
@@ -42,7 +43,7 @@ const VALIDATORS: { [K in keyof Required<AppSettings>]: (value: unknown) => valu
     autoSync: isBoolean,
     lastDownloadPath: (v): v is string | null => typeof v === 'string' || v === null,
     runInBackground: isBoolean,
-    syncInterval: (v): v is number => isFiniteNumber(v) && v > 0,
+    syncInterval: (v): v is number => isFiniteNumber(v) && Number.isInteger(v) && v >= 15 && v <= 1440,
     autoDownloadUpdates: isBoolean,
     lastBackgroundSync: isFiniteNumber,
     openAtLogin: isBoolean,
@@ -78,7 +79,13 @@ export class PersistenceService {
         try {
             if (!fs.existsSync(this.settingsPath)) return settings;
 
-            const stored = JSON.parse(fs.readFileSync(this.settingsPath, 'utf8')) as Record<string, unknown>;
+            let stored: Record<string, unknown>;
+            try {
+                stored = JSON.parse(fs.readFileSync(this.settingsPath, 'utf8')) as Record<string, unknown>;
+            } catch {
+                log.warn('Failed to parse settings.json; using defaults', { file: 'settings.json' });
+                return settings;
+            }
             if (typeof stored !== 'object' || stored === null) return settings;
 
             for (const key of Object.keys(VALIDATORS) as (keyof Required<AppSettings>)[]) {
@@ -124,10 +131,10 @@ export class PersistenceService {
 
         try {
             const encryptedPassword = safeStorage.encryptString(password);
-            fs.writeFileSync(this.credentialsPath, JSON.stringify({
+            writeJsonAtomicSync(this.credentialsPath, {
                 username,
                 password: encryptedPassword.toString('base64')
-            }));
+            });
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
             throw new Error(`Unable to store encrypted credentials: ${message}`);
@@ -189,7 +196,7 @@ export class PersistenceService {
      * está no disco, nunca uma configuração que some no próximo boot.
      */
     private commit(next: AppSettings) {
-        fs.writeFileSync(this.settingsPath, JSON.stringify({ schemaVersion: SETTINGS_SCHEMA_VERSION, ...next }, null, 2));
+        writeJsonAtomicSync(this.settingsPath, { schemaVersion: SETTINGS_SCHEMA_VERSION, ...next });
         this.loaded = next;
     }
 }
