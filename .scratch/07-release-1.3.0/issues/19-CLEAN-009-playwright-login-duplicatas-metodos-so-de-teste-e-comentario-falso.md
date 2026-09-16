@@ -1,6 +1,6 @@
 # CLEAN-009: `playwright-login`: duplicatas, método morto e comentário falso
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P3
 Blocked by: PORTAL-008, DL-007
 Review: agent
@@ -53,3 +53,8 @@ chamada em `:777`, e dois parâmetros de `downloadFile` que ninguém usa
   testes reescritos. Fica.
 - Quebrar o arquivo (extrair leitor de notícias, entrada na turma) é
   refactor largo, fora daqui; ticket `ARCH` próprio se for feito.
+- Critério 5 obrigou a tocar um terceiro arquivo fora das Primary files:
+  `tests/unit/sigaa-service.test.ts` tinha três `toHaveBeenCalledWith`
+  hardcoding a assinatura antiga de `downloadFile` (`''` e `{}` nas posições
+  removidas). Sem ajustar essas três linhas o critério 5 não fecha — não é
+  teste novo, é a expectativa velha alinhada à assinatura nova.

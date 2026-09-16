@@ -312,7 +312,7 @@ describe('SigaaService (Unit)', () => {
 
             expect(mockHttp.downloadFile).not.toHaveBeenCalled();
             expect(mockPlaywright.downloadFile).toHaveBeenCalledWith(
-                'C1', 'Math', 'doc.pdf', '', '/mock/downloads', {}, '123', undefined
+                'C1', 'Math', 'doc.pdf', '/mock/downloads', '123', undefined
             );
             expect(result).toEqual({ success: true, data: { filePath: '/mock/downloads/Math/doc.pdf' } });
         });
@@ -348,7 +348,7 @@ describe('SigaaService (Unit)', () => {
             expect(mockHttp.downloadFile).toHaveBeenCalledTimes(2);
             expect(mockPlaywright.downloadFile).toHaveBeenCalledTimes(1);
             expect(mockPlaywright.downloadFile).toHaveBeenCalledWith(
-                'C1', 'Math', 'doc.pdf', '', '/mock/downloads', {}, '123', SCRIPT
+                'C1', 'Math', 'doc.pdf', '/mock/downloads', '123', SCRIPT
             );
             expect(result).toEqual({ success: true, data: { filePath: '/mock/downloads/Math/doc.pdf' } });
         });
@@ -395,7 +395,7 @@ describe('SigaaService (Unit)', () => {
             });
             expect(mockPlaywright.downloadFile).toHaveBeenCalledTimes(1);
             expect(mockPlaywright.downloadFile).toHaveBeenCalledWith(
-                'C1', 'Math', 'doc.pdf', '', '/mock/downloads', {}, '123', SCRIPT
+                'C1', 'Math', 'doc.pdf', '/mock/downloads', '123', SCRIPT
             );
         });
 
