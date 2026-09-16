@@ -238,7 +238,7 @@ describe('SigaaService.downloadFile — plano B via DownloadService', () => {
             navigateToFilesSection: vi.fn(async () => ({ success: false })),
             getUserAgent: vi.fn(async () => 'ua-de-teste'),
             downloadFile: vi.fn(async (_courseId: string, courseName: string, name: string, _fileUrl: string, basePath: string) =>
-                new DownloadService().downloadFile(page, '', name, courseName, basePath, '999', DOWNLOAD_SCRIPT)),
+                new DownloadService().downloadFile(page, name, courseName, basePath, '999', DOWNLOAD_SCRIPT)),
         };
 
         try {
