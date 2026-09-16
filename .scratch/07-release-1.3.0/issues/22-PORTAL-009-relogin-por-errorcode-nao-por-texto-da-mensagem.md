@@ -1,6 +1,6 @@
 # PORTAL-009: Relogin decide por texto da mensagem, não por `errorCode`
 Status: open
-Stage: to-implement
+Stage: blocked
 Priority: P2
 Blocked by: nenhum
 Review: human
@@ -85,3 +85,5 @@ diff maior e mexe em caminho de download, então é escolha, não obviedade.
   por `SESSION_EXPIRED` (`sigaa.service.ts:411` decide por texto) fica para
   ticket próprio". A linha citada lá era `:411`; depois dos merges de
   2026-09-15 e do `SEC-004` ela é `:423`.
+
+- 2026-09-16 Attempt 1 stopped to ask: **PORTAL-009 blocked**, no code touched. Committed on branch `portal-009` (off the open session `sweatshop/2026-09-16-1046`). /  / Reason: criterion 2 says the scope "depends on the answer from stage 1" — Caminho A (fix only `sigaa.service.ts:423`) vs. Caminho B (shared relogin helper across all 8 `enterCourseAndGetHTML` call sites) — but stage 1 never picked one. That's a real scope fork, not something stage 2 should decide unilaterally. /  / Needs a human/stage-1 call: A or B? /
