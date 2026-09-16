@@ -164,7 +164,7 @@ export class SigaaService {
             try {
                 // 1. Enter course (Lands on Dashboard/Portal)
                 log.info('Entering course via Full Browser (Dashboard).');
-                const entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
+                const entryResult = await this.enterCourseWithRelogin(courseId, courseName || 'Unknown Course');
 
                 if (!entryResult.success || !entryResult.html) {
                     return failFromResult(entryResult, 'Failed to enter course');
@@ -195,6 +195,32 @@ export class SigaaService {
                 return failFromMessage(errorMessage(error), 'Failed to fetch files');
             }
         });
+    }
+
+    /**
+     * Ponto de entrada único de `enterCourseAndGetHTML` (PORTAL-009): decide o
+     * relogin por `errorCode === 'SESSION_EXPIRED'`, não por substring de
+     * mensagem, e tenta a entrada de novo **uma** vez. Qualquer outra falha
+     * (SELECTOR_DRIFT, NOT_FOUND, relogin sem sucesso) devolve a primeira
+     * tentativa como está.
+     */
+    private async enterCourseWithRelogin(
+        courseId: string, courseName: string
+    ): ReturnType<PlaywrightLoginService['enterCourseAndGetHTML']> {
+        const entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName);
+        if (entryResult.success || entryResult.errorCode !== 'SESSION_EXPIRED') return entryResult;
+
+        log.warn('Session expired entering course. Attempting re-login.', { courseId });
+        const reloginResult = await this.playwrightLogin.reloginWithStoredCredentials();
+        if (!reloginResult.success) {
+            log.error('Re-login failed.', { error: reloginResult.error });
+            return entryResult;
+        }
+        if (reloginResult.cookies) {
+            this.httpScraper.setCookies(reloginResult.cookies);
+        }
+        log.info('Re-login successful. Retrying course entry.');
+        return this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName);
     }
 
     /**
@@ -245,7 +271,7 @@ export class SigaaService {
 
             // 1. Enter course via Full Browser (Dashboard) - Headless API skips valid ViewState for files
             log.info('Entering course via Full Browser for download (state reliability).');
-            const entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
+            const entryResult = await this.enterCourseWithRelogin(courseId, courseName || 'Unknown Course');
             if (!entryResult.success || !entryResult.html) {
                 return failFromResult(entryResult, 'Failed to enter course');
             }
@@ -302,7 +328,7 @@ export class SigaaService {
             // 4. Refresh Session and Retry (HTTP Only)
             if (signal.aborted) return CANCELLED;
             log.info(`Re-entering course ${courseId} to refresh session (retry attempt).`);
-            const retryEntryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
+            const retryEntryResult = await this.enterCourseWithRelogin(courseId, courseName || 'Unknown Course');
 
             if (!retryEntryResult.success || !retryEntryResult.html) {
                 return failFromResult(retryEntryResult, 'Failed to refresh session for retry');
@@ -417,27 +443,7 @@ export class SigaaService {
             log.info('Refreshing course session for batch download.');
 
             // Enter course via Playwright to get fresh HTML
-            let entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
-
-            // If course not found, try re-login and retry
-            if (!entryResult.success && entryResult.error?.includes('not found in portal')) {
-                log.warn('Course not found in portal. Attempting re-login.');
-
-                // Try to get stored credentials and re-login
-                const reloginResult = await this.playwrightLogin.reloginWithStoredCredentials();
-
-                if (reloginResult.success) {
-                    log.info('Re-login successful. Retrying course entry.');
-                    if (reloginResult.cookies) {
-                        this.httpScraper.setCookies(reloginResult.cookies);
-                    }
-
-                    // Retry entering the course
-                    entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
-                } else {
-                    log.error('Re-login failed.', { error: reloginResult.error });
-                }
-            }
+            const entryResult = await this.enterCourseWithRelogin(courseId, courseName || 'Unknown Course');
 
             if (!entryResult.success || !entryResult.html) {
                 log.error('Failed to enter course for batch download.', { error: entryResult.error });
@@ -527,7 +533,7 @@ export class SigaaService {
                 log.info(`${failed} files failed HTTP download. Refreshing session and retrying.`);
 
                 // 1. Refresh Session
-                const retryEntryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
+                const retryEntryResult = await this.enterCourseWithRelogin(courseId, courseName || 'Unknown Course');
 
                 if (retryEntryResult.success && retryEntryResult.html) {
                     // Update HttpScraper
@@ -575,7 +581,7 @@ export class SigaaService {
                                 log.warn(`Retry ${attempt} failed for file ${file.id}.`, { error: retryResult.error });
                                 // Refresh session before next attempt if not last attempt
                                 if (attempt < 3) {
-                                    const refreshResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName || 'Unknown Course');
+                                    const refreshResult = await this.enterCourseWithRelogin(courseId, courseName || 'Unknown Course');
                                     if (refreshResult.success && refreshResult.cookies) {
                                         this.httpScraper.setCookies(refreshResult.cookies);
                                         // Update script if possible
@@ -655,7 +661,7 @@ export class SigaaService {
                 log.info(`Loading all news for course ${courseId}.`, { courseName });
 
                 // 1. Enter Course to get fresh News List (and ViewState)
-                const entryResult = await this.playwrightLogin.enterCourseAndGetHTML(courseId, courseName);
+                const entryResult = await this.enterCourseWithRelogin(courseId, courseName);
                 if (!entryResult.success || !entryResult.html) {
                     return failFromResult(entryResult, 'Failed to enter course');
                 }

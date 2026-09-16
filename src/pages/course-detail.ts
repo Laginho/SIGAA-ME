@@ -250,6 +250,7 @@ async function fetchCourseFiles(courseId: string) {
           // Poda do cache é best-effort: rejeição vai para o catch abaixo e a lista renderiza mesmo assim.
           if (!existenceResults.success) throw new Error(existenceResults.error.message);
           const staleKeys: string[] = [];
+          const staleKeyPaths = new Map<string, string>();
 
           existenceResults.data.forEach((res) => {
             if (!res.exists) {
@@ -258,6 +259,7 @@ async function fetchCourseFiles(courseId: string) {
               if (key) {
                 delete courseDownloads[key];
                 staleKeys.push(key);
+                staleKeyPaths.set(key, res.path);
               }
             }
           });
@@ -267,7 +269,13 @@ async function fetchCourseFiles(courseId: string) {
             // enquanto esperávamos checkFilesExistence (CONC-002).
             const freshDownloads = JSON.parse(readAccountItem('downloads') || '{}');
             const freshCourseDownloads = freshDownloads[courseId] || {};
-            for (const key of staleKeys) delete freshCourseDownloads[key];
+            for (const key of staleKeys) {
+              // CONC-003: só apaga se o path ainda for o que checkFilesExistence
+              // reportou ausente — path diferente é registro mais novo que a checagem.
+              if (freshCourseDownloads[key]?.path === staleKeyPaths.get(key)) {
+                delete freshCourseDownloads[key];
+              }
+            }
             freshDownloads[courseId] = freshCourseDownloads;
             writeAccountItem('downloads', JSON.stringify(freshDownloads));
           }
