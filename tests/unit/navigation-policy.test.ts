@@ -182,12 +182,18 @@ describe('classifyNavigation: só o próprio app navega na janela', () => {
         [FILE_APP.replace('index.html', 'other.html'), FILE_APP],
         // `file:` quando o app roda no dev server.
         [FILE_APP, DEV_APP],
+    ])('blocked (não é o app): %s (app %s)', (target, appUrl) => {
+        expect(classifyNavigation(target, appUrl)).toMatchObject({ kind: 'blocked' });
+    });
+
+    // BUG-019: não é o app, mas o esquema é http:, então vira external/untrusted, não blocked.
+    it.each([
         // Outra porta do localhost não é a nossa origem.
         ['http://localhost:5174/', DEV_APP],
         // Empacotado: nem o dev server é in-app.
         [DEV_APP, FILE_APP],
-    ])('blocked (não é o app): %s (app %s)', (target, appUrl) => {
-        expect(classifyNavigation(target, appUrl)).toMatchObject({ kind: 'blocked' });
+    ])('external, não blocked (não é o app, mas é http:): %s (app %s)', (target, appUrl) => {
+        expect(classifyNavigation(target, appUrl)).toEqual({ kind: 'external', trusted: false });
     });
 });
 
