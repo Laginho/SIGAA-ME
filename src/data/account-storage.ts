@@ -114,15 +114,21 @@ export function purgeLegacyStorage(): void {
  * (`dashboard.ts`), para os dois alimentarem o mesmo `known` que o próximo
  * lote usa para não duplicar.
  */
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 export function recordDownloads(courseId: string, records: DownloadRecord[]): void {
     const downloaded = records.filter(
         (r): r is Extract<DownloadRecord, { status: 'downloaded' }> => r.status === 'downloaded'
     );
     if (downloaded.length === 0) return;
-    const downloads = JSON.parse(readAccountItem('downloads') || '{}');
-    if (!downloads[courseId]) downloads[courseId] = {};
+    const parsed: unknown = JSON.parse(readAccountItem('downloads') || '{}');
+    const downloads: Record<string, unknown> = isPlainObject(parsed) ? parsed : {};
+    if (!isPlainObject(downloads[courseId])) downloads[courseId] = {};
+    const courseDownloads = downloads[courseId] as Record<string, unknown>;
     for (const r of downloaded) {
-        downloads[courseId][r.fileId] = { downloadedAt: Date.now(), path: r.filePath };
+        courseDownloads[r.fileId] = { downloadedAt: Date.now(), path: r.filePath };
     }
     writeAccountItem('downloads', JSON.stringify(downloads));
 }
