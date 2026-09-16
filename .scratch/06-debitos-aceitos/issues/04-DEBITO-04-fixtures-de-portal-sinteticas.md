@@ -21,3 +21,16 @@ Tracker status at migration: (sem linha de status — débito aceito conscientem
   (2026-09-08) fechou os dois ramos de classificador que nenhuma fixture
   ancorava e fixou o método: a mutação que prova uma fixture é em
   `selectors.ts`/classifier, não na própria fixture.
+
+## Comments
+
+- **`PORTAL-008` (2026-09-15), da revisão:** `access-denied.html` é uma página
+  nua — só `<h1>Acesso Negado</h1>`. Se a página real do SIGAA vier dentro do
+  shell autenticado, com `.nome_usuario`, a detecção nova fica inerte:
+  `validateCourseListDocument` e `classify` testam `isStudentPortal` antes de
+  `isAccessDenied`, então o acesso negado vira portal autenticado com zero
+  turmas — sucesso com lista vazia, e o `background-sync` chama
+  `recordSuccess()`. Mesma coisa para manutenção, se ela mantiver o header.
+  Quem capturar as fixtures reais confere isso primeiro; se o header estiver
+  lá, a ordem dos testes nas duas funções precisa inverter, com fixture que
+  tenha landmark **e** heading.
