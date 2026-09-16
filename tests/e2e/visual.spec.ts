@@ -36,12 +36,15 @@ const COURSES = [
     }
 ];
 
+// Landmark próprio de cada rota: heading ou seletor que só aquela página
+// renderiza. Substitui o antigo `innerHTML.length > 50`, que uma tela de erro
+// também satisfazia.
 const ROUTES = [
-    { hash: '#/login', label: 'login' },
-    { hash: '#/settings', label: 'settings' },
-    { hash: '#/sync-selection', label: 'sync-selection' },
-    { hash: '#/dashboard', label: 'dashboard' },
-    { hash: '#/course/c1', label: 'course-detail' }
+    { hash: '#/login', label: 'login', landmark: 'h1.login-title', text: 'SIGAA-ME' },
+    { hash: '#/settings', label: 'settings', landmark: '.settings-header h1', text: 'Configurações' },
+    { hash: '#/sync-selection', label: 'sync-selection', landmark: '.sync-title', text: 'Selecione o Modo de Sincronização' },
+    { hash: '#/dashboard', label: 'dashboard', landmark: '.course-card', text: null },
+    { hash: '#/course/c1', label: 'course-detail', landmark: '#courseTitle', text: 'Estruturas de Dados' }
 ];
 
 test.describe('Verificação visual das rotas', () => {
@@ -49,6 +52,12 @@ test.describe('Verificação visual das rotas', () => {
 
     test.beforeAll(async () => {
         launched = await launchApp('.test-user-data-visual');
+
+        // main.css zera `animation-duration` sob `prefers-reduced-motion`; isso
+        // tira a animação de entrada do caminho antes da screenshot, em vez de
+        // apostar num timing fixo.
+        await launched.page.emulateMedia({ reducedMotion: 'reduce' });
+
         await launched.page.evaluate(([sessionKey, coursesKey, account, courses]) => {
             sessionStorage.setItem(sessionKey as string, JSON.stringify(account));
             localStorage.setItem(coursesKey as string, JSON.stringify(courses));
@@ -73,9 +82,12 @@ test.describe('Verificação visual das rotas', () => {
                     }
                 }, [route.hash, theme] as const);
 
-                await expect
-                    .poll(() => page.evaluate(() => document.querySelector('#app')?.innerHTML.length ?? 0))
-                    .toBeGreaterThan(50);
+                const landmark = page.locator(route.landmark);
+                if (route.text) {
+                    await expect(landmark).toContainText(route.text);
+                } else {
+                    await expect(landmark).toHaveCount(COURSES.length);
+                }
 
                 await page.screenshot({
                     path: path.join(SHOT_DIR, `${route.label}-${theme}.png`),
