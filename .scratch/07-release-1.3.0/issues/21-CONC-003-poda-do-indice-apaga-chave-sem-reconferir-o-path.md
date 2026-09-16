@@ -1,6 +1,6 @@
 # CONC-003: A poda do índice de downloads apaga por chave sem reconferir o `path`
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P3
 Blocked by: nenhum
 Review: agent

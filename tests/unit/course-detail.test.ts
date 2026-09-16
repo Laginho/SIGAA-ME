@@ -291,3 +291,53 @@ describe('course-detail: índice de downloads sem read-modify-write cruzado (CON
         expect(downloads.c1['555']).toBeUndefined();
     });
 });
+
+describe('course-detail: poda reconfere o path antes de apagar chave existente (CONC-003)', () => {
+    beforeEach(() => {
+        document.body.innerHTML = '';
+        localStorage.clear();
+        sessionStorage.clear();
+        vi.restoreAllMocks();
+        setActiveAccount({ id: 'acc-test', name: 'ALUNO' });
+    });
+
+    it('mesmo fileId regravado com novo path durante o await sobrevive à poda', async () => {
+        writeAccountItem('courses', JSON.stringify([{
+            id: 'c1',
+            name: 'Cálculo I',
+            code: 'CB0001',
+            files: [{ name: 'x.pdf', type: 'file', id: 'X' }],
+            news: [],
+        }]));
+        writeAccountItem('downloads', JSON.stringify({
+            c1: { X: { path: '/a/x.pdf' } },
+        }));
+
+        let resolveExistence!: (value: unknown) => void;
+        (window as any).api = {
+            getSettings: vi.fn().mockResolvedValue({ lastDownloadPath: 'C:/Users/aluno/SIGAA' }),
+            downloadFile: vi.fn(),
+            selectDownloadFolder: vi.fn(),
+            updateSetting: vi.fn(),
+            checkFilesExistence: vi.fn(() => new Promise(resolve => { resolveExistence = resolve; })),
+            onDownloadProgress: vi.fn(() => () => undefined),
+        };
+
+        const container = document.createElement('div');
+        document.body.appendChild(container);
+        renderCourseDetailPage(container, 'c1');
+        await flushAll();
+
+        // Enquanto a checagem de /a/x.pdf está pendente, o mesmo fileId é baixado
+        // de novo para um path diferente.
+        writeAccountItem('downloads', JSON.stringify({
+            c1: { X: { path: '/b/x.pdf', downloadedAt: 1 } },
+        }));
+
+        resolveExistence(ok([{ path: '/a/x.pdf', exists: false }]));
+        for (let i = 0; i < 10; i++) await flushAll();
+
+        const downloads = JSON.parse(readAccountItem('downloads') || '{}');
+        expect(downloads.c1.X).toEqual({ path: '/b/x.pdf', downloadedAt: 1 });
+    });
+});
