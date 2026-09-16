@@ -470,6 +470,10 @@ describe('SigaaService (Unit)', () => {
             });
         });
 
+        it('does not leak the `existsSync: true` override into the next test (QA-010)', () => {
+            expect(fs.existsSync('/qualquer')).toBe(false);
+        });
+
         it('skips a material whose parsed pair on the page is a link, without touching the HTTP or Playwright fallback (SEC-004)', async () => {
             mockPlaywright.enterCourseAndGetHTML.mockResolvedValue({ success: true, html: '<html></html>' });
             mockHttp.getCourseFiles.mockResolvedValue({ success: true, files: [PARSED_LINK] });
