@@ -171,7 +171,7 @@ describe('Playwright portal navigation resilience', () => {
         expect(browser.close).toHaveBeenCalledOnce();
     });
 
-    it('returns an empty course list instead of drift when the page is authenticated but has zero course rows (PORTAL-008)', async () => {
+    it('fails instead of returning a silent empty course list when the page is authenticated but has zero course rows (PORTAL-010)', async () => {
         const { browser, page } = createNavigationHarness();
         page.evaluate.mockResolvedValue({
             courses: [],
@@ -182,8 +182,23 @@ describe('Playwright portal navigation resilience', () => {
 
         const result = await service.getCourses();
 
-        expect(result).toMatchObject({ success: true, courses: [] });
-        expect(browser.close).not.toHaveBeenCalled();
+        expect(result.success).toBe(false);
+        expect(result.error).toContain('zero courses');
+        expect(browser.close).toHaveBeenCalledOnce();
+    });
+
+    it('does not reuse SELECTOR_DRIFT for a zero-course authenticated page, so it never re-arms the compatibility kill-switch (PORTAL-010)', async () => {
+        const { page } = createNavigationHarness();
+        page.evaluate.mockResolvedValue({
+            courses: [],
+            selectorDiagnostics: { courseIdInputs: 0, virtualClassroomLinks: 0 }
+        });
+        const service = new PlaywrightLoginService();
+        (service as any).storedCookies = [{ name: 'JSESSIONID', value: 'valid', domain: 'si3.ufc.br' }];
+
+        const result = await service.getCourses();
+
+        expect(result.errorCode).not.toBe('SELECTOR_DRIFT');
     });
 
     it('reports scheduled maintenance as a retryable portal-unavailable error, not selector drift (PORTAL-008)', async () => {
@@ -300,7 +315,7 @@ describe('HTTP scraper structural validation', () => {
         expect(result.error).toContain('form[name="formAva"]');
     });
 
-    it('continues to accept a valid empty course page and records its JSF state for follow-up requests', async () => {
+    it('continues to accept a valid empty course-files page and records its JSF state for follow-up requests (unaffected by PORTAL-010: course files, not the course list)', async () => {
         const result = await authenticatedScraper().getCourseFiles(
             '123',
             'Algorithms',
@@ -349,7 +364,7 @@ describe('PORTAL-002: sanitized versioned portal fixtures', () => {
         expect(classify(fixture('student-home.html'))).toBe('STUDENT_HOME');
     });
 
-    it('classifies and accepts an empty student portal (0 turmas) by .nome_usuario alone', () => {
+    it('classifies and accepts an empty student portal (0 turmas) by .nome_usuario alone (unaffected by PORTAL-010: classify/validateCourseListDocument still see this as valid, only getCourses now treats it as an error)', () => {
         const html = fixture('student-portal-empty.html');
 
         expect(classify(html)).toBe('STUDENT_PORTAL');

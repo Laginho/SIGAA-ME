@@ -1,6 +1,6 @@
 # CONC-003: A poda do índice de downloads apaga por chave sem reconferir o `path`
-Status: open
-Stage: to-implement
+Status: resolved
+Stage: done
 Priority: P3
 Blocked by: nenhum
 Review: agent
@@ -49,6 +49,56 @@ mas é perda de dado real e o conserto é de uma linha.
   `/a/x.pdf`; `checkFilesExistence` reporta `/a/x.pdf` ausente; durante o
   `await`, outro contexto grava X apontando para `/b/x.pdf`. Depois da poda, X
   continua no índice com `/b/x.pdf`. Vermelho porque hoje X é apagado.
+
+#### Resolution (2026-09-16)
+
+Verdict: Approve
+
+Implementação: `course-detail.ts` colhe `staleKeyPaths: Map<string, string>` junto
+com `staleKeys` durante o laço e, na releitura, só apaga quando
+`freshCourseDownloads[key]?.path === staleKeyPaths.get(key)`.
+
+Critérios:
+
+1. ✅ O `path` comparado é `res.path`, e o handler
+   `check-files-existence` (`electron/ipc/register-handlers.ts:231`) devolve
+   `path: filePath` verbatim — o valor comparado é exatamente o que foi enviado
+   ao `checkFilesExistence`, não uma versão normalizada.
+2. ✅ Chave ausente do índice fresco: `?.path` é `undefined`, nunca igual a uma
+   string, então não é apagada — mesmo efeito líquido do `delete` num campo
+   inexistente. Chave com `path` igual continua sendo apagada (os testes do
+   `CONC-002` cobrem os dois e continuam verdes).
+3. ✅ `account-storage.ts` não foi tocado — `diff --stat` do branch lista só
+   `course-detail.ts`, `course-detail.test.ts` e este ticket.
+4. ✅ Gate verde.
+
+Commits: `1f1f1c2` (teste, vermelho) e `2ae01c0` (correção). O `diff --stat`
+confirma a separação: o commit de teste não toca `src/`, o de código não toca
+`tests/`.
+
+Prova red-green — com `src/pages/course-detail.ts` revertido para `1f1f1c2`:
+
+    FAIL tests/unit/course-detail.test.ts > ... (CONC-003) >
+      mesmo fileId regravado com novo path durante o await sobrevive à poda
+    AssertionError: expected undefined to deeply equal { path: '/b/x.pdf', downloadedAt: 1 }
+    Tests  1 failed | 7 passed (8)
+
+Vermelho pelo motivo certo: o registro novo foi apagado. Com a correção,
+`npm run quality`:
+
+    eslint: 0 errors, 40 warnings (no-explicit-any, pré-existentes)
+    Test Files  72 passed (72)
+    Tests  791 passed | 5 skipped (796)
+
+Ressalva, sem ação: a cópia em memória `courseDownloads` (`:260`) continua tendo
+a chave apagada incondicionalmente, então **este** render ainda pinta o arquivo
+como não baixado. O índice persistido agora sobrevive e o próximo render mostra
+baixado — a perda de dado, que é o que o ticket ataca, está fechada. Mudar o
+render seria mudança de comportamento que o critério 2 proíbe.
+
+Observação de estilo, sem ação: `staleKeys` e `staleKeyPaths` são duas coleções
+com a mesma chave que precisam ficar em sincronia; um `Array<[string, string]>`
+faria o mesmo. Dez linhas, legível, e trocar seria refatoração fora do pedido.
 
 ## Comments
 

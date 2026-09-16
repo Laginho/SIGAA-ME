@@ -1,6 +1,6 @@
 # PORTAL-010: Lista de turmas vazia é erro, não sucesso silencioso
-Status: open
-Stage: to-implement
+Status: resolved
+Stage: done
 Priority: P2
 Blocked by: nenhum
 Review: human
@@ -97,3 +97,56 @@ usuário vê erro, e não uma tela vazia que finge sucesso.
 - A fixture real de acesso negado continua faltando (`DEBITO-04`). Este ticket
   não a substitui — ele tira a urgência dela, porque o caso já não passa mais
   como sucesso.
+
+#### Resolution (2026-09-16)
+
+Verdict: Approve
+
+**Decisão.** O ramo `portalCheck === null` do `getCourses` deixou de cair no
+sucesso vazio: fecha o browser e devolve
+`{ success: false, errorCode: 'NOT_FOUND' }` com mensagem dizendo que zero
+turmas normalmente é sessão ou acesso. Os outros três desfechos do
+`validateCourseListDocument` ficaram intactos.
+
+**Arquivos.** `electron/services/playwright-login.service.ts` (`:383-395`),
+`tests/integration/portal-selector-resilience.test.ts` (`:174`, `:190`, `:318`,
+`:367`), `docs/PORTAL_COMPATIBILITY.md` (`:200-208`). Nada fora dos Primary
+files.
+
+**Critérios.** 1 ✅ · 2 ✅ · 3 ✅ · 4 ✅ · 5 ✅ · 6 ✅
+
+**Red-green.** Com só o serviço revertido para `b0e170d^` e os testes do
+`fbfed80` no lugar:
+`× fails instead of returning a silent empty course list ... (PORTAL-010)` —
+`AssertionError: expected true to be false` em `:185`; 1 failed | 32 passed.
+Com a correção: 33 passed no arquivo.
+
+**Gate.** `npm run quality` verde — tsc limpo, ESLint 0 erros / 40 warnings
+(todos `no-explicit-any` pré-existentes), vitest 72 arquivos, 793 passed |
+5 skipped.
+
+**Separação de commits.** `fbfed80` toca só o arquivo de teste, `b0e170d` só
+serviço e doc. Conferido por `git show --stat`.
+
+**Achados da revisão (nenhum bloqueante).**
+
+1. O segundo teste (`:190`) é guarda, não vermelho: antes da correção
+   `errorCode` era `undefined` e `not.toBe('SELECTOR_DRIFT')` já passava. É o
+   que o ticket pediu ("vermelho se a implementação escolher `SELECTOR_DRIFT`"),
+   e ele não afirma `success === false` — o teste `:174` cobre isso. Fica como
+   está.
+2. Efeito colateral bom, não previsto no ticket: no `background-sync`, o caminho
+   antigo devolvia sucesso vazio e empurrava `courses: []` para o renderer
+   (`background-sync.service.ts:304-319`), apagando a lista em cache. Agora o
+   ciclo aborta em `:119-126` antes desse envio, e `NOT_FOUND` não dispara
+   `recordStructuralFailure` (que só aceita `SELECTOR_DRIFT`) — critério 2
+   confirmado no consumidor, não só na origem.
+3. `NOT_FOUND` não está em `RETRYABLE` (`shared/errors.ts:56`), então não entra
+   em loop de retry. No sync manual o usuário vê o overlay vermelho com a
+   mensagem (`sync-selection.ts:206-210`, `:300-306`), que é o comportamento que
+   o ticket queria.
+4. `getCourses` também é usado como relançador de browser em
+   `playwright-login.service.ts:488` e `:883`. O `:488` propaga a falha nova
+   corretamente. O `:883` ignora o retorno, mas o guarda de `:886` devolve erro
+   — comportamento pré-existente para todos os códigos de erro, fora do escopo
+   deste ticket.

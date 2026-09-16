@@ -38,6 +38,7 @@ vi.mock('../../electron/services/playwright-login.service', () => {
             logout = vi.fn();
             getCourses = vi.fn();
             enterCourseAndGetHTML = vi.fn();
+            reloginWithStoredCredentials = vi.fn();
             navigateToFilesSection = vi.fn();
             loadAllNews = vi.fn();
             downloadFile = vi.fn();
@@ -96,6 +97,9 @@ describe('SigaaService (Unit)', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
+        // QA-010: clearAllMocks limpa mock.calls, não a implementação — um
+        // mockReturnValue(true) de um teste anterior sobrevive sem isto.
+        vi.mocked(fs.existsSync).mockReturnValue(false);
         service = new SigaaService();
         // Access the mocked internal instances
         mockPlaywright = (service as any).playwrightLogin;
@@ -240,6 +244,22 @@ describe('SigaaService (Unit)', () => {
 
             expect(result).toEqual({ success: false, error: { code: 'SESSION_EXPIRED', message: 'Session expired' } });
             expect(mockHttp.getCourseFiles).not.toHaveBeenCalled();
+        });
+
+        // PORTAL-009: entrada em turma fora do downloadAllFiles não tinha relogin
+        // nenhum — sessão expirada ao listar arquivos virava erro direto.
+        it('relogs in and retries course entry when the session expired (PORTAL-009)', async () => {
+            mockPlaywright.enterCourseAndGetHTML
+                .mockResolvedValueOnce({ success: false, errorCode: 'SESSION_EXPIRED', error: 'Session expired - please login again' })
+                .mockResolvedValueOnce({ success: true, html: '<html>...</html>' });
+            mockPlaywright.reloginWithStoredCredentials.mockResolvedValue({ success: true, cookies: [{ name: 'JSESSIONID', value: 'new' }] });
+            mockHttp.getCourseFiles.mockResolvedValue({ success: true, files: [], news: [] });
+
+            const result = await service.getCourseFiles('C1', 'Math');
+
+            expect(mockPlaywright.reloginWithStoredCredentials).toHaveBeenCalledTimes(1);
+            expect(mockPlaywright.enterCourseAndGetHTML).toHaveBeenCalledTimes(2);
+            expect(result.success).toBe(true);
         });
 
         it('propagates a parse failure instead of returning an empty course', async () => {
@@ -468,6 +488,45 @@ describe('SigaaService (Unit)', () => {
                     results: [{ fileId: '123', fileName: 'doc.pdf', status: 'skipped' }]
                 }
             });
+        });
+
+        it('does not leak the `existsSync: true` override into the next test (QA-010)', () => {
+            expect(fs.existsSync('/qualquer')).toBe(false);
+        });
+
+        it('relogs in and retries course entry when the session expired (PORTAL-009)', async () => {
+            mockPlaywright.enterCourseAndGetHTML
+                .mockResolvedValueOnce({ success: false, errorCode: 'SESSION_EXPIRED', error: 'Session expired - please login again' })
+                .mockResolvedValueOnce({ success: true, html: '<html></html>' });
+            mockPlaywright.reloginWithStoredCredentials.mockResolvedValue({ success: true, cookies: [{ name: 'JSESSIONID', value: 'new' }] });
+            mockHttp.getCourseFiles.mockResolvedValue({ success: true, files: [PARSED_DOC] });
+            mockHttp.downloadFile.mockResolvedValue({ success: true, filePath: '/mock/downloads/Math/doc.pdf' });
+
+            const result = await service.downloadAllFiles('C1', 'Math', [DOC_REF], '/mock/downloads');
+
+            expect(mockPlaywright.reloginWithStoredCredentials).toHaveBeenCalledTimes(1);
+            expect(mockPlaywright.enterCourseAndGetHTML).toHaveBeenCalledTimes(2);
+            expect(result).toEqual({
+                success: true,
+                data: {
+                    downloaded: 1, skipped: 0, failed: 0,
+                    results: [{ fileId: '123', fileName: 'doc.pdf', status: 'downloaded', filePath: '/mock/downloads/Math/doc.pdf' }]
+                }
+            });
+        });
+
+        it('does not retry relogin a second time when the retried entry expires again (criterion 3)', async () => {
+            mockPlaywright.enterCourseAndGetHTML.mockResolvedValue({
+                success: false, errorCode: 'SESSION_EXPIRED', error: 'Session expired - please login again'
+            });
+            mockPlaywright.reloginWithStoredCredentials.mockResolvedValue({ success: true, cookies: [] });
+
+            const result = await service.downloadAllFiles('C1', 'Math', [DOC_REF], '/mock/downloads');
+
+            expect(mockPlaywright.reloginWithStoredCredentials).toHaveBeenCalledTimes(1);
+            expect(mockPlaywright.enterCourseAndGetHTML).toHaveBeenCalledTimes(2);
+            expect(result.success).toBe(false);
+            if (!result.success) expect(result.error.code).toBe('SESSION_EXPIRED');
         });
 
         it('skips a material whose parsed pair on the page is a link, without touching the HTTP or Playwright fallback (SEC-004)', async () => {
