@@ -1,6 +1,6 @@
 # QA-010: O mock de `fs.existsSync` vaza para os testes seguintes
-Status: open
-Stage: to-review
+Status: resolved
+Stage: done
 Priority: P3
 Blocked by: nenhum
 Review: agent
@@ -53,6 +53,49 @@ file e o conserto é legítimo.
   porque o `mockReturnValue(true)` sobreviveu ao `clearAllMocks`. Ele pode ser
   o teste de regressão permanente, ou sair depois de verde se a etapa 3 achar
   que polui — decida no review, não na implementação.
+
+#### Resolution (2026-09-16)
+
+Verdict: Approve
+
+Decisão: o caminho menor do próprio ticket — reafirmar o default no
+`beforeEach`, uma linha, sem trocar `clearAllMocks` por `resetAllMocks` (o
+`## Comments` abaixo explica por que o reset seria pior). O teste de regressão
+fica: ele é o que trava o defeito, custa 1 linha e roda em microssegundos.
+
+Arquivos: só `tests/unit/sigaa-service.test.ts`, o único Primary file.
+
+- `0a4481a` (test, vermelho): o teste de regressão, logo depois do de
+  SEC-004 item 15.
+- `82b8af2` (fix): `vi.mocked(fs.existsSync).mockReturnValue(false)` no
+  `beforeEach` de `:97`, com o comentário dizendo o porquê.
+
+Separação test/código confirmada por `diff --stat`: o commit de teste só
+adiciona o `it(...)`, o de código só a linha do `beforeEach`. Que ambos caiam
+no mesmo arquivo é inerente — aqui o arquivo de teste **é** o alvo do ticket.
+
+Red-green:
+
+- Sem a linha do `beforeEach`: `1 failed | 30 passed (31)`, e a falha é o
+  teste novo, `expected true to be false` em `:476` — vermelho pelo motivo
+  certo, o `mockReturnValue(true)` de `:456` sobrevivendo ao `clearAllMocks`.
+- Com a linha: `31 passed (31)`.
+
+Gate (`npm run quality`): typecheck limpo, ESLint `0 errors, 40 warnings`
+(todos `no-explicit-any` preexistentes), vitest `72 passed (72)` arquivos,
+`792 passed | 5 skipped (797)` testes.
+
+Critérios: 1 ✅, 2 ✅ (nenhuma asserção mudou, nenhum teste saiu, e o de
+SEC-004 item 15 continua declarando o `true` que precisa), 3 ✅.
+
+Achado fora dos critérios, não consertado aqui: o mesmo vazamento existe em
+`fs.readSync`. O teste de SEC-004 item 15 (`:457`) sobrescreve a
+implementação para devolver `%PDF-1.4\n`, e isso também atravessa o
+`clearAllMocks` — a fábrica declara `readSync: vi.fn(() => 0)`. Nenhum teste
+de hoje depende disso, mas é a mesma armadilha de default silencioso que este
+ticket existe para remover. Provar exige teste novo, então cai na regra
+"reabrir, não consertar no review": vale um ticket `QA-*` próprio, decisão de
+quem faz a triagem.
 
 ## Comments
 
