@@ -14,7 +14,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { toast } from '../../src/components/toast';
-import { setActiveAccount, writeAccountItem } from '../../src/data/account-storage';
+import { readAccountItem, setActiveAccount, writeAccountItem } from '../../src/data/account-storage';
 import { renderCourseDetailPage } from '../../src/pages/course-detail';
 import { markAsRead } from '../../src/utils/notification-store';
 import { fail, ok } from '../../shared/errors';
@@ -191,5 +191,103 @@ describe('course-detail: leitura de arquivo por id (BUG-015)', () => {
         expect(rows[0].classList.contains('file-item--unread')).toBe(false);
         expect(rows[1].getAttribute('data-file-id')).toBe('11');
         expect(rows[1].classList.contains('file-item--unread')).toBe(true);
+    });
+});
+
+describe('course-detail: índice de downloads sem read-modify-write cruzado (CONC-002)', () => {
+    beforeEach(() => {
+        document.body.innerHTML = '';
+        localStorage.clear();
+        sessionStorage.clear();
+        vi.restoreAllMocks();
+        setActiveAccount({ id: 'acc-test', name: 'ALUNO' });
+    });
+
+    it('dois downloadFile resolvendo fora de ordem deixam os dois fileId no índice', async () => {
+        writeAccountItem('courses', JSON.stringify([{
+            id: 'c1',
+            name: 'Cálculo I',
+            code: 'CB0001',
+            files: [
+                { name: 'a.pdf', type: 'file', id: '20' },
+                { name: 'b.pdf', type: 'file', id: '21' },
+            ],
+            news: [],
+        }]));
+
+        const resolvers: Record<string, (value: unknown) => void> = {};
+        (window as any).api = {
+            getSettings: vi.fn().mockResolvedValue({ lastDownloadPath: 'C:/Users/aluno/SIGAA' }),
+            downloadFile: vi.fn((payload: { fileId: string }) => new Promise(resolve => {
+                resolvers[payload.fileId] = resolve;
+            })),
+            selectDownloadFolder: vi.fn(),
+            updateSetting: vi.fn(),
+            checkFilesExistence: vi.fn().mockResolvedValue(ok([])),
+            onDownloadProgress: vi.fn(() => () => undefined),
+        };
+
+        const container = document.createElement('div');
+        document.body.appendChild(container);
+        renderCourseDetailPage(container, 'c1');
+        for (let i = 0; i < 10; i++) await flushAll();
+
+        const buttons = container.querySelectorAll<HTMLButtonElement>('.btn-download-file');
+        expect(buttons).toHaveLength(2);
+        buttons[0].click();
+        buttons[1].click();
+        await flushAll();
+
+        // Resolve fora de ordem: o segundo clique termina primeiro.
+        resolvers['21'](ok({ filePath: 'C:/Users/aluno/SIGAA/b.pdf' }));
+        await flushAll();
+        resolvers['20'](ok({ filePath: 'C:/Users/aluno/SIGAA/a.pdf' }));
+        for (let i = 0; i < 10; i++) await flushAll();
+
+        const downloads = JSON.parse(readAccountItem('downloads') || '{}');
+        expect(Object.keys(downloads.c1 ?? {}).sort()).toEqual(['20', '21']);
+    });
+
+    it('poda relê o índice depois do await e preserva registro gravado durante a espera', async () => {
+        writeAccountItem('courses', JSON.stringify([{
+            id: 'c1',
+            name: 'Cálculo I',
+            code: 'CB0001',
+            files: [{ name: 'Lista 3.pdf', type: 'file', id: '555' }],
+            news: [],
+        }]));
+        writeAccountItem('downloads', JSON.stringify({
+            c1: { '555': { path: 'C:/Users/aluno/SIGAA/Lista 3.pdf' } },
+        }));
+
+        let resolveExistence!: (value: unknown) => void;
+        (window as any).api = {
+            getSettings: vi.fn().mockResolvedValue({ lastDownloadPath: 'C:/Users/aluno/SIGAA' }),
+            downloadFile: vi.fn(),
+            selectDownloadFolder: vi.fn(),
+            updateSetting: vi.fn(),
+            checkFilesExistence: vi.fn(() => new Promise(resolve => { resolveExistence = resolve; })),
+            onDownloadProgress: vi.fn(() => () => undefined),
+        };
+
+        const container = document.createElement('div');
+        document.body.appendChild(container);
+        renderCourseDetailPage(container, 'c1');
+        await flushAll();
+
+        // Enquanto a checagem de existência está pendente, outro download termina e grava.
+        writeAccountItem('downloads', JSON.stringify({
+            c1: {
+                '555': { path: 'C:/Users/aluno/SIGAA/Lista 3.pdf' },
+                '556': { path: 'C:/Users/aluno/SIGAA/Lista 4.pdf', downloadedAt: 1 },
+            },
+        }));
+
+        resolveExistence(ok([{ path: 'C:/Users/aluno/SIGAA/Lista 3.pdf', exists: false }]));
+        for (let i = 0; i < 10; i++) await flushAll();
+
+        const downloads = JSON.parse(readAccountItem('downloads') || '{}');
+        expect(downloads.c1['556']).toBeDefined();
+        expect(downloads.c1['555']).toBeUndefined();
     });
 });

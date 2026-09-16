@@ -1,6 +1,6 @@
 # PORTAL-007: Entrada na turma: guarda por igualdade e falha de `getCourses` propagada
-Status: open
-Stage: to-merge
+Status: resolved
+Stage: done
 Priority: P1
 Blocked by: nenhum
 Review: agent
@@ -185,3 +185,6 @@ Não é achado, fica registrado:
   `Stage: to-merge`. A pendência é só a do bloco acima — o relogin automático
   por `SESSION_EXPIRED` vindo da entrada em turma precisa de ticket próprio
   sobre `sigaa.service.ts:411`, que hoje decide relogin por texto da mensagem.
+- Fechado em 2026-09-16: PR #34 mergeado em `master` (`350ed62`). A pendencia do
+  relogin automatico por `SESSION_EXPIRED` (`sigaa.service.ts:411` decide por
+  texto) fica para ticket proprio, conforme a revisao da etapa 3.

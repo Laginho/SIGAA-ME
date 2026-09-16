@@ -1,6 +1,6 @@
 # CLEAN-008: `http-scraper`: caminhos sem chamador e cookie por rótulo
-Status: open
-Stage: to-implement
+Status: resolved
+Stage: done
 Priority: P3
 Blocked by: nenhum
 Review: agent
@@ -9,6 +9,12 @@ Review: agent
   - `electron/services/http-scraper.service.ts` (`enterCourseHTTP` `:170-248`; ramo sem `preFetchedHtml` de `getCourseFiles` `:269-389`; `getNewsDetail` `:627-761`; regex de extensões em `:437` e `:454`; domínio de cookie em `:90`)
   - `tests/integration/portal-adapter.test.ts` (usa `enterCourseHTTP` como porta de entrada; reescrever contra o adapter)
   - New: `tests/unit/http-scraper-cookie-domain.test.ts`
+  - Abertos pelo reopen da revisão (2026-09-15), só para os critérios 7–9:
+    - `tests/integration/logging-boundary.test.ts` (`:177-192`)
+    - `tests/integration/portal-course-entry.test.ts` (`:142-163`)
+    - `electron/sigaa/portal-adapter.ts` (`findCourseRow`, `validateCourseEntryEnd`, `missingViewStateBeforePostMessage`)
+    - `electron/sigaa/selectors.ts` (`formByName`)
+    - `ARCHITECTURE.md` (`:51`, `:86`)
 
 Slop de um relatório (Fable) mais o item 22 do gabarito (Opus e Fable), no
 mesmo arquivo.
@@ -30,16 +36,41 @@ que a URL virar configurável.
 1. Antes de apagar cada método, `grep` mostra zero chamadores fora de
    `tests/`. Se `sigaa.service.ts` ou outro código de produção chamar, o
    método **não** é morto: pare, registre no PR e não apague.
-2. `enterCourseHTTP`, o ramo sem `preFetchedHtml` e o `getNewsDetail` do
+2. ❌ `enterCourseHTTP`, o ramo sem `preFetchedHtml` e o `getNewsDetail` do
    `http-scraper` removidos; `portal-adapter.test.ts` passa a exercitar
    `validateCourseListDocument` e vizinhos diretamente (são puros), sem perder
    caso.
-3. Uma só constante para a regex de extensões.
-4. Domínio de cookie casa por rótulo: `host === domain || host.endsWith('.' + domain)`.
-5. Cobertura dos módulos com piso em `vitest.config.ts` não cai (apagar código
+   — Remoções corretas (grep confirmado). O "sem perder caso" caiu: a premissa
+   de que os vizinhos são seam viva é falsa. Só `validateCourseListDocument`
+   tem chamador de produção (`playwright-login.service.ts:490`);
+   `findCourseRow` e `validateCourseEntryEnd` ficaram sem nenhum, e os dois
+   testes reescritos apontam para código morto. Vira o critério 9.
+3. ✅ Uma só constante para a regex de extensões.
+4. ✅ Domínio de cookie casa por rótulo: `host === domain || host.endsWith('.' + domain)`.
+5. ❌ Cobertura dos módulos com piso em `vitest.config.ts` não cai (apagar código
    morto não pode reduzir; se reduzir, algum teste cobria só ele e precisa
    virar teste do caminho vivo).
-6. `npm run quality` verde.
+   — O piso numérico segurou (`http-scraper.service.ts` nem está no
+   `coverage.include`), mas a intenção da segunda metade falhou fora do
+   `portal-adapter.test.ts`. Vira o critério 7.
+6. ✅ `npm run quality` verde — 70 arquivos, 769 passed, 5 skipped, 0 erro de
+   lint (recontagem pós-reopen: -2 pela poda do critério 9).
+7. ✅ `logging-boundary.test.ts` agora chama `downloadFile` (que de fato usa
+   `axios.post:494`) para armar o `AxiosError` com o cookie; prova de vermelho
+   feita revertendo `sanitizeError` para espalhar o erro cru (vazou `config`,
+   restaurado). `portal-course-entry.test.ts` troca o `axios.get` morto por um
+   `vi.spyOn(diagnosticsService, 'saveRaw')` lançando uma vez — chamador real
+   dentro de `getCourseFiles`, não um bug de aridade; vermelho provado
+   removendo `this.courseData.delete(courseId)` do catch, restaurado.
+8. ✅ `ARCHITECTURE.md` não menciona mais o `getNewsDetail` HTTP do
+   `HttpScraperService`.
+9. ✅ `findCourseRow`, `validateCourseEntryEnd`, `missingViewStateBeforePostMessage`
+   (`portal-adapter.ts`) e `formByName` (`selectors.ts`) removidos — grep
+   confirma zero chamadores fora de `tests/`. `courseIdInputWithValue` e
+   `JSF.linkPattern`, únicos usados por `findCourseRow`, foram junto.
+   `portal-adapter.test.ts` perdeu as duas asserções que os exercitavam;
+   `validateCourseListDocument` (chamador real em
+   `playwright-login.service.ts:490`) continua coberto.
 
 #### Verification
 
@@ -55,8 +86,128 @@ que a URL virar configurável.
 - `portal-adapter.test.ts` reescrito no mesmo commit, verde antes e depois
   (é refactor de teste, não vermelho).
 
+Para o reopen (critérios 7–9):
+
+- `logging-boundary.test.ts:177-192`: o teste de redação do cookie tem que
+  falhar se a redação for revertida. Hoje não falha. Aponte-o para um caminho
+  que de fato chame `axios` (`downloadFile` usa `axios.post:494`) e prove o
+  vermelho revertendo o redator antes de corrigir.
+- `portal-course-entry.test.ts:142-163`: a invalidação do `courseData` no
+  `catch` (`:430`) continua real, mas a causa armada (`axios.get` rejeitando
+  por timeout) não é mais alcançável. Rearme com uma causa que exista.
+- Critério 9: antes de apagar `validateCourseEntryEnd`, confira se o caminho
+  Playwright de entrada na turma tem validação de estado final própria. Se não
+  tiver, isto é uma defesa que nunca foi ligada — registre em `## Comments` em
+  vez de apagar em silêncio.
+
+#### Revisão (2026-09-15) — reopen
+
+Verdict: Needs your call: as remoções estão certas e provadas, mas tornar
+`preFetchedHtml` obrigatório esvaziou dois testes em arquivos fora do limite —
+um deles é a prova de que o cookie de sessão não vai para o log.
+
+Revisado: `sweatshop/2026-09-15-2032...clean-008` (0808978, 13e9853, 60cec6e,
+d875e94), eixos Standards e Spec em paralelo.
+
+O que passou:
+
+- Separação de commits correta: `diff --stat` mostra o commit de teste sozinho,
+  e nenhum commit de código toca `tests/`.
+- Critério 1 e as três remoções: `enterCourseHTTP` e o `getNewsDetail` do
+  `http-scraper` tinham zero referências fora das próprias definições;
+  `sigaa.service.ts:611` tem o `getNewsDetail` dele, que delega ao
+  `playwrightLogin` e continua vivo. Todos os 9+ call sites de
+  `httpScraper.getCourseFiles(` em `electron/` passam o terceiro argumento, e
+  não há `await import()` deste arquivo — o ramo sem `preFetchedHtml` era
+  inalcançável de fato.
+- Os dois testes que o commit 0808978 removeu do `portal-adapter.test.ts`
+  chamavam `getCourseFiles` com dois argumentos: cobriam só o ramo apagado.
+  Remoção correta, não é perda.
+- Critérios 3, 4 e 6.
+
+O que falhou, e é o que sobra para a etapa 2: critérios 7, 8 e 9 acima.
+
+O `npm run quality` verde não pegou nada disso porque o `tsconfig.json` só
+inclui `src`, `electron` e `shared` — `tests/` nunca passa pelo `tsc`, então a
+chamada com aridade errada compila, e o `TypeError` que ela gera cai no `catch`
+genérico do próprio método. É o padrão do `QA-003` de novo: teste verde por
+cima de asserção que não executa mais nada.
+
+#### Resolution (2026-09-15)
+
+Verdict: Approve
+
+Revisado: `sweatshop/2026-09-15-2032...clean-008` (0808978, 13e9853, 60cec6e,
+d875e94, 97eb995, 8e3df53, 63ed4bd, 0b48469, 8bebe64). A rodada anterior já
+tinha validado os critérios 1, 3, 4 e 6; esta revisão fecha 7, 8 e 9.
+
+Arquivos: `electron/services/http-scraper.service.ts`,
+`electron/sigaa/portal-adapter.ts`, `electron/sigaa/selectors.ts`,
+`ARCHITECTURE.md`, `tests/integration/logging-boundary.test.ts`,
+`tests/integration/portal-adapter.test.ts`,
+`tests/integration/portal-course-entry.test.ts`,
+`tests/unit/http-scraper-cookie-domain.test.ts`.
+
+Vermelho provado pelo revisor, não só relatado:
+
+- Critério 7a — removido `this.courseData.delete(courseId)` do `catch` de
+  `getCourseFiles` (`http-scraper.service.ts:430`):
+  `portal-course-entry.test.ts:169` falha em
+  `expect(runtime.axios.post).not.toHaveBeenCalled()` (1 failed | 2 passed).
+  O `saveRaw` armado (`:196`) está dentro do `try` desse mesmo `catch` —
+  causa real, não bug de aridade.
+- Critério 7b — `sanitizeError` (`logger.service.ts:105`) devolvendo o erro
+  cru espalhado: `logging-boundary.test.ts:195` falha em
+  `expect(log).not.toContain('config')`, com
+  `{"isAxiosError":true,"config":{"headers":{"Cookie":...` no log
+  (1 failed | 6 passed). O teste agora passa por `downloadFile` →
+  `axios.post:494`, caminho vivo.
+- Critério 9 — a instrução do ticket era não apagar `validateCourseEntryEnd`
+  em silêncio se o caminho Playwright não tivesse validação de estado final
+  própria. Tem: `playwright-login.service.ts:550-551` (`Menu Turma Virtual`),
+  `:573-583` (`#nomeTurma` conferido contra `courseName`) e `:587-596`
+  (ainda no portal ⇒ erro). A remoção não desliga defesa nenhuma.
+  Grep confirma zero ocorrências de `findCourseRow`,
+  `validateCourseEntryEnd`, `missingViewStateBeforePostMessage`, `formByName`,
+  `courseIdInputWithValue` e `JSF.linkPattern` em `.ts`/`.js` — só texto de
+  ticket no `.scratch/`.
+- Critério 8: `ARCHITECTURE.md:51` removido, `:86` reescrito.
+
+Gate (Windows, `npm run quality`): 70 arquivos, 769 passed, 5 skipped,
+0 erro de lint (44 warnings `no-explicit-any`, pré-existentes). Exit 0.
+
+Critérios 2 e 5 seguem ❌ por registro histórico: a parte válida de cada um
+virou 9 e 7, ambos ✅. Nada da intenção original ficou sem cobertura.
+
+Desvio registrado, não bloqueante: o commit `0b48469` é `chore:` e edita
+`tests/integration/portal-adapter.test.ts` junto do código — a regra do loop
+é que commit de código não toca `tests/`. Aqui a edição é só a remoção das
+duas asserções que exerciam as funções apagadas no mesmo commit, então não há
+o risco que a regra guarda (teste verde por cima de código quebrado); ainda
+assim é desvio.
+
 ## Comments
 
+- Docs históricos ainda descrevem `enterCourseHTTP` como vivo, fora dos
+  Primary files deste ticket: `plans/README.md:107` (registra a decisão do
+  autor de mantê-lo até `BUG-010`, que já fechou),
+  `plans/005-debug-dump-and-log-hygiene.md:44,142` e
+  `docs/AUDITORIA_COMPLEXIDADE.md:33,176`. Vale `CLEAN-*` próprio se alguém
+  quiser os planos coerentes; auditoria datada é registro e pode ficar.
 - Lição registrada no `CLAUDE.md`: `import ... from` não acha
   `await import()`, e importado não é alcançável. Suba a cadeia até um handler
   IPC, `main.ts` ou teste antes de chamar de morto.
+- A mensagem do commit 0808978 diz que os puros do `portal-adapter` são "the
+  real production seam (also used by playwright-login.service.ts)". Vale só
+  para `validateCourseListDocument`. Corrija a afirmação no commit do reopen.
+- `cookie.domain` chega ao `setCookies` por dois caminhos com normalização
+  diferente: o parser de `Set-Cookie` tira o ponto inicial
+  (`http-scraper.service.ts:144`), o `context.cookies()` do Playwright
+  (`playwright-login.service.ts:171,256`) passa direto e pode trazer
+  `.si3.ufc.br`. Contra um domínio com ponto o `cookieDomainMatches` devolve
+  `false` para qualquer host — mas o `endsWith` antigo também devolvia `false`
+  para o host apex, que é o único que a `baseUrl` fixa usa. Não é regressão
+  deste ticket; é lacuna anterior. Vale ticket próprio se a URL virar
+  configurável, junto com o critério 4.
+- `tests/` fora do `include` do `tsconfig.json` é o que deixou a aridade errada
+  passar. Mudar isso é maior que este ticket e é `CLEAN-*` próprio.

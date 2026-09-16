@@ -8,6 +8,7 @@
 import * as fs from 'fs';
 import { errorMessage } from '../../shared/errors';
 import type { CompatibilityStatus } from '../../shared/ipc';
+import { writeJsonAtomicSync } from './atomic-write';
 import { logger } from './logger.service';
 
 const log = logger.scope('PortalCompatibility');
@@ -87,7 +88,13 @@ export class PortalCompatibilityService {
     private readFromDisk(): CompatibilityStatus {
         try {
             if (!fs.existsSync(this.filePath)) return OK_STATUS;
-            const parsed = JSON.parse(fs.readFileSync(this.filePath, 'utf8'));
+            let parsed: unknown;
+            try {
+                parsed = JSON.parse(fs.readFileSync(this.filePath, 'utf8'));
+            } catch {
+                log.warn('Failed to parse compatibility.json; treating status as ok', { file: 'compatibility.json' });
+                return OK_STATUS;
+            }
             return isValidStatus(parsed) ? parsed : OK_STATUS;
         } catch {
             return OK_STATUS;
@@ -96,7 +103,7 @@ export class PortalCompatibilityService {
 
     private persist(status: CompatibilityStatus): void {
         try {
-            fs.writeFileSync(this.filePath, JSON.stringify(status));
+            writeJsonAtomicSync(this.filePath, status);
         } catch (error) {
             // Decisão, não silêncio (regra 3 do CLAUDE.md): a falha de escrita não
             // pode derrubar o flip em memória, que é o que impede o login repetido.

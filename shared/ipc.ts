@@ -78,8 +78,6 @@ export interface DownloadProgress {
 
 export interface AppSettings {
   theme: 'light' | 'dark'
-  /** ponytail: nunca é lido. O controle real é `runInBackground`. Ver auditoria. */
-  autoSync: boolean
   lastDownloadPath: string | null
   runInBackground: boolean
   /** Em minutos. */
@@ -92,15 +90,15 @@ export interface AppSettings {
 /**
  * Chaves que o renderer tem permissão de alterar.
  *
- * `lastBackgroundSync` é escrito só pelo main (background-sync.service.ts).
- * `autoSync` é campo morto. Nenhum dos dois deve ser mutável pelo renderer.
+ * `lastBackgroundSync` é escrito só pelo main (background-sync.service.ts) e
+ * não deve ser mutável pelo renderer.
  *
  * `lastDownloadPath` só pode ser limpo pelo renderer (null = "Sempre perguntar");
  * a definição vem do main via `selectDownloadFolder` (DL-001).
  */
 export type RendererSettingKey = Exclude<
   keyof AppSettings,
-  'lastBackgroundSync' | 'autoSync'
+  'lastBackgroundSync'
 >
 
 /**

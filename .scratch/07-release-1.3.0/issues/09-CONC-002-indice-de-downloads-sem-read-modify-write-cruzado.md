@@ -1,6 +1,6 @@
 # CONC-002: Índice de downloads sem read-modify-write cruzado
-Status: open
-Stage: to-implement
+Status: resolved
+Stage: done
 Priority: P1
 Blocked by: nenhum
 Review: agent
@@ -46,7 +46,69 @@ verificação refutou essa parte do achado.
   índice; depois da poda ele continua lá. Vermelho porque a poda grava a cópia
   antiga.
 
+#### Resolution (2026-09-15)
+
+Verdict: Needs your call: o critério 2 fica cumprido para registro de chave
+nova, mas a poda apaga por chave sem reconferir o `path`, então um re-download
+da *mesma* chave durante a espera é apagado. Ver a observação abaixo e decida
+se vira ticket.
+
+Decisão: o download único parou de manter a cópia própria do índice e passou a
+gravar pelo `recordDownloads` de `account-storage.ts`, que relê dentro — some a
+segunda cópia da lógica de escrita (critério 3) e some a janela entre o read e
+o `await window.api.downloadFile` (critério 1). A poda trocou o booleano
+`changed` por `staleKeys: string[]`, colhidos durante o laço, e relê
+`readAccountItem('downloads')` depois do `await checkFilesExistence` para
+apagar só essas chaves da cópia fresca (critério 2). `account-storage.ts` não
+foi tocado, como o Primary file pedia ("reutilizar, não duplicar").
+
+Cobertura conferida subindo a cadeia, não pela prosa do ticket: os três pontos
+que gravam `downloads` no renderer são `course-detail.ts:397` (download único,
+agora `recordDownloads`), `course-detail.ts:481` ("Baixar todos", já era
+`recordDownloads`) e `dashboard.ts:76` (background, já era). O único
+`writeAccountItem('downloads', ...)` cru que sobra é o da poda, que agora relê.
+O `known` de `downloadAllFiles` (`course-detail.ts:458`) também lê antes do
+`await`, mas só para não rebaixar — não grava, e foi deixado em paz.
+
+Arquivos: `src/pages/course-detail.ts` (+13/-13),
+`tests/unit/course-detail.test.ts` (+99/-1). Nada fora dos Primary files.
+
+Vermelho, no commit só de testes (4e607e5, com o código ainda antigo):
+
+    npx vitest run tests/unit/course-detail.test.ts
+    Test Files  1 failed (1)
+         Tests  2 failed | 5 passed (7)
+    - dois downloadFile fora de ordem → expected ['20'] to deep equal ['20','21']
+    - poda relê o índice → expected undefined to be defined
+
+Verde, gate completo em b3844e6:
+
+    npm run quality
+    eslint: 0 errors, 52 warnings (no-explicit-any, pré-existentes)
+    Test Files  66 passed (66)
+         Tests  752 passed | 5 skipped (757)
+
+Critérios 1 a 4: ✓.
+
+Observação, fora dos critérios e sem teste: a poda apaga `freshCourseDownloads[key]`
+sem conferir que `freshCourseDownloads[key].path` ainda é o caminho que o
+`checkFilesExistence` achou faltando (`course-detail.ts:271`). Se o mesmo
+`fileId` for rebaixado durante o `await`, o registro novo e válido morre. É a
+mesma janela do critério 2 para uma chave que já existia, em vez de uma
+acrescentada — por isso o verdict é "Needs your call" e não "Approve".
+Comparar o `path` antes do `delete` fecha; precisa de teste novo, então não
+entrou aqui.
+
 ## Comments
 
 - Isto é `localStorage` síncrono num só renderer; a janela é só o `await`. Não
   precisa de lock, precisa de reler depois de esperar.
+- Candidato a `CLEAN-*` (revisão, 2026-09-15): `course-detail.ts` abre a forma
+  crua do índice `downloads` em três lugares (`:243`, `:269-273`, `:458`),
+  enquanto `account-storage.ts` é dono do formato. Um `forgetDownloads(courseId,
+  fileIds)` irmão do `recordDownloads` recolheria o read-parse-mutate-write da
+  poda para o módulo que já tem a lógica. Dois call sites, não é abstração para
+  um caso.
+- Cosmético, sem ação: `freshDownloads[courseId] = freshCourseDownloads`
+  (`:272`) cria um `{}` vazio para a disciplina se outro contexto tiver limpado
+  o índice durante a espera.

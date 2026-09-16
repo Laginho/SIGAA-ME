@@ -214,19 +214,6 @@ export class PlaywrightLoginService {
         }
     }
 
-    async forceReset() {
-        if (this.context) {
-            log.info('Playwright: Force resetting context (Abort Navigation)...');
-            try {
-                await this.context.close();
-            } catch (e) {
-                log.error('Playwright: Error closing context during reset.', { error: e });
-            }
-            this.context = null;
-            this.page = null;
-        }
-    }
-
     /**
      * Re-login using stored credentials when session expires
      */
@@ -387,17 +374,26 @@ export class PlaywrightLoginService {
 
             const { courses, selectorDiagnostics } = courseExtraction;
             if (selectorDiagnostics.courseIdInputs === 0 || selectorDiagnostics.virtualClassroomLinks === 0) {
-                this.recordDiagnostic(
-                    await page.content().catch(() => ''),
-                    page.url(),
-                    selectorDiagnostics
-                );
-                await this.close();
-                return {
-                    success: false,
-                    errorCode: 'SELECTOR_DRIFT',
-                    error: describeMissingCourseListSelectors(selectorDiagnostics.courseIdInputs, selectorDiagnostics.virtualClassroomLinks)
-                };
+                const html = await page.content().catch(() => '');
+                // Zero linhas de turma sozinho não é drift: pode ser conta
+                // autenticada sem turmas (fim de semestre, calouro), manutenção
+                // programada ou acesso negado — `validateCourseListDocument`
+                // distingue os quatro pelo landmark/heading da página (PORTAL-008).
+                const portalCheck = validateCourseListDocument(html);
+                if (portalCheck === null) {
+                    log.info('Playwright: authenticated portal with zero course rows; treating as an empty list.');
+                } else if (portalCheck.code === 'SELECTOR_DRIFT') {
+                    this.recordDiagnostic(html, page.url(), selectorDiagnostics);
+                    await this.close();
+                    return {
+                        success: false,
+                        errorCode: 'SELECTOR_DRIFT',
+                        error: describeMissingCourseListSelectors(selectorDiagnostics.courseIdInputs, selectorDiagnostics.virtualClassroomLinks)
+                    };
+                } else {
+                    await this.close();
+                    return { success: false, errorCode: portalCheck.code, error: portalCheck.message };
+                }
             }
 
             log.info(`Playwright: Found ${courses.length} courses.`);
@@ -430,6 +426,46 @@ export class PlaywrightLoginService {
             log.error('Playwright: Error fetching courses.', { error });
             await this.close();
             return { success: false, error: error.message };
+        }
+    }
+
+    /**
+     * Clica o link "Turma Virtual" da linha do portal cujo input oculto de id
+     * bate com `courseId`. Compartilhado por `enterCourseAndGetHTML` e
+     * `navigateToCourse` — mesmos seletores, mesmo retorno.
+     */
+    private async clickCourseVirtualClassLink(page: Page, courseId: string): Promise<{ success: boolean }> {
+        return page.evaluate(({ id, sel }) => {
+            const inputs = Array.from(document.querySelectorAll(sel.courseIdInput));
+            const targetInput = inputs.find(input => (input as HTMLInputElement).value === id);
+
+            if (targetInput) {
+                const row = targetInput.closest('tr');
+                if (row) {
+                    const link = row.querySelector(sel.virtualClassroomLink) as HTMLElement;
+                    if (link) {
+                        link.click();
+                        return { success: true };
+                    }
+                }
+            }
+            return { success: false };
+        }, { id: courseId, sel: { courseIdInput: STUDENT_PORTAL.courseIdInput, virtualClassroomLink: STUDENT_PORTAL.virtualClassroomLink } });
+    }
+
+    /**
+     * Espera o texto que só aparece na página da turma virtual. Compartilhado
+     * pelos dois pontos de verificação em `enterCourseAndGetHTML` — cada um
+     * decide por si o que fazer quando ela não aparece a tempo.
+     */
+    private async waitForCourseVirtualClassMenu(page: Page): Promise<boolean> {
+        try {
+            // Crucial: Wait for specific text that ONLY appears on the course page
+            await page.waitForSelector('text=Menu Turma Virtual', { timeout: 15000 });
+            log.info('Playwright: Verified we are on Course Page (found "Menu Turma Virtual").');
+            return true;
+        } catch {
+            return false;
         }
     }
 
@@ -505,22 +541,7 @@ export class PlaywrightLoginService {
             }
 
             log.info('Playwright: Entering course.', { courseId, courseName });
-            const entered = await page.evaluate(({ id, sel }) => {
-                const inputs = Array.from(document.querySelectorAll(sel.courseIdInput));
-                const targetInput = inputs.find(input => (input as HTMLInputElement).value === id);
-
-                if (targetInput) {
-                    const row = targetInput.closest('tr');
-                    if (row) {
-                        const link = row.querySelector(sel.virtualClassroomLink) as HTMLElement;
-                        if (link) {
-                            link.click();
-                            return { success: true };
-                        }
-                    }
-                }
-                return { success: false };
-            }, { id: courseId, sel: { courseIdInput: STUDENT_PORTAL.courseIdInput, virtualClassroomLink: STUDENT_PORTAL.virtualClassroomLink } });
+            const entered = await this.clickCourseVirtualClassLink(page, courseId);
 
             if (!entered.success) {
                 // Get debug info about what courses ARE on the portal
@@ -554,11 +575,7 @@ export class PlaywrightLoginService {
 
             if (entered.success) {
                 log.info('Playwright: Click processed, waiting for Course Page content...');
-                try {
-                    // Crucial: Wait for specific text that ONLY appears on the course page
-                    await page.waitForSelector('text=Menu Turma Virtual', { timeout: 15000 });
-                    log.info('Playwright: Verified we are on Course Page (found "Menu Turma Virtual").');
-                } catch (e) {
+                if (!(await this.waitForCourseVirtualClassMenu(page))) {
                     log.warn('Playwright: Timeout waiting for "Menu Turma Virtual". Navigation may have failed or page is slow.');
                     // Don't throw - let it proceed to check URL/content below, but this warns us
                 }
@@ -593,10 +610,7 @@ export class PlaywrightLoginService {
 
 
             // Verify we are on the course page
-            try {
-                await page.waitForSelector('text=Menu Turma Virtual', { timeout: 15000 });
-                log.info('Playwright: Verified we are on Course Page (found "Menu Turma Virtual").');
-            } catch (e) {
+            if (!(await this.waitForCourseVirtualClassMenu(page))) {
                 log.warn('Playwright: Could not verify "Menu Turma Virtual". We might be on the portal or a different page.');
                 const content = await page.content();
                 if (content.includes(STUDENT_HOME.portalDiscenteText)) {
@@ -699,8 +713,10 @@ export class PlaywrightLoginService {
     }
 
 
-    // Kept for backward compatibility but now unused by the new flow
-    private async navigateToCourse(page: any, courseId: string): Promise<boolean> {
+    // Navega da página do portal até a AVA da turma. Chamada só pelo download
+    // avulso (downloadFile, abaixo) para posicionar o browser dedicado dele
+    // antes de ir para a seção de arquivos.
+    private async navigateToCourse(page: Page, courseId: string): Promise<boolean> {
         try {
             // Go to portal
             await page.goto('https://si3.ufc.br/sigaa/verPortalDiscente.do');
@@ -708,22 +724,7 @@ export class PlaywrightLoginService {
 
             // Enter the course
             log.info('Playwright: Entering course.', { courseId });
-            const entered = await page.evaluate(({ id, sel }: { id: string; sel: { courseIdInput: string; virtualClassroomLink: string } }) => {
-                const inputs = Array.from(document.querySelectorAll(sel.courseIdInput));
-                const targetInput = inputs.find(input => (input as HTMLInputElement).value === id);
-
-                if (targetInput) {
-                    const row = targetInput.closest('tr');
-                    if (row) {
-                        const link = row.querySelector(sel.virtualClassroomLink) as HTMLElement;
-                        if (link) {
-                            link.click();
-                            return { success: true };
-                        }
-                    }
-                }
-                return { success: false };
-            }, { id: courseId, sel: { courseIdInput: STUDENT_PORTAL.courseIdInput, virtualClassroomLink: STUDENT_PORTAL.virtualClassroomLink } });
+            const entered = await this.clickCourseVirtualClassLink(page, courseId);
 
             if (!entered.success) {
                 log.error('Playwright: Course not found in portal.');
@@ -750,9 +751,7 @@ export class PlaywrightLoginService {
         courseId: string,
         courseName: string,
         fileName: string,
-        fileUrl: string,
         basePath: string,
-        _downloadedFiles: Record<string, any>,
         fileId: string,
         script?: string
     ): Promise<{ success: boolean; filePath?: string; error?: string }> {
@@ -766,7 +765,7 @@ export class PlaywrightLoginService {
 
                 // Launch a dedicated browser for this download to avoid concurrency issues
                 localBrowser = await chromium.launch({ channel: 'chrome', headless: false });
-                const downloadService = new DownloadService(localBrowser);
+                const downloadService = new DownloadService();
 
                 const context = await localBrowser.newContext();
                 // Inject stored cookies
@@ -836,7 +835,7 @@ export class PlaywrightLoginService {
 
                 const result = await downloadService.downloadFile(
                     page,
-                    fileUrl,
+                    '',
                     fileName,
                     courseName,
                     basePath,

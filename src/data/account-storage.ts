@@ -7,9 +7,10 @@
  * se alguém voltar a chamar storage direto (comentários contam).
  *
  * Entra e sai `string`, como o `localStorage`: quem chama continua dono do
- * seu `JSON.parse` e do seu `try/catch`.
+ * seu `JSON.parse` e do seu `try/catch` — exceto `readCoursesCache`, que
+ * existe porque esse parse+validação se repetia em seis chamadores (CLEAN-007).
  */
-import type { AccountId, AccountProfile, DownloadRecord } from '../../shared/domain';
+import type { AccountId, AccountProfile, CourseSnapshot, DownloadRecord } from '../../shared/domain';
 
 export const SESSION_ACCOUNT_KEY = 'sigaa-me:v2:session:account';
 
@@ -103,8 +104,24 @@ export function removeAccountItem(name: AccountStorageKey): void {
     if (account) localStorage.removeItem(accountKey(account.id, name));
 }
 
+/** `courses` da conta ativa, já parseado; `[]` se não houver cache ou o valor gravado não for um array. */
+export function readCoursesCache(): CourseSnapshot[] {
+    const raw = readAccountItem('courses');
+    if (!raw) return [];
+    try {
+        const parsed: unknown = JSON.parse(raw);
+        return Array.isArray(parsed) ? (parsed as CourseSnapshot[]) : [];
+    } catch {
+        return [];
+    }
+}
+
 export function purgeLegacyStorage(): void {
     for (const key of LEGACY_KEYS) localStorage.removeItem(key);
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 /**
@@ -119,10 +136,12 @@ export function recordDownloads(courseId: string, records: DownloadRecord[]): vo
         (r): r is Extract<DownloadRecord, { status: 'downloaded' }> => r.status === 'downloaded'
     );
     if (downloaded.length === 0) return;
-    const downloads = JSON.parse(readAccountItem('downloads') || '{}');
-    if (!downloads[courseId]) downloads[courseId] = {};
+    const parsed: unknown = JSON.parse(readAccountItem('downloads') || '{}');
+    const downloads: Record<string, unknown> = isPlainObject(parsed) ? parsed : {};
+    if (!isPlainObject(downloads[courseId])) downloads[courseId] = {};
+    const courseDownloads = downloads[courseId] as Record<string, unknown>;
     for (const r of downloaded) {
-        downloads[courseId][r.fileId] = { downloadedAt: Date.now(), path: r.filePath };
+        courseDownloads[r.fileId] = { downloadedAt: Date.now(), path: r.filePath };
     }
     writeAccountItem('downloads', JSON.stringify(downloads));
 }

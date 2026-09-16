@@ -46,7 +46,7 @@ vi.mock('../../electron/services/cache.service', () => ({
 }));
 
 const settings: AppSettings = {
-    theme: 'light', autoSync: true, lastDownloadPath: '/downloads', runInBackground: true,
+    theme: 'light', lastDownloadPath: '/downloads', runInBackground: true,
     syncInterval: 60, autoDownloadUpdates: true, openAtLogin: false,
 };
 

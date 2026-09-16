@@ -24,6 +24,8 @@ import {
     LEGACY_KEYS,
     purgeLegacyStorage,
     readAccountItem,
+    readCoursesCache,
+    recordDownloads,
     removeAccountItem,
     SESSION_ACCOUNT_KEY,
     setActiveAccount,
@@ -174,6 +176,52 @@ describe('account-storage: legacy unscoped data', () => {
         for (const key of LEGACY_KEYS) expect(localStorage.getItem(key)).toBeNull();
         expect(readAccountItem('courses')).toBeNull();
         expect(readAccountItem('photo')).toBeNull();
+    });
+});
+
+describe('account-storage: recordDownloads validates the downloads index shape', () => {
+    beforeEach(() => {
+        localStorage.clear();
+        sessionStorage.clear();
+        setActiveAccount(A);
+    });
+
+    it('DATA-005: recovers when the stored downloads value is not an object', () => {
+        writeAccountItem('downloads', '[]');
+
+        recordDownloads('c1', [{ fileId: 'f1', fileName: 'a.pdf', status: 'downloaded', filePath: '/x/a.pdf' }]);
+
+        const stored = JSON.parse(readAccountItem('downloads') || '{}');
+        expect(stored.c1.f1.path).toBe('/x/a.pdf');
+    });
+
+    it('DATA-005: discards a course entry that is not an object', () => {
+        writeAccountItem('downloads', JSON.stringify({ c1: 'x' }));
+
+        recordDownloads('c1', [{ fileId: 'f1', fileName: 'a.pdf', status: 'downloaded', filePath: '/x/a.pdf' }]);
+
+        const stored = JSON.parse(readAccountItem('downloads') || '{}');
+        expect(stored.c1.f1.path).toBe('/x/a.pdf');
+    });
+});
+
+describe('account-storage: readCoursesCache (CLEAN-007)', () => {
+    beforeEach(() => {
+        localStorage.clear();
+        sessionStorage.clear();
+        setActiveAccount(A);
+    });
+
+    it('returns [] when the stored value is not an array', () => {
+        writeAccountItem('courses', '{}');
+
+        expect(readCoursesCache()).toEqual([]);
+    });
+
+    it('returns the parsed array when the stored value is a valid array', () => {
+        writeAccountItem('courses', '[{"id":"c1"}]');
+
+        expect(readCoursesCache()).toEqual([{ id: 'c1' }]);
     });
 });
 
