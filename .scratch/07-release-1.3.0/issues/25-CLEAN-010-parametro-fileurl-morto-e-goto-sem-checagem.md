@@ -1,6 +1,6 @@
 # CLEAN-010: Parâmetro `fileUrl` morto leva a um `page.goto` sem checagem
-Status: open
-Stage: to-review
+Status: resolved
+Stage: done
 Priority: P3
 Blocked by: BUG-019
 Review: agent
@@ -90,3 +90,41 @@ que já existe — o comportamento de hoje, já que o ramo nunca roda.
   vermelho ali depois da deleção. Mesmo ajuste mecânico dos outros três —
   removida a `''`, sem teste novo — em commit de teste próprio, vermelho
   confirmado isoladamente antes do commit.
+
+- Achado fora do escopo, sem ticket: `npm run typecheck` não cobre `tests/`
+  (`tsconfig.json` inclui só `src`, `electron`, `shared`). Erro de tipo em
+  arquivo de teste é invisível ao gate. Não é defeito desta mudança.
+
+#### Resolution (2026-09-16)
+
+Verdict: Approve
+
+Decisão: aprovado como está, mergeado pelo PR #40 (`f9f99a5`). Os cinco
+critérios passam; a única correção é ao texto do ticket, não ao código.
+
+Arquivos: `electron/services/download.service.ts` (assinatura, −3 linhas),
+`electron/services/playwright-login.service.ts` (a chamada, −1),
+`tests/integration/download-boundary.test.ts`,
+`tests/integration/logging-boundary.test.ts`,
+`tests/unit/audit-download-inspect.test.ts`,
+`tests/unit/audit-download-fallback-identity.test.ts`.
+
+Critério 3 confirmado: `grep -n 'page.goto' electron/services/download.service.ts`
+não devolve nada — não sobrou navegação nenhuma no arquivo.
+
+Prova red-green — e a razão do vermelho não é a que o ticket previu. O ticket
+dizia "vermelho por compilação"; isso não podia acontecer. O `tsconfig.json`
+inclui só `src`, `electron` e `shared`, então `tsc --noEmit` nunca vê `tests/`;
+e todo parâmetro restante é `string`, então a chamada deslocada tipa igual.
+Verificado: `npx tsc --noEmit` em `95ae13d` (testes já ajustados, assinatura
+ainda antiga) passa limpo.
+
+O vermelho é real, só que em runtime. `npx vitest run` nos quatro arquivos em
+`95ae13d`: **10 failed | 11 passed**, entre eles
+`audit-download-fallback-identity` esperando `result.success` falso e recebendo
+verdadeiro, porque os argumentos andaram uma posição. Verde em `33420b1`.
+
+Gate (Windows, `npm run quality`): tsc limpo, eslint 0 erros e 40 warnings
+(todos `no-explicit-any` pré-existentes), vitest **797 passed | 5 skipped (802)**
+em 71 arquivos. CI do PR #40 verde nos três jobs.
+
