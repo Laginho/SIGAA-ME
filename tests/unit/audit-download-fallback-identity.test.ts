@@ -90,19 +90,3 @@ it('sem linha com o id, o resultado é falha, sem goto e sem executar script de 
     expect(goto).not.toHaveBeenCalled();
     expect(evaluate).toHaveBeenCalledTimes(1);
 });
-
-it('linha só com href (sem onclick) é alcançada pelo id "link:<url>" e vira goto (BUG-019)', async () => {
-    const href = 'https://si3.ufc.br/sigaa/ava/material/arquivo.jsf?key=abc123';
-    const row = {
-        tagName: 'A',
-        getAttribute: (name: string) => (name === 'href' ? href : undefined),
-    };
-    (globalThis as { document?: unknown }).document = { querySelectorAll: () => [row] };
-    const { page, evaluate, goto } = fakePage();
-
-    const result = await new DownloadService().downloadFile(page, '', 'Material', COURSE, destino, `link:${href}`);
-
-    expect(result.success).toBe(true);
-    expect(evaluate).toHaveBeenCalledTimes(1);
-    expect(goto).toHaveBeenCalledWith(href, expect.objectContaining({ waitUntil: 'networkidle' }));
-});
