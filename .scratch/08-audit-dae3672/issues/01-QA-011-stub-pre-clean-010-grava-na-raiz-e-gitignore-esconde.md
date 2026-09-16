@@ -1,6 +1,6 @@
 # QA-011: Stub pré-`CLEAN-010` grava PDF na raiz do repo a cada `npm test`, e o `.gitignore` esconde
-Status: open
-Stage: to-review
+Status: resolved
+Stage: done
 Priority: P1
 Blocked by: nenhum
 Review: agent
@@ -79,6 +79,48 @@ ou `.pdf` que alguém tentasse versionar. Nenhum teste grava fora de
   para provar o vermelho, rode a asserção nova em cima do stub antigo antes de
   trocar a assinatura (falha: o caminho começa com `999`). O `.gitignore` vai
   no commit de implementação.
+
+#### Resolution (2026-09-16)
+
+Verdict: Approve
+
+Commits `b4bc854` (teste/correção) e `3f68462` (`.gitignore`), merge `0bea343`
+pelo PR #41. Revisão completa em
+https://github.com/Laginho/SIGAA-ME/pull/41#issuecomment-5704521399.
+
+Decisão: os dois lados do ticket se provam um ao outro e por isso ficaram juntos.
+O stub voltou à assinatura atual (`basePath`, `fileId` nas posições certas) e o
+teste passou a afirmar `result.data.filePath.startsWith(destino)` — a metade que
+antes passava por vacuidade. As sete regras de extensão saíram do `.gitignore`
+porque são o que tornava a regressão invisível; sem elas, o critério 4 vira
+verificável.
+
+Arquivos: `tests/integration/logging-boundary.test.ts` (:240-241, :248-249),
+`.gitignore` (:38-44, removidas). Nada fora dos Primary files.
+
+Prova vermelho-verde, feita pelo revisor e não herdada do relatório da etapa 2 —
+assinatura antiga reposta no stub, arquivo rodado sozinho:
+
+    × loga no escopo Download, sem o nome do arquivo nem o caminho
+    AssertionError: expected false to be true
+      tests/integration/logging-boundary.test.ts:249
+      expect(result.data.filePath.startsWith(destino)).toBe(true)
+    Tests  1 failed | 6 passed (7)
+
+Essa mesma execução, já com o `.gitignore` corrigido, deixou `?? 999/` no
+`git status`, com `999/Cálculo I/Lista 3.pdf` dentro. Com a assinatura correta:
+árvore limpa.
+
+Gate (`npm run quality`, Windows): `tsc` limpo, eslint 0 erros / 40 warnings
+(`no-explicit-any` pré-existentes), 797 passed | 5 skipped (802) em 71 arquivos.
+`git status --short` vazio depois da suíte inteira, sem `999/` nem `10/`. CI do
+PR verde nos três jobs (typecheck/lint/testes, E2E sem credencial, scanner de
+segredo).
+
+Observação do revisor, sem ticket aberto (abrir é trabalho da etapa 1): a causa
+de fundo continua sendo o `tsconfig.json` não incluir `tests/`, o que deixa erro
+de tipo em teste invisível ao gate. Foi por isso que a chamada deslocada passou —
+todo parâmetro é `string`. Este ticket tratou o sintoma.
 
 ## Comments
 
