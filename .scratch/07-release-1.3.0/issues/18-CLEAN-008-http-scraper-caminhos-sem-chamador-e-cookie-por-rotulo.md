@@ -1,6 +1,6 @@
 # CLEAN-008: `http-scraper`: caminhos sem chamador e cookie por rótulo
-Status: open
-Stage: to-review
+Status: resolved
+Stage: done
 Priority: P3
 Blocked by: nenhum
 Review: agent
@@ -133,8 +133,67 @@ chamada com aridade errada compila, e o `TypeError` que ela gera cai no `catch`
 genérico do próprio método. É o padrão do `QA-003` de novo: teste verde por
 cima de asserção que não executa mais nada.
 
+#### Resolution (2026-09-15)
+
+Verdict: Approve
+
+Revisado: `sweatshop/2026-09-15-2032...clean-008` (0808978, 13e9853, 60cec6e,
+d875e94, 97eb995, 8e3df53, 63ed4bd, 0b48469, 8bebe64). A rodada anterior já
+tinha validado os critérios 1, 3, 4 e 6; esta revisão fecha 7, 8 e 9.
+
+Arquivos: `electron/services/http-scraper.service.ts`,
+`electron/sigaa/portal-adapter.ts`, `electron/sigaa/selectors.ts`,
+`ARCHITECTURE.md`, `tests/integration/logging-boundary.test.ts`,
+`tests/integration/portal-adapter.test.ts`,
+`tests/integration/portal-course-entry.test.ts`,
+`tests/unit/http-scraper-cookie-domain.test.ts`.
+
+Vermelho provado pelo revisor, não só relatado:
+
+- Critério 7a — removido `this.courseData.delete(courseId)` do `catch` de
+  `getCourseFiles` (`http-scraper.service.ts:430`):
+  `portal-course-entry.test.ts:169` falha em
+  `expect(runtime.axios.post).not.toHaveBeenCalled()` (1 failed | 2 passed).
+  O `saveRaw` armado (`:196`) está dentro do `try` desse mesmo `catch` —
+  causa real, não bug de aridade.
+- Critério 7b — `sanitizeError` (`logger.service.ts:105`) devolvendo o erro
+  cru espalhado: `logging-boundary.test.ts:195` falha em
+  `expect(log).not.toContain('config')`, com
+  `{"isAxiosError":true,"config":{"headers":{"Cookie":...` no log
+  (1 failed | 6 passed). O teste agora passa por `downloadFile` →
+  `axios.post:494`, caminho vivo.
+- Critério 9 — a instrução do ticket era não apagar `validateCourseEntryEnd`
+  em silêncio se o caminho Playwright não tivesse validação de estado final
+  própria. Tem: `playwright-login.service.ts:550-551` (`Menu Turma Virtual`),
+  `:573-583` (`#nomeTurma` conferido contra `courseName`) e `:587-596`
+  (ainda no portal ⇒ erro). A remoção não desliga defesa nenhuma.
+  Grep confirma zero ocorrências de `findCourseRow`,
+  `validateCourseEntryEnd`, `missingViewStateBeforePostMessage`, `formByName`,
+  `courseIdInputWithValue` e `JSF.linkPattern` em `.ts`/`.js` — só texto de
+  ticket no `.scratch/`.
+- Critério 8: `ARCHITECTURE.md:51` removido, `:86` reescrito.
+
+Gate (Windows, `npm run quality`): 70 arquivos, 769 passed, 5 skipped,
+0 erro de lint (44 warnings `no-explicit-any`, pré-existentes). Exit 0.
+
+Critérios 2 e 5 seguem ❌ por registro histórico: a parte válida de cada um
+virou 9 e 7, ambos ✅. Nada da intenção original ficou sem cobertura.
+
+Desvio registrado, não bloqueante: o commit `0b48469` é `chore:` e edita
+`tests/integration/portal-adapter.test.ts` junto do código — a regra do loop
+é que commit de código não toca `tests/`. Aqui a edição é só a remoção das
+duas asserções que exerciam as funções apagadas no mesmo commit, então não há
+o risco que a regra guarda (teste verde por cima de código quebrado); ainda
+assim é desvio.
+
 ## Comments
 
+- Docs históricos ainda descrevem `enterCourseHTTP` como vivo, fora dos
+  Primary files deste ticket: `plans/README.md:107` (registra a decisão do
+  autor de mantê-lo até `BUG-010`, que já fechou),
+  `plans/005-debug-dump-and-log-hygiene.md:44,142` e
+  `docs/AUDITORIA_COMPLEXIDADE.md:33,176`. Vale `CLEAN-*` próprio se alguém
+  quiser os planos coerentes; auditoria datada é registro e pode ficar.
 - Lição registrada no `CLAUDE.md`: `import ... from` não acha
   `await import()`, e importado não é alcançável. Suba a cadeia até um handler
   IPC, `main.ts` ou teste antes de chamar de morto.
