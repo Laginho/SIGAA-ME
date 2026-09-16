@@ -1,6 +1,6 @@
 # CONC-002: Índice de downloads sem read-modify-write cruzado
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P1
 Blocked by: nenhum
 Review: agent
