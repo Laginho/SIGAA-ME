@@ -84,12 +84,12 @@ export class DownloadService {
 
                     const onclick = link.getAttribute('onclick');
                     const idMatch = onclick && onclick.match(/,id,([^,'"]+)/);
-                    if (!idMatch || idMatch[1] !== id) continue;
+                    if (idMatch && idMatch[1] === id) return { type: 'script', value: onclick };
 
-                    if (onclick) return { type: 'script', value: onclick };
-
+                    // Sem onclick, o id não vem do JSF: é o `link:<url>` que o parser
+                    // atribui a material sem script (BUG-019).
                     const href = link.getAttribute('href');
-                    if (href) return { type: 'href', value: href };
+                    if (!onclick && href && id === `link:${href}`) return { type: 'href', value: href };
                 }
                 return null;
             }, fileId);
