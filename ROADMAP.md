@@ -15,8 +15,8 @@ Only works for UFC's SIGAA (`si3.ufc.br`).
 
 - [ ] Better error messages
 - [ ] More accurate loading states
-- [ ] Settings options to store default choices
-- [ ] Dark mode (sorry for not being on the MVP)
+- [x] Settings options to store default choices
+- [x] Dark mode (sorry for not being on the MVP)
 
 ---
 

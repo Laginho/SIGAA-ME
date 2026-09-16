@@ -299,20 +299,21 @@ must occur outside the repository before the fixture is added.
 
 ### Layer 4 — Live compatibility canary
 
-- Runs nightly and on demand.
-- Uses a dedicated minimum-privilege account.
-- Is read-only unless a separate download test is explicitly enabled.
-- Never runs as part of ordinary PR checks.
-- Reports compatibility evidence and safe diagnostics.
+Not implemented yet. No nightly workflow exists (see `.github/workflows/`);
+the live smoke test (`tests/integration/scraper.test.ts`, gated by
+`npm run test:live`/`RUN_LIVE_SIGAA_TESTS=true`) is the manual equivalent
+today. Design, if built: a dedicated minimum-privilege account, read-only
+unless a separate download test is explicitly enabled, never part of
+ordinary PR checks, reporting compatibility evidence and safe diagnostics.
 
 ### Layer 5 — Manual release verification
 
 Required when a release changes login, session handling, selectors, navigation,
 JSF parsing, download behavior, or adapter version.
 
-## Live canary contract
+## Live canary contract (design, not implemented — see Layer 4)
 
-The canary should verify:
+If built, the canary should verify:
 
 1. SIGAA login URL is reachable.
 2. Login page classifies as `LOGIN` with high confidence.
@@ -425,7 +426,8 @@ privacy design review.
 - Run parser/classifier fixtures.
 - Run mocked navigation tests.
 - Run packaged Electron E2E.
-- Run the live canary.
+- Run the live smoke test manually (`npm run test:live`/
+  `RUN_LIVE_SIGAA_TESTS=true`); no automated canary exists yet (Layer 4).
 - Manually verify the affected journey when it changes session or download
   behavior.
 
@@ -433,8 +435,8 @@ privacy design review.
 
 - Document the adapter version in release notes.
 - Keep the previous adapter logic available for rollback when feasible.
-- Monitor canary outcomes after release.
-- Close the incident only after repeated successful live checks.
+- Re-run the live smoke test manually after release and watch for recurrence.
+- Close the incident once the manual live smoke test passes post-release.
 
 ## Release compatibility evidence
 
