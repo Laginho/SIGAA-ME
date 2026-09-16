@@ -219,3 +219,23 @@ describe('PORTAL-007 — getCourses falho ao relançar o browser dentro de enter
         expect(result.error).not.toContain(internalMessage);
     });
 });
+
+describe('PORTAL-012 — verificação de turma: mensagem literal e errorCode explícito', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it('quando o cabeçalho #nomeTurma mostra outra turma, devolve SESSION_EXPIRED sem vazar cabeçalho nem nome da turma na mensagem', async () => {
+        const { service, page, setDocument } = await authenticatedService();
+        setDocument(PORTAL_DOCUMENT);
+        page.evaluate.mockResolvedValue({ success: true });
+        page.locator().textContent.mockResolvedValue('TI0116 - SINAIS E SISTEMAS (2026.1 - T01)');
+
+        const result = await service.enterCourseAndGetHTML('123', 'Algorithms');
+
+        expect(result.success).toBe(false);
+        expect(result.errorCode).toBe('SESSION_EXPIRED');
+        expect(result.error).not.toMatch(/sinais e sistemas|algorithms/i);
+        expect(result.error).not.toMatch(/session/i);
+    });
+});

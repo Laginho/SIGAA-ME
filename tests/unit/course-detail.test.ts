@@ -37,7 +37,7 @@ describe('course-detail: falha de download', () => {
             name: 'Cálculo I',
             code: 'CB0001',
             files: [{ name: 'Lista 3.pdf', type: 'file', id: '555', script: "jsfcljs(document.forms['formAva'],'formAva:j_id_jsp_1,formAva:j_id_jsp_1,id,555','');" }],
-            news: [],
+            news: [{ id: 'n1', title: 'Aviso importante', date: '01/01/2026', notification: '' }],
         }]));
 
         (window as any).api = {
@@ -48,6 +48,7 @@ describe('course-detail: falha de download', () => {
             checkFilesExistence: vi.fn().mockResolvedValue(ok([])),
             // Assinado no render; sem ele a página cai no error-message e não há botão.
             onDownloadProgress: vi.fn(() => () => undefined),
+            getNewsDetail: vi.fn(),
         };
     });
 
@@ -89,6 +90,40 @@ describe('course-detail: falha de download', () => {
         expect((window as any).api.checkFilesExistence).toHaveBeenCalledWith(['C:/Users/aluno/SIGAA/Lista 3.pdf']);
         expect(container.querySelectorAll('.file-item')).toHaveLength(1);
         expect(container.querySelector('.status-done')).not.toBeNull();
+    });
+
+    it('mostra o corpo da notícia e avisa por toast quando o cache falha (CLEAN-011 item 1)', async () => {
+        const toastError = vi.spyOn(toast, 'error').mockImplementation(() => undefined);
+        const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+        (window as any).api.getNewsDetail = vi.fn().mockResolvedValue(ok({
+            title: 'Aviso importante', date: '01/01/2026', notification: '', content: 'Corpo da notícia',
+        }));
+        // `mergeCoursesIntoCache` traduz `QuotaExceededError` numa mensagem de
+        // cache cheio (ver ui-helpers.ts) — simular a cota estourando no
+        // `localStorage.setItem` real exercita esse caminho de verdade, sem
+        // mockar o util que o item 1 corrige o chamador de.
+        vi.spyOn(Storage.prototype, 'setItem').mockImplementation((key: string) => {
+            if (key.endsWith(':courses')) {
+                const quotaError = new Error('quota') as Error & { name: string };
+                quotaError.name = 'QuotaExceededError';
+                throw quotaError;
+            }
+        });
+
+        const container = document.createElement('div');
+        document.body.appendChild(container);
+        renderCourseDetailPage(container, 'c1');
+        for (let i = 0; i < 10; i++) await flushAll();
+
+        const newsItem = container.querySelector<HTMLButtonElement>('.news-item');
+        expect(newsItem).not.toBeNull();
+        newsItem!.click();
+        for (let i = 0; i < 10; i++) await flushAll();
+
+        const modalBody = document.getElementById('modalBody');
+        expect(modalBody?.textContent).toContain('Corpo da notícia');
+        expect(toastError).toHaveBeenCalledWith(expect.stringContaining('Cache local cheio'));
+        expect(consoleWarn).not.toHaveBeenCalled();
     });
 });
 
@@ -253,7 +288,10 @@ describe('course-detail: índice de downloads sem read-modify-write cruzado (CON
             id: 'c1',
             name: 'Cálculo I',
             code: 'CB0001',
-            files: [{ name: 'Lista 3.pdf', type: 'file', id: '555' }],
+            files: [
+                { name: 'Lista 3.pdf', type: 'file', id: '555' },
+                { name: 'Lista 4.pdf', type: 'file', id: '556' },
+            ],
             news: [],
         }]));
         writeAccountItem('downloads', JSON.stringify({
@@ -289,6 +327,13 @@ describe('course-detail: índice de downloads sem read-modify-write cruzado (CON
         const downloads = JSON.parse(readAccountItem('downloads') || '{}');
         expect(downloads.c1['556']).toBeDefined();
         expect(downloads.c1['555']).toBeUndefined();
+
+        // CLEAN-011 item 2: a lista renderizada precisa refletir a releitura,
+        // não o objeto capturado antes do `await checkFilesExistence`.
+        const row555 = container.querySelector('[data-file-id="555"]');
+        const row556 = container.querySelector('[data-file-id="556"]');
+        expect(row555?.querySelector('.status-done')).toBeNull();
+        expect(row556?.querySelector('.status-done')).not.toBeNull();
     });
 });
 

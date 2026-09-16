@@ -38,6 +38,7 @@ let originalArgv: string[];
 
 beforeEach(() => {
     originalArgv = process.argv;
+    delete process.env.SIGAA_DEV_BRIDGE;
     vi.resetModules();
     contextBridgeMock.exposeInMainWorld.mockClear();
     ipcMock.on.mockClear();
@@ -67,23 +68,12 @@ function apiObject(): Record<string, any> {
 }
 
 describe('preload dev gate', () => {
-    it('sem --sigaa-dev expõe apenas api, sem ipcRenderer e sem simulateNewFile', async () => {
-        process.argv = originalArgv.filter(a => a !== '--sigaa-dev');
+    it('expõe apenas api, sem ipcRenderer e sem simulateNewFile (sem SIGAA_DEV_BRIDGE)', async () => {
         await importPreload();
 
         const names = exposedNames();
         expect(names).toHaveLength(1);
         expect(names[0]).toBe('api');
-        expect(names).not.toContain('ipcRenderer');
-        expect('simulateNewFile' in apiObject()).toBe(false);
-    });
-
-    it('com --sigaa-dev mantém simulação e IPC genérico fora de api', async () => {
-        process.argv = [...originalArgv, '--sigaa-dev'];
-        await importPreload();
-
-        const names = exposedNames();
-        expect(names).toContain('api');
         expect(names).not.toContain('ipcRenderer');
         expect('simulateNewFile' in apiObject()).toBe(false);
     });
