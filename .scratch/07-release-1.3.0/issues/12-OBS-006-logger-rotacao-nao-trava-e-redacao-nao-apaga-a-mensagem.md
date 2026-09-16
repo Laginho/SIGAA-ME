@@ -1,6 +1,6 @@
 # OBS-006: Logger: rotação não trava e redação não apaga a mensagem
-Status: open
-Stage: to-review
+Status: resolved
+Stage: done
 Priority: P2
 Blocked by: nenhum
 Review: agent
@@ -51,6 +51,58 @@ fim da linha. `expected <string> but got undefined` vira
 - `tests/unit/logger-redaction.test.ts`: `redact('expected <string> but got 5')`
   preserva `but got 5`; `redact('<div class="x">oi</div> fim')` remove as
   tags e mantém `oi` e `fim`. Vermelho no primeiro.
+
+#### Resolution (2026-09-15)
+
+Verdict: Approve
+
+Commits: `33e086d` (testes, vermelho), `573979e` (correção), merge `83dc405`.
+
+Decisão. `rotate()` envolve o laço `unlink`/`rename` num `try/catch` que
+registra por `console.error` — o mesmo caminho do `onSinkFailure`, escolhido
+porque `this.error` chamaria `rotate()` de novo. O `openStream()`, o
+`this.bytes = 0` e o `resolve()` ficaram fora do `try`, então a promise resolve
+em qualquer caso e o `writeLine` seguinte grava. `HTML_RE` virou
+`/<!--[\s\S]*?-->|<\/?[a-zA-Z!][^<>]*>/g` com substituição por string vazia:
+casa uma tag ou um comentário por vez em vez de consumir até o fim da linha.
+
+Arquivos: `electron/services/logger.service.ts` (`:35`, `:52`, `:263-289`),
+`tests/unit/logger-redaction.test.ts`, `tests/unit/logger-rotate.test.ts` (novo).
+Nada fora dos Primary files. Commit de teste e commit de código separados, sem
+sobreposição de arquivos no `diff --stat`.
+
+Vermelho sem a correção (`git checkout 33e086d~1 -- electron/services/logger.service.ts`):
+
+    Test Files  2 failed (2)
+         Tests  3 failed | 24 passed (27)
+        Errors  1 error
+    Uncaught Exception: EPERM: operation not permitted, unlink '…\logs\app.1.log'
+      ❯ Array.finish electron/services/logger.service.ts:271:47
+
+Ou seja: a exceção escapa do callback do `stream.end`, `rotate()` nunca
+resolve, e o teste novo morre no timeout de 2s. As duas asserções de redação
+falham junto.
+
+Verde com a correção, gate completo (`npm run quality`):
+
+    ✖ 52 problems (0 errors, 52 warnings)
+    Test Files  69 passed (69)
+         Tests  761 passed | 5 skipped (766)
+
+Critérios 1 a 4: todos atendidos.
+
+Observações que não bloqueiam e não viraram ticket:
+
+- `[^<>]*` não casa `>` dentro de valor de atributo (`<a title="a>b">` deixa
+  resto), e tag não fechada no fim da linha não é removida. Cosmético: sobra
+  texto, não segredo.
+- Corpo de `<script>`/`<style>` agora sobrevive à remoção das tags. Busca no
+  `electron/` e no `src/` não achou **nenhum** chamador que passe HTML de
+  página ao logger: os ~11 pontos de captura em `playwright-login.service.ts` e
+  `http-scraper.service.ts` vão para `diagnosticsService.saveRaw`, e os `log.*`
+  vizinhos registram só `length`/`contentLength`. Some-se o `CONTENT_KEYS`
+  (`html`, `body`, `script` viram `[redacted]` em produção) e o risco é
+  teórico. É o compromisso já registrado abaixo.
 
 ## Comments
 
