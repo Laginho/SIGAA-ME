@@ -1,6 +1,6 @@
 # CLEAN-011: Cortes pequenos da auditoria `dae3672`, um commit cada
 Status: open
-Stage: to-implement
+Stage: implementing
 Priority: P3
 Blocked by: nenhum
 Review: agent
