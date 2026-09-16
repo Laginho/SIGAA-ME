@@ -1,6 +1,6 @@
 # SEC-004: Material `link` nunca entra no pipeline de download
-Status: open
-Stage: to-implement
+Status: resolved
+Stage: done
 Priority: P0
 Blocked by: nenhum
 Review: human
@@ -19,13 +19,23 @@ Itens 7 e 15 do gabarito (`docs/audits/release-1.3.0/README.md`); detalhe em
 #### What to build
 
 Com `autoDownloadUpdates` ligado (padrão), um material novo do tipo `link`
-numa turma não pode abrir um Chrome visível nem navegar para a URL que o
-professor colou. Hoje `diff.newFiles` vai inteiro a `downloadAllFiles`; o link
-não tem script e vira `failed`; o retry HTTP pula por falta de script; o laço de
-último recurso chama `downloadViaPlaywright`, que abre o navegador com
-`headless: false` e faz `page.goto(href)` na URL externa, esperando até 65 s por
-um download que não vem. O caminho manual já filtra
-(`course-detail.ts:462`); o background não.
+numa turma não pode abrir um Chrome visível. Hoje `diff.newFiles` vai inteiro a
+`downloadAllFiles`; o link não tem script e vira `failed`; o retry HTTP pula por
+falta de script; o laço de último recurso chama `downloadViaPlaywright`, que
+abre o navegador com `headless: false`, navega pela turma, não acha a linha e
+lança `Link not found and no script provided in fallback` depois do overhead
+todo. O caminho manual já filtra (`course-detail.ts:462`); o background não.
+
+**Correção (revisão do PR #32):** a versão original deste parágrafo dizia que o
+fallback fazia `page.goto(href)` na URL externa que o professor colou. Não faz —
+o ramo `href` do `freshAction` é inalcançável (`download.service.ts:90` exige um
+`onclick` casando por id antes de olhar o `href`, e linha de `link` não tem
+`onclick`), e o outro `page.goto` do fallback (`else if (fileUrl && ...)`)
+recebe sempre `fileUrl: ''` de `downloadViaPlaywright`
+(`sigaa.service.ts:204`). O dano real é o browser visível, a navegação na turma
+e a espera. O P0 continua de pé pelo comportamento em background; só o pior caso
+estava descrito errado. O critério 4 vira defesa em profundidade: fecha o ramo
+antes que `DL-007` (casamento por id) o torne alcançável.
 
 Junto, o item 15: uma fila que esvazia inteira por `skipped` ainda entra na
 turma (`enterCourseAndGetHTML`), e offline isso devolve erro e descarta os
@@ -83,3 +93,53 @@ caso.
   para servir a este caso.
 - `DL-007` mexe no mesmo `freshAction` (casamento por id). Sem gate: blocos
   diferentes; quem chegar depois resolve o conflito dentro dos Primary files.
+
+#### Resolution (2026-09-15)
+
+Verdict: Approve
+
+Revisão de etapa 3 sobre `master..sec-004` (3 commits), eixos Standards e Spec.
+Nenhum achado que exija correção. PR aberto e segurando, porque `Review: human`.
+
+**Critérios, um a um**
+
+1. ✅ `background-sync.service.ts:235` filtra `f.type === 'file'` antes do
+   `if`, então um diff só de links não loga "Auto-downloading" nem chama
+   `downloadAllFiles`. `CourseFile.type` é obrigatório (`shared/domain.ts:75`),
+   não opcional — o filtro não descarta arquivo legítimo por campo ausente.
+2. ✅ `sigaa.service.ts:494-501`: o par é buscado por id, `type: 'link'` vira
+   `skipped` com log próprio e `continue`, antes do retry HTTP e do
+   `downloadViaPlaywright`. Item sem par continua `failed` (`:503-510`).
+3. ✅ `sigaa.service.ts:415-417` devolve `ok` com os `skipped` já apurados sem
+   chamar `enterCourseAndGetHTML`.
+4. ✅ `download.service.ts:139-145` resolve contra `page.url()` e exige
+   `https:` + `si3.ufc.br`; recusa devolve `{ success: false }` com mensagem e
+   sem `goto`. `new URL` inválida cai no catch externo (`:296-302`), que também
+   devolve falha, e o `localBrowser.close()` do chamador
+   (`playwright-login.service.ts:831/835`) roda nos dois caminhos.
+5. ✅ Gate verde.
+
+**Separação de commits**: `8efb858` e `2ef0db7` só tocam `tests/` + o ticket;
+`fa68ae6` só toca `electron/` + o ticket. Nenhum commit de código mexeu em teste.
+
+**Prova red-green**: com `git checkout master -- electron/` (testes novos sobre
+o código velho), `npx vitest run` nos três arquivos dá
+`Test Files 3 failed (3) | Tests 5 failed | 31 passed (36)` — o diff do
+`sigaa-service.test.ts` mostra `status: 'failed'` onde o esperado é `'skipped'`.
+Com o código da branch, `npm run quality`: 0 erros de lint (52 warnings de
+`no-explicit-any`, pré-existentes), `Test Files 66 passed (66)`,
+`Tests 739 passed | 5 skipped (744)`.
+
+**Observações, nenhuma bloqueante**
+
+- A troca de `findScript(a) ?? findScript(b)` por
+  `findParsedFile(a) ?? findParsedFile(b)` muda o curto-circuito: agora basta
+  existir par por id em `parsedFiles` para a seção de arquivos não ser
+  consultada. Só diverge se o mesmo id sair como `link` no Dashboard e como
+  `file` na seção — e aí o resultado é `skipped`, o lado seguro. O parser não
+  emite `type: 'file'` sem `script` (`http-scraper.service.ts:422,460`), então
+  o caso que motivou o segundo parse (arquivo ausente do Dashboard) continua
+  caindo no `??`.
+- O gatilho do `navigateToFilesSection` (`sigaa.service.ts:473`) ainda usa
+  `findScript`, então um link que chegue à fila pela via manual paga uma
+  navegação extra antes de ser pulado. Custo, não correção; não vale ticket.
