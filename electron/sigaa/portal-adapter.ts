@@ -10,9 +10,9 @@ import type { AppErrorCode } from '../../shared/errors';
 import { AVA, LOGIN_SELECTOR_LABELS, STUDENT_PORTAL } from './selectors';
 import type { AvaForm, PortalCheck } from './portal-contracts';
 import { portalError } from './portal-contracts';
-import { isAuthenticatedLanding, isLoginDocument, isStudentHome, isStudentPortal } from './portal-state-classifier';
+import { isAccessDenied, isAuthenticatedLanding, isLoginDocument, isMaintenance, isStudentHome, isStudentPortal } from './portal-state-classifier';
 
-export { isLoginDocument, isStudentHome, isStudentPortal, isAuthenticatedLanding, hasRecognizedAvaForm, classify } from './portal-state-classifier';
+export { isLoginDocument, isStudentHome, isStudentPortal, isAuthenticatedLanding, isMaintenance, isAccessDenied, hasRecognizedAvaForm, classify } from './portal-state-classifier';
 export { LOGIN_SELECTOR_LABELS } from './selectors';
 export type { PortalError, PortalCheck, PortalState, AvaForm } from './portal-contracts';
 export { PORTAL_ADAPTER_VERSION, portalError } from './portal-contracts';
@@ -63,6 +63,12 @@ export function validateCourseListDocument(html: string): PortalCheck {
         return portalError('SESSION_EXPIRED', 'Session expired: SIGAA returned the login page instead of the student portal.');
     }
     if (isStudentPortal(html) || isStudentHome(html)) return null;
+    if (isMaintenance(html)) {
+        return portalError('PORTAL_UNAVAILABLE', 'SIGAA portal unavailable: scheduled maintenance page returned instead of the student portal.');
+    }
+    if (isAccessDenied(html)) {
+        return portalError('SESSION_EXPIRED', 'Session expired: SIGAA denied access to the student portal.');
+    }
     return portalError(
         'SELECTOR_DRIFT',
         `SIGAA portal selector drift: the student portal structure (${STUDENT_PORTAL.courseIdInput}) was not found. The portal layout may have changed.`
