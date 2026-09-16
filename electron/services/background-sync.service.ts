@@ -46,10 +46,6 @@ export class BackgroundSyncService {
         }
     }
 
-    public restart() {
-        this.start();
-    }
-
     /**
      * Resolve de imediato sem sync em voo. Com um em voo, pede a parada e só
      * resolve quando ele efetivamente parar — logout e clear-all aguardam isto
