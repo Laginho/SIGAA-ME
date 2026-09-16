@@ -175,20 +175,27 @@ describe('HttpScraperService', () => {
     });
 
     it('uma falha de rede com cookie de sessão no AxiosError nunca grava o cookie', async () => {
+        await scraper.getCourseFiles('99999', 'Cálculo I', fixture('course-page-with-files.html'));
+
         const axiosError = Object.assign(new Error('Request failed with status code 500'), {
             isAxiosError: true,
             config: { headers: { Cookie: 'JSESSIONID=SEGREDO123' } },
         });
-        vi.mocked(axios.get).mockRejectedValue(axiosError);
+        vi.mocked(axios.post).mockRejectedValue(axiosError);
+        const destino = mkdtempSync(path.join(os.tmpdir(), 'sigaa-me-logging-boundary-download-error-'));
 
-        const result = await scraper.getCourseFiles('99999', 'Cálculo I');
+        try {
+            const result = await scraper.downloadFile('99999', '555', 'Lista 3.pdf', destino, DOWNLOAD_SCRIPT);
 
-        expect(result.success).toBe(false);
-        await logger.flush();
-        const log = readLog();
-        expect(log).toContain('[HttpScraper]');
-        expect(log).not.toContain('SEGREDO123');
-        expect(log).not.toContain('config');
+            expect(result.success).toBe(false);
+            await logger.flush();
+            const log = readLog();
+            expect(log).toContain('[HttpScraper]');
+            expect(log).not.toContain('SEGREDO123');
+            expect(log).not.toContain('config');
+        } finally {
+            rmSync(destino, { recursive: true, force: true });
+        }
     });
 
     it('downloadFile HTTP loga no escopo HttpScraper, sem o nome do arquivo', async () => {
