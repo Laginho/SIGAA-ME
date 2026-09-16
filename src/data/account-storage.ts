@@ -107,6 +107,10 @@ export function purgeLegacyStorage(): void {
     for (const key of LEGACY_KEYS) localStorage.removeItem(key);
 }
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 /**
  * Grava os arquivos `downloaded` de `records` no índice `downloads` da conta
  * ativa (DL-006) — chamado depois de um "Baixar todos" manual
@@ -114,10 +118,6 @@ export function purgeLegacyStorage(): void {
  * (`dashboard.ts`), para os dois alimentarem o mesmo `known` que o próximo
  * lote usa para não duplicar.
  */
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 export function recordDownloads(courseId: string, records: DownloadRecord[]): void {
     const downloaded = records.filter(
         (r): r is Extract<DownloadRecord, { status: 'downloaded' }> => r.status === 'downloaded'
