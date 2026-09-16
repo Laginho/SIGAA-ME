@@ -1,6 +1,6 @@
 # PIPE-007: CI: catraca de warnings, `permissions:` e gitleaks pinado
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P2
 Blocked by: nenhum
 Review: agent
@@ -50,3 +50,7 @@ checkout.
 - `release.yml` já tem `permissions` por job desde `REL-001`; fora do escopo.
 - O piso de cobertura repo-wide (também na seção Processo) ficou fora: exige
   um número decidido, não um ticket.
+- `gitleaks/gitleaks-action@v2` roda em Node 20, que o GitHub remove dos
+  runners hospedados em 2026-09-16 — a v3 (Node 24) é um `uses:` de uma linha
+  mais `actions/checkout@v6`. Fora do escopo daqui (o ticket pede pin por SHA,
+  não upgrade de major); vale um ticket próprio antes daquela data.

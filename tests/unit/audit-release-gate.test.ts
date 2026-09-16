@@ -143,3 +143,37 @@ describe('quality workflow runs the coverage and audit gates on every PR (QA-001
         },
     );
 });
+
+describe('lint script ratchets eslint warnings, never grows (PIPE-007)', () => {
+    const pkg = JSON.parse(readFileSync(path.resolve(process.cwd(), 'package.json'), 'utf8')) as {
+        scripts: Record<string, string>;
+    };
+
+    it('caps the lint script with --max-warnings', () => {
+        expect(pkg.scripts.lint).toMatch(/--max-warnings \d+/);
+    });
+});
+
+describe('quality workflow scopes the GITHUB_TOKEN permissions (PIPE-007)', () => {
+    const qualityLines = workflowLines('quality.yml');
+
+    it('declares permissions before the first job', () => {
+        const permissionsIndex = qualityLines.findIndex((line) => line.trim() === 'permissions:');
+        const jobsIndex = qualityLines.findIndex((line) => line.trim() === 'jobs:');
+
+        expect(permissionsIndex).toBeGreaterThan(-1);
+        expect(jobsIndex).toBeGreaterThan(-1);
+        expect(permissionsIndex).toBeLessThan(jobsIndex);
+    });
+});
+
+describe('gitleaks action is pinned by commit SHA (PIPE-007)', () => {
+    const qualityLines = workflowLines('quality.yml');
+
+    it('pins gitleaks/gitleaks-action to a full 40-char commit SHA', () => {
+        const usesLine = qualityLines.find((line) => line.includes('gitleaks/gitleaks-action@'));
+
+        expect(usesLine).toBeDefined();
+        expect(usesLine).toMatch(/gitleaks\/gitleaks-action@[0-9a-f]{40}/);
+    });
+});
