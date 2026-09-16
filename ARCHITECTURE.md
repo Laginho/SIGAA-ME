@@ -119,12 +119,9 @@ electron/services/
 
 ## Logging and diagnostics
 
-Target state, specified in `OBS-001` → `OBS-004` → `OBS-005` → `OBS-003` →
-`OBS-002` (2026-09-08). The migration is expand–contract: `OBS-001` ships the
-logger and removes the `console` monkeypatch, `OBS-004`/`OBS-005` move the
-services over, `OBS-005` narrows the signature and turns `no-console` on for
-all of `electron/**`. Until `OBS-005` closes, services not yet migrated write
-to stdout only.
+`OBS-001` → `OBS-004` → `OBS-005` → `OBS-003` → `OBS-002` are all `done`. Every
+service in `electron/**` writes through the logger; `no-console` is a lint
+error there, enforced for the whole tree.
 
 - One logger (`logger.service.ts`), `userData/logs/app.log`, rotated 1 MiB × 5.
   `no-console` is a lint error in `electron/**`; the renderer's `console.*`

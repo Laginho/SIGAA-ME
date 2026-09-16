@@ -2,7 +2,7 @@ import '../styles/dashboard.css';
 import type { AccountProfile } from '../../shared/domain';
 import type { BackgroundSyncUpdate, CompatibilityStatus } from '../../shared/ipc';
 import { toast } from '../components/toast';
-import { clearActiveAccount, clearAllLocalData, getActiveAccount, readAccountItem, recordDownloads } from '../data/account-storage';
+import { clearActiveAccount, clearAllLocalData, getActiveAccount, readAccountItem, readCoursesCache, recordDownloads } from '../data/account-storage';
 import { h } from '../utils/dom';
 import { formatSyncLabel, mergeCoursesIntoCache } from '../utils/ui-helpers';
 import {
@@ -368,7 +368,7 @@ function loadCoursesFromCache() {
 
     if (cachedData) {
       console.log('Loading from cache...');
-      const coursesWithFiles = JSON.parse(cachedData);
+      const coursesWithFiles = readCoursesCache();
       displayCourses(coursesWithFiles, coursesListElement);
 
       if (cacheTimestamp && syncStatusManual) {

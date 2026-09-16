@@ -79,6 +79,9 @@ function findParsedFile(files: ParsedFile[] | undefined, file: DownloadFileRef):
 /** Devolvido pelas checagens de cancelamento; texto livre, os testes só olham o código. */
 const CANCELLED = fail('CANCELLED', 'Operação cancelada.');
 
+/** DL-008: teto de falhas consecutivas do fallback Playwright em downloadAllFiles. */
+const PLAYWRIGHT_FALLBACK_FAILURE_LIMIT = 3;
+
 export class SigaaService {
     private playwrightLogin: PlaywrightLoginService;
     private httpScraper: HttpScraperService;
@@ -609,13 +612,21 @@ export class SigaaService {
                 }
             }
 
-            // ponytail: um browser por arquivo no fallback de retry. O lote
-            // (playwrightLogin.downloadAllFiles) foi removido em CLEAN-003 por não ter chamador
-            // nem teste; se o volume de falhas justificar lote de novo, reconstruir do zero em
-            // vez de reviver o código antigo.
+            // ponytail: um browser por arquivo no fallback de retry, até 65s cada
+            // (download.service.ts:113), sem lote (CLEAN-003 removeu
+            // playwrightLogin.downloadAllFiles por não ter chamador nem teste; não
+            // reviver). DL-008: teto de PLAYWRIGHT_FALLBACK_FAILURE_LIMIT falhas
+            // consecutivas — acima disso o custo por tentativa não compensa, e o caso
+            // típico é deriva de seletor que já derrubou o lote inteiro. Um sucesso
+            // zera a contagem.
+            let consecutiveFailures = 0;
             for (let i = 0; i < results.length; i++) {
                 if (signal.aborted) return CANCELLED;
                 if (results[i].status !== 'failed') continue;
+                if (consecutiveFailures >= PLAYWRIGHT_FALLBACK_FAILURE_LIMIT) {
+                    log.warn('Playwright fallback interrupted by consecutive failures.', { courseId });
+                    break;
+                }
                 const fileId = results[i].fileId;
                 const fileName = results[i].fileName;
                 const originalFile = files.find(f => f.id === fileId);
@@ -631,6 +642,9 @@ export class SigaaService {
                     failed--;
                     results[i] = { fileId, fileName, status: 'downloaded', filePath: pwResult.data.filePath };
                     if (onProgress) onProgress(fileId, fileName, 'downloaded');
+                    consecutiveFailures = 0;
+                } else {
+                    consecutiveFailures++;
                 }
             }
 

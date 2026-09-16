@@ -1,6 +1,6 @@
 # PORTAL-012: Falha de verificação de turma: mensagem literal e `errorCode` explícito
-Status: open
-Stage: to-implement
+Status: resolved
+Stage: done
 Priority: P1
 Blocked by: nenhum
 Review: agent
@@ -93,6 +93,43 @@ hoje funciona. Se quem especificar preferir um código próprio, o
 - Opcional, se o critério 1 não tornar o vazamento impossível por construção:
   um caso com o logger em produção (`tests/integration/logging-boundary.test.ts`
   já tem `readLog()` e `production`) provando o critério 2.
+
+#### Resolution (2026-09-16)
+
+Verdict: Approve
+
+Decisão: forma mínima do ticket. O `throw new Error(errorMsg)` virou `return {
+success: false, error: 'Verificação de turma falhou: o portal carregou outra
+turma.', errorCode: 'SESSION_EXPIRED' }` dentro do `try`; o `log.error` da linha
+acima ficou como estava. `SESSION_EXPIRED` mantido, pelo motivo do corpo: o
+relogin reseta o estado JSF e a segunda entrada acerta a turma, e
+`enterCourseWithRelogin` já trata esse código.
+
+Arquivos: `electron/services/playwright-login.service.ts` (`:614-620`),
+`tests/integration/portal-course-entry.test.ts` (+20). `sigaa.service.ts` não
+foi tocado.
+
+Red-green: em `146f923` (commit só de teste), `npx vitest run
+tests/integration/portal-course-entry.test.ts` → 1 failed | 6 passed, falhando
+em `expect(result.error).not.toMatch(/sinais e sistemas|algorithms/i)` com a
+mensagem antiga interpolada. Com `e0d4437`, `npm run quality` verde: 0 erros de
+lint (40 warnings `no-explicit-any` pré-existentes), 71 arquivos, 798 passed |
+5 skipped.
+
+Critérios: 1 ✅ mensagem literal, cabeçalho e turma só em `meta`. 2 ✅ por
+construção — `coursename` e `title` estão em `CONTENT_KEYS`
+(`logger.service.ts:92-95`), redigidos quando `production()`; o teste opcional
+de logger não foi preciso. 3 ✅ código literal no `return`, sem passar pelo
+`catch` nem por `classifyMessage`; o `expect(result.error).not.toMatch(/session/i)`
+é a prova de que nenhuma prosa sustenta o código. 4 ✅ 5 ✅.
+
+Observação para quem for mexer aqui, não é bloqueio: o `throw` antigo caía no
+`catch`, que gravava `debug_playwright_fail_<id>.html` via
+`diagnosticsService.saveRaw`. O `return` pula esse dump. Custo baixo — o
+`saveRaw` só escreve quando `shouldCaptureRawArtifact` permite (fora de build
+empacotado), e em dev o `log.error` já mostra `courseName` e `title` sem
+redação. Os outros retornos `SESSION_EXPIRED` deste método (`:518`, `:551`)
+também não gravam dump; só `SELECTOR_DRIFT` e `NOT_FOUND` gravam.
 
 ## Comments
 
