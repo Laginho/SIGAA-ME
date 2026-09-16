@@ -1,6 +1,6 @@
 # QA-009: E2E assertam sem condição; visual checa conteúdo e espera a animação
 Status: open
-Stage: to-review
+Stage: reviewing
 Priority: P2
 Blocked by: nenhum
 Review: agent
@@ -62,3 +62,11 @@ entrada, então os PNGs em `_agent_tmp/shots/` variam sem mudança de código.
   impresso — onde o código antigo (asserção dentro do `if`) teria dado
   `2 passed` sem checar nada. `npx tsc --noEmit` e `npx eslint tests/e2e/
   app.spec.ts tests/e2e/visual.spec.ts` limpos.
+- Etapa 3 (`code-review`): 1 finding real. Separar o teste combinado tirou o
+  `test.setTimeout(180000)` que cobria o fluxo inteiro; "can download a course
+  file when one exists" ficou sob o timeout global de 60000ms do
+  `playwright.config.ts` enquanto ainda esperava até 90000ms pelo toast.
+  Fix pequeno, dentro do Primary file, sem teste novo: `test.setTimeout(120000)`
+  no início do teste (`tests/e2e/app.spec.ts:154`). Gate depois do fix:
+  `npx tsc --noEmit`, `npx eslint tests/e2e/app.spec.ts` limpos; `npm run
+  test:e2e` 44 passed (2.4min).
