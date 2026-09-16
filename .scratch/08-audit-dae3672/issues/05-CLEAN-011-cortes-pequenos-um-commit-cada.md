@@ -1,6 +1,6 @@
 # CLEAN-011: Cortes pequenos da auditoria `dae3672`, um commit cada
-Status: open
-Stage: to-review
+Status: resolved
+Stage: done
 Priority: P3
 Blocked by: nenhum
 Review: agent
@@ -138,3 +138,70 @@ Fixar `any` fica de fora: é trabalho de verdade em `course-detail.ts` (15) e
 Gate final: `npm run quality` verde — typecheck limpo, ESLint 0 erros / 40
 warnings (baseline 52, item 6), vitest 71 arquivos, 800 passed | 5 skipped
 (um a menos que antes: os dois casos do item 4 viraram um).
+
+#### Resolution (2026-09-16)
+
+Verdict: Approve
+
+Nove commits: dois só de teste (itens 1 e 2, vermelhos), um de teste-como-prova
+(item 4), quatro de código/doc, um de `Stage`. `diff --stat` por commit
+confere: commit de teste não toca fonte, commit de código não toca teste. Nada
+fora dos Primary files.
+
+Vermelho provado pelo revisor, não pelo relatório: com
+`src/pages/course-detail.ts` revertido para a ponta da sessão,
+`npx vitest run tests/unit/course-detail.test.ts` dá **2 failed | 7 passed** —
+o do item 1 em `toast.error` com 0 chamadas, o do item 2 em `.status-done` do
+`556` nulo. Restaurado: **9 passed**.
+
+Critérios:
+
+1. ✔ `course-detail.ts:592-596`: o `catch` chama `toast.error` com a mensagem
+   do erro e nenhum `console.warn` sobra. O `try` cobre só a gravação do
+   cache, então o toast não captura erro alheio. O teste estoura a cota no
+   `Storage.prototype.setItem` real e atravessa `mergeCoursesIntoCache` de
+   verdade — a asserção é sobre `'Cache local cheio'`, a mensagem que o util
+   produz, não sobre um mock do util.
+2. ✔ `courseDownloads` virou `let` e é reatribuído para `freshCourseDownloads`
+   (`:282`), fora do `if (staleKeys.length > 0)`; o laço de render (`:290`) lê
+   a releitura. A poda condicional do `CONC-003` ficou intacta.
+   **Residual anotado:** a releitura continua dentro de
+   `if (filePaths.length > 0)` (`:247`). Curso cujo índice de downloads está
+   vazio não relê nada, e um download que terminou durante o `await` de
+   `getCourseFiles` só aparece no render seguinte. É pré-existente e fora do
+   critério 2, que nomeia `checkFilesExistence`.
+3. ✔ `grep -n "JSON.parse" src/pages/dashboard.ts src/pages/sync-selection.ts`:
+   zero. Os três pontos passam por `readCoursesCache()`. Mudança de
+   comportamento aceita e correta: cache malformado agora vira `[]` validado em
+   vez de estourar no `catch` genérico do `dashboard.ts:391`.
+4. **Não cortado, e a recusa está certa** — pelo segundo ticket seguido. O
+   ticket afirmava "único leitor: `preload-dev-gate.test.ts`"; falso, e o
+   `CLEAN-007` item 8 (fechado 2026-09-15, `Approve`) já tinha registrado o
+   porquê. `dev-cache-mutation-boundary.test.ts:139,166-177` usa o retorno de
+   `bootMain(false)` (`additionalArguments` do `main.ts`) para alimentar
+   `loadPreload([...productionArgs, ...devArgs])` e provar que argv sozinho não
+   libera `testApi`. Apagar `main.ts:154` zera `devArgs` e essa linha vira uma
+   repetição de `:171`. O critério estava errado, não a implementação. Quem
+   quiser o corte reescreve aquele teste primeiro.
+   A parte do item que **foi** feita está certa: os dois casos de
+   `preload-dev-gate.test.ts` alternavam `--sigaa-dev` no `process.argv` e
+   afirmavam o mesmo resultado; viraram um, renomeado, com
+   `delete process.env.SIGAA_DEV_BRIDGE` no `beforeEach` — a autoridade real
+   agora está explícita no setup.
+   **Nota:** sobraram três `process.argv = originalArgv.filter(a => a !== '--sigaa-dev')`
+   em testes vizinhos do mesmo arquivo (`:82`, `:104`, `:126`), setup morto pelo
+   mesmo motivo. Fora da faixa `:70-90` dos Primary files, então não foi tocado
+   aqui.
+5. ✔ `ARCHITECTURE.md:122-124` descreve o estado atual; `OBS-005` só aparece na
+   lista de fechados. Conferido contra o `eslint.config.js:153-158`:
+   `no-console: 'error'` em `electron/**/*.ts`, com o próprio
+   `logger.service.ts` como único `ignores` — o bullet abaixo do parágrafo já
+   dizia isso.
+6. ✔ `package.json:29` com `--max-warnings 40`; `npm run lint` passa com 0
+   erros e exatamente 40 warnings, encostado na catraca.
+7. ✔ Gate verde na ponta: typecheck limpo, ESLint 0/40, vitest 71 arquivos,
+   **800 passed | 5 skipped**.
+
+Higiene de teste conferida: o spy em `Storage.prototype.setItem` é global, e o
+`vitest.config.ts` não tem `restoreMocks`. Não vaza porque os cinco `describe`
+do arquivo chamam `vi.restoreAllMocks()` no `beforeEach`.
