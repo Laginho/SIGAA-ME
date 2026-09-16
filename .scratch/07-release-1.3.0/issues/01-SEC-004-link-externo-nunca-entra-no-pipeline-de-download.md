@@ -93,6 +93,17 @@ caso.
   para servir a este caso.
 - `DL-007` mexe no mesmo `freshAction` (casamento por id). Sem gate: blocos
   diferentes; quem chegar depois resolve o conflito dentro dos Primary files.
+- **2026-09-16, `BUG-019`: a trava deste ticket foi removida, com autorização
+  escrita do autor.** O `BUG-019` critério 5 apagou o ramo `href` inteiro do
+  `freshAction` — e o `if (protocol !== 'https:' || hostname !== 'si3.ufc.br')`
+  vivia dentro dele, sem `page.goto` sobrando para proteger. O
+  `tests/unit/audit-download-external-url.test.ts` (`New:` daqui) foi apagado
+  junto: ele mocka `page.evaluate` devolvendo `{ type: 'href' }`, forma que o
+  código não produz mais. Não é regressão — o risco que a trava cobria era o
+  `DL-007` tornar o ramo alcançável, e o ramo deixou de existir. A revisão do
+  `BUG-019` confirmou que `download.service.ts` ficou sem navegação alcançável:
+  o único `page.goto` restante (`:106`) recebe `fileUrl`, que o único chamador
+  passa como `''` (`playwright-login.service.ts:847`). O `:106` é o `CLEAN-010`.
 
 #### Resolution (2026-09-15)
 
