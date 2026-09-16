@@ -8,7 +8,7 @@ Review: agent
 - Primary files:
   - `electron/services/playwright-login.service.ts` (`enterCourseAndGetHTML`,
     o `return` do redirect para login, `:518`)
-  - `tests/unit/sigaa-service.test.ts`
+  - `tests/integration/portal-course-entry.test.ts`
 
 Achado da revisão do `PORTAL-009` (2026-09-16), verdict "Needs your call". O
 revisor não consertou porque o arquivo está fora dos Primary files daquele
@@ -50,24 +50,25 @@ o app deveria refazer sozinho.
 
 #### Verification
 
-    npx vitest run tests/unit/sigaa-service.test.ts
+    npx vitest run tests/integration/portal-course-entry.test.ts
     npm run quality
 
 ## Tests stage 2 writes (own commit, red)
 
-- `tests/unit/sigaa-service.test.ts`: `enterCourseAndGetHTML` devolve
-  `{ success: false, error: 'Session expired - please login again' }` **sem**
-  `errorCode`; o teste espera `reloginWithStoredCredentials` chamado uma vez e a
-  entrada repetida. Vermelho porque hoje o helper só olha o `errorCode`, que não
-  vem, e devolve a primeira falha como está.
+- `tests/integration/portal-course-entry.test.ts`: novo teste no describe do
+  `PORTAL-001` (mesmo harness real, `page.url()` devolvendo uma URL com
+  `verTelaLogin` ou `logar.do`) chamando `enterCourseAndGetHTML` e esperando
+  `result.errorCode === 'SESSION_EXPIRED'`. Vermelho hoje porque o `return` de
+  `:518` não leva `errorCode`. Critério 2 não pega teste novo: a relogada por
+  `errorCode === 'SESSION_EXPIRED'` já está coberta pelos testes do `PORTAL-009`
+  em `tests/unit/sigaa-service.test.ts:497` e `:518` (mock de
+  `enterCourseAndGetHTML`, que já cobre o "depois"), e passa a valer para este
+  caminho assim que o critério 1 sai.
 
 ## Comments
 
 - Registrado na revisão do `PORTAL-009` (2026-09-16): "conserto é uma linha
   (`errorCode: 'SESSION_EXPIRED'` no `:518`) mais um teste, e o arquivo não está
   nos Primary files deste ticket".
-- O teste vive em `tests/unit/sigaa-service.test.ts` porque o que se prova é o
-  comportamento do helper, não o do `playwright-login` — o mock de
-  `enterCourseAndGetHTML` já existe lá, dos três testes do `PORTAL-009`.
 
 - 2026-09-16 Attempt 1 failed: exit 0. Log tail: **PORTAL-011 blocked, back to stage 1.** /  / The ticket names `tests/unit/sigaa-service.test.ts` as the test seam, but that file fully mocks `PlaywrightLoginService` — a test there can never fail because of the actual fix at `playwright-login.service.ts:518` (the mock returns whatever I hardcode, regardless of production code). Mocking the "before" shape (no `errorCode`) stays red forever since `sigaa.service.ts` — the only real code in that path — is outside Primary files; mocking the "after" shape passes immediately without any fix, since the existing PORTAL-009 tests (lines 497-516) already cover that case. /  / The right seam is `tests/integration/portal-course-entry.test.ts`, which already tests `PlaywrightLoginService` for real (fake `page`, no class mock) for the other three failure branches of `enterCourseAndGetHTML` — it just never exercises the `verTelaLogin`/`logar.do` branch at `:514`. /  / I reset the branch to `a6f731a` (no production or test files touched) and committed the blocked status with this reasoning on `portal-011`. Stage 1 should swap the Primary-files test target before this goes back to implementation. /
