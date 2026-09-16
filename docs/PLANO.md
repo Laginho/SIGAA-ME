@@ -1,8 +1,7 @@
 # Plano de Profissionalização — SIGAA-ME
 
-> **Status deste documento:** proposta para discussão. Nada aqui foi implementado.
-> Depois de revisado e aprovado, ele vira o plano oficial e o
-> `HARDENING_TRACKER.md` é atualizado para refletir a ordem definida aqui.
+> **Status deste documento:** o plano foi executado (fases 0–4 no `.scratch/`,
+> concluídas em 2026-09-15). Fica como registro histórico da ordem seguida.
 
 **Autor:** Claude, a pedir de Bruno
 **Data:** 2026-08-02
