@@ -44,6 +44,11 @@ vi.mock('fs', () => ({
     existsSync: vi.fn((file: string) => storage.files.has(file)),
     readFileSync: vi.fn((file: string) => storage.files.get(file) ?? ''),
     writeFileSync: vi.fn((file: string, content: string) => storage.files.set(file, String(content))),
+    renameSync: vi.fn((from: string, to: string) => {
+        const content = storage.files.get(from);
+        if (content !== undefined) storage.files.set(to, content);
+        storage.files.delete(from);
+    }),
     unlinkSync: vi.fn((file: string) => storage.files.delete(file)),
 }));
 
@@ -209,6 +214,20 @@ describe('PersistenceService — settings.json versioned and validated', () => {
             lastBackgroundSync: 123,
             openAtLogin: true,
         });
+    });
+
+    it('rejects a non-integer or out-of-range syncInterval on disk, matching the IPC rule (item 19)', () => {
+        storage.files.set(settingsFile, JSON.stringify({ schemaVersion: 1, syncInterval: 0.001 }));
+        expect(new PersistenceService().getSettings().syncInterval).toBe(60);
+
+        storage.files.set(settingsFile, JSON.stringify({ schemaVersion: 1, syncInterval: 1441 }));
+        expect(new PersistenceService().getSettings().syncInterval).toBe(60);
+
+        storage.files.set(settingsFile, JSON.stringify({ schemaVersion: 1, syncInterval: 15 }));
+        expect(new PersistenceService().getSettings().syncInterval).toBe(15);
+
+        storage.files.set(settingsFile, JSON.stringify({ schemaVersion: 1, syncInterval: 1440 }));
+        expect(new PersistenceService().getSettings().syncInterval).toBe(1440);
     });
 
     it('writes schemaVersion 1 alongside the settings', () => {

@@ -47,6 +47,12 @@ const harness = vi.hoisted(() => {
         existsSync: vi.fn((file: string) => files.has(file)),
         readFileSync: vi.fn((file: string) => files.get(file) ?? ''),
         writeFileSync: vi.fn((file: string, value: string) => files.set(file, String(value))),
+        renameSync: vi.fn((from: string, to: string) => {
+            const content = files.get(from);
+            if (content !== undefined) files.set(to, content);
+            files.delete(from);
+        }),
+        unlinkSync: vi.fn((file: string) => files.delete(file)),
         mkdirSync: vi.fn(),
         createWriteStream: vi.fn(() => ({ writable: false })),
     };

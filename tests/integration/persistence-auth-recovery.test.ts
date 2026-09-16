@@ -39,6 +39,11 @@ vi.mock('fs', () => ({
     existsSync: vi.fn((file: string) => storage.files.has(file)),
     readFileSync: vi.fn((file: string) => storage.files.get(file) ?? ''),
     writeFileSync: vi.fn((file: string, content: string) => storage.files.set(file, String(content))),
+    renameSync: vi.fn((from: string, to: string) => {
+        const content = storage.files.get(from);
+        if (content !== undefined) storage.files.set(to, content);
+        storage.files.delete(from);
+    }),
     unlinkSync: vi.fn((file: string) => storage.files.delete(file))
 }));
 vi.mock('../../electron/services/logger.service', () => ({ logger: loggerMock.logger }));
