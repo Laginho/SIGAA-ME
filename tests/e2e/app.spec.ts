@@ -130,7 +130,7 @@ describeOrSkip('App E2E (With Credentials)', () => {
         await expect(title).toContainText('Selecione o Modo de Sincronização');
     });
 
-    test('can sync and interact with course materials (News & Downloads)', async () => {
+    test('can sync and open a course from the dashboard', async () => {
         test.setTimeout(180000); // 3 minutes timeout for full sync processing
 
         // 1. We are currently on the sync selection page from the previous test.
@@ -148,45 +148,41 @@ describeOrSkip('App E2E (With Credentials)', () => {
 
         // 4. Assert we are correctly viewing the course details
         await window.waitForSelector('#courseTitle', { timeout: 15000 });
+    });
 
-        // 5. TEST FILE DOWNLOAD: Try to download the first file if one exists
+    test('can download a course file when one exists', async () => {
+        test.setTimeout(120000); // the toast wait below alone can take 90s
+
         const fileDownloadBtns = window.locator('.btn-download-file');
+        const fileCount = await fileDownloadBtns.count();
+        test.skip(fileCount === 0, 'nenhum arquivo para baixar nesta disciplina');
 
-        if (await fileDownloadBtns.count() > 0) {
-            console.log('E2E: Found a file! Testing download mechanism...');
-            await fileDownloadBtns.first().click();
-            // A toast should eventually appear confirming success
-            const toast = window.locator('.toast');
-            await expect(toast).toBeVisible({ timeout: 90000 });
-            // Let's assert it's a success toast if possible, but allow error just in case of file missing
-            const isSuccess = await toast.evaluate(node => node.classList.contains('toast--success'));
-            if (!isSuccess) {
-                console.warn('E2E WARNING: The download resulted in an error toast. Proceeding as soft-failure.', await toast.textContent());
-            }
-        } else {
-            console.log('E2E: No files found in this course to test download.');
-        }
+        await fileDownloadBtns.first().click();
 
-        // 6. TEST NEWS: Try to expand a news modal
+        // A toast should eventually appear confirming success; an error toast is a test failure.
+        const toast = window.locator('.toast');
+        await expect(toast).toBeVisible({ timeout: 90000 });
+        await expect(toast).toHaveClass(/toast--success/);
+    });
+
+    test('can expand a news item when one exists', async () => {
         const newsItems = window.locator('.news-item');
-        if (await newsItems.count() > 0) {
-            console.log('E2E: Found a news item! Testing expanding content modal...');
-            await newsItems.first().click();
+        const newsCount = await newsItems.count();
+        test.skip(newsCount === 0, 'nenhuma notícia nesta disciplina');
 
-            // Assert modal opened and loaded content
-            const modal = window.locator('#newsModal');
-            await expect(modal).toBeVisible({ timeout: 10000 });
+        await newsItems.first().click();
 
-            // Wait for content body to be populated
-            const modalContent = window.locator('#modalBody');
-            await expect(modalContent).not.toBeEmpty();
+        // Assert modal opened and loaded content
+        const modal = window.locator('#newsModal');
+        await expect(modal).toBeVisible({ timeout: 10000 });
 
-            // Assert we can close it
-            await window.click('.modal-close');
-            await expect(modal).toBeHidden();
-        } else {
-            console.log('E2E: No news found in this course to test the modal.');
-        }
+        // Wait for content body to be populated
+        const modalContent = window.locator('#modalBody');
+        await expect(modalContent).not.toBeEmpty();
+
+        // Assert we can close it
+        await window.click('.modal-close');
+        await expect(modal).toBeHidden();
     });
 
     test('background sync updates the dashboard in real-time', async () => {
