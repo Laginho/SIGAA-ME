@@ -1,6 +1,6 @@
 # PORTAL-011: Redirect para a tela de login sai sem `errorCode`, e o relogin não dispara
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P2
 Blocked by: nenhum
 Review: agent
