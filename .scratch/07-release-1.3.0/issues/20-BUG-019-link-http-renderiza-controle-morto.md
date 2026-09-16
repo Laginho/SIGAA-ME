@@ -13,6 +13,8 @@ Review: human
   - `tests/unit/sigaa-service.test.ts`
   - `tests/unit/navigation-policy.test.ts`
   - `tests/unit/audit-download-fallback-identity.test.ts`
+  - `tests/unit/audit-download-external-url.test.ts` (do `SEC-004`; apagado
+    junto com o ramo que ele exercita, ver critério 5)
 
 Achado da revisão do `BUG-014` (2026-09-15). O `BUG-014` está fechado e o que
 ele entregou funciona para `https:`; isto é o resto. A revisão do PR da sessão
@@ -68,6 +70,15 @@ dois caminhos; o outro vira "não fazer".
    `tests/unit/audit-download-fallback-identity.test.ts`, no commit de teste;
    código que deixa de existir não ganha teste novo.
 
+   **A trava do `SEC-004` sai junto, de propósito** (autor, 2026-09-16, ver
+   `## Comments`). O `if (protocol !== 'https:' || hostname !== 'si3.ufc.br')`
+   vive dentro do ramo; sem o ramo não há `page.goto` para travar, e não
+   navegar é mais forte que navegar checando. `tests/unit/audit-download-external-url.test.ts`
+   é apagado no commit de teste: ele monta `page.evaluate` devolvendo
+   `{ type: 'href' }`, uma forma que o código deixa de produzir. Nenhuma outra
+   navegação do `download.service.ts` perde checagem com isso — a do
+   `:121` (`page.goto(fileUrl)`) nunca teve, e é o `CLEAN-010`.
+
 #### Verification
 
     npx vitest run tests/unit/sigaa-service.test.ts tests/unit/navigation-policy.test.ts
@@ -87,9 +98,12 @@ dois caminhos; o outro vira "não fazer".
 - Critério 4 — `tests/unit/sigaa-service.test.ts`: `toCourseFile` de um material
   `link` com `https://si3.ufc.br/sigaa/...` omite `url`. Vermelho porque hoje
   ela é preservada.
-- Critério 5 — `tests/unit/audit-download-fallback-identity.test.ts`: linha com
-  `href` e sem `onclick` é alcançada pelo id e vira `goto`. Vermelho porque hoje
-  o `continue` do id passa por ela.
+- Critério 5 — nenhum teste novo: o commit de teste só **remove** o caso de
+  `href` absoluto de `tests/unit/audit-download-fallback-identity.test.ts` e o
+  arquivo `tests/unit/audit-download-external-url.test.ts` inteiro. Os dois
+  descrevem um `freshAction` do tipo `href`, que deixa de existir. Deleção de
+  código morto não tem vermelho para provar; o que prova é o gate verde com os
+  dois fora.
 
 ## Comments
 
@@ -196,4 +210,51 @@ disso.
   Critério 5 reescrito para a deleção; os critérios 1–4 seguem como estão, na
   branch `bug-019`. Stage 2 continua nessa branch.
 
-- 2026-09-16 Attempt 1 failed: exit 0. Log tail: **BUG-019 is now `blocked` on branch `bug-019`.** /  / Deleting the `href` branch in `download.service.ts` (criterion 5) would also delete the `https:` + `si3.ufc.br` check that **SEC-004** (P0, human-reviewed, closed 2026-09-15) added on purpose as defense-in-depth for exactly this scenario — its own text says the check exists to "close the branch before DL-007-style id matching makes it reachable." `tests/unit/audit-download-external-url.test.ts` (SEC-004's own test, not in BUG-019's Primary files) breaks: 2 failures with criterion 5 implemented as written. /  / I reverted the code edit, kept the one commit that's uncontroversial (dropping the now-dead absolute-href test BUG-019 itself asked for), and wrote the conflict + a concrete question into the ticket's `## Comments`: delete the whole branch (SEC-004's check goes with it), or keep just the `https:`/`si3.ufc.br` guard alive somehow. Need your call before continuing. /
+- **2026-09-16, stage 2, pergunta que trava o ticket:** o ramo `href` de
+  `freshAction` que o critério 5 manda apagar é o mesmo que `SEC-004`
+  (P0, `Review: human`, fechado 2026-09-15) blindou de propósito —
+  `download.service.ts:139-145` (linhas de antes deste ticket) resolve a URL
+  contra `page.url()` e só chama `page.goto` se for `https:` + `si3.ufc.br`,
+  devolvendo `{ success: false }` no resto. O texto do próprio `SEC-004` chama
+  isso de "defesa em profundidade: fecha o ramo antes que `DL-007` (casamento
+  por id) o torne alcançável" — ou seja, a blindagem foi escrita justamente
+  para o caso deste ticket (id passa a casar `href`), não para o caso em que o
+  ramo inteiro some.
+
+  `tests/unit/audit-download-external-url.test.ts` (`New:` em `SEC-004`, não
+  listado nos Primary files daqui) exercita esse `if` diretamente — mocka
+  `page.evaluate` para devolver `{ type: 'href', value: <url> }` sem passar
+  pelo casamento por id — e quebra com a implementação que este ticket pede:
+  2 failed (`npx vitest run tests/unit/audit-download-external-url.test.ts`
+  com o `freshAction` já simplificado para string).
+
+  A implementação de criterio 5 como está escrita (apagar o ramo inteiro)
+  também apaga a checagem `https:` + `si3.ufc.br` que o `SEC-004` tratou como
+  bloqueador de release. Isso é escopo que o ticket não nomeia — nenhum Primary
+  file daqui cobre `tests/unit/audit-download-external-url.test.ts`, e apagar
+  esse teste unilateralmente descartaria uma decisão `Review: human` de outro
+  ticket sem a mesma revisão.
+
+  Não implementado: código de `download.service.ts` revertido ao estado do
+  `master` (`git checkout -- electron/services/download.service.ts`), sem
+  diff pendente. Fica só o commit de teste (`c7faada`, remove o caso de `href`
+  absoluto de `audit-download-fallback-identity.test.ts` — esse não colide com
+  `SEC-004`, é o teste que o próprio `BUG-019` pediu para sumir).
+
+  Pergunta para o autor: apagar o `href` inteiro (e junto a checagem do
+  `SEC-004`, porque não há como manter um `if` sem o ramo em que ele vive), ou
+  manter o `if https:`+`si3.ufc.br` como a única coisa que sobra do ramo —
+  aceita `freshAction` do tipo `href`, sem o casamento por id ter mudado, só
+  não deixa a URL vazar sem checagem enquanto o ramo ainda existe de algum
+  jeito? Este ticket, sozinho, não decide revogar uma blindagem P0 de outro.
+
+- **Resposta do autor (2026-09-16): apagar o ramo inteiro, com a trava junto.**
+  A objeção estava certa em parar — revogar decisão `Review: human` de um P0 não
+  é do stage 2 — mas a blindagem não se perde: ela existe para impedir que o
+  `page.goto` daquele ramo saia do `si3.ufc.br`, e sem o ramo não existe `goto`
+  nenhum ali. Deletar é estritamente mais forte que checar. O
+  `audit-download-external-url.test.ts` fica testando um `freshAction` do tipo
+  `href` que o código não produz mais, então sai junto — agora nomeado nos
+  Primary files, que era o que faltava para o stage 2 poder tocá-lo.
+  O texto do `SEC-004` ("fecha o ramo antes que o `DL-007` o torne alcançável")
+  descreve um risco que some com o ramo.
