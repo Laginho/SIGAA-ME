@@ -17,6 +17,7 @@ export type PortalState =
     | 'FILES_SECTION'
     | 'NEWS_DETAIL'
     | 'ACCESS_DENIED'
+    | 'MAINTENANCE'
     | 'UNKNOWN';
 
 export interface PortalError {

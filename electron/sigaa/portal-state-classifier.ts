@@ -5,7 +5,7 @@
  */
 
 import * as cheerio from 'cheerio';
-import { AVA, LOGIN, STUDENT_HOME, STUDENT_PORTAL } from './selectors';
+import { ACCESS_DENIED, AVA, LOGIN, MAINTENANCE, STUDENT_HOME, STUDENT_PORTAL } from './selectors';
 import type { PortalState } from './portal-contracts';
 
 /**
@@ -49,10 +49,24 @@ export function hasRecognizedAvaForm(html: string): boolean {
     return typeof viewState === 'string' && viewState.length > 0;
 }
 
+/** Manutenção programada: nada mais confiável no ar além do heading reconhecido. */
+export function isMaintenance(html: string): boolean {
+    const $ = cheerio.load(html);
+    return $.text().includes(MAINTENANCE.heading);
+}
+
+/** Acesso negado: sessão pode existir, mas o portal recusou esta página. */
+export function isAccessDenied(html: string): boolean {
+    const $ = cheerio.load(html);
+    return $.text().includes(ACCESS_DENIED.heading);
+}
+
 export function classify(html: string, url = ''): PortalState {
     if (isLoginDocument(html)) return 'LOGIN';
     if (isStudentPortal(html)) return 'STUDENT_PORTAL';
     if (isStudentHome(html)) return 'STUDENT_HOME';
+    if (isMaintenance(html)) return 'MAINTENANCE';
+    if (isAccessDenied(html)) return 'ACCESS_DENIED';
     if (hasRecognizedAvaForm(html)) return url.includes('/ava/') ? 'FILES_SECTION' : 'COURSE_HOME';
     return 'UNKNOWN';
 }

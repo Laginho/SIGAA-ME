@@ -36,6 +36,16 @@ export const STUDENT_PORTAL = {
     userName: '.nome_usuario'
 } as const;
 
+/** Heading reconhecido da página de manutenção programada do SIGAA. */
+export const MAINTENANCE = {
+    heading: 'Sistema em Manutenção'
+} as const;
+
+/** Heading reconhecido da página de acesso negado do SIGAA. */
+export const ACCESS_DENIED = {
+    heading: 'Acesso Negado'
+} as const;
+
 export const COURSE_HOME = {
     /** Mantido pela verificação existente em `enterCourseAndGetHTML`; não reescrever a checagem, só mover o literal. */
     nomeTurmaSelector: '#nomeTurma',
