@@ -38,12 +38,18 @@ function toCourseFile(f: ParsedFile): CourseFile {
     return { id: f.id, name: f.name, type: f.type, date: f.date, url: extractLinkUrl(f) };
 }
 
-/** Só `http:`/`https:` absoluta atravessa; `javascript:`, relativa ou vazia fica para trás. */
+/**
+ * Só `http:`/`https:` absoluta atravessa, e nunca o próprio host do SIGAA
+ * (BUG-019): esse host é `trusted` na allowlist de navegação, então um link
+ * interno mal filtrado abriria no navegador do SO sem confirmação.
+ */
 function extractLinkUrl(f: ParsedFile): string | undefined {
     if (f.type !== 'link' || !f.url) return undefined;
     try {
         const parsed = new URL(f.url);
-        return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? f.url : undefined;
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return undefined;
+        if (parsed.hostname === 'si3.ufc.br') return undefined;
+        return f.url;
     } catch {
         return undefined;
     }

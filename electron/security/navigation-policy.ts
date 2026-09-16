@@ -60,11 +60,15 @@ export function classifyNavigation(target: string, appUrl: string): NavigationVe
 
   // `mailto:` segue a mesma regra de um https fora da allowlist: confirma antes.
   if (url.protocol === 'mailto:') return { kind: 'external', trusted: false }
-  if (url.protocol !== 'https:') return { kind: 'blocked', reason: `esquema ${url.protocol}` }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+    return { kind: 'blocked', reason: `esquema ${url.protocol}` }
+  }
   // `https://si3.ufc.br@evil.example/` não vai para o si3: o host é o `evil`.
   if (url.username !== '' || url.password !== '') {
     return { kind: 'blocked', reason: 'credencial embutida na URL' }
   }
+  // `http:` nunca é trusted, nem para host da allowlist (BUG-019): sempre confirma antes de abrir.
+  if (url.protocol === 'http:') return { kind: 'external', trusted: false }
 
   return { kind: 'external', trusted: isTrustedHost(url) }
 }
