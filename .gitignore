@@ -35,13 +35,6 @@ debug_*.json
 .agent/
 debug/
 verification_output*.txt
-*.pdf
-*.zip
-*.docx
-*.pptx
-*.xlsx
-*.rar
-*.txt
 
 # Environment variables (contains credentials - NEVER commit)
 .env
