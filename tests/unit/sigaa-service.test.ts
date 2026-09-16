@@ -574,6 +574,59 @@ describe('SigaaService (Unit)', () => {
             expect(mockHttp.downloadFile).not.toHaveBeenCalled();
             expect(mockPlaywright.downloadFile).not.toHaveBeenCalled();
         });
+
+        it('caps the Playwright fallback at 3 consecutive failures, leaving the rest failed (DL-008)', async () => {
+            const files = Array.from({ length: 10 }, (_, i) => ({
+                ...PARSED_DOC, id: `f${i}`, name: `doc${i}.pdf`
+            }));
+            const refs = files.map(f => ({ id: f.id, name: f.name }));
+
+            mockPlaywright.enterCourseAndGetHTML.mockResolvedValue({ success: true, html: '<html></html>' });
+            mockHttp.getCourseFiles.mockResolvedValue({ success: true, files });
+            mockHttp.downloadFile.mockResolvedValue({ success: false, error: 'HTTP Error 302' });
+            mockPlaywright.downloadFile.mockResolvedValue({ success: false, error: 'Playwright download failed' });
+
+            const result = await service.downloadAllFiles('C1', 'Math', refs, '/mock/downloads');
+
+            expect(mockPlaywright.downloadFile).toHaveBeenCalledTimes(3);
+            expect(result.success).toBe(true);
+            if (result.success) {
+                expect(result.data.downloaded).toBe(0);
+                expect(result.data.failed).toBe(10);
+                expect(result.data.results.filter(r => r.status === 'failed')).toHaveLength(10);
+            }
+        });
+
+        it('resets the consecutive-failure count on a fallback success (DL-008 criterion 2)', async () => {
+            // 7 files; fail, fail, success, fail, fail, fail, <never reached>.
+            // A streak that resets on success stops after the 6th call (3
+            // consecutive failures starting right after the success) and never
+            // attempts the 7th file. A counter that does not reset would already
+            // have hit 3 total failures by the 4th call and stop there instead —
+            // the call count is what tells the two apart.
+            const files = Array.from({ length: 7 }, (_, i) => ({
+                ...PARSED_DOC, id: `f${i}`, name: `doc${i}.pdf`
+            }));
+            const refs = files.map(f => ({ id: f.id, name: f.name }));
+
+            mockPlaywright.enterCourseAndGetHTML.mockResolvedValue({ success: true, html: '<html></html>' });
+            mockHttp.getCourseFiles.mockResolvedValue({ success: true, files });
+            mockHttp.downloadFile.mockResolvedValue({ success: false, error: 'HTTP Error 302' });
+            mockPlaywright.downloadFile
+                .mockResolvedValueOnce({ success: false, error: 'Playwright download failed' })
+                .mockResolvedValueOnce({ success: false, error: 'Playwright download failed' })
+                .mockResolvedValueOnce({ success: true, filePath: '/mock/downloads/Math/doc2.pdf' })
+                .mockResolvedValue({ success: false, error: 'Playwright download failed' });
+
+            const result = await service.downloadAllFiles('C1', 'Math', refs, '/mock/downloads');
+
+            expect(mockPlaywright.downloadFile).toHaveBeenCalledTimes(6);
+            expect(result.success).toBe(true);
+            if (result.success) {
+                expect(result.data.downloaded).toBe(1);
+                expect(result.data.failed).toBe(6);
+            }
+        });
     });
 
     // ── DATA-002: logout esquece a sessão ──
