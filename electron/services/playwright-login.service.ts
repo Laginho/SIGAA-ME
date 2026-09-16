@@ -381,7 +381,18 @@ export class PlaywrightLoginService {
                 // distingue os quatro pelo landmark/heading da página (PORTAL-008).
                 const portalCheck = validateCourseListDocument(html);
                 if (portalCheck === null) {
-                    log.info('Playwright: authenticated portal with zero course rows; treating as an empty list.');
+                    // PORTAL-010: uma conta autenticada com zero turmas é
+                    // efetivamente inexistente na população real do app — o
+                    // caso vira erro em vez de sucesso silencioso com lista
+                    // vazia. Reusa NOT_FOUND: SELECTOR_DRIFT religaria o
+                    // kill-switch do PORTAL-008 (background-sync.service.ts).
+                    log.warn('Playwright: authenticated portal returned zero course rows; treating as an error.');
+                    await this.close();
+                    return {
+                        success: false,
+                        errorCode: 'NOT_FOUND',
+                        error: 'SIGAA returned zero courses for this authenticated account. This usually means a session or access problem, not that you have no courses.'
+                    };
                 } else if (portalCheck.code === 'SELECTOR_DRIFT') {
                     this.recordDiagnostic(html, page.url(), selectorDiagnostics);
                     await this.close();
