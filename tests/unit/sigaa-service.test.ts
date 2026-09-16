@@ -234,6 +234,33 @@ describe('SigaaService (Unit)', () => {
             });
         });
 
+        it('drops url for a link file hosted on si3.ufc.br itself, even though the host is trusted for navigation (BUG-019)', async () => {
+            mockPlaywright.enterCourseAndGetHTML.mockResolvedValue({
+                success: true,
+                html: '<html>...</html>'
+            });
+
+            mockHttp.getCourseFiles.mockResolvedValue({
+                success: true,
+                files: [
+                    { id: 'link:1', name: 'Tela de login', type: 'link', url: 'https://si3.ufc.br/sigaa/verTelaLogin.do' },
+                ],
+                news: []
+            });
+
+            const result = await service.getCourseFiles('C1', 'Math');
+
+            expect(result).toEqual({
+                success: true,
+                data: {
+                    files: [
+                        { id: 'link:1', name: 'Tela de login', type: 'link' },
+                    ],
+                    news: []
+                }
+            });
+        });
+
         it('returns SESSION_EXPIRED if Playwright entry fails on session', async () => {
             mockPlaywright.enterCourseAndGetHTML.mockResolvedValue({
                 success: false,
