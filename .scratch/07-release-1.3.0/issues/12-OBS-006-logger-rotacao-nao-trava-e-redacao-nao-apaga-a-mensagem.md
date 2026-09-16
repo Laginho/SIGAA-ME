@@ -1,6 +1,6 @@
 # OBS-006: Logger: rotação não trava e redação não apaga a mensagem
 Status: open
-Stage: to-implement
+Stage: implementing
 Priority: P2
 Blocked by: nenhum
 Review: agent

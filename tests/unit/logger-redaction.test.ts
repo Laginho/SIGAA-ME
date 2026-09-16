@@ -68,8 +68,16 @@ describe('redact() — camada (a), sempre, em todo modo', () => {
         expect(out).not.toContain('jsfcljs');
     });
 
-    it('HTML a partir do primeiro < vira [html omitted] até o fim', () => {
-        expect(redact('resposta: <html><body>oi</body></html>')).toBe('resposta: [html omitted]');
+    it('HTML removido tag a tag; texto fora das tags permanece', () => {
+        const out = redact('<div class="x">oi</div> fim');
+        expect(out).not.toContain('<div');
+        expect(out).not.toContain('</div>');
+        expect(out).toContain('oi');
+        expect(out).toContain('fim');
+    });
+
+    it('uma linha com um só <...> mantém tudo depois dele', () => {
+        expect(redact('expected <string> but got 5')).toContain('but got 5');
     });
 
     it('caminho absoluto Windows e POSIX', () => {
