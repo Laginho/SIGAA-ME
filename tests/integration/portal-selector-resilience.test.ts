@@ -153,8 +153,9 @@ describe('Playwright portal navigation resilience', () => {
         expect(browser.close).toHaveBeenCalledOnce();
     });
 
-    it('reports a portal-layout change when neither course selector exists after navigation', async () => {
+    it('reports a portal-layout change when neither course selector exists and the page has no authenticated landmark', async () => {
         const { browser, page } = createNavigationHarness();
+        page.content.mockResolvedValue('<main>Unexpected layout</main>');
         page.evaluate.mockResolvedValue({
             courses: [],
             selectorDiagnostics: { courseIdInputs: 0, virtualClassroomLinks: 0 }
@@ -167,6 +168,53 @@ describe('Playwright portal navigation resilience', () => {
         expect(result.success).toBe(false);
         expect(result.error).toContain('SIGAA portal selector drift');
         expect(result.error).toContain('input[name="idTurma"]');
+        expect(browser.close).toHaveBeenCalledOnce();
+    });
+
+    it('returns an empty course list instead of drift when the page is authenticated but has zero course rows (PORTAL-008)', async () => {
+        const { browser, page } = createNavigationHarness();
+        page.evaluate.mockResolvedValue({
+            courses: [],
+            selectorDiagnostics: { courseIdInputs: 0, virtualClassroomLinks: 0 }
+        });
+        const service = new PlaywrightLoginService();
+        (service as any).storedCookies = [{ name: 'JSESSIONID', value: 'valid', domain: 'si3.ufc.br' }];
+
+        const result = await service.getCourses();
+
+        expect(result).toMatchObject({ success: true, courses: [] });
+        expect(browser.close).not.toHaveBeenCalled();
+    });
+
+    it('reports scheduled maintenance as a retryable portal-unavailable error, not selector drift (PORTAL-008)', async () => {
+        const { browser, page } = createNavigationHarness();
+        page.content.mockResolvedValue('<h1>Sistema em Manutenção</h1><p>Tente novamente mais tarde.</p>');
+        page.evaluate.mockResolvedValue({
+            courses: [],
+            selectorDiagnostics: { courseIdInputs: 0, virtualClassroomLinks: 0 }
+        });
+        const service = new PlaywrightLoginService();
+        (service as any).storedCookies = [{ name: 'JSESSIONID', value: 'valid', domain: 'si3.ufc.br' }];
+
+        const result = await service.getCourses();
+
+        expect(result).toMatchObject({ success: false, errorCode: 'PORTAL_UNAVAILABLE' });
+        expect(browser.close).toHaveBeenCalledOnce();
+    });
+
+    it('reports access denied as an expired session that relogin can resolve, not selector drift (PORTAL-008)', async () => {
+        const { browser, page } = createNavigationHarness();
+        page.content.mockResolvedValue('<h1>Acesso Negado</h1><p>Você não tem permissão para acessar esta página.</p>');
+        page.evaluate.mockResolvedValue({
+            courses: [],
+            selectorDiagnostics: { courseIdInputs: 0, virtualClassroomLinks: 0 }
+        });
+        const service = new PlaywrightLoginService();
+        (service as any).storedCookies = [{ name: 'JSESSIONID', value: 'valid', domain: 'si3.ufc.br' }];
+
+        const result = await service.getCourses();
+
+        expect(result).toMatchObject({ success: false, errorCode: 'SESSION_EXPIRED' });
         expect(browser.close).toHaveBeenCalledOnce();
     });
 
@@ -325,24 +373,24 @@ describe('PORTAL-002: sanitized versioned portal fixtures', () => {
         expect(classify(html, AVA_URL)).toBe('FILES_SECTION');
     });
 
-    // access-denied.html e maintenance.html documentam uma lacuna, não um
-    // comportamento correto: nada em portal-state-classifier.ts reconhece
-    // "Acesso Negado" ou manutenção programada. Ambos caem em UNKNOWN e viram
-    // SELECTOR_DRIFT genérico. Reconhecer esses estados de verdade é
-    // PORTAL-003/PORTAL-005; se esta asserção quebrar porque alguém passou a
-    // classificar como ACCESS_DENIED, ótimo — atualize o teste, não a fixture.
-    it('does not yet recognize the access-denied fixture as its own state (documents the PORTAL-003/005 gap)', () => {
+    it('classifies the access-denied fixture as its own state, mapped to a session code relogin can fix (PORTAL-008)', () => {
         const html = fixture('access-denied.html');
 
-        expect(classify(html)).toBe('UNKNOWN');
-        expect(validateCourseListDocument(html)?.code).toBe('SELECTOR_DRIFT');
+        expect(classify(html)).toBe('ACCESS_DENIED');
+        expect(validateCourseListDocument(html)).toEqual({
+            code: 'SESSION_EXPIRED',
+            message: 'Session expired: SIGAA denied access to the student portal.'
+        });
     });
 
-    it('does not yet recognize the maintenance fixture as its own state (documents the PORTAL-003/005 gap)', () => {
+    it('classifies the maintenance fixture as its own state, mapped to the portal-unavailable code (PORTAL-008)', () => {
         const html = fixture('maintenance.html');
 
-        expect(classify(html)).toBe('UNKNOWN');
-        expect(validateCourseListDocument(html)?.code).toBe('SELECTOR_DRIFT');
+        expect(classify(html)).toBe('MAINTENANCE');
+        expect(validateCourseListDocument(html)).toEqual({
+            code: 'PORTAL_UNAVAILABLE',
+            message: 'SIGAA portal unavailable: scheduled maintenance page returned instead of the student portal.'
+        });
     });
 });
 
