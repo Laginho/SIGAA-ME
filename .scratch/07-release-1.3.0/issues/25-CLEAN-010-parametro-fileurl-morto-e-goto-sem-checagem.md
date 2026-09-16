@@ -1,6 +1,6 @@
 # CLEAN-010: Parâmetro `fileUrl` morto leva a um `page.goto` sem checagem
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P3
 Blocked by: BUG-019
 Review: agent
@@ -84,3 +84,9 @@ que já existe — o comportamento de hoje, já que o ramo nunca roda.
   `https:` + `si3.ufc.br`. Este `goto` ficou de fora daquela varredura porque
   está no `else`, no caminho do script em cache. O `BUG-019` apaga o do `href`;
   este apaga o que sobrou.
+- Primary files não listava `tests/integration/logging-boundary.test.ts`, que
+  também chama `DownloadService.downloadFile` com o `''` posicional (mock do
+  plano B em `SigaaService.downloadFile`). `npm test` completo pegou 1 teste
+  vermelho ali depois da deleção. Mesmo ajuste mecânico dos outros três —
+  removida a `''`, sem teste novo — em commit de teste próprio, vermelho
+  confirmado isoladamente antes do commit.
