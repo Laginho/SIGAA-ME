@@ -196,8 +196,6 @@ describe('classifyNavigation: esquemas e credenciais', () => {
         'javascript:alert(1)',
         'data:text/html,<script>alert(1)</script>',
         'blob:file:///7f2a1c3e',
-        // http: puro, mesmo em host da allowlist.
-        'http://si3.ufc.br/sigaa/verTelaLogin.do',
         'ftp://ufc.br/pub',
         'ms-msdt:/id PCWDiagnostic',
         'about:blank',
@@ -215,7 +213,22 @@ describe('classifyNavigation: esquemas e credenciais', () => {
 
     it('blocked nunca é confundido com external', () => {
         expect(classifyNavigation('javascript:alert(1)', FILE_APP)).not.toMatchObject({ kind: 'external' });
-        expect(classifyNavigation('http://si3.ufc.br/', FILE_APP)).not.toMatchObject({ kind: 'external' });
+    });
+});
+
+// BUG-019: `http:` deixa de ser `blocked` e vira `external`, sempre `trusted: false`.
+describe('classifyNavigation: http: (BUG-019)', () => {
+    it('http: fora do app devolve external com trusted: false', () => {
+        expect(classifyNavigation('http://example.com/aviso', FILE_APP)).toEqual({ kind: 'external', trusted: false });
+    });
+
+    it('http: em host da allowlist ainda devolve trusted: false, nunca true', () => {
+        expect(classifyNavigation('http://algo.ufc.br/x', FILE_APP)).toEqual({ kind: 'external', trusted: false });
+    });
+
+    it('http: com credencial embutida continua blocked', () => {
+        const verdict = classifyNavigation('http://si3.ufc.br@evil.example/', FILE_APP);
+        expect(verdict).toMatchObject({ kind: 'blocked' });
     });
 });
 
@@ -366,7 +379,6 @@ describe('installNavigationGuard', () => {
         'data:text/html,<b>x</b>',
         'blob:file:///7f2a1c3e',
         'file:///C:/Windows/System32/calc.exe',
-        'http://si3.ufc.br/sigaa',
         'https://aluno:senha@si3.ufc.br/sigaa',
     ])('blocked %s: previne e nem pergunta nem abre', async (url) => {
         const fake = fakeContents();
