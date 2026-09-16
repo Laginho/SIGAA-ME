@@ -1,6 +1,6 @@
 # BUG-018: "Sair" do tray roda logout e flush
-Status: open
-Stage: to-review
+Status: resolved
+Stage: done
 Priority: P1
 Blocked by: nenhum
 Review: agent
@@ -44,3 +44,39 @@ faz o desligamento certo; sair pelo tray deixa Chrome órfão e log truncado.
 - A correção menor é o "Sair" chamar só `app.quit()` e deixar o `before-quit`
   fazer o resto. Se o teste ficar mais simples com o desligamento extraído
   numa função exportada, pode; não crie módulo novo para isso.
+
+#### Resolution (2026-09-15)
+
+Verdict: Approve
+
+A correção é a menor que o ticket previa: o "Sair" do tray perdeu o
+`isQuitting = true` e chama só `app.quit()`. O `before-quit` vê a flag ainda
+`false`, dá `preventDefault()` de forma síncrona (primeira instrução, antes de
+qualquer `await`, então a prevenção vale), roda `logout()` sob o teto de 5 s,
+`logger.flush()` e então o `app.quit()` de verdade — que reentra no handler já
+com `isQuitting = true` e não repete nada. Critérios 1 e 2 atendidos. Nenhuma
+abstração nova, nenhum módulo criado.
+
+O outro consumidor da flag continua correto: o `win.on('close')`
+(`electron/main.ts:191`) só esconde a janela enquanto `!isQuitting`, e no novo
+caminho a flag já está `true` quando o quit real dispara o close.
+
+Fora de escopo, não corrigido: dois cliques em "Sair" em sequência rápida ainda
+abortam o desligamento pendente (o segundo `before-quit` vê a flag `true` e
+deixa o quit seguir). É comportamento anterior à mudança, idêntico ao de
+janela + tray, e a correção não o piora.
+
+Arquivos: `electron/main.ts` (`:288`), `tests/unit/quit-shutdown.test.ts` (novo).
+Ambos dentro dos Primary files.
+
+Prova red-green: com `electron/main.ts` revertido para `32513e5`,
+`npx vitest run tests/unit/quit-shutdown.test.ts` falha em
+`quit-shutdown.test.ts:116` — `expected "vi.fn()" to be called 1 times, but got
+0 times` (o `logout` não roda). Com a correção, passa. O teste importa
+`electron/main` de verdade e dispara o `click` do item "Sair" capturado do
+`Menu.buildFromTemplate`; não é cópia da lógica.
+
+Gate: `npm run quality` verde — 0 erros de lint (52 warnings `no-explicit-any`
+pré-existentes), 67 arquivos de teste, 753 passed | 5 skipped (758).
+
+Merge: `ae15f3a`, na sessão `sweatshop/2026-09-15-2032`.
