@@ -48,7 +48,6 @@ Handles operations where speed matters and session can be borrowed from Playwrig
 |--------|-----------|
 | `getCourseFiles()` | Parsing only (uses HTML from Playwright) |
 | `downloadFile()` | Bulk downloads — HTTP is ~10x faster; after HTTP → session refresh + HTTP both fail, `SigaaService.downloadViaPlaywright` falls back to Playwright (dedicated visible browser via `download.service.ts`) |
-| `getNewsDetail()` | Has HTTP version but unused - sessions go stale between requests |
 
 ---
 
@@ -83,7 +82,7 @@ Handles operations where speed matters and session can be borrowed from Playwrig
 
 ### Could Move to HTTP (with effort)
 - **`enterCourseAndGetHTML`** - If ViewState chain is reverse-engineered
-- **`getNewsDetail`** - HTTP version exists but needs better session persistence
+- **`getNewsDetail`** - Playwright-only today (CLEAN-008 removed the unreachable HTTP version); would need session persistence across requests
 
 ### Probably Forever Playwright
 - **`login`** - Too many JS dependencies, potential CAPTCHA
