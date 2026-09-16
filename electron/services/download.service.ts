@@ -29,7 +29,6 @@ async function rejectIfTooLarge(partPath: string): Promise<string | undefined> {
 export class DownloadService {
     async downloadFile(
         page: Page,
-        fileUrl: string,
         fileName: string,
         courseName: string,
         basePath: string,
@@ -102,8 +101,6 @@ export class DownloadService {
                         const func = new Function(scriptStr.replace('return false', ''));
                         func();
                     }, script);
-                } else if (fileUrl && !fileUrl.includes('javascript:')) {
-                    await page.goto(fileUrl, { waitUntil: 'networkidle', timeout: 30000 });
                 } else {
                     throw new Error('Link not found and no script provided in fallback');
                 }

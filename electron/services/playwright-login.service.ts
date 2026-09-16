@@ -846,7 +846,6 @@ export class PlaywrightLoginService {
 
                 const result = await downloadService.downloadFile(
                     page,
-                    '',
                     fileName,
                     courseName,
                     basePath,
