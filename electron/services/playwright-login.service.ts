@@ -3,7 +3,7 @@ import { app } from 'electron';
 import { logger } from './logger.service';
 import { buildStructuralDiagnostic, diagnosticsService, shouldCaptureRawArtifact } from './diagnostics.service';
 import type { NewsDetail } from '../../shared/domain';
-import type { AppErrorCode } from '../../shared/errors';
+import { classifyMessage, type AppErrorCode } from '../../shared/errors';
 import { COURSE_HOME, FILES_MENU, LOGIN, NEWS, STUDENT_HOME, STUDENT_PORTAL, newsFormSelector } from '../sigaa/selectors';
 import {
     classifyLoginEnd,
@@ -44,8 +44,14 @@ export interface ParsedCourse {
  */
 export function isExpectedCoursePage(nomeTurmaText: string, courseName: string): boolean {
     const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const header = normalize(nomeTurmaText);
-    return header.length > 0 && header.includes(normalize(courseName));
+    const header = nomeTurmaText.trim().replace(/\s+/g, ' ');
+    if (header.length === 0) return false;
+    // "CODE - NAME (PERIOD - TURMA)": strip both wrappers so what remains is
+    // just the course name, compared for equality — not substring, or
+    // "FÍSICA I" matches inside "FÍSICA II" and "LABORATÓRIO DE FÍSICA I".
+    const withoutPeriod = header.replace(/\s*\([^)]*\)\s*$/, '');
+    const withoutCode = withoutPeriod.replace(/^[^-]*-\s*/, '');
+    return normalize(withoutCode) === normalize(courseName);
 }
 
 /**
@@ -432,7 +438,10 @@ export class PlaywrightLoginService {
             if (!this.browser || !this.context) {
                 // If browser is closed, relaunch it
                 log.info('Playwright: Browser not active, relaunching...');
-                await this.getCourses(); // This will relaunch and set this.context
+                const relaunch = await this.getCourses(); // This will relaunch and set this.context
+                if (!relaunch.success) {
+                    return { success: false, error: relaunch.error, errorCode: relaunch.errorCode };
+                }
             }
 
             // IMPORTANT: Reuse the existing page instead of creating a new one
@@ -606,7 +615,12 @@ export class PlaywrightLoginService {
             if (html) diagnosticsService.saveRaw(`debug_playwright_fail_${courseId}.html`, html);
             log.error('Playwright: Error entering course.', { courseId, error });
             // Don't close likely
-            return { success: false, error: error.message };
+            // A TypeError here is our own bug (e.g. a null non-null assertion),
+            // not something the user caused — never surface its message.
+            if (error instanceof TypeError) {
+                return { success: false, error: 'Unexpected internal error while entering the course.', errorCode: 'UNKNOWN' };
+            }
+            return { success: false, error: error.message, errorCode: classifyMessage(error.message || '') };
         }
     }
 
