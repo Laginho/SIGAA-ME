@@ -1,6 +1,6 @@
 # DL-008: Teto no laço de último recurso do lote: N falhas seguidas do fallback Playwright encerram a rodada
-Status: open
-Stage: to-review
+Status: resolved
+Stage: done
 Priority: P2
 Blocked by: nenhum
 Review: agent
@@ -74,3 +74,44 @@ Fora do escopo: `headless: false`, o timeout de 65 s, e lote no Playwright
 - Não é bug de correção: cada chamada individual faz o certo. É custo sem
   teto num caminho que só roda quando tudo já falhou, e é exatamente aí que
   500 janelas aparecem.
+
+#### Resolution (2026-09-16)
+
+Verdict: Approve
+
+Decisão: contador `consecutiveFailures` local ao laço de fallback, com o teto
+em `PLAYWRIGHT_FALLBACK_FAILURE_LIMIT = 3` no topo do módulo. A checagem do
+teto fica **antes** da tentativa e depois do `continue` de status, então só
+conta arquivo que de fato foi ao Playwright; sucesso zera. O `break` garante
+que o `log.warn` sai no máximo uma vez, e só quando ainda havia arquivo por
+tentar — lote que acaba em três falhas nas últimas posições não gera aviso
+falso.
+
+Arquivos:
+
+- `electron/services/sigaa.service.ts` — constante nova, comentário `ponytail:`
+  reescrito nomeando o teto e os 65 s por tentativa, guarda e contador no laço
+  (`:615-649`).
+- `tests/unit/sigaa-service.test.ts` — dois casos novos no describe de
+  `downloadAllFiles`.
+
+Prova red-green (rodada pelo revisor, `sigaa.service.ts` revertido para a
+versão da branch de sessão):
+
+    × caps the Playwright fallback at 3 consecutive failures  → expected 3, got 10
+    × resets the consecutive-failure count on a fallback success → expected 6, got 7
+    Tests  2 failed | 35 passed (37)
+
+Com a correção: `Test Files 71 passed (71)`, `Tests 800 passed | 5 skipped (805)`,
+`eslint` 0 erros / 40 warnings (`no-explicit-any` pré-existentes), `tsc` limpo.
+
+Critérios: 1 ✅ (teste, 3 chamadas em lote de 10), 2 ✅ (teste, 6 chamadas na
+sequência f,f,s,f,f,f), 3 ✅ (teste afirma `downloaded`/`failed` e os 10
+`failed` em `results`), 4 ✅ por leitura — `log.warn('Playwright fallback
+interrupted by consecutive failures.', { courseId })`, sem nome de arquivo nem
+de turma —, 5 ✅ (`signal.aborted` intacto no topo do laço), 6 ✅.
+
+Observação, não bloqueia: o critério 4 não tem teste. A seção "Tests stage 2
+writes" só pediu testes para 1 e 2, e o implementador ficou dentro do que foi
+pedido. Se o formato do aviso virar contrato de observabilidade, abrir ticket
+próprio — aqui seria teste novo, ou seja, fora do que a etapa 3 pode fazer.
