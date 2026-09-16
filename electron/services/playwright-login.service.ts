@@ -612,9 +612,12 @@ export class PlaywrightLoginService {
             const nomeTurma = (await page.locator(COURSE_HOME.nomeTurmaSelector).textContent({ timeout: 5000 }).catch(() => '')) ?? '';
             const nomeTurmaClean = nomeTurma.trim().replace(/\s+/g, ' ');
             if (!isExpectedCoursePage(nomeTurma, courseName)) {
-                const errorMsg = `Playwright: Course verification failed! Page header shows "${nomeTurmaClean}" instead of "${courseName}" — the JSF session is likely still on the previous course.`;
                 log.error('Playwright: Course verification failed.', { courseName, title: nomeTurmaClean });
-                throw new Error(errorMsg);
+                return {
+                    success: false,
+                    error: 'Verificação de turma falhou: o portal carregou outra turma.',
+                    errorCode: 'SESSION_EXPIRED'
+                };
             } else {
                 log.info('Playwright: Verified course.', { courseName, title: nomeTurmaClean });
             }
