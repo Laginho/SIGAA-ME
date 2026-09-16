@@ -240,7 +240,7 @@ async function fetchCourseFiles(courseId: string) {
     } else {
       // Get downloaded status
       const downloadedFiles = JSON.parse(readAccountItem('downloads') || '{}');
-      const courseDownloads = downloadedFiles[courseId] || {};
+      let courseDownloads = downloadedFiles[courseId] || {};
 
       // Verify existence
       const filePaths = Object.values(courseDownloads).map((f: any) => f.path).filter(p => p);
@@ -257,28 +257,29 @@ async function fetchCourseFiles(courseId: string) {
               // Find key by path
               const key = Object.keys(courseDownloads).find(k => courseDownloads[k].path === res.path);
               if (key) {
-                delete courseDownloads[key];
                 staleKeys.push(key);
                 staleKeyPaths.set(key, res.path);
               }
             }
           });
 
-          if (staleKeys.length > 0) {
-            // Relê depois do await: um download concorrente pode ter gravado
-            // enquanto esperávamos checkFilesExistence (CONC-002).
-            const freshDownloads = JSON.parse(readAccountItem('downloads') || '{}');
-            const freshCourseDownloads = freshDownloads[courseId] || {};
-            for (const key of staleKeys) {
-              // CONC-003: só apaga se o path ainda for o que checkFilesExistence
-              // reportou ausente — path diferente é registro mais novo que a checagem.
-              if (freshCourseDownloads[key]?.path === staleKeyPaths.get(key)) {
-                delete freshCourseDownloads[key];
-              }
+          // Relê depois do await, sem condição: um download concorrente pode
+          // ter gravado enquanto esperávamos checkFilesExistence (CONC-002),
+          // e é a partir desta releitura que a lista renderiza (CLEAN-011).
+          const freshDownloads = JSON.parse(readAccountItem('downloads') || '{}');
+          const freshCourseDownloads = freshDownloads[courseId] || {};
+          for (const key of staleKeys) {
+            // CONC-003: só apaga se o path ainda for o que checkFilesExistence
+            // reportou ausente — path diferente é registro mais novo que a checagem.
+            if (freshCourseDownloads[key]?.path === staleKeyPaths.get(key)) {
+              delete freshCourseDownloads[key];
             }
+          }
+          if (staleKeys.length > 0) {
             freshDownloads[courseId] = freshCourseDownloads;
             writeAccountItem('downloads', JSON.stringify(freshDownloads));
           }
+          courseDownloads = freshCourseDownloads;
         } catch (e) {
           console.error('Failed to verify files:', e);
         }
