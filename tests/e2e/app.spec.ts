@@ -151,6 +151,8 @@ describeOrSkip('App E2E (With Credentials)', () => {
     });
 
     test('can download a course file when one exists', async () => {
+        test.setTimeout(120000); // the toast wait below alone can take 90s
+
         const fileDownloadBtns = window.locator('.btn-download-file');
         const fileCount = await fileDownloadBtns.count();
         test.skip(fileCount === 0, 'nenhum arquivo para baixar nesta disciplina');
