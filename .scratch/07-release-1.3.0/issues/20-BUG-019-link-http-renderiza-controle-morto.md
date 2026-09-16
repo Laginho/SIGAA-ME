@@ -1,6 +1,6 @@
 # BUG-019: Link `http://` renderiza um controle que não abre nada
-Status: open
-Stage: to-merge
+Status: resolved
+Stage: done
 Priority: P2
 Blocked by: nenhum
 Review: human
