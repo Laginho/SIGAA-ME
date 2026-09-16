@@ -50,4 +50,14 @@ describe('isExpectedCoursePage', () => {
     it('rejeita cabeçalho vazio (drift de seletor: #nomeTurma sumiu)', () => {
         expect(isExpectedCoursePage('', 'SINAIS E SISTEMAS')).toBe(false);
     });
+
+    it('rejeita "FÍSICA II" quando o esperado é "FÍSICA I" (PORTAL-007: includes aceitava por engano)', () => {
+        const header = 'FI0222 - FÍSICA II (2026.1 - T01)';
+        expect(isExpectedCoursePage(header, 'FÍSICA I')).toBe(false);
+    });
+
+    it('rejeita "LABORATÓRIO DE FÍSICA I" quando o esperado é "FÍSICA I"', () => {
+        const header = 'FI0100 - LABORATÓRIO DE FÍSICA I (2026.1 - T01)';
+        expect(isExpectedCoursePage(header, 'FÍSICA I')).toBe(false);
+    });
 });
