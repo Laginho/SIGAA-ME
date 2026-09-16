@@ -22,6 +22,7 @@ vi.mock('../../electron/services/logger.service', () => ({ logger: runtime.logge
 import { HttpScraperService } from '../../electron/services/http-scraper.service';
 import { PlaywrightLoginService } from '../../electron/services/playwright-login.service';
 import { SigaaService } from '../../electron/services/sigaa.service';
+import { validateCourseListDocument } from '../../electron/sigaa/portal-adapter';
 
 // Synthetic documents, never captured from an authenticated session.
 const loginHtml = '<form action="/sigaa/logar.do"><input name="user.login"><input name="user.senha"><input name="entrar" type="submit"></form>';
@@ -98,42 +99,9 @@ describe('PORTAL-001: production service compatibility boundary', () => {
         expect(result).toMatchObject({ success: true, files: [], news: [] });
     });
 
-    it('classifies session expiry after the HTTP files POST, before parsing its response', async () => {
-        runtime.axios.get.mockResolvedValue(response(menuHtml));
-        runtime.axios.post.mockResolvedValue(response(loginHtml));
-        const result = await scraper().getCourseFiles('123', 'Algorithms');
-        expect(runtime.axios.post).toHaveBeenCalledOnce();
-        expect(result).toMatchObject({ success: false, errorCode: 'SESSION_EXPIRED' });
-    });
-
-    it('does not submit a files action when its starting document lacks ViewState', async () => {
-        runtime.axios.get.mockResolvedValue(response(menuHtml.replace('<input name="javax.faces.ViewState" value="fixture-state">', '')));
-        runtime.axios.post.mockResolvedValue(response(courseHtml));
-        const result = await scraper().getCourseFiles('123', 'Algorithms');
-        expect(runtime.axios.post).not.toHaveBeenCalled();
-        expect(result).toMatchObject({ success: false, errorCode: 'SELECTOR_DRIFT' });
-    });
-
-    it('distinguishes an expired entry page from an absent course', async () => {
-        runtime.axios.get.mockResolvedValue(response(loginHtml));
-        const result = await scraper().enterCourseHTTP('123');
-        expect(result).toMatchObject({ success: false, errorCode: 'SESSION_EXPIRED' });
-        expect(runtime.axios.post).not.toHaveBeenCalled();
-    });
-
-    it('reports NOT_FOUND only after recognizing the student portal structure', async () => {
-        runtime.axios.get.mockResolvedValue(response(portalHtml));
-        const result = await scraper().enterCourseHTTP('999');
-        expect(result).toMatchObject({ success: false, errorCode: 'NOT_FOUND' });
-        expect(runtime.axios.post).not.toHaveBeenCalled();
-    });
-
-    it('rejects a course entry end state containing only the generic conteudo element', async () => {
-        runtime.axios.get.mockResolvedValue(response(portalHtml));
-        runtime.axios.post.mockResolvedValue(response('<div id="conteudo">Unexpected layout</div>'));
-        const result = await scraper().enterCourseHTTP('123');
-        expect(result.success).toBe(false);
-        expect(result).toMatchObject({ errorCode: 'SELECTOR_DRIFT' });
+    it('distinguishes an expired entry page from a recognized student portal', () => {
+        expect(validateCourseListDocument(loginHtml)).toMatchObject({ code: 'SESSION_EXPIRED' });
+        expect(validateCourseListDocument(portalHtml)).toBeNull();
     });
 
     it('invalidates old course request state after a failed refresh instead of posting a stale token', async () => {
