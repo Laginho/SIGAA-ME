@@ -144,7 +144,7 @@ describe('DownloadService.downloadFile — caminho Playwright usa a mesma valida
     };
 
     const baixar = (page: Page, fileName = 'LISTA 1') =>
-        new DownloadService().downloadFile(page, '', fileName, COURSE, destino, '555', DOWNLOAD_SCRIPT);
+        new DownloadService().downloadFile(page, fileName, COURSE, destino, '555', DOWNLOAD_SCRIPT);
 
     it('texto com suggestedFilename .html não vira .pdf e não é apagado', async () => {
         // O redirect JSF faz o Chrome sugerir `.html`; o código antigo trocava

@@ -73,7 +73,7 @@ it('pedido pelo id da linha certa executa o onclick dela, mesmo com nome ambígu
     stubDom();
     const { page, evaluate } = fakePage();
 
-    const result = await new DownloadService().downloadFile(page, '', 'Aula 1', COURSE, destino, '10');
+    const result = await new DownloadService().downloadFile(page, 'Aula 1', COURSE, destino, '10');
 
     expect(result.success).toBe(true);
     expect(evaluate).toHaveBeenCalledTimes(2);
@@ -84,7 +84,7 @@ it('sem linha com o id, o resultado é falha, sem goto e sem executar script de 
     stubDom();
     const { page, evaluate, goto } = fakePage();
 
-    const result = await new DownloadService().downloadFile(page, '', 'Aula 3', COURSE, destino, '999');
+    const result = await new DownloadService().downloadFile(page, 'Aula 3', COURSE, destino, '999');
 
     expect(result.success).toBe(false);
     expect(goto).not.toHaveBeenCalled();
