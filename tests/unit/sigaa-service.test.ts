@@ -96,6 +96,9 @@ describe('SigaaService (Unit)', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
+        // QA-010: clearAllMocks limpa mock.calls, não a implementação — um
+        // mockReturnValue(true) de um teste anterior sobrevive sem isto.
+        vi.mocked(fs.existsSync).mockReturnValue(false);
         service = new SigaaService();
         // Access the mocked internal instances
         mockPlaywright = (service as any).playwrightLogin;
