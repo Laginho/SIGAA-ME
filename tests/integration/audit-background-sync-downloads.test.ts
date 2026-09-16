@@ -67,14 +67,17 @@ function makeWindow() {
     return { win: { isDestroyed: () => false, webContents: { send } } as unknown as BrowserWindow, send };
 }
 
-function makeSigaaService(downloadAllFiles: ReturnType<typeof vi.fn>) {
+function makeSigaaService(
+    downloadAllFiles: ReturnType<typeof vi.fn>,
+    files: { id: string; name: string; type: 'file' | 'link' }[] = [
+        { id: 'old', name: 'old.pdf', type: 'file' },
+        { id: 'new', name: 'new.pdf', type: 'file' },
+    ]
+) {
     return {
         operations: new SessionOperationCoordinator(),
         getCourses: vi.fn(async () => ok({ courses: [{ id: 'c1', name: 'Course 1', code: 'C1', period: '2026.1' }] })),
-        getCourseFiles: vi.fn(async () => ok({
-            files: [{ id: 'old', name: 'old.pdf', type: 'file' }, { id: 'new', name: 'new.pdf', type: 'file' }],
-            news: [],
-        })),
+        getCourseFiles: vi.fn(async () => ok({ files, news: [] })),
         login: vi.fn(async () => ok({ id: deriveAccountId('aluno01'), name: 'U' })),
         downloadAllFiles,
         getNewsDetail: vi.fn(),
@@ -134,6 +137,53 @@ describe('BackgroundSyncService feeds its own downloads back into the renderer i
 
         const [, payload] = send.mock.calls[0] as [string, BackgroundSyncUpdate];
         expect(payload.downloads ?? []).not.toContainEqual(expect.objectContaining({ courseId: 'c1' }));
+    });
+});
+
+describe('BackgroundSyncService filters link-type materials out of the auto-download batch (SEC-004)', () => {
+    beforeEach(() => {
+        setActiveMainAccount(null);
+        vi.clearAllMocks();
+        vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+        setActiveMainAccount(null);
+    });
+
+    it('passes downloadAllFiles only the file-type items from the diff, never the link', async () => {
+        const accountId = deriveAccountId('aluno01');
+        setActiveMainAccount(accountId);
+        const { win } = makeWindow();
+        const downloadAllFiles = vi.fn(async () => ok({ downloaded: 0, skipped: 0, failed: 0, results: [] }));
+        const files: { id: string; name: string; type: 'file' | 'link' }[] = [
+            { id: 'old', name: 'old.pdf', type: 'file' },
+            { id: 'new', name: 'new.pdf', type: 'file' },
+            { id: 'link1', name: 'Slide do professor', type: 'link' },
+        ];
+        const service = new BackgroundSyncService(makeSigaaService(downloadAllFiles, files), () => win);
+
+        await runSync(service);
+
+        expect(downloadAllFiles).toHaveBeenCalledTimes(1);
+        expect(downloadAllFiles.mock.calls[0][2]).toEqual([{ id: 'new', name: 'new.pdf', type: 'file' }]);
+    });
+
+    it('does not call downloadAllFiles when the diff has only external links', async () => {
+        const accountId = deriveAccountId('aluno01');
+        setActiveMainAccount(accountId);
+        const { win } = makeWindow();
+        const downloadAllFiles = vi.fn();
+        const files: { id: string; name: string; type: 'file' | 'link' }[] = [
+            { id: 'old', name: 'old.pdf', type: 'file' },
+            { id: 'link1', name: 'Slide do professor', type: 'link' },
+        ];
+        const service = new BackgroundSyncService(makeSigaaService(downloadAllFiles, files), () => win);
+
+        await runSync(service);
+
+        expect(downloadAllFiles).not.toHaveBeenCalled();
     });
 });
 
