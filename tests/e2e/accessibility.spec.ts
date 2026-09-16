@@ -197,10 +197,10 @@ test.describe('Acessibilidade', () => {
                 // Height}` (não `window.inner{Width,Height}`, que inclui a faixa da
                 // scrollbar; o `<dialog fixed>` centraliza contra o viewport de
                 // layout, que a exclui).
-                // `boundingBox()` do Playwright também retorna null pra este
-                // `<dialog>`: ele renderiza no "top layer" do browser, fora da
-                // árvore normal que a checagem de visibilidade percorre.
-                // `getBoundingClientRect()` no próprio DOM não tem esse problema.
+                // O retângulo vem de `getBoundingClientRect()` no mesmo
+                // `evaluate` que o viewport — `boundingBox()` do Playwright dá o
+                // mesmo valor, mas numa segunda ida ao browser, e as duas
+                // medidas precisam ser do mesmo instante de layout.
                 const { viewport, box } = await page.locator('#newsModal').evaluate((el) => {
                     const r = el.getBoundingClientRect();
                     return {
