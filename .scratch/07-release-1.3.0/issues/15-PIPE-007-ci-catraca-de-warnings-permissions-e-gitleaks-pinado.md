@@ -1,6 +1,6 @@
 # PIPE-007: CI: catraca de warnings, `permissions:` e gitleaks pinado
 Status: open
-Stage: to-implement
+Stage: implementing
 Priority: P2
 Blocked by: nenhum
 Review: agent
