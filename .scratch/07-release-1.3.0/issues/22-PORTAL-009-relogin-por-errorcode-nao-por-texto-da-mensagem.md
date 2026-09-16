@@ -1,6 +1,6 @@
 # PORTAL-009: Relogin decide por texto da mensagem, não por `errorCode`
 Status: open
-Stage: blocked
+Stage: to-implement
 Priority: P2
 Blocked by: nenhum
 Review: human
@@ -51,10 +51,14 @@ diff maior e mexe em caminho de download, então é escolha, não obviedade.
    não por `error?.includes('not found in portal')`. Se a mensagem antiga
    precisar continuar valendo por compatibilidade, isso fica explícito no código
    com o motivo, não por acidente.
-2. **Depende da resposta da etapa 1.** Caminho A: só o `:423` muda, e os outros
-   sete call sites ficam registrados sob `## Comments` como dívida conhecida.
-   Caminho B: a entrada em turma vira um helper privado que classifica e
-   relogga uma vez, e os call sites passam a usá-lo.
+2. **Caminho B** (decidido pelo autor em 2026-09-16, ver `## Comments`). A
+   entrada em turma vira um helper privado de `sigaa.service.ts`: chama
+   `enterCourseAndGetHTML`, e se o resultado trouxer
+   `errorCode === 'SESSION_EXPIRED'`, relogga uma vez e repete a entrada. Os
+   oito call sites (`:167`, `:248`, `:305`, `:420`, `:423`, `:530`, `:578`,
+   `:658`) passam a usá-lo, e nenhum deles fica com relogin próprio — o do
+   `:423` é absorvido pelo helper, não duplicado. O `background-sync.service.ts`
+   não entra: o relogin dele lê o `getCourses()`, não a entrada em turma.
 3. O relogin continua tentando **uma** vez. Nenhum laço novo, nenhum retry
    adicional — sessão que expira duas vezes seguidas é erro para o usuário.
 4. `npm run quality` verde.
@@ -72,8 +76,8 @@ diff maior e mexe em caminho de download, então é escolha, não obviedade.
   `reloginWithStoredCredentials` chamado uma vez e a entrada repetida.
   Vermelho porque hoje a mensagem não contém "not found in portal" e o `if`
   não casa.
-- Caminho B, se escolhido: o mesmo teste para pelo menos um call site fora do
-  `downloadAllFiles`.
+- O mesmo teste para pelo menos um call site fora do `downloadAllFiles` —
+  Caminho B é o escolhido, então essa cobertura é obrigatória, não opcional.
 
 ## Comments
 
@@ -87,3 +91,10 @@ diff maior e mexe em caminho de download, então é escolha, não obviedade.
   2026-09-15 e do `SEC-004` ela é `:423`.
 
 - 2026-09-16 Attempt 1 stopped to ask: **PORTAL-009 blocked**, no code touched. Committed on branch `portal-009` (off the open session `sweatshop/2026-09-16-1046`). /  / Reason: criterion 2 says the scope "depends on the answer from stage 1" — Caminho A (fix only `sigaa.service.ts:423`) vs. Caminho B (shared relogin helper across all 8 `enterCourseAndGetHTML` call sites) — but stage 1 never picked one. That's a real scope fork, not something stage 2 should decide unilaterally. /  / Needs a human/stage-1 call: A or B? /
+
+- **Resposta do autor (2026-09-16): Caminho B.** Sete dos oito call sites de
+  `enterCourseAndGetHTML` não têm recuperação nenhuma — abrir turma, listar
+  arquivos e ler notícia viram erro para o usuário quando a sessão expira. O
+  Caminho A consertaria só o `downloadAllFiles`, o menos visível dos oito, e
+  deixaria o mesmo sintoma nos outros sete. Critério 2 reescrito para o helper;
+  o critério 3 (uma tentativa só) vale dentro dele.

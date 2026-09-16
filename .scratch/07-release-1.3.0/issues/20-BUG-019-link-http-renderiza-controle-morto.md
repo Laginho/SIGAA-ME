@@ -1,6 +1,6 @@
 # BUG-019: Link `http://` renderiza um controle que não abre nada
 Status: open
-Stage: blocked
+Stage: to-implement
 Priority: P2
 Blocked by: nenhum
 Review: human
@@ -59,8 +59,14 @@ dois caminhos; o outro vira "não fazer".
    critério 2 mexer em cor de texto ou fundo (regra do `AGENTS.md`).
 4. `extractLinkUrl` filtra por host, não só por esquema: URL interna do SIGAA
    não atravessa o IPC. Independe da resposta em `## Comments`.
-5. A busca da linha viva por id em `download.service.ts` volta a alcançar linha
-   só com `href`. Independe da resposta em `## Comments`.
+5. O ramo `{ type: 'href' }` da busca por id em `download.service.ts` é
+   **apagado**, não consertado — decidido pelo autor em 2026-09-16, ver
+   `## Comments`. Some o `return { type: 'href' }` do `page.evaluate`, some o
+   `else if (freshAction.type === 'href')` que o consome (o `goto` e a checagem
+   de protocolo junto), e `freshAction` passa a ser o script, sem o campo
+   `type`. O caso de `href` absoluto escrito na primeira passada sai do
+   `tests/unit/audit-download-fallback-identity.test.ts`, no commit de teste;
+   código que deixa de existir não ganha teste novo.
 
 #### Verification
 
@@ -126,4 +132,66 @@ dois caminhos; o outro vira "não fazer".
   antes o casamento por texto devolvia o `href` e o `goto` baixava. Não é do
   tema deste ticket; entrou aqui porque é pequeno e ninguém mais o carrega.
 
-- 2026-09-16 Attempt 1 stopped to ask: BUG-019 is reopened (`Stage: to-implement`, reviewed 2026-09-16) with only criterion 5 left; branch `bug-019` already checked out. The review's Resolution block leaves an explicit decision for you before stage 2 can proceed: /  / **Criterion 5** — the id-match in `download.service.ts:96` compares against the raw `href` attribute, but the parser builds ids from the *resolved* URL (`http-scraper.service.ts:282`). So relative `href`s never match, and the fallback still breaks the way it did before this ticket. /  / Two ways forward, per the review: /  / 1. **Fix it** — resolve both sides the same way (or match against `baseUrl + href` too), plus a new red test for a relative `href`. This is stage 2 work, continuing the existing seam. / 2. **Delete it** — the review also found nothing in production ever calls `downloadFile` with a `link:` id (no download button renders for `type === 'link'`, and `sigaa.service.ts:496` skips it explicitly). If that makes the whole `href` branch not worth keeping, criterion 5 and its Primary-files entry get removed from the ticket — that's a stage 1 edit, not stage 2. /  / Which do you want — fix the id-matching, or drop criterion 5 and the dead `href` branch? /
+#### Revisão (2026-09-16)
+
+Verdict: Needs your call: o critério 5 casa o id contra o `href` cru do DOM, e o
+parser guarda o id com a URL já resolvida — a linha de `href` relativo, que é a
+razão de o parser ter a resolução, continua inalcançável.
+
+Separação de commits verde: `563d4a6` e `ed465c6` tocam só `tests/`, `2c0070d` e
+`99fb241` só `electron/` e `src/`. Nada fora dos Primary files.
+
+Vermelho provado: com os testes de `ed465c6` sobre o código do `master`,
+`npx vitest run tests/unit/navigation-policy.test.ts tests/unit/sigaa-service.test.ts
+tests/unit/audit-download-fallback-identity.test.ts` dá 6 failed | 103 passed.
+Com a correção, `npm run quality` dá 72 arquivos, 793 passed | 5 skipped, ESLint
+0 erros / 40 warnings. `npm run test:e2e -- accessibility`: 17 passed (critério 3).
+
+Critérios 1, 2, 3 e 4: ✅.
+
+- 1: `navigation-policy.ts:63-71` segue a ordem que o ticket sugeriu; o teste de
+  `http://si3.ufc.br@evil.example/` prende o caso da credencial embutida, e o de
+  `http://algo.ufc.br/x` prende o "nunca `trusted`".
+- 2: `.btn-open-link` copia campo a campo o `.btn-download-file` (40px, redondo) e
+  acrescenta `text-decoration: none`; o bloco `[data-theme="dark"]` espelha o do
+  `.btn-download-file`.
+- 4: `extractLinkUrl` descarta `hostname === 'si3.ufc.br'`, que é o host do
+  `baseUrl` do parser. Literal repetido, mas é o mesmo literal que o resto do
+  `electron/` já usa (`download.service.ts:106`, `playwright-login.service.ts`).
+
+Critério 5: ❌. Dois pontos, e o segundo decide o tamanho do primeiro.
+
+1. **O casamento por id não cobre `href` relativo.** O parser monta o id com a
+   URL resolvida — `http-scraper.service.ts:282,288`:
+   `const url = href.startsWith('http') ? href : this.baseUrl + href`, depois
+   `id: \`link:${url}\``. A busca nova compara com o atributo cru:
+   `download.service.ts:96`, `id === \`link:${href}\``, e `getAttribute('href')`
+   devolve o literal, não a URL resolvida. Para `<a href="/sigaa/ava/xyz.jsf">`
+   o id é `link:https://si3.ufc.br/sigaa/ava/xyz.jsf` e o lado direito é
+   `link:/sigaa/ava/xyz.jsf`: não casa, a linha é pulada, e o fallback estoura o
+   mesmo "Link not found and no script provided" de antes. O teste novo usa
+   `href` absoluto, então passa — é o formato que a implementação escolheu, não o
+   que o parser produz. A correção é resolver os dois lados igual (ou casar
+   também contra `baseUrl + href`) e um teste vermelho com `href` relativo.
+2. **Nada chama `downloadFile` com id `link:`.** `course-detail.ts:297-312` não
+   renderiza botão de download para `type === 'link'`, e `:468` filtra
+   `f.type !== 'link'` antes do "baixar tudo"; no main,
+   `sigaa.service.ts:496` pula `matched?.type === 'link'`. Ou seja, o ramo
+   `{ type: 'href' }` continua inalcançável em produção mesmo depois do ponto 1.
+
+Por isso "Needs your call": o ponto 1 precisa de teste novo, então pela regra do
+loop o stage 3 não conserta — volta ao stage 2. Mas se o ponto 2 fizer você
+preferir **apagar** o critério 5 e o ramo `href` em vez de consertá-los, isso é
+edição de stage 1, não de stage 2. Os critérios 1–4 estão prontos e não dependem
+disso.
+
+- 2026-09-16 Attempt 1 stopped to ask (driver, no run): qual dos dois caminhos do
+  bloco de revisão — consertar o casamento por id relativo, ou apagar o critério
+  5 e o ramo `href`.
+
+- **Resposta do autor (2026-09-16): apagar.** O ramo é inalcançável hoje
+  (`continue` exige `idMatch`, `idMatch` exige `onclick`, então o `return` do
+  `href` nunca roda) e não há chamador em produção com id `link:` — o ponto 2 da
+  revisão. Consertar o casamento restauraria um caminho que nada alcança.
+  Critério 5 reescrito para a deleção; os critérios 1–4 seguem como estão, na
+  branch `bug-019`. Stage 2 continua nessa branch.
