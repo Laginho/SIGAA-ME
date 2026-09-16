@@ -589,7 +589,9 @@ async function openNewsModal(courseId: string, courseName: string, newsId: strin
           }
         }
       } catch (e) {
-        console.warn('Failed to cache news content:', e);
+        // Igual ao dashboard.ts:90-93: a notícia continua renderizando, mas
+        // o usuário precisa saber que a cópia offline não foi salva.
+        toast.error(e instanceof Error ? e.message : 'Falha ao guardar a notícia offline.');
       }
 
       renderNewsIntoModal(modalBody, news.title, news.date, news.notification, news.content)
