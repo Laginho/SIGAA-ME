@@ -1,6 +1,6 @@
 # QA-011: Stub pré-`CLEAN-010` grava PDF na raiz do repo a cada `npm test`, e o `.gitignore` esconde
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P1
 Blocked by: nenhum
 Review: agent
