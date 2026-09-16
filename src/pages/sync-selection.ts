@@ -1,7 +1,7 @@
 import '../styles/sync-selection.css';
 import { h } from '../utils/dom';
 import { mergeCoursesIntoCache } from '../utils/ui-helpers';
-import { getActiveAccount, readAccountItem, setActiveAccount, writeAccountItem } from '../data/account-storage';
+import { getActiveAccount, readAccountItem, readCoursesCache, setActiveAccount, writeAccountItem } from '../data/account-storage';
 import type { CourseSnapshot, CourseSummary } from '../../shared/domain';
 import type { CompatibilityStatus } from '../../shared/ipc';
 
@@ -283,9 +283,7 @@ async function startSync(app: HTMLDivElement, mode: 'fast' | 'full') {
     // A failure blocks the replaceSet: a course that left the enrollment is
     // only dropped from the cache on a fully clean sync.
     if (failures.length > 0) {
-      const savedSoFar = (() => {
-        try { return JSON.parse(readAccountItem('courses') || '[]').length; } catch { return 0; }
-      })();
+      const savedSoFar = readCoursesCache().length;
       const detail = failures.map(f => `${f.name} — ${f.message}`).join('; ');
       showError(`${failures.length} disciplina(s) falharam: ${detail}`, savedSoFar);
       return;
@@ -299,9 +297,7 @@ async function startSync(app: HTMLDivElement, mode: 'fast' | 'full') {
 
   } catch (error: any) {
     console.error('Sync failed:', error);
-    const savedSoFar = (() => {
-      try { return JSON.parse(readAccountItem('courses') || '[]').length; } catch { return 0; }
-    })();
+    const savedSoFar = readCoursesCache().length;
     showError(`Erro: ${error.message}`, savedSoFar);
   }
 }
