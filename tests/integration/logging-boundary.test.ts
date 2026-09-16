@@ -237,14 +237,16 @@ describe('SigaaService.downloadFile — plano B via DownloadService', () => {
             enterCourseAndGetHTML: vi.fn(async () => ({ success: true, html: '<html></html>', cookies: [] })),
             navigateToFilesSection: vi.fn(async () => ({ success: false })),
             getUserAgent: vi.fn(async () => 'ua-de-teste'),
-            downloadFile: vi.fn(async (_courseId: string, courseName: string, name: string, _fileUrl: string, basePath: string) =>
-                new DownloadService().downloadFile(page, name, courseName, basePath, '999', DOWNLOAD_SCRIPT)),
+            downloadFile: vi.fn(async (_courseId: string, courseName: string, name: string, basePath: string, fileId: string) =>
+                new DownloadService().downloadFile(page, name, courseName, basePath, fileId, DOWNLOAD_SCRIPT)),
         };
 
         try {
             const result = await service.downloadFile('c1', 'Cálculo I', { id: '999', name: fileName }, destino);
 
             expect(result.success).toBe(true);
+            if (!result.success) throw new Error('unreachable');
+            expect(result.data.filePath.startsWith(destino)).toBe(true);
             await logger.flush();
             const log = readLog();
             expect(log).toContain('[Download]');
