@@ -84,32 +84,17 @@ export class DownloadService {
 
                     const onclick = link.getAttribute('onclick');
                     const idMatch = onclick && onclick.match(/,id,([^,'"]+)/);
-                    if (idMatch && idMatch[1] === id) return { type: 'script', value: onclick };
-
-                    // Sem onclick, o id não vem do JSF: é o `link:<url>` que o parser
-                    // atribui a material sem script (BUG-019).
-                    const href = link.getAttribute('href');
-                    if (!onclick && href && id === `link:${href}`) return { type: 'href', value: href };
+                    if (idMatch && idMatch[1] === id) return onclick;
                 }
                 return null;
             }, fileId);
 
             if (freshAction) {
-                if (freshAction.type === 'script') {
-                    log.info('Executing completely fresh JSF script from current DOM.');
-                    await page.evaluate((scriptStr: string) => {
-                        const func = new Function(scriptStr.replace('return false', ''));
-                        func();
-                    }, freshAction.value);
-                } else if (freshAction.type === 'href') {
-                    const resolvedUrl = new URL(freshAction.value, page.url());
-                    if (resolvedUrl.protocol !== 'https:' || resolvedUrl.hostname !== 'si3.ufc.br') {
-                        log.warn('Refusing to navigate to a link outside si3.ufc.br.', { url: resolvedUrl.href });
-                        return { success: false, error: 'Link externo ao SIGAA; download recusado.' };
-                    }
-                    log.info('Navigating to direct URL from current DOM.');
-                    await page.goto(resolvedUrl.href, { waitUntil: 'networkidle', timeout: 30000 });
-                }
+                log.info('Executing completely fresh JSF script from current DOM.');
+                await page.evaluate((scriptStr: string) => {
+                    const func = new Function(scriptStr.replace('return false', ''));
+                    func();
+                }, freshAction);
             } else {
                 log.info('Failed to find fresh action. Fallback to cached original script.');
                 if (script) {
