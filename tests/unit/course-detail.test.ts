@@ -288,7 +288,10 @@ describe('course-detail: índice de downloads sem read-modify-write cruzado (CON
             id: 'c1',
             name: 'Cálculo I',
             code: 'CB0001',
-            files: [{ name: 'Lista 3.pdf', type: 'file', id: '555' }],
+            files: [
+                { name: 'Lista 3.pdf', type: 'file', id: '555' },
+                { name: 'Lista 4.pdf', type: 'file', id: '556' },
+            ],
             news: [],
         }]));
         writeAccountItem('downloads', JSON.stringify({
@@ -324,6 +327,13 @@ describe('course-detail: índice de downloads sem read-modify-write cruzado (CON
         const downloads = JSON.parse(readAccountItem('downloads') || '{}');
         expect(downloads.c1['556']).toBeDefined();
         expect(downloads.c1['555']).toBeUndefined();
+
+        // CLEAN-011 item 2: a lista renderizada precisa refletir a releitura,
+        // não o objeto capturado antes do `await checkFilesExistence`.
+        const row555 = container.querySelector('[data-file-id="555"]');
+        const row556 = container.querySelector('[data-file-id="556"]');
+        expect(row555?.querySelector('.status-done')).toBeNull();
+        expect(row556?.querySelector('.status-done')).not.toBeNull();
     });
 });
 
