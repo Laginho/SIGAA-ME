@@ -399,8 +399,15 @@ describe('Diagnóstico estrutural nos pontos de falha (PORTAL-003)', () => {
         vi.clearAllMocks();
     });
 
+    /**
+     * Zero seletores de turma sozinho não é mais drift (PORTAL-008): o
+     * conteúdo genérico aqui garante que a página não carrega o landmark
+     * autenticado, então este continua sendo o cenário de drift de verdade
+     * que os testes abaixo querem — não o de conta sem turmas.
+     */
     function driftingCourseList() {
         const harness = createNavigationHarness();
+        harness.page.content.mockResolvedValue('<main>Unexpected layout</main>');
         harness.page.evaluate.mockResolvedValue({
             courses: [],
             selectorDiagnostics: { courseIdInputs: 0, virtualClassroomLinks: 0 }
@@ -429,7 +436,7 @@ describe('Diagnóstico estrutural nos pontos de falha (PORTAL-003)', () => {
         expect(recordSpy).toHaveBeenCalledTimes(1);
         const diagnostic = recordSpy.mock.calls[0][0] as any;
         expect(diagnostic).toMatchObject({
-            state: 'STUDENT_PORTAL',
+            state: 'UNKNOWN',
             urlFamily: '/sigaa/paginaInicial.do',
             adapterVersion: PORTAL_ADAPTER_VERSION,
             selectorCounts: { courseIdInputs: 0, virtualClassroomLinks: 0 }
