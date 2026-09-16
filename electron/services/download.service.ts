@@ -5,7 +5,7 @@
 //   IPC `download-file` (main.ts) → SigaaService.downloadFile
 //   → SigaaService.downloadViaPlaywright (plano B, BUG-004) → PlaywrightLoginService.downloadFile → aqui
 // Busca por `import ... from` vai dizer que é código morto. Não é.
-import { Browser, Page } from 'playwright';
+import { Page } from 'playwright';
 import * as fs from 'fs';
 import * as path from 'path';
 import { logger } from './logger.service';
@@ -27,10 +27,6 @@ async function rejectIfTooLarge(partPath: string): Promise<string | undefined> {
 }
 
 export class DownloadService {
-    constructor(_browser: Browser | null) {
-        // browser is not used but kept for compatibility if needed
-    }
-
     async downloadFile(
         page: Page,
         fileUrl: string,
@@ -213,7 +209,13 @@ export class DownloadService {
                         } else {
                             await route.continue();
                         }
-                    } catch { try { await route.continue(); } catch { } }
+                    } catch (e) {
+                        try {
+                            await route.continue();
+                        } catch (continueError) {
+                            log.warn('Popup route interception failed and the fallback continue() also failed.', { error: e, continueError });
+                        }
+                    }
                 });
 
                 try {
