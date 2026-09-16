@@ -22,6 +22,14 @@ import {
 const log = logger.scope('HttpScraper');
 
 /**
+ * Item 22 (CLEAN-008): `endsWith` puro aceitava `notsi3.ufc.br` como dono de
+ * um cookie de `si3.ufc.br` — precisa do rótulo inteiro, não só do sufixo.
+ */
+export function cookieDomainMatches(requestHost: string, cookieDomain: string): boolean {
+    return requestHost === cookieDomain || requestHost.endsWith(`.${cookieDomain}`);
+}
+
+/**
  * Arquivo como o parser o vê, com o que o main precisa para baixar. `script` e
  * `key` são internos do JSF e **não** atravessam o IPC: `SigaaService` reduz
  * isto a `CourseFile` (shared/domain.ts) antes de devolver.
@@ -87,7 +95,7 @@ export class HttpScraperService {
         const validCookies = this.cookies.filter(cookie => {
             if (cookie.path && !urlObj.pathname.startsWith(cookie.path)) return false;
             const requestDomain = urlObj.hostname;
-            if (!requestDomain.endsWith(cookie.domain)) return false;
+            if (!cookieDomainMatches(requestDomain, cookie.domain)) return false;
             if (cookie.expires && cookie.expires < new Date()) return false;
             return true;
         });
