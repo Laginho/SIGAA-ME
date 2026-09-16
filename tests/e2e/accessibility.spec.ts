@@ -183,6 +183,39 @@ test.describe('Acessibilidade', () => {
                 expect(insideModal).toBe(true);
             }
         });
+
+        test('dialog fica centralizado no viewport, tema claro e escuro', async () => {
+            const { page } = launched;
+            for (const theme of ['light', 'dark'] as const) {
+                await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme);
+                await page.locator('.news-item').first().click();
+                await expect(page.locator('#newsModal[open]')).toBeVisible();
+
+                // `page.viewportSize()` é null numa janela do Electron: não é um
+                // contexto de browser com viewport configurado, é o tamanho real
+                // da janela nativa — lida via `document.documentElement.client{Width,
+                // Height}` (não `window.inner{Width,Height}`, que inclui a faixa da
+                // scrollbar; o `<dialog fixed>` centraliza contra o viewport de
+                // layout, que a exclui).
+                // O retângulo vem de `getBoundingClientRect()` no mesmo
+                // `evaluate` que o viewport — `boundingBox()` do Playwright dá o
+                // mesmo valor, mas numa segunda ida ao browser, e as duas
+                // medidas precisam ser do mesmo instante de layout.
+                const { viewport, box } = await page.locator('#newsModal').evaluate((el) => {
+                    const r = el.getBoundingClientRect();
+                    return {
+                        viewport: { width: document.documentElement.clientWidth, height: document.documentElement.clientHeight },
+                        box: { x: r.x, y: r.y, width: r.width, height: r.height },
+                    };
+                });
+
+                expect(Math.abs((box.x + box.width / 2) - viewport.width / 2)).toBeLessThanOrEqual(2);
+                expect(Math.abs((box.y + box.height / 2) - viewport.height / 2)).toBeLessThanOrEqual(2);
+
+                await page.keyboard.press('Escape');
+                await expect(page.locator('#newsModal')).toBeHidden();
+            }
+        });
     });
 
     test.describe('Scan automático (axe-core)', () => {
