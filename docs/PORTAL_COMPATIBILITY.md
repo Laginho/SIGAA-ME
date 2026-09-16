@@ -311,9 +311,9 @@ ordinary PR checks, reporting compatibility evidence and safe diagnostics.
 Required when a release changes login, session handling, selectors, navigation,
 JSF parsing, download behavior, or adapter version.
 
-## Live canary contract
+## Live canary contract (design, not implemented — see Layer 4)
 
-The canary should verify:
+If built, the canary should verify:
 
 1. SIGAA login URL is reachable.
 2. Login page classifies as `LOGIN` with high confidence.
@@ -426,7 +426,8 @@ privacy design review.
 - Run parser/classifier fixtures.
 - Run mocked navigation tests.
 - Run packaged Electron E2E.
-- Run the live canary.
+- Run the live smoke test manually (`npm run test:live`/
+  `RUN_LIVE_SIGAA_TESTS=true`); no automated canary exists yet (Layer 4).
 - Manually verify the affected journey when it changes session or download
   behavior.
 
@@ -434,8 +435,8 @@ privacy design review.
 
 - Document the adapter version in release notes.
 - Keep the previous adapter logic available for rollback when feasible.
-- Monitor canary outcomes after release.
-- Close the incident only after repeated successful live checks.
+- Re-run the live smoke test manually after release and watch for recurrence.
+- Close the incident once the manual live smoke test passes post-release.
 
 ## Release compatibility evidence
 
