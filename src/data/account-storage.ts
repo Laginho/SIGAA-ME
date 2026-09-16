@@ -7,9 +7,10 @@
  * se alguém voltar a chamar storage direto (comentários contam).
  *
  * Entra e sai `string`, como o `localStorage`: quem chama continua dono do
- * seu `JSON.parse` e do seu `try/catch`.
+ * seu `JSON.parse` e do seu `try/catch` — exceto `readCoursesCache`, que
+ * existe porque esse parse+validação se repetia em seis chamadores (CLEAN-007).
  */
-import type { AccountId, AccountProfile, DownloadRecord } from '../../shared/domain';
+import type { AccountId, AccountProfile, CourseSnapshot, DownloadRecord } from '../../shared/domain';
 
 export const SESSION_ACCOUNT_KEY = 'sigaa-me:v2:session:account';
 
@@ -101,6 +102,18 @@ export function writeAccountItem(name: AccountStorageKey, value: string): void {
 export function removeAccountItem(name: AccountStorageKey): void {
     const account = getActiveAccount();
     if (account) localStorage.removeItem(accountKey(account.id, name));
+}
+
+/** `courses` da conta ativa, já parseado; `[]` se não houver cache ou o valor gravado não for um array. */
+export function readCoursesCache(): CourseSnapshot[] {
+    const raw = readAccountItem('courses');
+    if (!raw) return [];
+    try {
+        const parsed: unknown = JSON.parse(raw);
+        return Array.isArray(parsed) ? (parsed as CourseSnapshot[]) : [];
+    } catch {
+        return [];
+    }
 }
 
 export function purgeLegacyStorage(): void {
