@@ -1,6 +1,6 @@
 # CLEAN-008: `http-scraper`: caminhos sem chamador e cookie por rótulo
 Status: open
-Stage: to-implement
+Stage: implementing
 Priority: P3
 Blocked by: nenhum
 Review: agent
