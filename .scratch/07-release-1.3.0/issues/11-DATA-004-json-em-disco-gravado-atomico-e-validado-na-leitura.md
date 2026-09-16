@@ -1,6 +1,6 @@
 # DATA-004: JSON em disco gravado atômico e validado na leitura
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P2
 Blocked by: nenhum
 Review: agent
