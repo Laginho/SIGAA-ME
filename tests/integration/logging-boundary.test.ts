@@ -69,7 +69,6 @@ vi.mock('../../electron/services/cache.service', () => ({
 
 const SETTINGS = vi.hoisted(() => ({
     theme: 'light',
-    autoSync: true,
     lastDownloadPath: null as string | null,
     runInBackground: true,
     syncInterval: 60,
