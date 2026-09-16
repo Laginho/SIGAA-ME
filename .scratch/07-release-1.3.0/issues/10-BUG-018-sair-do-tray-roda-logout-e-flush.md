@@ -1,6 +1,6 @@
 # BUG-018: "Sair" do tray roda logout e flush
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P1
 Blocked by: nenhum
 Review: agent
