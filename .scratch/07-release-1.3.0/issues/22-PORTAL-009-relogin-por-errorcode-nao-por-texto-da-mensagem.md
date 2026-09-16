@@ -1,6 +1,6 @@
 # PORTAL-009: Relogin decide por texto da mensagem, não por `errorCode`
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P2
 Blocked by: nenhum
 Review: human
