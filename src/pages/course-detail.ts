@@ -4,8 +4,11 @@ import { sanitizeNewsHtml } from '../security/html-sanitizer'
 import { h } from '../utils/dom'
 import { isNewsCached, mergeCoursesIntoCache } from '../utils/ui-helpers'
 import { isItemRead, markAsRead } from '../utils/notification-store'
-import { readAccountItem, recordDownloads, writeAccountItem } from '../data/account-storage'
+import { readAccountItem, readCoursesCache, recordDownloads, writeAccountItem } from '../data/account-storage'
 import type { CourseSnapshot } from '../../shared/domain'
+
+/** Desliga o listener de progresso da renderização anterior desta página (uma por módulo, nunca duas telas ao mesmo tempo). */
+let cleanupProgress: (() => void) | null = null
 
 export function renderCourseDetailPage(container: HTMLDivElement, courseId: string) {
   container.innerHTML = `
@@ -77,8 +80,7 @@ export function renderCourseDetailPage(container: HTMLDivElement, courseId: stri
   const loadAllNewsBtn = document.getElementById('loadAllNewsBtn')
   loadAllNewsBtn?.addEventListener('click', async () => {
     // Get fresh course data for name
-    const cachedData = readAccountItem('courses');
-    const courses = cachedData ? JSON.parse(cachedData) : [];
+    const courses = readCoursesCache();
     const course = courses.find((c: any) => c.id === courseId);
 
     const btn = loadAllNewsBtn as HTMLButtonElement;
@@ -91,20 +93,17 @@ export function renderCourseDetailPage(container: HTMLDivElement, courseId: stri
 
       if (result.success) {
         // Find current cached course
-        const cachedData = readAccountItem('courses');
-        if (cachedData) {
-          const courses = JSON.parse(cachedData);
-          const course = courses.find((c: any) => c.id === courseId);
-          if (course) {
-            // Merge content
-            course.news = result.data;
-            // Único escritor de `coursesWithFiles`: sanitiza antes de
-            // cachear (SEC-001). `replaceSet: false` substitui a turma
-            // pelo `id` — a semântica que este ponto já tinha.
-            mergeCoursesIntoCache([course], { keepTimestamp: true });
-            // Refresh UI
-            fetchCourseFiles(courseId);
-          }
+        const courses = readCoursesCache();
+        const course = courses.find((c: any) => c.id === courseId);
+        if (course) {
+          // Merge content
+          course.news = result.data;
+          // Único escritor de `coursesWithFiles`: sanitiza antes de
+          // cachear (SEC-001). `replaceSet: false` substitui a turma
+          // pelo `id` — a semântica que este ponto já tinha.
+          mergeCoursesIntoCache([course], { keepTimestamp: true });
+          // Refresh UI
+          fetchCourseFiles(courseId);
         }
         btn.textContent = '✅ Concluído';
         setTimeout(() => {
@@ -174,7 +173,7 @@ async function fetchCourseFiles(courseId: string) {
       return
     }
 
-    const coursesWithFiles = JSON.parse(cachedData)
+    const coursesWithFiles = readCoursesCache()
     const course = coursesWithFiles.find((c: any) => c.id === courseId)
 
     if (!course) {
@@ -345,9 +344,9 @@ async function fetchCourseFiles(courseId: string) {
       });
 
       // Listen for progress events from "Download All"
-      if ((window as any).cleanupProgress) (window as any).cleanupProgress();
+      if (cleanupProgress) cleanupProgress();
 
-      (window as any).cleanupProgress = window.api.onDownloadProgress((data: { fileId: string, fileName: string, status: string }) => {
+      cleanupProgress = window.api.onDownloadProgress((data: { fileId: string, fileName: string, status: string }) => {
         const buttons = Array.from(document.querySelectorAll('.btn-download-file'));
         const targetBtn = buttons.find(b => b.getAttribute('data-file-id') === data.fileId) as HTMLElement;
 
@@ -428,7 +427,7 @@ async function testDownloadAll(courseId: string) {
       return;
     }
 
-    const coursesWithFiles: CourseSnapshot[] = JSON.parse(cachedData);
+    const coursesWithFiles = readCoursesCache();
     const course = coursesWithFiles.find((c) => c.id === courseId);
 
     if (!course || !course.files || course.files.length === 0) {
@@ -533,24 +532,21 @@ async function openNewsModal(courseId: string, courseName: string, newsId: strin
 
   try {
     // Check cache first
-    const cachedData = readAccountItem('courses')
     let cachedContent = null;
     let cachedTitle = '';
     let cachedDate = '';
     let cachedNotification = '';
 
-    if (cachedData) {
-      const courses = JSON.parse(cachedData);
-      const course = courses.find((c: any) => c.id === courseId);
-      if (course && course.news) {
-        const newsItem = course.news.find((n: any) => n.id === newsId);
-        if (newsItem) {
-          cachedTitle = newsItem.title;
-          cachedDate = newsItem.date;
-          cachedNotification = newsItem.notification;
-          if (newsItem.content) {
-            cachedContent = newsItem.content;
-          }
+    const cachedCourses = readCoursesCache();
+    const cachedCourse = cachedCourses.find((c: any) => c.id === courseId);
+    if (cachedCourse && cachedCourse.news) {
+      const newsItem = cachedCourse.news.find((n: any) => n.id === newsId);
+      if (newsItem) {
+        cachedTitle = newsItem.title;
+        cachedDate = newsItem.date;
+        cachedNotification = newsItem.notification;
+        if (newsItem.content) {
+          cachedContent = newsItem.content;
         }
       }
     }
@@ -569,22 +565,19 @@ async function openNewsModal(courseId: string, courseName: string, newsId: strin
       const news = result.data;
       // Guarda o conteúdo baixado no cache desta conta
       try {
-        const cachedData = readAccountItem('courses');
-        if (cachedData) {
-          const courses = JSON.parse(cachedData);
-          const course = courses.find((c: any) => c.id === courseId);
-          if (course && course.news) {
-            const newsItem = course.news.find((n: any) => n.id === newsId);
-            if (newsItem) {
-              newsItem.content = news.content;
-              newsItem.title = news.title;
-              newsItem.date = news.date;
-              newsItem.notification = news.notification;
-              // Único escritor de `coursesWithFiles`: sanitiza antes de
-              // cachear (SEC-001).
-              mergeCoursesIntoCache([course], { keepTimestamp: true });
-              console.log('Cached news content for', newsId);
-            }
+        const courses = readCoursesCache();
+        const course = courses.find((c: any) => c.id === courseId);
+        if (course && course.news) {
+          const newsItem = course.news.find((n: any) => n.id === newsId);
+          if (newsItem) {
+            newsItem.content = news.content;
+            newsItem.title = news.title;
+            newsItem.date = news.date;
+            newsItem.notification = news.notification;
+            // Único escritor de `coursesWithFiles`: sanitiza antes de
+            // cachear (SEC-001).
+            mergeCoursesIntoCache([course], { keepTimestamp: true });
+            console.log('Cached news content for', newsId);
           }
         }
       } catch (e) {

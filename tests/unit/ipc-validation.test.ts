@@ -259,7 +259,7 @@ describe('registerIpcHandlers: remetente, validação e cópia limpa', () => {
                 clearCredentials: vi.fn(),
                 loadCredentials: vi.fn(),
             },
-            backgroundSync: { restart: vi.fn() },
+            backgroundSync: { start: vi.fn() },
             getWindow: () => ({ webContents: { id: 7 } }),
             allowedOrigin: 'http://localhost:5173',
             isPackaged: false,
@@ -383,14 +383,14 @@ describe('registerIpcHandlers: remetente, validação e cópia limpa', () => {
         const result = await invoke('update-app-setting', { key: 'syncInterval', value: 30 });
         expect(result.success).toBe(true);
         expect(deps.persistence.applySetting).toHaveBeenCalledWith({ key: 'syncInterval', value: 30 });
-        expect(deps.backgroundSync.restart).toHaveBeenCalled();
+        expect(deps.backgroundSync.start).toHaveBeenCalled();
     });
 
     it('update-app-setting devolve STORAGE quando a escrita falha e não reinicia o sync (DATA-003)', async () => {
         deps.persistence.applySetting.mockImplementation(() => { throw new Error('ENOSPC: no space left'); });
         const result = await invoke('update-app-setting', { key: 'syncInterval', value: 30 });
         expect(result).toMatchObject({ success: false, error: { code: 'STORAGE' } });
-        expect(deps.backgroundSync.restart).not.toHaveBeenCalled();
+        expect(deps.backgroundSync.start).not.toHaveBeenCalled();
     });
 
     it('select-download-folder devolve STORAGE quando a escrita falha, em vez de rejeitar a invoke (DATA-003)', async () => {

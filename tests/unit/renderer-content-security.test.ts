@@ -147,7 +147,6 @@ describe('sem handlers inline em src/ e index.html', () => {
 describe('dashboard: conteúdo do SIGAA não cria nó executável', () => {
     const baseSettings = {
         theme: 'light',
-        autoSync: false,
         lastDownloadPath: null,
         runInBackground: false,
         syncInterval: 60,
@@ -264,7 +263,6 @@ describe('course-detail: conteúdo do SIGAA não cria nó executável, sanitiza 
     const MALICIOUS = '<p>ok</p><script>alert(1)</script><img src=x onerror=alert(1)><a href="javascript:alert(1)">j</a><a href="https://si3.ufc.br/">s</a>';
     const baseSettings = {
         theme: 'light',
-        autoSync: false,
         lastDownloadPath: 'C:/Users/aluno/SIGAA',
         runInBackground: false,
         syncInterval: 60,

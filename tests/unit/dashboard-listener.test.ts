@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { toast } from '../../src/components/toast';
 import { accountKey, readAccountItem, setActiveAccount, writeAccountItem } from '../../src/data/account-storage';
 import { handleBackgroundSyncUpdate, renderDashboardPage } from '../../src/pages/dashboard';
-import { clearAllNotifications, getAllNotifications } from '../../src/utils/notification-store';
+import { getAllNotifications } from '../../src/utils/notification-store';
 
 // DATA-001: o evento precisa vir carimbado com a conta ativa para ser aceito.
 const ACCOUNT = { id: 'acc-test', name: 'ALUNO' };
@@ -13,7 +13,6 @@ describe('handleBackgroundSyncUpdate', () => {
     localStorage.clear();
     sessionStorage.clear();
     setActiveAccount(ACCOUNT);
-    clearAllNotifications();
     vi.restoreAllMocks();
   });
 

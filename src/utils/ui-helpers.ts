@@ -1,5 +1,5 @@
 import { sanitizeNewsHtml } from '../security/html-sanitizer';
-import { readAccountItem, writeAccountItem } from '../data/account-storage';
+import { readAccountItem, readCoursesCache, writeAccountItem } from '../data/account-storage';
 
 /**
  * Utility: Sync Badge Label Formatter
@@ -47,15 +47,9 @@ function formatClock(date: Date): string {
  * Extracted from course-detail.ts (openNewsModal) to be independently unit-testable.
  */
 export function isNewsCached(courseId: string, newsId: string): boolean {
-    try {
-        const raw = readAccountItem('courses');
-        if (!raw) return false;
-        const courses = JSON.parse(raw);
-        const course = courses.find((c: any) => c.id === courseId);
-        return !!(course?.news?.find((n: any) => n.id === newsId)?.content);
-    } catch {
-        return false;
-    }
+    const courses = readCoursesCache();
+    const course = courses.find((c: any) => c.id === courseId);
+    return !!(course?.news?.find((n: any) => n.id === newsId)?.content);
 }
 
 export interface MergeOptions {

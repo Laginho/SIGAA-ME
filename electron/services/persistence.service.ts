@@ -19,7 +19,6 @@ export interface StoredCredentials {
 
 const DEFAULT_SETTINGS: AppSettings = {
     theme: 'light',
-    autoSync: true,
     lastDownloadPath: null,
     runInBackground: true,
     syncInterval: 60,
@@ -40,7 +39,6 @@ const isFiniteNumber = (v: unknown): v is number => typeof v === 'number' && Num
  */
 const VALIDATORS: { [K in keyof Required<AppSettings>]: (value: unknown) => value is Required<AppSettings>[K] } = {
     theme: (v): v is 'light' | 'dark' => v === 'light' || v === 'dark',
-    autoSync: isBoolean,
     lastDownloadPath: (v): v is string | null => typeof v === 'string' || v === null,
     runInBackground: isBoolean,
     syncInterval: (v): v is number => isFiniteNumber(v) && Number.isInteger(v) && v >= 15 && v <= 1440,
