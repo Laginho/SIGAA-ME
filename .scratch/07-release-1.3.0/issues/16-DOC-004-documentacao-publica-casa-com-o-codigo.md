@@ -1,6 +1,6 @@
 # DOC-004: Documentação pública casa com o código
 Status: open
-Stage: to-review
+Stage: done
 Priority: P2
 Blocked by: nenhum
 Review: human
@@ -75,3 +75,41 @@ Três documentos citam `tests/unit/parser.test.ts`, que não existe mais. O
   próximo agente lê antes de trabalhar.
 - O parágrafo "Desatualizado desde o `BUG-004`" do `CLAUDE.md` já se
   corrige sozinho; não mexa nele.
+
+#### Resolution (2026-09-15)
+
+Verdict: Needs your call: canário de compatibilidade descrito como "design,
+não implementado" em vários lugares de `docs/PORTAL_COMPATIBILITY.md` — decisão
+de construí-lo ou não é do autor, e a linha de `DÉBITO-01` sobre estar dentro
+das três majors mais recentes do Electron também fica para o autor confirmar.
+
+- Arquivos: `README.md`, `ARCHITECTURE.md`, `CLAUDE.md`,
+  `tests/fixtures/README.md`, `docs/agents/orchestration.md`, `ROADMAP.md`,
+  `docs/PORTAL_COMPATIBILITY.md`, `.gitignore`, `docs/PLANO.md`,
+  `.scratch/06-debitos-aceitos/issues/01-DEBITO-01-electron-30-fora-de-suporte.md`,
+  `electron/main.ts`.
+- Achados centrais: Electron foi de 30 para 41.10.7 pelo `DEP-005`
+  (2026-09-14) — README, `main.ts` e `DÉBITO-01` citavam 30. Persistência é
+  JSON + localStorage, sem SQLite. `tests/unit/parser.test.ts` foi removido;
+  três documentos ainda o citavam como fonte de verdade — trocado por
+  referência ao `tests/integration/parser-real.test.ts`, que chama produção.
+  `HARDENING_TRACKER.md` é stub desde 2026-09-03; `ARCHITECTURE.md` ainda o
+  apontava como ativo. Lista de serviços em `ARCHITECTURE.md` tinha 4 de 15
+  arquivos reais. Dark mode e settings persistidos estão implementados
+  (`ROADMAP.md` marcava como pendente). Canário nightly nunca existiu (sem
+  workflow em `.github/workflows/`) — `PORTAL_COMPATIBILITY.md` o descrevia
+  como rodando. `docs/PLANO.md` dizia "nada implementado" com as fases 0-4
+  fechadas em `.scratch/`.
+- Prova: os 4 `grep` da Verification voltam vazios; `npm run quality` verde
+  (0 erros, 52 warnings pré-existentes, 69 arquivos, 768 passed, 5 skipped)
+  antes e depois do fix de revisão.
+- Revisão (etapa 3, `code-review` skill): achou um segundo `parser.test.ts`
+  em `tests/fixtures/README.md:20` que o grep original pegava mas eu tinha
+  lido errado na primeira passada — corrigido. Achou que a correção de
+  Layer 4 (canário "não implementado") deixava "Live canary contract" e o
+  runbook de incidente no mesmo arquivo tratando o canário como processo
+  mandatório existente — `docs/PORTAL_COMPATIBILITY.md` (Primary file, sem
+  teste novo necessário) corrigido como fix pequeno na própria etapa 3,
+  commit `ebf3698`.
+- Gate: `npx tsc --noEmit` limpo; `npx eslint .` 0 erros/52 warnings
+  pré-existentes; `npx vitest run` 768 passed, 5 skipped, 69 arquivos.
