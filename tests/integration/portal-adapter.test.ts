@@ -22,7 +22,7 @@ vi.mock('../../electron/services/logger.service', () => ({ logger: runtime.logge
 import { HttpScraperService } from '../../electron/services/http-scraper.service';
 import { PlaywrightLoginService } from '../../electron/services/playwright-login.service';
 import { SigaaService } from '../../electron/services/sigaa.service';
-import { findCourseRow, validateCourseEntryEnd, validateCourseListDocument } from '../../electron/sigaa/portal-adapter';
+import { validateCourseListDocument } from '../../electron/sigaa/portal-adapter';
 
 // Synthetic documents, never captured from an authenticated session.
 const loginHtml = '<form action="/sigaa/logar.do"><input name="user.login"><input name="user.senha"><input name="entrar" type="submit"></form>';
@@ -99,17 +99,9 @@ describe('PORTAL-001: production service compatibility boundary', () => {
         expect(result).toMatchObject({ success: true, files: [], news: [] });
     });
 
-    it('distinguishes an expired entry page from an absent course', () => {
+    it('distinguishes an expired entry page from a recognized student portal', () => {
         expect(validateCourseListDocument(loginHtml)).toMatchObject({ code: 'SESSION_EXPIRED' });
-    });
-
-    it('reports NOT_FOUND only after recognizing the student portal structure', () => {
         expect(validateCourseListDocument(portalHtml)).toBeNull();
-        expect(findCourseRow(portalHtml, '999')).toMatchObject({ status: 'not_found' });
-    });
-
-    it('rejects a course entry end state containing only the generic conteudo element', () => {
-        expect(validateCourseEntryEnd('<div id="conteudo">Unexpected layout</div>')).toMatchObject({ code: 'SELECTOR_DRIFT' });
     });
 
     it('invalidates old course request state after a failed refresh instead of posting a stale token', async () => {

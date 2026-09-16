@@ -7,7 +7,7 @@
 
 import * as cheerio from 'cheerio';
 import type { AppErrorCode } from '../../shared/errors';
-import { AVA, COURSE_HOME, JSF, LOGIN_SELECTOR_LABELS, STUDENT_PORTAL, courseIdInputWithValue } from './selectors';
+import { AVA, LOGIN_SELECTOR_LABELS, STUDENT_PORTAL } from './selectors';
 import type { AvaForm, PortalCheck } from './portal-contracts';
 import { portalError } from './portal-contracts';
 import { isAuthenticatedLanding, isLoginDocument, isStudentHome, isStudentPortal } from './portal-state-classifier';
@@ -57,10 +57,6 @@ export function describeMissingAvaForm(html: string): string {
     return `SIGAA course selector drift: required JSF structure is missing (${missing}). The page may no longer be a course files page.`;
 }
 
-export function missingViewStateBeforePostMessage(): string {
-    return `SIGAA course selector drift: cannot submit the Conteúdo action without a recognized ${AVA.viewStateSelector} on the starting document.`;
-}
-
 /** Documento inicial da entrada de turma via HTTP: portal do discente esperado. */
 export function validateCourseListDocument(html: string): PortalCheck {
     if (isLoginDocument(html)) {
@@ -70,46 +66,6 @@ export function validateCourseListDocument(html: string): PortalCheck {
     return portalError(
         'SELECTOR_DRIFT',
         `SIGAA portal selector drift: the student portal structure (${STUDENT_PORTAL.courseIdInput}) was not found. The portal layout may have changed.`
-    );
-}
-
-export type CourseRowLookup =
-    | { status: 'found'; formName: string; formAction: string; paramKey: string; paramValue: string }
-    | { status: 'not_found' }
-    | { status: 'malformed' };
-
-/** Localiza a linha da turma pedida num portal já validado por `validateCourseListDocument`. */
-export function findCourseRow(html: string, courseId: string): CourseRowLookup {
-    const $ = cheerio.load(html);
-    const idInput = $(courseIdInputWithValue(courseId));
-    if (idInput.length === 0) return { status: 'not_found' };
-
-    const form = idInput.closest('form');
-    const formName = form.attr('name');
-    const formAction = form.attr('action') || '/sigaa/verPortalDiscente.do';
-    const link = idInput.closest('tr').find(STUDENT_PORTAL.virtualClassroomLink);
-    const onclick = link.attr('onclick');
-    if (!onclick || !formName) return { status: 'malformed' };
-
-    const match = onclick.match(JSF.linkPattern);
-    if (!match) return { status: 'malformed' };
-    const [paramKey, paramValue] = match[2].split(',');
-    if (!paramKey || !paramValue) return { status: 'malformed' };
-
-    return { status: 'found', formName, formAction, paramKey, paramValue };
-}
-
-/** Resposta ao POST de entrada na turma: recusa o "sucesso" só por `#conteudo` genérico. */
-export function validateCourseEntryEnd(html: string): PortalCheck {
-    if (isLoginDocument(html)) {
-        return portalError('SESSION_EXPIRED', 'Session expired: SIGAA returned the login page instead of the course.');
-    }
-    if (html.includes(COURSE_HOME.emptyTopicsMarker) || html.includes(COURSE_HOME.menuTurmaVirtualMarker)) {
-        return null;
-    }
-    return portalError(
-        'SELECTOR_DRIFT',
-        'SIGAA course entry selector drift: the response after entering the course was not recognized as a course page.'
     );
 }
 
