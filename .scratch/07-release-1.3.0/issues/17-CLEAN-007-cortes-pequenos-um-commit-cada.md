@@ -72,5 +72,13 @@ Cada item é um commit `chore:`/`refactor:` próprio, gate verde em cada um:
   `CLAUDE.md`, "npm install roda no Windows"). Se a etapa 2 rodar em Linux,
   edita o `package.json` e deixa o lock para o autor regenerar antes do
   merge, dizendo isso no PR.
+- Da revisão do `DATA-005` (2026-09-15): o índice `downloads` é parseado solto
+  em `course-detail.ts` `:243`, `:269` e `:458`, três cópias de
+  `JSON.parse(readAccountItem('downloads') || '{}')`. O `|| {}` do
+  `downloads[courseId]` já absorve array, string e entrada de turma inválida
+  sem lançar, então não é bug hoje; o que lança é `downloads = 'null'`, que
+  nenhum escritor produz. Se o item 5 render um helper de leitura validada,
+  vale um irmão para `downloads` e as três cópias somem. Não é critério novo.
+
 - `playwright-login.service.ts` e `http-scraper.service.ts` têm tickets
   próprios (`CLEAN-009`, `CLEAN-008`); não toque neles aqui.
