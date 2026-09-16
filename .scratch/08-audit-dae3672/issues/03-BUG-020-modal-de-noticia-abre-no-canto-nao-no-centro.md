@@ -1,6 +1,6 @@
 # BUG-020: Modal de notícia abre no canto superior esquerdo, não no centro
 Status: open
-Stage: implementing
+Stage: to-review
 Priority: P2
 Blocked by: nenhum
 Review: agent
