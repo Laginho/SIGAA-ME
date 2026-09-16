@@ -1,6 +1,6 @@
 # PORTAL-010: Lista de turmas vazia é erro, não sucesso silencioso
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P2
 Blocked by: nenhum
 Review: human
