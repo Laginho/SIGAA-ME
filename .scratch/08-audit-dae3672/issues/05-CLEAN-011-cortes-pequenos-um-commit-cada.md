@@ -1,6 +1,6 @@
 # CLEAN-011: Cortes pequenos da auditoria `dae3672`, um commit cada
 Status: open
-Stage: implementing
+Stage: to-review
 Priority: P3
 Blocked by: nenhum
 Review: agent
@@ -108,3 +108,33 @@ Fixar `any` fica de fora: é trabalho de verdade em `course-detail.ts` (15) e
 - Os itens 1 e 2 são pequenos demais para ticket próprio mas não são estilo:
   um esconde erro do usuário, o outro mostra estado velho. Por isso vêm
   primeiro, e por isso o item 1 tem teste.
+
+### Notas da implementação (2026-09-16)
+
+- **Item 4 não cortado.** O ticket dizia "Único leitor:
+  `preload-dev-gate.test.ts:70,81`" — falso hoje.
+  `tests/integration/dev-cache-mutation-boundary.test.ts:111,166-177` também lê
+  `additionalArguments` do `main.ts` de verdade: `bootMain(false)` captura o
+  argv que o main injeta em dev (`devArgs`) e o próprio teste alimenta esse
+  argv para um preload **empacotado** (`loadPreload([...productionArgs,
+  ...devArgs])`) para provar que argv sozinho não libera `testApi` — a
+  autoridade real é `SIGAA_DEV_BRIDGE` em `process.env` (`DEV-001`). Cortar a
+  linha do `main.ts` zera `devArgs` e apaga esse caso da prova. Mesma regra do
+  `CLEAN-007` item 8: leitor existe, item vira nota, não corte. A linha em
+  `main.ts:154` continua.
+  Critério 4 não fechado como escrito: `grep -rn sigaa-dev electron/ src/
+  tests/` ainda devolve `main.ts:154` e as três ocorrências de
+  `dev-cache-mutation-boundary.test.ts`. As duas que o ticket citava, em
+  `preload-dev-gate.test.ts`, foram de fato removidas (commit de teste do
+  item 4): os dois casos que alternavam o argv provavam o mesmo resultado —
+  o preload nunca leu `process.argv` — e viraram um só, renomeado para o que
+  prova de verdade.
+- Item 2: não havia harness de DOM pronto para "download concorrente durante
+  `checkFilesExistence`" — o `CONC-002` existente cobria só o índice em
+  `localStorage`. Estendido para incluir um segundo arquivo do curso
+  (`556`) e afirmar a classe `.status-done` no `file-item` renderizado, além
+  da asserção de storage já existente.
+
+Gate final: `npm run quality` verde — typecheck limpo, ESLint 0 erros / 40
+warnings (baseline 52, item 6), vitest 71 arquivos, 800 passed | 5 skipped
+(um a menos que antes: os dois casos do item 4 viraram um).
