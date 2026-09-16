@@ -7,6 +7,9 @@ import { isItemRead, markAsRead } from '../utils/notification-store'
 import { readAccountItem, readCoursesCache, recordDownloads, writeAccountItem } from '../data/account-storage'
 import type { CourseSnapshot } from '../../shared/domain'
 
+/** Desliga o listener de progresso da renderização anterior desta página (uma por módulo, nunca duas telas ao mesmo tempo). */
+let cleanupProgress: (() => void) | null = null
+
 export function renderCourseDetailPage(container: HTMLDivElement, courseId: string) {
   container.innerHTML = `
     <div class="course-detail-page">
@@ -341,9 +344,9 @@ async function fetchCourseFiles(courseId: string) {
       });
 
       // Listen for progress events from "Download All"
-      if ((window as any).cleanupProgress) (window as any).cleanupProgress();
+      if (cleanupProgress) cleanupProgress();
 
-      (window as any).cleanupProgress = window.api.onDownloadProgress((data: { fileId: string, fileName: string, status: string }) => {
+      cleanupProgress = window.api.onDownloadProgress((data: { fileId: string, fileName: string, status: string }) => {
         const buttons = Array.from(document.querySelectorAll('.btn-download-file'));
         const targetBtn = buttons.find(b => b.getAttribute('data-file-id') === data.fileId) as HTMLElement;
 
