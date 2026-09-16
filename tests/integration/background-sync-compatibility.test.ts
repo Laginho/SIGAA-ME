@@ -53,7 +53,6 @@ vi.mock('../../electron/services/cache.service', () => ({
 
 const settings: AppSettings = {
     theme: 'light',
-    autoSync: true,
     lastDownloadPath: null,
     runInBackground: true,
     syncInterval: 60,
@@ -185,6 +184,23 @@ describe('BackgroundSyncService.syncNow — contagem por ciclo (critério 4)', (
         const p = service.syncNow();
         await vi.runAllTimersAsync();
         await p;
+
+        expect(compatibility.recordStructuralFailure).not.toHaveBeenCalled();
+        expect(compatibility.recordSuccess).not.toHaveBeenCalled();
+    });
+
+    it('três ciclos seguidos de manutenção (PORTAL_UNAVAILABLE) nunca alimentam o kill-switch (PORTAL-008)', async () => {
+        const compatibility = makeCompatibility('ok');
+        const sigaaService = makeSigaaService({
+            getCourses: vi.fn(async () => fail('PORTAL_UNAVAILABLE', 'manutenção')),
+        });
+        const service = new BackgroundSyncService(sigaaService, () => makeWindow(), compatibility);
+
+        for (let i = 0; i < 3; i++) {
+            const p = service.syncNow();
+            await vi.runAllTimersAsync();
+            await p;
+        }
 
         expect(compatibility.recordStructuralFailure).not.toHaveBeenCalled();
         expect(compatibility.recordSuccess).not.toHaveBeenCalled();

@@ -2,7 +2,7 @@
 
 Aplicativo desktop para o SIGAA da UFC, que visa proporcionar uma experiência melhor do que o site oficial em funcionalidades específicas e amigáveis para o estudante.
 
-![Electron](https://img.shields.io/badge/Electron-30-47848F?logo=electron)
+![Electron](https://img.shields.io/badge/Electron-41-47848F?logo=electron)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.2-3178C6?logo=typescript)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
@@ -74,19 +74,19 @@ Compare com a linha correspondente em `SHA256SUMS.txt`, publicado junto na relea
 ```bash
 git clone https://github.com/Laginho/SIGAA-ME.git
 cd SIGAA-ME
-npm install
+npm ci
 npm run dev
 ```
 
 ### Rodando os Testes
 
 ```bash
-# Apenas testes unitários (sem credenciais, roda em ~1s)
-npx vitest run tests/unit
-
-# Todos os testes, incluindo integração real com o SIGAA (requer .env)
-cp .env.example .env   # depois preencha suas credenciais
+# Suíte offline (sem credenciais, sem rede)
 npm test
+
+# Smoke live contra o SIGAA de verdade (requer .env)
+cp .env.example .env   # depois preencha suas credenciais
+npm run test:live      # ou RUN_LIVE_SIGAA_TESTS=true
 ```
 
 ---
@@ -98,7 +98,7 @@ npm test
 | UI | Vanilla TypeScript + Vite |
 | Backend | Electron (Node.js) |
 | Scraping | Playwright (Chrome) + Axios |
-| Armazenamento | SQLite + localStorage |
+| Armazenamento | JSON (`userData`) + localStorage |
 | Build | electron-builder |
 | CI/CD | GitHub Actions |
 

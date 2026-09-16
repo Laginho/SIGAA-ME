@@ -5,7 +5,8 @@ branch base e modelo por etapa: o bloco `## Bindings do fluxo` do `AGENTS.md`.
 Aqui ficam as amarrações que valem para qualquer etapa. A regra que sustenta
 tudo: **os testes entram num commit próprio, vermelhos, antes de qualquer
 código** — foi assim que 14 testes verdes ficaram em cima de um parser
-quebrado (`tests/unit/parser.test.ts` testava uma cópia).
+quebrado (o teste unitário removido testava uma cópia; ver
+`tests/fixtures/README.md`).
 
 ## Regras que valem para todo papel
 

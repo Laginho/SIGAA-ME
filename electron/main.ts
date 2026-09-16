@@ -152,7 +152,7 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
       additionalArguments: app.isPackaged ? [] : ['--sigaa-dev'],
-      // Explícitos por documentação (SEC-003): já são o efetivo no Electron 30,
+      // Explícitos por documentação (SEC-003): já são o efetivo no Electron 41,
       // mas ninguém deveria precisar saber disso para auditar a janela.
       contextIsolation: true,
       nodeIntegration: false,
@@ -285,7 +285,7 @@ app.whenReady().then(() => {
     { label: 'Sincronizar Agora', click: () => backgroundSyncService.syncNow() },
     ...(app.isPackaged ? [] : [{ type: 'separator' } as const, { label: '[Dev] Simular Arquivo Novo', click: () => { void simulateNewFile(); } } as const]),
     { type: 'separator' },
-    { label: 'Sair', click: () => { isQuitting = true; app.quit(); } }
+    { label: 'Sair', click: () => { app.quit(); } }
   ]);
   tray.setToolTip('SIGAA-ME Background Sync');
   tray.setContextMenu(contextMenu);

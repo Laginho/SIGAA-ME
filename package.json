@@ -26,7 +26,7 @@
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings 52",
     "quality": "npm run typecheck && npm run lint && npm test",
     "test:watch": "vitest",
     "test:live": "vitest run tests/integration/scraper.test.ts",
@@ -59,8 +59,7 @@
     "dompurify": "^3.4.14",
     "electron-updater": "^6.8.9",
     "mime-types": "^3.0.2",
-    "playwright": "^1.63.0",
-    "sqlite": "^5.1.1"
+    "playwright": "^1.63.0"
   },
   "allowScripts": {
     "esbuild@0.25.12": true,

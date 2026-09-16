@@ -149,4 +149,21 @@ describe('notification-store', () => {
         expect(isItemRead('file', 'c1', 'a.pdf')).toBe(false);
         expect(getUnreadCount()).toBe(0);
     });
+
+    it('DATA-005: returns [] for a notifications value that parses but is not an array, and drops entries without a string id', () => {
+        writeAccountItem('notifications', '{}');
+        expect(getAllNotifications()).toEqual([]);
+
+        writeAccountItem('notifications', JSON.stringify([{ id: 1 }, { id: 'ok', type: 'file' }]));
+        expect(getAllNotifications()).toEqual([{ id: 'ok', type: 'file' }]);
+    });
+
+    it('DATA-005: treats a read-items value that is not an array of strings as an empty set, without throwing', () => {
+        writeAccountItem('read-items', JSON.stringify('x'));
+
+        expect(() => markAsRead('file', 'c1', 'a.pdf')).not.toThrow();
+
+        const stored = JSON.parse(readAccountItem('read-items') || '[]');
+        expect(stored).toEqual(['file-c1-a.pdf']);
+    });
 });

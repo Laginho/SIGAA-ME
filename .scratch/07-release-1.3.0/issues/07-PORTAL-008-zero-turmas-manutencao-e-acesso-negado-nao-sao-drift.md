@@ -1,6 +1,6 @@
 # PORTAL-008: Zero turmas, manutenção e acesso negado não são drift
-Status: open
-Stage: to-implement
+Status: resolved
+Stage: done
 Priority: P1
 Blocked by: PORTAL-007
 Review: agent
@@ -63,6 +63,50 @@ e também contam no kill-switch (`portal-compatibility.service.ts:47-62`).
 - `tests/integration/background-sync-compatibility.test.ts`: três ciclos de
   manutenção não mudam o estado de compatibilidade. Vermelho porque hoje
   conta.
+
+#### Resolution (2026-09-15)
+
+Verdict: Needs your call: em `validateCourseListDocument` e em `classify` o
+landmark autenticado (`.nome_usuario`) é testado **antes** de manutenção e
+acesso negado, então uma página "Acesso Negado" que venha dentro do shell
+autenticado do SIGAA vira lista vazia com sucesso, em silêncio — e ninguém
+sabe qual das duas formas a página real tem (fixtures sintéticas,
+`DEBITO-04`). Antes desta ticket esse caso dava `SELECTOR_DRIFT`: errado, mas
+barulhento. Não reabri porque o critério 1 manda exatamente esse
+comportamento para qualquer página com o landmark, e inverter a ordem pede
+fixture nova que hoje seria outro chute. Registrado sob `## Comments` do
+`DEBITO-04`.
+
+Todos os seis critérios passam; o resto da revisão não achou nada.
+
+- Decisão: `getCourses` deixou de tratar "zero inputs de turma" como drift por
+  si só e passou a perguntar ao adapter qual é o estado da página. Os quatro
+  desfechos ficam no `validateCourseListDocument`, não no serviço.
+- Arquivos: `electron/services/playwright-login.service.ts`,
+  `electron/sigaa/portal-adapter.ts`, `electron/sigaa/portal-state-classifier.ts`,
+  `electron/sigaa/selectors.ts` (tabela dos dois headings novos),
+  `electron/sigaa/portal-contracts.ts` (`MAINTENANCE` no `PortalState`),
+  `tests/integration/portal-selector-resilience.test.ts`,
+  `tests/integration/background-sync-compatibility.test.ts`,
+  `tests/fixtures/sigaa/README.md`.
+- Fora dos Primary files: `portal-contracts.ts` e `selectors.ts`. O tipo
+  precisava do estado novo e a tabela de landmarks que o ticket cita mora no
+  `selectors.ts`, de onde o adapter importa. Nenhum outro arquivo foi tocado.
+- Vermelho (`b7907cd`, commit só de teste, sem a mudança):
+  `portal-selector-resilience.test.ts` 5 failed | 35 passed. Os cinco:
+  lista vazia em página autenticada, manutenção → `PORTAL_UNAVAILABLE`,
+  acesso negado → `SESSION_EXPIRED`, e `classify` das duas fixtures.
+- O teste do critério 4 (`background-sync-compatibility.test.ts`, três ciclos
+  de manutenção) já passava em `b7907cd`: `background-sync.service.ts:115`
+  trata `PORTAL_UNAVAILABLE` como retryable desde antes e nunca chamou
+  `recordStructuralFailure` nele. A premissa "hoje conta" da seção de testes
+  estava errada — o que alimentava o kill-switch era o `SELECTOR_DRIFT` que o
+  `getCourses` devolvia, e isso está coberto em vermelho acima. O teste fica
+  como guarda de regressão.
+- Verde: `npm run quality` — 0 erros de lint (44 warnings de `no-explicit-any`,
+  pré-existentes), 71 test files, 784 passed | 5 skipped (789).
+- Separação de commits: `b7907cd` e `1aecd18` tocam só teste; `1ba66cc` e
+  `56e684b` tocam só produção.
 
 ## Comments
 

@@ -35,6 +35,11 @@ vi.mock('fs', () => ({
     existsSync: vi.fn((file: string) => h.files.has(file)),
     readFileSync: vi.fn((file: string) => h.files.get(file) ?? ''),
     writeFileSync: vi.fn((file: string, content: string) => h.files.set(file, String(content))),
+    renameSync: vi.fn((from: string, to: string) => {
+        const content = h.files.get(from);
+        if (content !== undefined) h.files.set(to, content);
+        h.files.delete(from);
+    }),
     unlinkSync: vi.fn((file: string) => h.files.delete(file)),
 }));
 

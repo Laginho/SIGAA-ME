@@ -93,7 +93,7 @@ Increment it when:
 - A fallback path is added or removed.
 - A fixture set represents a newly observed live structure.
 
-Include the version in diagnostics, canary output, and cache metadata. A version
+Include the version in diagnostics and cache metadata. A version
 change does not automatically invalidate all domain cache, but it must invalidate
 session-bound download tokens and raw parser state.
 
@@ -299,20 +299,27 @@ must occur outside the repository before the fixture is added.
 
 ### Layer 4 — Live compatibility canary
 
-- Runs nightly and on demand.
-- Uses a dedicated minimum-privilege account.
-- Is read-only unless a separate download test is explicitly enabled.
-- Never runs as part of ordinary PR checks.
-- Reports compatibility evidence and safe diagnostics.
+**Not built, and not planned** (decisão do autor, 2026-09-16). UFC's SIGAA does
+not change on a cadence that a nightly canary would earn its keep against — that
+stability is the premise SIGAA-ME is built on. The live smoke test
+(`tests/integration/scraper.test.ts`, gated by
+`npm run test:live`/`RUN_LIVE_SIGAA_TESTS=true`), run manually before a release,
+is the standing substitute.
+
+Reopen this decision only if the portal actually breaks twice without warning.
+The design is kept below so nobody has to redesign it from scratch: a dedicated
+minimum-privilege account, read-only unless a separate download test is
+explicitly enabled, never part of ordinary PR checks, reporting compatibility
+evidence and safe diagnostics.
 
 ### Layer 5 — Manual release verification
 
 Required when a release changes login, session handling, selectors, navigation,
 JSF parsing, download behavior, or adapter version.
 
-## Live canary contract
+## Live canary contract (design only — not built, see Layer 4)
 
-The canary should verify:
+Kept as a design record. If it is ever built, the canary should verify:
 
 1. SIGAA login URL is reachable.
 2. Login page classifies as `LOGIN` with high confidence.
@@ -396,7 +403,8 @@ privacy design review.
 
 - Determine whether the failure is network, maintenance, authentication,
   account-specific, or structural.
-- Compare adapter version and fingerprint with the last successful canary.
+- Compare adapter version and fingerprint with the last successful live smoke
+  test (there is no canary — Layer 4).
 - Reproduce with the dedicated test account, never a contributor's personal
   account if avoidable.
 
@@ -425,7 +433,9 @@ privacy design review.
 - Run parser/classifier fixtures.
 - Run mocked navigation tests.
 - Run packaged Electron E2E.
-- Run the live canary.
+- Run the live smoke test manually (`npm run test:live`/
+  `RUN_LIVE_SIGAA_TESTS=true`). This is the substitute for the canary, which is
+  deliberately not built (Layer 4).
 - Manually verify the affected journey when it changes session or download
   behavior.
 
@@ -433,8 +443,8 @@ privacy design review.
 
 - Document the adapter version in release notes.
 - Keep the previous adapter logic available for rollback when feasible.
-- Monitor canary outcomes after release.
-- Close the incident only after repeated successful live checks.
+- Re-run the live smoke test manually after release and watch for recurrence.
+- Close the incident once the manual live smoke test passes post-release.
 
 ## Release compatibility evidence
 
@@ -445,15 +455,15 @@ Adapter version:
 Fixture suite commit:
 Deterministic portal tests:
 Packaged E2E result:
-Live canary result and timestamp:
+Live smoke test result and timestamp:
 Manual verification performed by:
 Known degraded states:
 Rollback commit/version:
 ```
 
-A green fixture suite without a recent canary is insufficient evidence that the
-live portal is compatible. A green canary without fixture coverage is
-insufficient evidence that known failure states are handled safely.
+A green fixture suite without a recent live smoke test is insufficient evidence
+that the live portal is compatible. A green smoke test without fixture coverage
+is insufficient evidence that known failure states are handled safely.
 
 ## Agent handoff for portal work
 
@@ -466,7 +476,7 @@ Every portal-related task handoff must state:
 - Fixtures added or updated.
 - Whether any raw diagnostic material existed and how it was destroyed.
 - Deterministic test results.
-- Live canary status, if run.
+- Live smoke test status, if run.
 - Remaining uncertainty and rollback path.
 
 Do not paste credentials, cookies, ViewState, raw HTML, or personal academic

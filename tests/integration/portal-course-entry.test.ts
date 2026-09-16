@@ -36,6 +36,7 @@ vi.mock('fs', () => ({
 
 import { HttpScraperService } from '../../electron/services/http-scraper.service';
 import { PlaywrightLoginService } from '../../electron/services/playwright-login.service';
+import { diagnosticsService } from '../../electron/services/diagnostics.service';
 import { failFromResult } from '../../shared/errors';
 
 const LOGIN_DOCUMENT =
@@ -146,8 +147,14 @@ describe('PORTAL-001 — invalidação do estado JSF quando a atualização lan�
         const first = await scraper.getCourseFiles('123', 'Algorithms', COURSE_PAGE);
         expect(first.success).toBe(true);
 
-        runtime.axios.get.mockRejectedValueOnce(new Error('timeout of 10000ms exceeded'));
-        const refresh = await scraper.getCourseFiles('123', 'Algorithms');
+        // Causa real: diagnosticsService.saveRaw é chamado de dentro de getCourseFiles
+        // (dump da página para depuração) e sua falha ainda tem que cair no catch
+        // genérico do método, não só nos ramos classificados (SESSION_EXPIRED etc).
+        const saveRaw = vi.spyOn(diagnosticsService, 'saveRaw').mockImplementationOnce(() => {
+            throw new Error('disco cheio');
+        });
+        const refresh = await scraper.getCourseFiles('123', 'Algorithms', COURSE_PAGE);
+        saveRaw.mockRestore();
         expect(refresh.success).toBe(false);
 
         const download = await scraper.downloadFile(

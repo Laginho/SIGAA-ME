@@ -36,9 +36,15 @@ export const STUDENT_PORTAL = {
     userName: '.nome_usuario'
 } as const;
 
-export function courseIdInputWithValue(courseId: string): string {
-    return `input[name="idTurma"][value="${courseId}"]`;
-}
+/** Heading reconhecido da página de manutenção programada do SIGAA. */
+export const MAINTENANCE = {
+    heading: 'Sistema em Manutenção'
+} as const;
+
+/** Heading reconhecido da página de acesso negado do SIGAA. */
+export const ACCESS_DENIED = {
+    heading: 'Acesso Negado'
+} as const;
 
 export const COURSE_HOME = {
     /** Mantido pela verificação existente em `enterCourseAndGetHTML`; não reescrever a checagem, só mover o literal. */
@@ -55,10 +61,6 @@ export const AVA = {
     viewStateSelector: 'input[name="javax.faces.ViewState"]'
 } as const;
 
-export function formByName(name: string): string {
-    return `form[name="${name}"]`;
-}
-
 export const FILES_MENU = {
     itemMenu: '.itemMenu',
     itemMenuHeaderMateriais: '.itemMenuHeaderMateriais',
@@ -68,9 +70,7 @@ export const FILES_MENU = {
 } as const;
 
 export const JSF = {
-    /** `jsfcljs(document.forms['NOME'],'PARAM1,PARAM2', ...)` — link que aciona uma ação JSF. */
-    linkPattern: /jsfcljs\(document\.forms\['([^']+)'\],'([^']+)'/,
-    /** Mesma chamada quando o form não precisa ser capturado, só os parâmetros. */
+    /** Chamada `jsfcljs(...)` quando o form não precisa ser capturado, só os parâmetros. */
     scriptParamsPattern: /jsfcljs\([^,]+,'([^']+)'/
 };
 

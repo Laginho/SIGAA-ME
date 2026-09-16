@@ -23,7 +23,13 @@ vi.mock('electron', () => ({
 vi.mock('fs', () => ({
     existsSync: vi.fn((file: string) => storage.files.has(file)),
     readFileSync: vi.fn((file: string) => storage.files.get(file) ?? ''),
-    writeFileSync: vi.fn((file: string, content: string) => storage.files.set(file, String(content)))
+    writeFileSync: vi.fn((file: string, content: string) => storage.files.set(file, String(content))),
+    renameSync: vi.fn((from: string, to: string) => {
+        const content = storage.files.get(from);
+        if (content !== undefined) storage.files.set(to, content);
+        storage.files.delete(from);
+    }),
+    unlinkSync: vi.fn((file: string) => storage.files.delete(file)),
 }));
 vi.mock('../../electron/services/logger.service', () => ({ logger: loggerMock.logger }));
 
@@ -101,6 +107,14 @@ describe('CacheService', () => {
         const service = new CacheService();
 
         expect(service.getCourseState(ACC, 'anything')).toEqual({ files: [], news: [] });
+    });
+
+    it('warns with the filename (not the content) when cache.json fails to parse', () => {
+        storage.files.set(path.join('sigaa-me-cache-tests', 'cache.json'), '{not-json');
+
+        new CacheService().getCourseState(ACC, 'anything');
+
+        expect(loggerMock.cacheScope.warn).toHaveBeenCalledWith(expect.any(String), { file: 'cache.json' });
     });
 
     it('a write failure propagates out of updateCourseState and leaves the state untouched (DATA-003)', () => {

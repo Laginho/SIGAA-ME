@@ -2,6 +2,7 @@ import { app } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 import type { AccountId, CourseId } from '../../shared/domain';
+import { writeJsonAtomicSync } from './atomic-write';
 import { logger } from './logger.service';
 
 const log = logger.scope('Cache');
@@ -80,7 +81,13 @@ export class CacheService {
     private loadCache(): CacheFileV2 {
         try {
             if (fs.existsSync(this.cachePath)) {
-                const data: unknown = JSON.parse(fs.readFileSync(this.cachePath, 'utf8'));
+                let data: unknown;
+                try {
+                    data = JSON.parse(fs.readFileSync(this.cachePath, 'utf8'));
+                } catch {
+                    log.warn('Failed to parse cache.json; starting from an empty cache', { file: 'cache.json' });
+                    return { schemaVersion: 2, accounts: {} };
+                }
                 if (typeof data === 'object' && data !== null && (data as CacheFileV2).schemaVersion === 2) {
                     const stored = (data as { accounts?: unknown }).accounts;
                     const accounts: Record<AccountId, AccountBucket> = {};
@@ -106,7 +113,7 @@ export class CacheService {
      * deixa o cache como estava, em vez de fingir uma baseline salva.
      */
     private commit(next: CacheFileV2) {
-        fs.writeFileSync(this.cachePath, JSON.stringify(next, null, 2));
+        writeJsonAtomicSync(this.cachePath, next);
         this.loaded = next;
     }
 

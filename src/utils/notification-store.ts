@@ -9,7 +9,7 @@
  * sobrevive a reinícios do app sem precisar de persistência no main.
  */
 
-import { readAccountItem, removeAccountItem, writeAccountItem } from '../data/account-storage';
+import { readAccountItem, writeAccountItem } from '../data/account-storage';
 
 const MAX_NOTIFICATIONS = 15;
 
@@ -24,7 +24,10 @@ import type { NotificationItem } from '../../shared/domain';
 function getReadSet(): Set<string> {
   try {
     const raw = readAccountItem('read-items');
-    return raw ? new Set(JSON.parse(raw)) : new Set();
+    if (!raw) return new Set();
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed) || !parsed.every(item => typeof item === 'string')) return new Set();
+    return new Set(parsed);
   } catch {
     return new Set();
   }
@@ -88,10 +91,17 @@ export function getUnreadCount(): number {
 
 // ─── Notification History ────────────────────────────────
 
+function isNotificationItem(item: unknown): item is NotificationItem {
+  return typeof item === 'object' && item !== null && typeof (item as { id?: unknown }).id === 'string';
+}
+
 function getNotifications(): NotificationItem[] {
   try {
     const raw = readAccountItem('notifications');
-    return raw ? JSON.parse(raw) : [];
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(isNotificationItem);
   } catch {
     return [];
   }
@@ -121,11 +131,6 @@ export function pushNotifications(items: NotificationItem[]) {
 /** Get all notifications (most recent first) */
 export function getAllNotifications(): NotificationItem[] {
   return getNotifications();
-}
-
-/** Clear all notification history */
-export function clearAllNotifications() {
-  removeAccountItem('notifications');
 }
 
 // BUG-015: v1 seeded file reads by name; v2 keys by id instead. An account
