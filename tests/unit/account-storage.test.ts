@@ -24,6 +24,7 @@ import {
     LEGACY_KEYS,
     purgeLegacyStorage,
     readAccountItem,
+    readCoursesCache,
     recordDownloads,
     removeAccountItem,
     SESSION_ACCOUNT_KEY,
@@ -201,6 +202,26 @@ describe('account-storage: recordDownloads validates the downloads index shape',
 
         const stored = JSON.parse(readAccountItem('downloads') || '{}');
         expect(stored.c1.f1.path).toBe('/x/a.pdf');
+    });
+});
+
+describe('account-storage: readCoursesCache (CLEAN-007)', () => {
+    beforeEach(() => {
+        localStorage.clear();
+        sessionStorage.clear();
+        setActiveAccount(A);
+    });
+
+    it('returns [] when the stored value is not an array', () => {
+        writeAccountItem('courses', '{}');
+
+        expect(readCoursesCache()).toEqual([]);
+    });
+
+    it('returns the parsed array when the stored value is a valid array', () => {
+        writeAccountItem('courses', '[{"id":"c1"}]');
+
+        expect(readCoursesCache()).toEqual([{ id: 'c1' }]);
     });
 });
 

@@ -1,6 +1,6 @@
 # CLEAN-007: Cortes pequenos, um commit cada
 Status: open
-Stage: to-implement
+Stage: implementing
 Priority: P3
 Blocked by: nenhum
 Review: agent
