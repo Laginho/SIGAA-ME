@@ -32,7 +32,7 @@ const COOKIE_HEADER_RE = /\b(set-cookie|cookie)(\s*:\s*)[^\r\n]*/gi;
 const SESSION_PAIR_RE = /\b(\w*session\w*)=[^\r\n]*/gi;
 const AUTH_RE = /\bAuthorization(\s*[:=]\s*)[^\r\n]*/gi;
 const VIEWSTATE_RE = /\b(javax\.faces\.ViewState)(\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s&"']+)/gi;
-const HTML_RE = /<[a-zA-Z!][\s\S]*$/;
+const HTML_RE = /<!--[\s\S]*?-->|<\/?[a-zA-Z!][^<>]*>/g;
 const WIN_PATH_RE = /[A-Za-z]:\\[^\s"'<>|]*/g;
 const UNC_PATH_RE = /\\\\[^\s"'<>|]+/g;
 const POSIX_PATH_RE = /(?:\/home|\/Users|\/tmp|\/var|\/root|\/opt|\/mnt)(?:\/[^\s"'<>|]*)?/g;
@@ -49,7 +49,7 @@ export function redact(text: string): string {
     out = out.replace(AUTH_RE, (_m, sep: string) => `Authorization${sep}[redacted]`);
     out = out.replace(VIEWSTATE_RE, (_m, key: string, sep: string) => `${key}${sep}[redacted]`);
     out = redactJsf(out);
-    out = out.replace(HTML_RE, '[html omitted]');
+    out = out.replace(HTML_RE, '');
     out = out.replace(WIN_PATH_RE, '[path]');
     out = out.replace(UNC_PATH_RE, '[path]');
     out = out.replace(POSIX_PATH_RE, '[path]');
@@ -263,13 +263,21 @@ export class LoggerService implements ScopedLogger {
     private rotate(): Promise<void> {
         return new Promise<void>((resolve) => {
             const finish = () => {
-                const { maxFiles } = this;
-                for (let i = maxFiles - 1; i >= 1; i--) {
-                    const from = this.rotatedPath(i - 1);
-                    const to = this.rotatedPath(i);
-                    if (!fs.existsSync(from)) continue;
-                    if (fs.existsSync(to)) fs.unlinkSync(to);
-                    fs.renameSync(from, to);
+                try {
+                    const { maxFiles } = this;
+                    for (let i = maxFiles - 1; i >= 1; i--) {
+                        const from = this.rotatedPath(i - 1);
+                        const to = this.rotatedPath(i);
+                        if (!fs.existsSync(from)) continue;
+                        if (fs.existsSync(to)) fs.unlinkSync(to);
+                        fs.renameSync(from, to);
+                    }
+                } catch (err) {
+                    // Arquivo rotacionado bloqueado por outro processo (antivírus,
+                    // editor aberto): não deixa a promise pendente nem vira
+                    // uncaughtException. `console.error`, não `this.error`, porque
+                    // esse caminho chamaria `rotate()` de novo.
+                    console.error('[Logger] falha ao rotacionar log:', err);
                 }
                 this.openStream();
                 this.bytes = 0;
