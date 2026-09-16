@@ -1,6 +1,6 @@
 # CLEAN-007: Cortes pequenos, um commit cada
 Status: open
-Stage: implementing
+Stage: to-review
 Priority: P3
 Blocked by: nenhum
 Review: agent
@@ -82,3 +82,34 @@ Cada item é um commit `chore:`/`refactor:` próprio, gate verde em cada um:
 
 - `playwright-login.service.ts` e `http-scraper.service.ts` têm tickets
   próprios (`CLEAN-009`, `CLEAN-008`); não toque neles aqui.
+
+### Notas da implementação (2026-09-15)
+
+- Item 5: além dos seis pontos listados, `testDownloadAll` (`course-detail.ts`)
+  tinha um sétimo `JSON.parse(readAccountItem('courses') || ...)` idêntico,
+  não citado no ticket original (drift de linha desde que foi escrito). Migrado
+  para `readCoursesCache()` também — mesmo arquivo, mesmo padrão, sem seam novo.
+- Item 6: remover o parâmetro `_browser` do construtor exige ajustar todo
+  chamador. Único chamador de produção é `playwright-login.service.ts:755`
+  (`new DownloadService(localBrowser)` → `new DownloadService()`), uma linha —
+  não é o refactor mais amplo que `CLEAN-009` cobre, então não conflita com a
+  nota acima. Os seis chamadores de teste (`download-boundary.test.ts`,
+  `logging-boundary.test.ts`, `audit-download-fallback-identity.test.ts`,
+  `audit-download-inspect.test.ts`) tiveram só o `null` removido da chamada.
+- Item 7: `Pick<>` sem `restart` quebrou o mock de
+  `tests/unit/ipc-validation.test.ts` (`backgroundSync: { restart: vi.fn() }`
+  e duas asserções sobre ele) — trocado por `start`, mesmo teste, mesma
+  asserção de comportamento.
+- Item 8: **não cortado**, virou nota. `--sigaa-dev` não é lido por
+  `preload.ts` (autoridade real é `SIGAA_DEV_BRIDGE` em `process.env`, como o
+  comentário do preload já diz), mas
+  `tests/integration/dev-cache-mutation-boundary.test.ts` lê o valor de
+  `additionalArguments` do `main.ts` de verdade (`bootMain` devolve
+  `options.webPreferences?.additionalArguments` e usa isso para montar o
+  `process.argv` do preload em seguida, e a última asserção do teste é
+  `expect(productionArgs).not.toContain('--sigaa-dev')`). Pela própria regra do
+  critério 8 ("se algo lê, o item vira nota"), isto conta como leitura — o
+  corte fica para quem quiser reescrever esse teste antes.
+
+Gate final: `npm run quality` verde — typecheck limpo, 770 testes (5 skipped),
+48 warnings de lint (baseline era 52, não subiu).
