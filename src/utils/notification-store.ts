@@ -9,7 +9,7 @@
  * sobrevive a reinícios do app sem precisar de persistência no main.
  */
 
-import { readAccountItem, removeAccountItem, writeAccountItem } from '../data/account-storage';
+import { readAccountItem, writeAccountItem } from '../data/account-storage';
 
 const MAX_NOTIFICATIONS = 15;
 
@@ -131,11 +131,6 @@ export function pushNotifications(items: NotificationItem[]) {
 /** Get all notifications (most recent first) */
 export function getAllNotifications(): NotificationItem[] {
   return getNotifications();
-}
-
-/** Clear all notification history */
-export function clearAllNotifications() {
-  removeAccountItem('notifications');
 }
 
 // BUG-015: v1 seeded file reads by name; v2 keys by id instead. An account
