@@ -1,6 +1,6 @@
 # QA-012: `tsconfig.json` não inclui `tests/`, e o gate não vê erro de tipo em arquivo de teste
-Status: open
-Stage: reviewing
+Status: resolved
+Stage: done
 Priority: P2
 Blocked by: nenhum
 Review: agent
@@ -105,7 +105,74 @@ teste e devem ser verificáveis sem o `tsc`. Para o 5, um caso em
 `updater-consent.test.ts` onde `getHandler` não acha o handler e a expectativa
 é a falha de asserção.
 
+#### Resolution (2026-09-17)
+
+**Verdict: Approve.** PR [#43](https://github.com/Laginho/SIGAA-ME/pull/43),
+merge `a69c15f`. Os seis critérios passam.
+
+Três commits:
+
+- `25f0c05` — só `"tests"` no `include` do `tsconfig.json`. O vermelho: 78 erros
+  em 19 arquivos, exatamente a contagem que a sonda do ticket previu.
+- `9c155fa` — zera os 78 tipando contra o domínio real, não silenciando:
+  narrowing de `AppResult` antes de ler `.filePath`/`.error`
+  (`audit-download-disk`, `download-real`, e o helper `invoke<T>` do
+  `clear-all-data`); mocks completados para `CourseSnapshot`,
+  `NotificationItem`, `BackgroundSyncUpdate`, `AppSettings`,
+  `CompatibilityStatus` e `IpcDeps`; `this: Storage` nos dois
+  `mockImplementation` que leem `this`; `vi.fn()` com tipos de parâmetro reais
+  onde `.mock.calls` é lido; imports e consts mortos removidos.
+- `26d9cdd` — correção da revisão, abaixo.
+
+**Critério 4:** `sigaa-service.test.ts:481,493` ganharam
+`expect(result.success).toBe(true)`; o que os testes já afirmavam sobre os mocks
+continua. **Critério 5:** `assertHandler` (`asserts handler is T`) estreita os
+quatro `handler(...)` e falha com mensagem nomeando o evento; um teste novo prova
+que o erro é `Error`, nunca `TypeError`.
+
+**Critério 3 — os casts que entraram, e por quê:**
+
+- `cache-service.test.ts` ×2, `as unknown as { id: string }[]`: os testes
+  alimentam de propósito ids que a constraint genérica proíbe, para provar o
+  guard de runtime que só existe porque JS não checa tipo. Sem o cast o teste
+  não pode ser escrito.
+- `logger-redaction.test.ts` ×3, `as unknown as LogMeta`: o tipo é que está
+  estreito, não o teste — `sanitizeMeta` tem `if (value instanceof Error)` como
+  primeiro branch (`electron/services/logger.service.ts:109`), então `Error`
+  como `meta` é suportado em runtime; `LogMeta = Record<string, unknown>` não
+  diz isso. Alargar é código de produção, fora das Primary files.
+- `ipc-validation.test.ts` ×1, `as unknown as BrowserWindow` no `getWindow`
+  falso: a mesma saída que `clear-all-data.test.ts` já usa. Substituiu dois
+  `as never`.
+
+**Correção aplicada na revisão (`26d9cdd`).** `ipc-validation.test.ts` era o
+único arquivo onde a premissa do ticket não valia: `let deps: any`
+(pré-existente) mais dois `registerIpcHandlers(makeDeps(...) as never)` deixavam
+a forma do mock sem checagem nenhuma — no arquivo que guarda o contrato IPC.
+Trocado por `const base = { ... } satisfies IpcDeps`, que checa sem alargar os
+tipos de mock que os 18 `expect(deps.x.y)` leem; os dois `as never` saíram.
+Vermelho-verde: apagar `cache: { clear: vi.fn() }` do mock quebra o `tsc` com
+TS1360 no `satisfies` e TS2345 nos dois call sites; antes do commit, silêncio.
+
+**Gate** (Windows, `npm run quality`): `tsc` limpo; eslint 0 erros / 40 warnings
+com `--max-warnings 40` intacto; 71 arquivos, 801 passed | 5 skipped — a baseline
+de 800 mais o teste novo do critério 5. CI do PR: os três jobs verdes.
+
 ## Comments
+
+- Follow-ups para a etapa 1, deliberadamente não abertos pelo revisor:
+  - `LogMeta` (`electron/services/logger.service.ts:7`) é estreito demais.
+    `sanitizeMeta` trata `Error` no topo do `meta`, o tipo não permite. Alargar
+    para `Record<string, unknown> | Error` apaga os três casts do
+    `logger-redaction.test.ts`.
+  - `let deps: any` em `ipc-validation.test.ts:281` continua. O `satisfies`
+    cobre a forma do mock; tirar o `any` da variável exige tipar as 18 leituras
+    `deps.x.y.mock*`.
+  - `IncomingCourse` (`src/utils/ui-helpers.ts:69`) só declara `id`/`news`, e é
+    por isso que `merge-courses-cache.test.ts` precisou de uma factory e
+    `account-isolation.test.ts` de um `const` intermediário — literal fresco bate
+    em excess-property check, variável não. Funciona, mas é contorno: o tipo não
+    descreve o que os chamadores de produção passam.
 
 - Achado do revisor do `QA-011`, que deliberadamente não abriu o ticket: "o
   root cause é que o `tsconfig.json` não inclui `tests/` (...) Abrir o
