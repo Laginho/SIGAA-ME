@@ -31,12 +31,13 @@ import {
     pushNotifications,
 } from '../../src/utils/notification-store';
 import { isNewsCached, mergeCoursesIntoCache } from '../../src/utils/ui-helpers';
+import type { CourseSnapshot } from '../../shared/domain';
 
 const A = { id: 'acc-a', name: 'ALUNO A' };
 const A_PHOTO = 'https://si3.ufc.br/sigaa/verFoto?id=a';
 const B = { id: 'acc-b', name: 'ALUNO B' };
 
-const COURSE_A = {
+const COURSE_A: CourseSnapshot = {
     id: 'c1', name: 'Estruturas de Dados', code: 'CK0210', period: '2026.1', fileCount: 1,
     files: [{ id: '555', name: 'Lista 1.pdf', type: 'file' }],
     news: [{ id: 'n1', title: 'Prova adiada', date: '01/09/2026', notification: '', content: '<p>Prova dia 10.</p>' }],
@@ -127,8 +128,9 @@ describe('account isolation (renderer)', () => {
     it('returning to account A reuses only account A namespaced cache', () => {
         seedAccountA();
         setActiveAccount(B);
-        const COURSE_9 = { id: 'c9', name: 'Física', code: 'CF1', period: '2026.1', files: [], news: [], fileCount: 0 };
-        mergeCoursesIntoCache([COURSE_9], { replaceSet: true }, 2_000);
+        mergeCoursesIntoCache([
+            { id: 'c9', name: 'Física', code: 'CF1', period: '2026.1', files: [], news: [], fileCount: 0 },
+        ], { replaceSet: true }, 2_000);
         pushNotifications([{ ...FILE_NOTIFICATION, id: 'file-c9-x.pdf', courseId: 'c9', itemId: 'x.pdf', itemTitle: 'x.pdf' }]);
 
         setActiveAccount(A);
