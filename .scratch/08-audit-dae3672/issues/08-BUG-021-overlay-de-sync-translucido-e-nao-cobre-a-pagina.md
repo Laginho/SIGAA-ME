@@ -1,6 +1,6 @@
 # BUG-021: Overlay de sync é translúcido e não cobre a página inteira
 Status: open
-Stage: to-implement
+Stage: blocked
 Priority: P2
 Blocked by: nenhum
 Review: agent
@@ -76,3 +76,5 @@ Não mexer no `.sync-selection-container` nem em `#app`.
   linha que diga por que é `fixed` (a página rola).
 
 - 2026-09-17 Attempt 1 failed: exit 0. Log tail: BUG-021 is already closed — no work to do. /  / - Ticket state on `master`: `Stage: done`, `Status: resolved` (ledger row `2026-09-17 | BUG-021 | ce2a440`). / - Fixed via PR #45 (branch `bug-021`, merged `ce2a440`): `.sync-progress-overlay` changed from `position: absolute` + `opacity: 0.98` + `backdrop-filter: blur(5px)` to `position: fixed; inset: 0; opacity: 1`, no blur. / - Verification recorded: 19/19 accessibility e2e green, `npm run quality` green (801 passed, 5 skipped), red/green proof rebuilt against a fresh `vite build`. / - Two non-blocking notes left in the ticket, no action: an `afterEach` that doesn't restore a removed IPC handler, and the overlay not making the page behind it inert (pre-existing, out of scope). /  / Your current branch (`sweatshop/2026-09-17-1301`) hasn't picked up master's commits yet, so the checked-out copy of the ticket still shows the pristine `to-implement` version — that's just staleness, not a real reopening. Nothing for this session to act on. /
+
+- 2026-09-17 Attempt 2 failed: exit 0; blocked after two attempts. Log tail: Confirmed: BUG-021 is already merged into `origin/master` (`ce2a440` via PR #45, closed at `55f8451` with `Stage: done`). This session's branch just hasn't pulled those commits yet — the ticket's own `## Comments` log already documents this exact staleness from a prior attempt. /  / Nothing to do. BUG-021 is done; no work for this session. /
