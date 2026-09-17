@@ -20,7 +20,9 @@
 import path from 'path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fail, ok } from '../../shared/errors';
+import type { AppResult } from '../../shared/errors';
 import { registerIpcHandlers } from '../../electron/ipc/register-handlers';
+import type { CompatibilityStatus } from '../../shared/ipc';
 
 const electronMock = vi.hoisted(() => {
     const handlers = new Map<string, (event: unknown, payload: unknown) => unknown>();
@@ -132,7 +134,7 @@ function makeDeps(overrides: { settings?: Record<string, unknown> } = {}) {
         logger: { clear: vi.fn(async () => { await tick(); record('logger.clear'); }) },
         diagnostics: { clear: vi.fn(async () => { await tick(); record('diagnostics.clear'); }) },
         compatibility: {
-            status: vi.fn(() => ({ state: 'ok' as const })),
+            status: vi.fn((): CompatibilityStatus => ({ state: 'ok' })),
             recordSuccess: vi.fn(() => { record('compatibility.recordSuccess'); }),
             clear: vi.fn(async () => { await tick(); record('compatibility.clear'); }),
         },
@@ -148,10 +150,10 @@ function makeDeps(overrides: { settings?: Record<string, unknown> } = {}) {
 
 type Deps = ReturnType<typeof makeDeps>['deps'];
 
-async function invoke(channel: string, payload: unknown = undefined) {
+async function invoke<T = void>(channel: string, payload: unknown = undefined): Promise<AppResult<T>> {
     const handler = electronMock.handlers.get(channel);
     expect(handler, `handler de ${channel}`).toBeDefined();
-    return await handler!(trustedEvent, payload);
+    return await handler!(trustedEvent, payload) as AppResult<T>;
 }
 
 const DESTRUCTIVE = [

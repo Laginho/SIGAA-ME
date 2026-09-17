@@ -35,16 +35,10 @@ const portalHtml = `<h1>Portal do Discente</h1><form name="entry" action="/sigaa
     <td><input name="idTurma" value="123"></td><td>
     <a id="entry:turmaVirtual" onclick="jsfcljs(document.forms['entry'],'entry:turmaVirtual,entry:turmaVirtual','');">Algorithms</a>
     </td></tr></table></form>`;
-const menuHtml = courseHtml + `<a onclick="jsfcljs(document.forms['formAva'],'files,files','');"><span class="itemMenu"> Conteudo</span></a>`;
-
 function scraper() {
     const service = new HttpScraperService();
     service.setCookies([{ name: 'JSESSIONID', value: 'fixture-cookie', domain: 'si3.ufc.br' }]);
     return service;
-}
-
-function response(data: string) {
-    return { data, headers: {}, status: 200 };
 }
 
 function loginBrowser(startHtml: string, endHtml: string) {

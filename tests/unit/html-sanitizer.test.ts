@@ -10,14 +10,6 @@
 import { describe, it, expect } from 'vitest';
 import { sanitizeNewsHtml } from '../../src/security/html-sanitizer';
 
-const MALICIOUS = [
-  '<img src=x onerror=alert(1)>',
-  '<script>alert(1)</script>',
-  '<iframe src="evil.com"></iframe>',
-  '<svg onload=alert(1)></svg>',
-  '<a href="javascript:alert(1)">click</a>',
-].join('');
-
 describe('sanitizeNewsHtml', () => {
   // ── Preserves allowed tags ─────────────────────────────
   it('preserves allowed inline tags: p, b, strong, i, em, u, br', () => {

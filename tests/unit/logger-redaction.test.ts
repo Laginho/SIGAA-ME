@@ -19,6 +19,7 @@ import { AxiosError } from 'axios';
 vi.mock('electron', () => ({ app: { getPath: vi.fn(() => os.tmpdir()), isPackaged: false } }));
 
 import { LoggerService, redact } from '../../electron/services/logger.service';
+import type { LogMeta } from '../../electron/services/logger.service';
 
 beforeEach(() => {
     expect(typeof LoggerService).toBe('function');
@@ -167,7 +168,7 @@ describe('LoggerService', () => {
         const err = Object.assign(new Error('deu ruim'), { code: 'ECONNRESET' });
 
         const prodLogger = makeLogger({ production: true });
-        prodLogger.error('falhou', err);
+        prodLogger.error('falhou', err as unknown as LogMeta);
         await prodLogger.flush();
         const prodContent = readLog(dir);
         expect(prodContent).toContain('ECONNRESET');
@@ -176,7 +177,7 @@ describe('LoggerService', () => {
 
         const devDir = makeTmpDir();
         const devLogger = new LoggerService({ userDataPath: () => devDir, production: () => false });
-        devLogger.error('falhou', err);
+        devLogger.error('falhou', err as unknown as LogMeta);
         await devLogger.flush();
         const devContent = readLog(devDir);
         expect(devContent).toContain('ECONNRESET');
@@ -192,7 +193,7 @@ describe('LoggerService', () => {
         );
 
         const logger = makeLogger({ production: true });
-        logger.error('falha http', axiosErr);
+        logger.error('falha http', axiosErr as unknown as LogMeta);
         await logger.flush();
 
         const content = readLog(dir);

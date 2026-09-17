@@ -195,6 +195,7 @@ describe('HttpScraperService.downloadFile — falhas não deixam resíduo (BUG-0
         const result = await pendente;
 
         expect(result.success).toBe(false);
+        if (result.success) return;
         expect(result.error).toMatch(/socket hang up/);
         expect(arquivosNoDestino()).toEqual([]);
     });
@@ -208,8 +209,9 @@ describe('DL-001 — contenção no gravador HTTP', () => {
         const result = await scraper.downloadFile('99999', '555', '../../evil.pdf', destino, DOWNLOAD_SCRIPT);
 
         expect(result.success).toBe(true);
+        if (!result.success) return;
         // filePath must be inside destino — same proof the writer uses
-        expect(isInsideRoot(destino, result.filePath!)).toBe(true);
+        expect(isInsideRoot(destino, result.filePath)).toBe(true);
         // exactly one file in destino, name has no separators
         const files = arquivosNoDestino();
         expect(files).toHaveLength(1);
