@@ -32,6 +32,8 @@ import {
 } from '../../electron/ipc/validation';
 import { isTrustedSender } from '../../electron/ipc/sender-policy';
 import { registerIpcHandlers } from '../../electron/ipc/register-handlers';
+import type { IpcDeps } from '../../electron/ipc/register-handlers';
+import type { BrowserWindow } from 'electron';
 
 const electronMock = vi.hoisted(() => {
     const handlers = new Map<string, (event: any, payload: any) => any>();
@@ -239,8 +241,10 @@ describe('registerIpcHandlers: remetente, validação e cópia limpa', () => {
         senderFrame: { url: 'http://localhost:5173/', parent: null },
     };
 
+    // `satisfies IpcDeps` checa o mock contra o contrato real de `registerIpcHandlers`
+    // sem alargar os tipos que os `expect(deps.x.y).toHaveBeenCalled()` abaixo precisam.
     function makeDeps(overrides: Record<string, any> = {}) {
-        return {
+        const base = {
             sigaaService: {
                 login: vi.fn(async () => ok({ id: 'a'.repeat(64), name: 'ALUNO' })),
                 getCourses: vi.fn(async () => ok({ courses: [] })),
@@ -270,12 +274,12 @@ describe('registerIpcHandlers: remetente, validação e cópia limpa', () => {
             compatibility: { status: vi.fn(() => ({ state: 'ok' as const })), recordSuccess: vi.fn(), clear: vi.fn() },
             userDataPath: 'C:\\ud',
             clearBrowserStorage: vi.fn(async () => undefined),
-            getWindow: () => ({ webContents: { id: 7 } }),
+            getWindow: () => ({ webContents: { id: 7 } }) as unknown as BrowserWindow,
             allowedOrigin: 'http://localhost:5173',
             isPackaged: false,
             simulateNewFile: vi.fn(async () => true),
-            ...overrides,
-        };
+        } satisfies IpcDeps;
+        return { ...base, ...overrides };
     }
 
     let deps: any;
@@ -424,12 +428,12 @@ describe('registerIpcHandlers: remetente, validação e cópia limpa', () => {
 
     it('test-simulate-new-file só é registrado fora de produção', () => {
         electronMock.handlers.clear();
-        registerIpcHandlers(makeDeps({ isPackaged: true }) as never);
+        registerIpcHandlers(makeDeps({ isPackaged: true }));
         expect(electronMock.handlers.has('test-simulate-new-file')).toBe(false);
         expect(electronMock.handlers.size).toBe(15);
 
         electronMock.handlers.clear();
-        registerIpcHandlers(makeDeps({ isPackaged: false }) as never);
+        registerIpcHandlers(makeDeps({ isPackaged: false }));
         expect(electronMock.handlers.has('test-simulate-new-file')).toBe(true);
         expect(electronMock.handlers.size).toBe(16);
     });
