@@ -1,6 +1,6 @@
 # BUG-021: Overlay de sync é translúcido e não cobre a página inteira
-Status: open
-Stage: blocked
+Status: resolved
+Stage: done
 Priority: P2
 Blocked by: nenhum
 Review: agent
@@ -75,6 +75,48 @@ Não mexer no `.sync-selection-container` nem em `#app`.
   sobre tema claro vs. escuro e não diz nada sobre cobertura. Trocar por uma
   linha que diga por que é `fixed` (a página rola).
 
-- 2026-09-17 Attempt 1 failed: exit 0. Log tail: BUG-021 is already closed — no work to do. /  / - Ticket state on `master`: `Stage: done`, `Status: resolved` (ledger row `2026-09-17 | BUG-021 | ce2a440`). / - Fixed via PR #45 (branch `bug-021`, merged `ce2a440`): `.sync-progress-overlay` changed from `position: absolute` + `opacity: 0.98` + `backdrop-filter: blur(5px)` to `position: fixed; inset: 0; opacity: 1`, no blur. / - Verification recorded: 19/19 accessibility e2e green, `npm run quality` green (801 passed, 5 skipped), red/green proof rebuilt against a fresh `vite build`. / - Two non-blocking notes left in the ticket, no action: an `afterEach` that doesn't restore a removed IPC handler, and the overlay not making the page behind it inert (pre-existing, out of scope). /  / Your current branch (`sweatshop/2026-09-17-1301`) hasn't picked up master's commits yet, so the checked-out copy of the ticket still shows the pristine `to-implement` version — that's just staleness, not a real reopening. Nothing for this session to act on. /
+#### Resolution (2026-09-17)
 
-- 2026-09-17 Attempt 2 failed: exit 0; blocked after two attempts. Log tail: Confirmed: BUG-021 is already merged into `origin/master` (`ce2a440` via PR #45, closed at `55f8451` with `Stage: done`). This session's branch just hasn't pulled those commits yet — the ticket's own `## Comments` log already documents this exact staleness from a prior attempt. /  / Nothing to do. BUG-021 is done; no work for this session. /
+Verdict: Approve
+
+`.sync-progress-overlay` passou a `position: fixed; inset: 0; opacity: 1`, sem
+`backdrop-filter` (`src/styles/sync-selection.css:145-156`), e o comentário
+obsoleto acima da regra virou uma linha que diz por que é `fixed`. Teste novo em
+`tests/e2e/accessibility.spec.ts:231`, no commit próprio `e95d29e`; correção em
+`fde58e8`. PR #45, merge `ce2a440`.
+
+Nenhum ancestral do overlay cria bloco contentor para `fixed`: `body` e `#app`
+(`main.css:83-97`) não têm `transform`/`filter`/`perspective`, e o único
+`perspective` do arquivo está em `.sync-cards-container` (`sync-selection.css:56`),
+irmão do overlay e não ancestral.
+
+Vermelho/verde, provado com o bundle reconstruído (`npx playwright test` sozinho
+roda contra o `dist` antigo e dá falso verde — a prova exige `npx vite build`
+antes, como o script `test:e2e` faz):
+
+- Com o CSS anterior: `1 failed` — `expect(position).toBe('fixed')` recebeu
+  `absolute`. Sondagem no mesmo build mostrou que a página rola de verdade
+  (`scrollY: 123`, `scrollHeight: 643`, `clientHeight: 520`), a caixa do overlay
+  fica em `top: -123` e os dois cantos inferiores do viewport **não** atingem o
+  overlay — o critério 3 é vermelho por si só, não só pela ordem das asserções.
+- Com a correção: `19 passed (17.8s)` em `npm run test:e2e -- accessibility`,
+  os cinco pontos atingindo o overlay.
+
+Critérios: 1 ✅, 2 ✅ no essencial (o teste afirma `position`/`opacity` computados
+e cobertura por `elementFromPoint`, mais forte que a igualdade de `boundingBox`,
+mas roda num tema só — `.sync-progress-overlay` tem uma única regra em todo o
+`src/`, sem sobrescrita por `[data-theme]`, e os dois `--color-background`
+(`main.css:6` e `:24`) são hex opacos, então os valores não variam por tema),
+3 ✅, 4 ✅ (801 passed | 5 skipped; os cinco testes unitários do overlay intactos),
+5 ✅ (`npm run quality` verde, 0 erros de lint e 40 warnings `no-explicit-any`
+pré-existentes).
+
+Duas observações sem ação, nenhuma bloqueante:
+
+- O `afterEach` do describe novo faz `removeHandler('get-courses')` sem restaurar
+  o handler real. Hoje é inofensivo — nenhum teste posterior do arquivo invoca
+  esse canal —, mas um teste futuro que clique em sync depois deste describe vai
+  falhar sem apontar para cá.
+- O overlay cobre visualmente e não torna o resto da página inerte: durante o
+  sync o Tab ainda alcança os `.sync-card` atrás dele. É anterior a este ticket e
+  fora dos Primary files.
