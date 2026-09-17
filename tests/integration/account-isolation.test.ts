@@ -127,8 +127,9 @@ describe('account isolation (renderer)', () => {
     it('returning to account A reuses only account A namespaced cache', () => {
         seedAccountA();
         setActiveAccount(B);
-        const COURSE_9 = { id: 'c9', name: 'Física', code: 'CF1', period: '2026.1', files: [], news: [], fileCount: 0 };
-        mergeCoursesIntoCache([COURSE_9], { replaceSet: true }, 2_000);
+        mergeCoursesIntoCache([
+            { id: 'c9', name: 'Física', code: 'CF1', period: '2026.1', files: [], news: [], fileCount: 0 },
+        ], { replaceSet: true }, 2_000);
         pushNotifications([{ ...FILE_NOTIFICATION, id: 'file-c9-x.pdf', courseId: 'c9', itemId: 'x.pdf', itemTitle: 'x.pdf' }]);
 
         setActiveAccount(A);
