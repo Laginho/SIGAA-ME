@@ -1,5 +1,5 @@
 # A11Y-004: Overlay de sync não torna a página atrás dele inerte
-Status: done
+Status: resolved
 Stage: done
 Priority: P3
 Blocked by: nenhum
