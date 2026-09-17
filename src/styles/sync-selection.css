@@ -139,24 +139,19 @@
     width: 100%;
 }
 
-/* Progress Overlay - Dark overlay still works best for focus, or make it light?
-   Let's keep it dark for cinematic feel, or white with dark text.
-   User asked for Light Theme, so let's do a Light Overlay.
-*/
+/* fixed, não absolute: .sync-selection-container rola quando o conteúdo
+   passa de 100vh, e um ancestral não posicionado deixaria o overlay cobrir
+   só a primeira altura de viewport. */
 .sync-progress-overlay {
     background: var(--color-background);
-    opacity: 0.98;
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    opacity: 1;
+    position: fixed;
+    inset: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     z-index: 10;
-    backdrop-filter: blur(5px);
     transition: opacity 0.3s ease;
 }
 

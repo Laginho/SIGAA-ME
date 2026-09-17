@@ -1,6 +1,6 @@
 # BUG-021: Overlay de sync é translúcido e não cobre a página inteira
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P2
 Blocked by: nenhum
 Review: agent
