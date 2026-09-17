@@ -287,7 +287,7 @@ app.whenReady().then(() => {
     { type: 'separator' },
     { label: 'Sair', click: () => { app.quit(); } }
   ]);
-  tray.setToolTip('SIGAA-ME Background Sync');
+  tray.setToolTip('SIGAA-ME');
   tray.setContextMenu(contextMenu);
   
   tray.on('double-click', () => {
