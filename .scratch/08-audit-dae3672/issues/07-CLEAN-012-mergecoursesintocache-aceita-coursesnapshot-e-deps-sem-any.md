@@ -1,6 +1,6 @@
 # CLEAN-012: `mergeCoursesIntoCache` aceita `CourseSnapshot`, e `deps` do `ipc-validation.test.ts` sem `any`
-Status: open
-Stage: to-review
+Status: resolved
+Stage: done
 Priority: P3
 Blocked by: nenhum
 Review: agent
@@ -111,3 +111,51 @@ compilando sem cast. Não adicionar `as any` em nenhuma delas.
   inflada: são 3 chamadas `.mock*` e 16 `expect(deps.x.y)`. Total 19, e o
   `satisfies` já cobre a forma — por isso o item 2 é uma linha, não um ticket
   próprio.
+
+#### Resolution (2026-09-17)
+
+Verdict: Approve
+
+**Decisão.** Os dois itens entraram como especificados, um commit cada, e o
+gate ficou verde na ponta. O `LogMeta` seguiu fora, como `## Comments` decidiu.
+
+**Arquivos.** `src/utils/ui-helpers.ts` (`IncomingCourse` apagado, parâmetro
+`CourseSnapshot[]`, leitura por `readCoursesCache()`),
+`tests/unit/merge-courses-cache.test.ts`,
+`tests/integration/account-isolation.test.ts`,
+`tests/unit/ipc-validation.test.ts`.
+
+**Red-green.** `git checkout 68fa7af && npx tsc --noEmit`, só o commit de
+teste:
+
+    tests/integration/account-isolation.test.ts(131,25): error TS2353:
+    Object literal may only specify known properties, and 'name' does not
+    exist in type 'IncomingCourse'.
+
+Verde em `8e6b91a`. Item 2 compilou de primeira depois de trocar
+`overrides: Record<string, any>` por `Partial<ReturnType<typeof makeBase>>` —
+o índice genérico no spread era o que apagava `Mock` dos 19 `deps.x.y`, então
+`ReturnType<typeof makeDeps>` sozinho teria virado `any` por outro caminho.
+
+**Gate.** `npm run quality`: 0 erros, 40 warnings (teto inalterado), 71
+arquivos, 801 passed / 5 skipped. CI do PR #44 verde nos três jobs.
+
+**Critérios.** 1 ✅ 2 ✅ 3 ✅ 4 ✅ 5 ✅.
+
+**Alcance verificado.** O laço do lado `incoming` perdeu o guard
+`if (course.news)`, então turma sem `news` agora quebra em vez de ser
+ignorada. Subi os cinco chamadores até o produtor —
+`background-sync.service.ts:275`, `sync-selection.ts:275`,
+`course-detail.ts:103` e o `if (course && course.news)` de `:588` — e nenhum
+alcança o laço sem `news`. O lado `existingCourses`, único dado de fato não
+validado, manteve o guard e o `isIncomingNews`. A sanitização SEC-001 do lado
+`incoming` passou a cobrir também item sem `id` string: estritamente mais,
+nunca menos.
+
+**Registrado, sem reabrir.** `8e6b91a` (commit de código) tocou
+`account-isolation.test.ts` para anotar `COURSE_A: CourseSnapshot` — anotação
+de tipo, nenhuma asserção mudou, mas quebra a separação de commits do fluxo.
+E `merge-courses-cache.test.ts:79,90` compara contra a própria factory em vez
+de literal; enfraquece pouco, um campo perdido no merge ainda falha.
+
+**PR.** https://github.com/Laginho/SIGAA-ME/pull/44 (merge commit `1559af7`).
