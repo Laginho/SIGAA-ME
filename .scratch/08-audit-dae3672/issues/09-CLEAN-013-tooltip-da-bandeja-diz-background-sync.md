@@ -1,6 +1,6 @@
 # CLEAN-013: Tooltip do ícone da bandeja diz "SIGAA-ME Background Sync"
 Status: open
-Stage: to-review
+Stage: done
 Priority: P3
 Blocked by: nenhum
 Review: agent
@@ -39,3 +39,35 @@ certo e não muda.
 ## Comments
 
 - Nenhum.
+
+#### Resolution (2026-09-17)
+
+Verdict: Approve
+
+Decisão: a mudança é exatamente a linha que o ticket pediu, e os três
+critérios passam. Nada fora dos Primary files.
+
+Arquivos: `electron/main.ts:290` (`tray.setToolTip('SIGAA-ME')`), commit
+`c4d2f06`.
+
+Critérios:
+
+1. ✅ `tray.setToolTip('SIGAA-ME')` — string exata, `electron/main.ts:290`.
+2. ✅ `grep -rn "Background Sync" electron src` devolve só dois comentários
+   (`electron/preload.ts:57`, `src/pages/settings.ts:172`).
+3. ✅ gate verde.
+
+Prova red-green: não se aplica. O ticket dispensou teste na etapa 1 e o
+revisor concorda — é string de UI passada a uma API do Electron, sem lógica
+que possa regredir em silêncio; o critério 2 é a checagem permanente. Nota
+para a etapa 1: um teste que afirmasse o argumento do `setToolTip` seria
+barato, porque seis suítes já mockam `Tray` com `setToolTip: vi.fn()`. Não
+justifica reabrir por uma string cosmética.
+
+Gate (`npm run quality`, Windows): typecheck limpo, ESLint 0 erros e 40
+warnings (`no-explicit-any`, todos pré-existentes), vitest 71 arquivos,
+801 passed | 5 skipped.
+
+Observação fora do escopo: o `--max-warnings 40` do lint está exatamente no
+limite — o próximo `any` que alguém adicionar derruba o gate. Não é desta
+issue; vale um `CLEAN-*` se incomodar.
