@@ -182,3 +182,8 @@ de 800 mais o teste novo do critério 5. CI do PR: os três jobs verdes.
   string de script mais longa para o mesmo resultado que uma palavra no
   `include` — só valeria se `tests/` precisasse de `compilerOptions` diferente,
   e a sonda mostrou que não precisa.
+
+- Follow-ups triados em 2026-09-17: `IncomingCourse` e `let deps: any` viraram
+  o `CLEAN-012` (um ticket, dois itens). `LogMeta` avaliado e recusado —
+  nenhum chamador de produção passa `Error` no topo do `meta`; motivo completo
+  em `## Comments` do `CLEAN-012`.
