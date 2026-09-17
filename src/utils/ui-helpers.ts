@@ -1,5 +1,6 @@
 import { sanitizeNewsHtml } from '../security/html-sanitizer';
-import { readAccountItem, readCoursesCache, writeAccountItem } from '../data/account-storage';
+import { readCoursesCache, writeAccountItem } from '../data/account-storage';
+import type { CourseSnapshot } from '../../shared/domain';
 
 /**
  * Utility: Sync Badge Label Formatter
@@ -66,11 +67,6 @@ interface IncomingNews {
     content?: string;
 }
 
-interface IncomingCourse {
-    id: string;
-    news?: unknown[];
-}
-
 function isIncomingNews(value: unknown): value is IncomingNews {
     return typeof value === 'object' && value !== null
         && typeof (value as { id?: unknown }).id === 'string';
@@ -90,16 +86,8 @@ function isIncomingNews(value: unknown): value is IncomingNews {
  * sync push (`dashboard.ts`) — and the only writer of this cache: news
  * modals merge through here too (SEC-001).
  */
-export function mergeCoursesIntoCache(incoming: IncomingCourse[], opts: MergeOptions = {}, timestamp: number = Date.now()): void {
-    const existingRaw = readAccountItem('courses');
-    let existingCourses: IncomingCourse[] = [];
-    if (existingRaw) {
-        try {
-            existingCourses = JSON.parse(existingRaw) as IncomingCourse[];
-        } catch {
-            existingCourses = [];
-        }
-    }
+export function mergeCoursesIntoCache(incoming: CourseSnapshot[], opts: MergeOptions = {}, timestamp: number = Date.now()): void {
+    const existingCourses = readCoursesCache();
     // Build a lookup of cached news content: "courseId-newsId" -> content
     const contentMap = new Map<string, string>();
     for (const course of existingCourses) {
@@ -113,12 +101,10 @@ export function mergeCoursesIntoCache(incoming: IncomingCourse[], opts: MergeOpt
     }
     // Re-inject cached content into incoming data where missing
     for (const course of incoming) {
-        if (course.news) {
-            for (const n of course.news) {
-                if (isIncomingNews(n) && !n.content) {
-                    const cached = contentMap.get(`${course.id}-${n.id}`);
-                    if (cached) n.content = cached;
-                }
+        for (const n of course.news) {
+            if (!n.content) {
+                const cached = contentMap.get(`${course.id}-${n.id}`);
+                if (cached) n.content = cached;
             }
         }
     }
@@ -126,16 +112,14 @@ export function mergeCoursesIntoCache(incoming: IncomingCourse[], opts: MergeOpt
     // SIGAA e este é o único escritor do blob de disciplinas — cobre os
     // quatro caminhos de escrita num lugar só.
     for (const course of incoming) {
-        if (course.news) {
-            for (const n of course.news) {
-                if (isIncomingNews(n) && typeof n.content === 'string') {
-                    n.content = sanitizeNewsHtml(n.content);
-                }
+        for (const n of course.news) {
+            if (typeof n.content === 'string') {
+                n.content = sanitizeNewsHtml(n.content);
             }
         }
     }
 
-    const merged: IncomingCourse[] = opts.replaceSet ? [...incoming] : [...existingCourses];
+    const merged: CourseSnapshot[] = opts.replaceSet ? [...incoming] : [...existingCourses];
     if (!opts.replaceSet) {
         for (const course of incoming) {
             const idx = merged.findIndex((c) => c.id === course.id);
