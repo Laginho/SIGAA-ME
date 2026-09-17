@@ -218,6 +218,55 @@ test.describe('Acessibilidade', () => {
         });
     });
 
+    test.describe('Overlay de sync', () => {
+        test.afterEach(async () => {
+            // A troca de handler é global ao processo main: sem restaurar, o
+            // describe seguinte (que também navega para #/sync-selection)
+            // herdaria uma Promise que nunca resolve.
+            await launched.app.evaluate(({ ipcMain }) => {
+                ipcMain.removeHandler('get-courses');
+            });
+        });
+
+        test('cobre o viewport inteiro, opaco, mesmo com a página rolada até o fim', async () => {
+            const { page, app } = launched;
+            await app.evaluate(({ ipcMain }) => {
+                ipcMain.removeHandler('get-courses');
+                ipcMain.handle('get-courses', () => new Promise(() => { }));
+            });
+
+            await goto('#/sync-selection');
+            await page.click('#btnFastSync');
+            await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+
+            const result = await page.evaluate(() => {
+                const overlay = document.querySelector('.sync-progress-overlay');
+                if (!overlay) return null;
+                const style = getComputedStyle(overlay);
+                const width = document.documentElement.clientWidth;
+                const height = document.documentElement.clientHeight;
+                const corners: [number, number][] = [
+                    [1, 1],
+                    [width - 1, 1],
+                    [1, height - 1],
+                    [width - 1, height - 1],
+                    [width / 2, height / 2],
+                ];
+                const coversViewport = corners.every(([x, y]) => {
+                    const hit = document.elementFromPoint(x, y);
+                    return hit === overlay || overlay.contains(hit);
+                });
+                return { position: style.position, opacity: style.opacity, backdropFilter: style.backdropFilter, coversViewport };
+            });
+
+            expect(result).not.toBeNull();
+            expect(result?.position).toBe('fixed');
+            expect(result?.opacity).toBe('1');
+            expect(result?.backdropFilter).toBe('none');
+            expect(result?.coversViewport).toBe(true);
+        });
+    });
+
     test.describe('Scan automático (axe-core)', () => {
         test.afterAll(async () => {
             await launched.page.emulateMedia({ reducedMotion: null });
