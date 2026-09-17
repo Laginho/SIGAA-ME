@@ -1,6 +1,6 @@
 # CLEAN-013: Tooltip do ícone da bandeja diz "SIGAA-ME Background Sync"
 Status: open
-Stage: to-implement
+Stage: implementing
 Priority: P3
 Blocked by: nenhum
 Review: agent
