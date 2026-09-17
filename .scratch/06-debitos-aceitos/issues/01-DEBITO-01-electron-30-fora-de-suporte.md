@@ -31,3 +31,5 @@ Tracker status at migration: (sem linha de status — débito aceito conscientem
   2026-08-25. O debito nao fecha: precisa de novo ciclo de upgrade, alvo 44
   (42 expira em um mes). Mesmo roteiro do `DEP-005`: subir, live smoke do
   scraper no Windows, empacotar. Decisao do autor se abre `DEP-008`.
+- 2026-09-17: aberto o `DEP-008` (`.scratch/08-audit-dae3672/`) para o upgrade
+  a 44. Este debito fecha junto com ele.
