@@ -1,6 +1,6 @@
 # CLEAN-012: `mergeCoursesIntoCache` aceita `CourseSnapshot`, e `deps` do `ipc-validation.test.ts` sem `any`
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P3
 Blocked by: nenhum
 Review: agent

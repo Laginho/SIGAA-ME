@@ -33,6 +33,7 @@ import {
 import { isTrustedSender } from '../../electron/ipc/sender-policy';
 import { registerIpcHandlers } from '../../electron/ipc/register-handlers';
 import type { IpcDeps } from '../../electron/ipc/register-handlers';
+import type { AppSettings } from '../../shared/ipc';
 import type { BrowserWindow } from 'electron';
 
 const electronMock = vi.hoisted(() => {
@@ -243,8 +244,10 @@ describe('registerIpcHandlers: remetente, validação e cópia limpa', () => {
 
     // `satisfies IpcDeps` checa o mock contra o contrato real de `registerIpcHandlers`
     // sem alargar os tipos que os `expect(deps.x.y).toHaveBeenCalled()` abaixo precisam.
-    function makeDeps(overrides: Record<string, any> = {}) {
-        const base = {
+    // `overrides` é `Partial<...makeBase>`, não `Record<string, any>`: um índice
+    // genérico no spread apaga o tipo de todo campo de `base`, `Mock` incluso.
+    function makeBase() {
+        return {
             sigaaService: {
                 login: vi.fn(async () => ok({ id: 'a'.repeat(64), name: 'ALUNO' })),
                 getCourses: vi.fn(async () => ok({ courses: [] })),
@@ -256,8 +259,8 @@ describe('registerIpcHandlers: remetente, validação e cópia limpa', () => {
                 logout: vi.fn(async () => {}),
             },
             persistence: {
-                getSettings: vi.fn(() => ({
-                    theme: 'light' as const, lastDownloadPath: 'C:\\root', runInBackground: true,
+                getSettings: vi.fn((): AppSettings => ({
+                    theme: 'light', lastDownloadPath: 'C:\\root', runInBackground: true,
                     syncInterval: 60, autoDownloadUpdates: true, openAtLogin: false,
                 })),
                 applySetting: vi.fn(),
@@ -276,13 +279,16 @@ describe('registerIpcHandlers: remetente, validação e cópia limpa', () => {
             clearBrowserStorage: vi.fn(async () => undefined),
             getWindow: () => ({ webContents: { id: 7 } }) as unknown as BrowserWindow,
             allowedOrigin: 'http://localhost:5173',
-            isPackaged: false,
+            isPackaged: false as boolean,
             simulateNewFile: vi.fn(async () => true),
         } satisfies IpcDeps;
-        return { ...base, ...overrides };
     }
 
-    let deps: any;
+    function makeDeps(overrides: Partial<ReturnType<typeof makeBase>> = {}) {
+        return { ...makeBase(), ...overrides };
+    }
+
+    let deps: ReturnType<typeof makeDeps>;
 
     async function invoke(channel: string, payload: unknown = undefined, event: any = trustedEvent) {
         const handler = electronMock.handlers.get(channel);
@@ -415,7 +421,10 @@ describe('registerIpcHandlers: remetente, validação e cópia limpa', () => {
     });
 
     it('download-file sem pasta definida devolve INVALID_REQUEST, comportamento de hoje', async () => {
-        deps.persistence.getSettings.mockReturnValue({ lastDownloadPath: null });
+        deps.persistence.getSettings.mockReturnValue({
+            theme: 'light', lastDownloadPath: null, runInBackground: true,
+            syncInterval: 60, autoDownloadUpdates: true, openAtLogin: false,
+        });
         const result = await invoke('download-file', {
             courseId: '540316',
             courseName: 'Cálculo',
