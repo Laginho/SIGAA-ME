@@ -14,6 +14,12 @@ import { mergeCoursesIntoCache } from '../../src/utils/ui-helpers';
 // DATA-001: o cache é por conta; a fixture entra pelo escritor com escopo.
 const ACCOUNT = { id: 'acc-test', name: 'ALUNO' };
 
+// Fixture tipada: `mergeCoursesIntoCache` só olha `id`/`news`, mas o literal
+// direto excede o `IncomingCourse` local por causa do `name` de asserção.
+function course(id: string, name: string, news: Array<{ id: string; content?: string }> = []) {
+    return { id, name, news };
+}
+
 beforeEach(() => {
     localStorage.clear();
     sessionStorage.clear();
@@ -27,7 +33,7 @@ describe('mergeCoursesIntoCache', () => {
         ]));
 
         mergeCoursesIntoCache([
-            { id: 'A', name: 'Course A', news: [{ id: '1' }, { id: '2' }] },
+            course('A', 'Course A', [{ id: '1' }, { id: '2' }]),
         ]);
 
         const result = JSON.parse(readAccountItem('courses') || '[]');
@@ -44,7 +50,7 @@ describe('mergeCoursesIntoCache', () => {
         ]));
 
         mergeCoursesIntoCache([
-            { id: 'A', name: 'Course A Updated', news: [] },
+            course('A', 'Course A Updated'),
         ]);
 
         const result = JSON.parse(readAccountItem('courses') || '[]');
@@ -61,7 +67,7 @@ describe('mergeCoursesIntoCache', () => {
         ]));
 
         mergeCoursesIntoCache([
-            { id: 'A', name: 'Course A Updated', news: [] },
+            course('A', 'Course A Updated'),
         ], { replaceSet: true });
 
         const result = JSON.parse(readAccountItem('courses') || '[]');
@@ -72,7 +78,7 @@ describe('mergeCoursesIntoCache', () => {
         writeAccountItem('courses', 'not-valid-json{{');
 
         expect(() => mergeCoursesIntoCache([
-            { id: 'A', name: 'Course A', news: [] },
+            course('A', 'Course A'),
         ])).not.toThrow();
 
         const result = JSON.parse(readAccountItem('courses') || '[]');
@@ -85,7 +91,7 @@ describe('mergeCoursesIntoCache', () => {
         ]));
 
         mergeCoursesIntoCache([
-            { id: 'A', name: 'Course A', news: [{ id: '1', content: 'NEW' }] },
+            course('A', 'Course A', [{ id: '1', content: 'NEW' }]),
         ]);
 
         const result = JSON.parse(readAccountItem('courses') || '[]');
@@ -93,22 +99,20 @@ describe('mergeCoursesIntoCache', () => {
     });
 
     it('writes the sync timestamp', () => {
-        mergeCoursesIntoCache([{ id: 'A', name: 'Course A', news: [] }], {}, 12345);
+        mergeCoursesIntoCache([course('A', 'Course A')], {}, 12345);
         expect(readAccountItem('sync-timestamp')).toBe('12345');
     });
 
     it('keeps the sync timestamp untouched with keepTimestamp (a news-body cache write is not a sync)', () => {
         writeAccountItem('sync-timestamp', '111');
-        mergeCoursesIntoCache([{ id: 'A', name: 'Course A', news: [{ id: '1', content: '<p>ok</p>' }] }], { keepTimestamp: true });
+        mergeCoursesIntoCache([course('A', 'Course A', [{ id: '1', content: '<p>ok</p>' }])], { keepTimestamp: true });
         expect(readAccountItem('sync-timestamp')).toBe('111');
     });
 
     it('sanitizes news content before writing to cache (SEC-001)', () => {
-        mergeCoursesIntoCache([{
-            id: 'A',
-            name: 'Course A',
-            news: [{ id: '1', content: '<p>ok</p><script>x</script><img src=x onerror=alert(1)>' }],
-        }]);
+        mergeCoursesIntoCache([
+            course('A', 'Course A', [{ id: '1', content: '<p>ok</p><script>x</script><img src=x onerror=alert(1)>' }]),
+        ]);
 
         const result = JSON.parse(readAccountItem('courses') || '[]');
         const content = result[0].news[0].content as string;

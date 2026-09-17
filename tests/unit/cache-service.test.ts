@@ -72,7 +72,7 @@ describe('CacheService', () => {
         const service = new CacheService();
         service.updateCourseState(ACC, 'c1', ['42'], []);
 
-        const diff = service.diffCourseState(ACC, 'c1', [{ id: 42 }], []);
+        const diff = service.diffCourseState(ACC, 'c1', [{ id: 42 }] as unknown as { id: string }[], []);
 
         expect(diff.newFiles).toEqual([]);
     });
@@ -80,7 +80,7 @@ describe('CacheService', () => {
     it('never reports an id-less item as new, even against an empty baseline — the parser is responsible for always supplying an id (link-type materials get a deterministic `link:<url>` id since plan 003), and this filter stays as a guard against the case where it does not', () => {
         const service = new CacheService();
 
-        const diff = service.diffCourseState(ACC, 'c1', [{ name: 'Lista', type: 'link', url: 'http://example.com' }], []);
+        const diff = service.diffCourseState(ACC, 'c1', [{ name: 'Lista', type: 'link', url: 'http://example.com' }] as unknown as { id: string }[], []);
 
         expect(diff.newFiles).toEqual([]);
     });

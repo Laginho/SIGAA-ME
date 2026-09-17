@@ -85,6 +85,11 @@ function getHandler(event: string) {
   return harness.handlers.get(event);
 }
 
+/** Estreita `handler` e falha com mensagem de asserção — nunca `TypeError` — se o evento não foi registrado. */
+function assertHandler<T>(handler: T | undefined, event: string): asserts handler is T {
+  expect(handler, `handler de ${event} não foi registrado`).toBeDefined();
+}
+
 describe('updater consent', () => {
   beforeEach(() => {
     harness.handlers.clear();
@@ -115,7 +120,7 @@ describe('updater consent', () => {
     setupAutoUpdater();
     harness.dialog.showMessageBox.mockResolvedValue({ response: 0 } as any);
     const handler = getHandler('update-available');
-    expect(handler).toBeDefined();
+    assertHandler(handler, 'update-available');
     handler({ version: '9.9.9' });
     // flush microtasks: dialog.then + downloadUpdate
     await new Promise((r) => setTimeout(r, 0));
@@ -127,6 +132,7 @@ describe('updater consent', () => {
     setupAutoUpdater();
     harness.dialog.showMessageBox.mockResolvedValue({ response: 1 } as any);
     const handler = getHandler('update-available');
+    assertHandler(handler, 'update-available');
     handler({ version: '9.9.9' });
     await new Promise((r) => setTimeout(r, 0));
     expect(harness.autoUpdater.downloadUpdate).not.toHaveBeenCalled();
@@ -136,6 +142,7 @@ describe('updater consent', () => {
     setupAutoUpdater();
     harness.dialog.showMessageBox.mockRejectedValue(new Error('dialog fail'));
     const handler = getHandler('update-available');
+    assertHandler(handler, 'update-available');
     const updaterLog = loggerHarness.scopes.get('Updater');
 
     // Should not throw / reject
@@ -155,7 +162,7 @@ describe('updater consent', () => {
     updaterLog?.error.mockClear();
     harness.dialog.showMessageBox.mockRejectedValue(new Error('dialog fail 2'));
     const handler2 = getHandler('update-downloaded');
-    expect(handler2).toBeDefined();
+    assertHandler(handler2, 'update-downloaded');
     threw = false;
     try {
       handler2();
@@ -163,5 +170,21 @@ describe('updater consent', () => {
     } catch { threw = true; }
     expect(threw).toBe(false);
     expect(updaterLog?.error).toHaveBeenCalledWith('Dialog failed', { err: expect.any(Error) });
+  });
+
+  it('um evento nunca registrado falha com mensagem de asserção nomeando-o, não com TypeError', () => {
+    setupAutoUpdater();
+    const handler = getHandler('evento-nao-registrado');
+
+    let caught: unknown;
+    try {
+      assertHandler(handler, 'evento-nao-registrado');
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeInstanceOf(Error);
+    expect(caught).not.toBeInstanceOf(TypeError);
+    expect((caught as Error).message).toContain('evento-nao-registrado');
   });
 });

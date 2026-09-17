@@ -156,7 +156,7 @@ describe('BackgroundSyncService filters link-type materials out of the auto-down
         const accountId = deriveAccountId('aluno01');
         setActiveMainAccount(accountId);
         const { win } = makeWindow();
-        const downloadAllFiles = vi.fn(async () => ok({ downloaded: 0, skipped: 0, failed: 0, results: [] }));
+        const downloadAllFiles = vi.fn(async (_courseId: string, _courseName: string, _files: unknown[]) => ok({ downloaded: 0, skipped: 0, failed: 0, results: [] }));
         const files: { id: string; name: string; type: 'file' | 'link' }[] = [
             { id: 'old', name: 'old.pdf', type: 'file' },
             { id: 'new', name: 'new.pdf', type: 'file' },

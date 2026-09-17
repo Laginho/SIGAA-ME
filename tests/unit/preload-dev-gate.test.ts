@@ -19,11 +19,11 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
 const contextBridgeMock = {
-    exposeInMainWorld: vi.fn(),
+    exposeInMainWorld: vi.fn((_channel: string, _api: unknown) => {}),
 };
 
 const ipcMock = {
-    on: vi.fn(),
+    on: vi.fn((_channel: string, _listener: unknown) => {}),
     off: vi.fn(),
     send: vi.fn(),
     invoke: vi.fn(),
