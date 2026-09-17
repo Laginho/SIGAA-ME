@@ -69,3 +69,5 @@ a prova são os critérios 2–6, e o 6 é do autor.
   agente faz 1–4 e deixa em `to-merge`.
 - Ao fechar, fechar também o `DÉBITO-01` (`.scratch/06-debitos-aceitos/`),
   com a versão e a data.
+
+- 2026-09-17 Attempt 1 failed: exit 0. Log tail: DEP-008 done through what the agent can do: Electron bumped 41.10.7 → 44.4.1, criteria 1–4 verified green, ticket updated with breaking-changes findings, `Stage: to-merge` committed, and [PR #47](https://github.com/Laginho/SIGAA-ME/pull/47) opened against `master`. /  / Left for you (Review: human): criterion 5 (`npm run release`, Windows installer) and criterion 6 (live smoke `npm run test:live`, one run). Once those are green, merge and close `DÉBITO-01` alongside DEP-008. /
