@@ -32,6 +32,8 @@ import {
 } from '../../electron/ipc/validation';
 import { isTrustedSender } from '../../electron/ipc/sender-policy';
 import { registerIpcHandlers } from '../../electron/ipc/register-handlers';
+import type { IpcDeps } from '../../electron/ipc/register-handlers';
+import type { BrowserWindow } from 'electron';
 
 const electronMock = vi.hoisted(() => {
     const handlers = new Map<string, (event: any, payload: any) => any>();
@@ -239,33 +241,45 @@ describe('registerIpcHandlers: remetente, validação e cópia limpa', () => {
         senderFrame: { url: 'http://localhost:5173/', parent: null },
     };
 
+    // `satisfies IpcDeps` checa o mock contra o contrato real de `registerIpcHandlers`
+    // sem alargar os tipos que os `expect(deps.x.y).toHaveBeenCalled()` abaixo precisam.
     function makeDeps(overrides: Record<string, any> = {}) {
-        return {
+        const base = {
             sigaaService: {
-                login: vi.fn(async () => ok({ name: 'ALUNO', username: 'aluno' })),
+                login: vi.fn(async () => ok({ id: 'a'.repeat(64), name: 'ALUNO' })),
                 getCourses: vi.fn(async () => ok({ courses: [] })),
                 getCourseFiles: vi.fn(async () => ok({ files: [], news: [] })),
                 downloadFile: vi.fn(async () => ok({ filePath: 'C:/root/a.pdf' })),
-                downloadAllFiles: vi.fn(async () => ok({ downloaded: [], failed: [] })),
+                downloadAllFiles: vi.fn(async () => ok({ downloaded: 0, skipped: 0, failed: 0, results: [] })),
                 getNewsDetail: vi.fn(async () => ok({ title: 'T', date: 'D', notification: '', content: '' })),
                 loadAllNews: vi.fn(async () => ok([])),
-                logout: vi.fn(async () => ok()),
+                logout: vi.fn(async () => {}),
             },
             persistence: {
-                getSettings: vi.fn(() => ({ lastDownloadPath: 'C:\\root' })),
+                getSettings: vi.fn(() => ({
+                    theme: 'light' as const, lastDownloadPath: 'C:\\root', runInBackground: true,
+                    syncInterval: 60, autoDownloadUpdates: true, openAtLogin: false,
+                })),
                 applySetting: vi.fn(),
                 updateSetting: vi.fn(),
                 saveCredentials: vi.fn(),
                 clearCredentials: vi.fn(),
                 loadCredentials: vi.fn(),
+                reset: vi.fn(),
             },
-            backgroundSync: { start: vi.fn() },
-            getWindow: () => ({ webContents: { id: 7 } }),
+            backgroundSync: { start: vi.fn(), stop: vi.fn(), cancel: vi.fn() },
+            cache: { clear: vi.fn() },
+            logger: { clear: vi.fn() },
+            diagnostics: { clear: vi.fn() },
+            compatibility: { status: vi.fn(() => ({ state: 'ok' as const })), recordSuccess: vi.fn(), clear: vi.fn() },
+            userDataPath: 'C:\\ud',
+            clearBrowserStorage: vi.fn(async () => undefined),
+            getWindow: () => ({ webContents: { id: 7 } }) as unknown as BrowserWindow,
             allowedOrigin: 'http://localhost:5173',
             isPackaged: false,
             simulateNewFile: vi.fn(async () => true),
-            ...overrides,
-        };
+        } satisfies IpcDeps;
+        return { ...base, ...overrides };
     }
 
     let deps: any;
@@ -273,7 +287,7 @@ describe('registerIpcHandlers: remetente, validação e cópia limpa', () => {
     async function invoke(channel: string, payload: unknown = undefined, event: any = trustedEvent) {
         const handler = electronMock.handlers.get(channel);
         expect(handler).toBeDefined();
-        return await handler(event, payload);
+        return await handler!(event, payload);
     }
 
     beforeEach(() => {

@@ -480,6 +480,7 @@ describe('SigaaService (Unit)', () => {
 
             const result = await service.downloadAllFiles('C1', 'Math', [DOC_REF], '/mock/downloads');
 
+            expect(result.success).toBe(true);
             expect(mockHttp.downloadFile).toHaveBeenCalledTimes(1);
             expect(mockHttp.downloadFile.mock.calls[0][4]).toBe(SCRIPT);
             expect(mockPlaywright.downloadFile).not.toHaveBeenCalled();
@@ -492,6 +493,7 @@ describe('SigaaService (Unit)', () => {
 
             const result = await service.downloadAllFiles('C1', 'Math', [DOC_REF], '/mock/downloads');
 
+            expect(result.success).toBe(true);
             expect(mockPlaywright.navigateToFilesSection).not.toHaveBeenCalled();
             expect(mockHttp.downloadFile).toHaveBeenCalledTimes(1);
         });
