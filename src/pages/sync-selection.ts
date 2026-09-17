@@ -152,6 +152,9 @@ async function startSync(app: HTMLDivElement, mode: 'fast' | 'full') {
       <div class="progress-text" id="progressDetail">Preparando ambiente...</div>
     </div>
   `;
+  // A11Y-004: what is already in app becomes inert while the overlay lives.
+  const covered = [...app.children];
+  covered.forEach((el) => el.setAttribute('inert', ''));
   app.appendChild(overlay);
 
   // Helper: update progress bar + labels
@@ -192,6 +195,7 @@ async function startSync(app: HTMLDivElement, mode: 'fast' | 'full') {
     overlay.querySelector('.progress-list')?.after(actions);
 
     document.getElementById('retryBtn')?.addEventListener('click', () => {
+      covered.forEach((el) => el.removeAttribute('inert'));
       overlay.remove();
       startSync(app, mode);
     });

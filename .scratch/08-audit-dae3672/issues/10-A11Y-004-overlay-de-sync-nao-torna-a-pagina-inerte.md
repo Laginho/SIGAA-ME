@@ -1,6 +1,6 @@
 # A11Y-004: Overlay de sync não torna a página atrás dele inerte
-Status: open
-Stage: to-implement
+Status: done
+Stage: done
 Priority: P3
 Blocked by: nenhum
 Review: agent
@@ -50,3 +50,9 @@ de saída do overlay, se houver mais de um.
 - Aberta por pedido do Bruno em 2026-09-17, a partir da oferta do revisor do
   `BUG-021`. A outra nota daquela revisão — o `afterEach` que remove o handler
   `get-courses` sem restaurá-lo — não virou ticket.
+
+- Fechada em 2026-09-17 direto na master, sem ticket-flow, a pedido do Bruno
+  (ticket simples). `inert` via `setAttribute` nos filhos pre-existentes de
+  `app`; revertido no unico `overlay.remove()` (retry). O outro caminho de
+  saida e navegacao por hash, que re-renderiza `app`. Dois testes em
+  `tests/unit/sync-selection.test.ts`, vermelhos sem a correcao.
