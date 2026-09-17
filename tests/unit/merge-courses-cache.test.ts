@@ -10,14 +10,19 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { readAccountItem, setActiveAccount, writeAccountItem } from '../../src/data/account-storage';
 import { mergeCoursesIntoCache } from '../../src/utils/ui-helpers';
+import type { CourseSnapshot } from '../../shared/domain';
 
 // DATA-001: o cache é por conta; a fixture entra pelo escritor com escopo.
 const ACCOUNT = { id: 'acc-test', name: 'ALUNO' };
 
-// Fixture tipada: `mergeCoursesIntoCache` só olha `id`/`news`, mas o literal
-// direto excede o `IncomingCourse` local por causa do `name` de asserção.
-function course(id: string, name: string, news: Array<{ id: string; content?: string }> = []) {
-    return { id, name, news };
+// Factory por brevidade: um `CourseSnapshot` completo em cada chamada deixaria
+// os testes ilegíveis. `code`/`period` fixos porque `mergeCoursesIntoCache`
+// não olha para eles.
+function course(id: string, name: string, news: Array<{ id: string; content?: string }> = []): CourseSnapshot {
+    return {
+        id, code: id, name, period: '2026.1', files: [], fileCount: 0,
+        news: news.map((n) => ({ title: '', date: '', notification: '', ...n })),
+    };
 }
 
 beforeEach(() => {
@@ -71,7 +76,7 @@ describe('mergeCoursesIntoCache', () => {
         ], { replaceSet: true });
 
         const result = JSON.parse(readAccountItem('courses') || '[]');
-        expect(result).toEqual([{ id: 'A', name: 'Course A Updated', news: [] }]);
+        expect(result).toEqual([course('A', 'Course A Updated')]);
     });
 
     it('treats missing/corrupt existing cache as empty (no throw)', () => {
@@ -82,7 +87,7 @@ describe('mergeCoursesIntoCache', () => {
         ])).not.toThrow();
 
         const result = JSON.parse(readAccountItem('courses') || '[]');
-        expect(result).toEqual([{ id: 'A', name: 'Course A', news: [] }]);
+        expect(result).toEqual([course('A', 'Course A')]);
     });
 
     it('fresh incoming content wins over stale cached content', () => {
