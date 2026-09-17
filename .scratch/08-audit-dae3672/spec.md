@@ -14,6 +14,8 @@ auditoria: é bug visual reportado pelo autor no mesmo dia.
 | 03 | BUG-020 | modal de notícia fora do centro | P2 | — | agent |
 | 04 | DL-008 | Fragile 4 | P2 | — | agent |
 | 05 | CLEAN-011 | Slop: cortes pequenos, um commit cada | P3 | — | agent |
+| 06 | QA-012 | root cause do QA-011: `tsconfig` não vê `tests/` | P2 | — | agent |
+| 07 | CLEAN-012 | follow-up do QA-012: `IncomingCourse` e `deps: any` | P3 | — | agent |
 
 Nenhum ticket bloqueia outro; os Primary files não se cruzam. `CLEAN-011` toca
 `course-detail.ts` e `BUG-020` toca `course-detail.css`: arquivos diferentes.
