@@ -25,3 +25,9 @@ Tracker status at migration: (sem linha de status — débito aceito conscientem
 - `Stage: blocked` porque o débito foi aceito conscientemente, não porque
   alguém parou no meio. O motivo e o gatilho de desbloqueio estão no corpo,
   em "Por quê adiado" e "Gatilho".
+- **2026-09-17, verificacao (endoflife.date):** `41.10.7` esta **fora** da
+  faixa suportada. Majors suportadas hoje: 42 (EOL 2026-10-20), 43 (EOL
+  2027-01-05) e 44 (EOL 2027-03-02, lancada 2026-08-25). O 41 saiu de suporte em
+  2026-08-25. O debito nao fecha: precisa de novo ciclo de upgrade, alvo 44
+  (42 expira em um mes). Mesmo roteiro do `DEP-005`: subir, live smoke do
+  scraper no Windows, empacotar. Decisao do autor se abre `DEP-008`.
