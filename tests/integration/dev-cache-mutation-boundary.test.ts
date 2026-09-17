@@ -122,8 +122,10 @@ async function loadPreload(args: string[]) {
     // A sandboxed preload has no `app` export. Packaging authority belongs to main.
     vi.doMock('electron', () => ({ contextBridge: harness.contextBridge, ipcRenderer: harness.ipcRenderer }));
     harness.exposed.clear();
-    expect(harness.windowEnv.current).toBeDefined();
-    process.env = { ...harness.windowEnv.current };
+    const savedEnv = harness.windowEnv.current;
+    expect(savedEnv).toBeDefined();
+    if (!savedEnv) throw new Error('windowEnv.current não foi capturado');
+    process.env = { ...savedEnv };
     process.argv = ['electron-renderer', ...args];
     await import('../../electron/preload');
     expect(harness.exposed.get('api')).toBeDefined();

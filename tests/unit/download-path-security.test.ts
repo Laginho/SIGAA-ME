@@ -10,7 +10,7 @@
  * The object under test is the resolved path on disk, not a mock.
  */
 
-import { mkdtempSync, rmSync, symlinkSync, mkdirSync } from 'fs';
+import { mkdtempSync, rmSync, symlinkSync } from 'fs';
 import os from 'os';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';

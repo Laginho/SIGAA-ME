@@ -149,9 +149,10 @@ describe('audit download disk failures and collisions', () => {
 
         expect(resultA).toMatchObject({ success: true });
         expect(resultB).toMatchObject({ success: true });
+        if (!resultA.success || !resultB.success) throw new Error('esperava sucesso nos dois downloads');
         expect(resultA.filePath).not.toBe(resultB.filePath);
 
-        expect(readFileSync(resultA.filePath!, 'utf8')).toBe('conteudo-A');
-        expect(readFileSync(resultB.filePath!, 'utf8')).toBe('conteudo-B');
+        expect(readFileSync(resultA.filePath, 'utf8')).toBe('conteudo-A');
+        expect(readFileSync(resultB.filePath, 'utf8')).toBe('conteudo-B');
     });
 });

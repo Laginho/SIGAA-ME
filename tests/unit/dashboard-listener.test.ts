@@ -23,7 +23,7 @@ describe('handleBackgroundSyncUpdate', () => {
     quotaError.name = 'QuotaExceededError';
     const coursesKey = accountKey(ACCOUNT.id, 'courses');
     const originalSetItem = Storage.prototype.setItem;
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (key: string, value: string) {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, key: string, value: string) {
       if (key === coursesKey) throw quotaError;
       return originalSetItem.call(this, key, value);
     });
@@ -32,8 +32,8 @@ describe('handleBackgroundSyncUpdate', () => {
 
     expect(() => handleBackgroundSyncUpdate({
       accountId: ACCOUNT.id,
-      courses: [{ id: 'C1', news: [] }],
-      notifications: [{ id: 'N1', title: 'New item', read: false }],
+      courses: [{ id: 'C1', name: 'Course 1', code: 'C1', period: '2026.1', files: [], news: [], fileCount: 0 }],
+      notifications: [{ id: 'N1', type: 'news', courseId: 'C1', courseName: 'Course 1', itemId: 'n1', itemTitle: 'New item', timestamp: Date.now(), read: false }],
       timestamp: Date.now(),
     })).not.toThrow();
 
@@ -66,7 +66,7 @@ describe('handleBackgroundSyncUpdate', () => {
     quotaError.name = 'QuotaExceededError';
     const downloadsKey = accountKey(ACCOUNT.id, 'downloads');
     const originalSetItem = Storage.prototype.setItem;
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (key: string, value: string) {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, key: string, value: string) {
       if (key === downloadsKey) throw quotaError;
       return originalSetItem.call(this, key, value);
     });
@@ -74,8 +74,8 @@ describe('handleBackgroundSyncUpdate', () => {
 
     expect(() => handleBackgroundSyncUpdate({
       accountId: ACCOUNT.id,
-      courses: [{ id: 'C1', news: [] }],
-      notifications: [{ id: 'N1', title: 'New item', read: false }],
+      courses: [{ id: 'C1', name: 'Course 1', code: 'C1', period: '2026.1', files: [], news: [], fileCount: 0 }],
+      notifications: [{ id: 'N1', type: 'news', courseId: 'C1', courseName: 'Course 1', itemId: 'n1', itemTitle: 'New item', timestamp: Date.now(), read: false }],
       timestamp: Date.now(),
       downloads: [
         { courseId: 'c1', records: [{ fileId: 'f1', fileName: 'lista.pdf', status: 'downloaded', filePath: '/downloads/Course 1/lista.pdf' }] },
@@ -97,7 +97,7 @@ describe('handleBackgroundSyncUpdate', () => {
 
     handleBackgroundSyncUpdate({
       accountId: ACCOUNT.id,
-      courses: [{ id: 'A', name: 'Course A Updated', files: [], news: [] }],
+      courses: [{ id: 'A', name: 'Course A Updated', code: 'A', period: '2026.1', files: [], news: [], fileCount: 0 }],
       notifications: [],
       timestamp: Date.now(),
       incomplete: true,
@@ -117,7 +117,7 @@ describe('handleBackgroundSyncUpdate', () => {
 
     handleBackgroundSyncUpdate({
       accountId: ACCOUNT.id,
-      courses: [{ id: 'A', name: 'Course A Updated', files: [], news: [] }],
+      courses: [{ id: 'A', name: 'Course A Updated', code: 'A', period: '2026.1', files: [], news: [], fileCount: 0 }],
       notifications: [],
       timestamp: Date.now(),
     });

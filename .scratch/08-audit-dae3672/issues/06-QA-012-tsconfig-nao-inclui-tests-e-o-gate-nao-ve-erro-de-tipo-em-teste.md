@@ -1,6 +1,6 @@
 # QA-012: `tsconfig.json` não inclui `tests/`, e o gate não vê erro de tipo em arquivo de teste
 Status: open
-Stage: implementing
+Stage: to-review
 Priority: P2
 Blocked by: nenhum
 Review: agent

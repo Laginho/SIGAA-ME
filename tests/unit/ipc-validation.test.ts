@@ -242,24 +242,34 @@ describe('registerIpcHandlers: remetente, validação e cópia limpa', () => {
     function makeDeps(overrides: Record<string, any> = {}) {
         return {
             sigaaService: {
-                login: vi.fn(async () => ok({ name: 'ALUNO', username: 'aluno' })),
+                login: vi.fn(async () => ok({ id: 'a'.repeat(64), name: 'ALUNO' })),
                 getCourses: vi.fn(async () => ok({ courses: [] })),
                 getCourseFiles: vi.fn(async () => ok({ files: [], news: [] })),
                 downloadFile: vi.fn(async () => ok({ filePath: 'C:/root/a.pdf' })),
-                downloadAllFiles: vi.fn(async () => ok({ downloaded: [], failed: [] })),
+                downloadAllFiles: vi.fn(async () => ok({ downloaded: 0, skipped: 0, failed: 0, results: [] })),
                 getNewsDetail: vi.fn(async () => ok({ title: 'T', date: 'D', notification: '', content: '' })),
                 loadAllNews: vi.fn(async () => ok([])),
-                logout: vi.fn(async () => ok()),
+                logout: vi.fn(async () => {}),
             },
             persistence: {
-                getSettings: vi.fn(() => ({ lastDownloadPath: 'C:\\root' })),
+                getSettings: vi.fn(() => ({
+                    theme: 'light' as const, lastDownloadPath: 'C:\\root', runInBackground: true,
+                    syncInterval: 60, autoDownloadUpdates: true, openAtLogin: false,
+                })),
                 applySetting: vi.fn(),
                 updateSetting: vi.fn(),
                 saveCredentials: vi.fn(),
                 clearCredentials: vi.fn(),
                 loadCredentials: vi.fn(),
+                reset: vi.fn(),
             },
-            backgroundSync: { start: vi.fn() },
+            backgroundSync: { start: vi.fn(), stop: vi.fn(), cancel: vi.fn() },
+            cache: { clear: vi.fn() },
+            logger: { clear: vi.fn() },
+            diagnostics: { clear: vi.fn() },
+            compatibility: { status: vi.fn(() => ({ state: 'ok' as const })), recordSuccess: vi.fn(), clear: vi.fn() },
+            userDataPath: 'C:\\ud',
+            clearBrowserStorage: vi.fn(async () => undefined),
             getWindow: () => ({ webContents: { id: 7 } }),
             allowedOrigin: 'http://localhost:5173',
             isPackaged: false,
@@ -273,7 +283,7 @@ describe('registerIpcHandlers: remetente, validação e cópia limpa', () => {
     async function invoke(channel: string, payload: unknown = undefined, event: any = trustedEvent) {
         const handler = electronMock.handlers.get(channel);
         expect(handler).toBeDefined();
-        return await handler(event, payload);
+        return await handler!(event, payload);
     }
 
     beforeEach(() => {
@@ -414,12 +424,12 @@ describe('registerIpcHandlers: remetente, validação e cópia limpa', () => {
 
     it('test-simulate-new-file só é registrado fora de produção', () => {
         electronMock.handlers.clear();
-        registerIpcHandlers(makeDeps({ isPackaged: true }));
+        registerIpcHandlers(makeDeps({ isPackaged: true }) as never);
         expect(electronMock.handlers.has('test-simulate-new-file')).toBe(false);
         expect(electronMock.handlers.size).toBe(15);
 
         electronMock.handlers.clear();
-        registerIpcHandlers(makeDeps({ isPackaged: false }));
+        registerIpcHandlers(makeDeps({ isPackaged: false }) as never);
         expect(electronMock.handlers.has('test-simulate-new-file')).toBe(true);
         expect(electronMock.handlers.size).toBe(16);
     });

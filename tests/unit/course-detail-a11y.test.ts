@@ -204,7 +204,7 @@ describe('course-detail: nome acessível do modal antes do conteúdo carregar', 
         const modal = document.getElementById('newsModal') as HTMLDialogElement;
         expect(modal.open).toBe(true);
         const labelledBy = modal.getAttribute('aria-labelledby');
-        const label = labelledBy && document.getElementById(labelledBy);
+        const label = labelledBy ? document.getElementById(labelledBy) : null;
         expect(label?.textContent).toBe('Carregando notícia...');
     });
 
@@ -219,7 +219,7 @@ describe('course-detail: nome acessível do modal antes do conteúdo carregar', 
         await flushAll();
         const modal = document.getElementById('newsModal') as HTMLDialogElement;
         const labelledBy = modal.getAttribute('aria-labelledby');
-        const label = labelledBy && document.getElementById(labelledBy);
+        const label = labelledBy ? document.getElementById(labelledBy) : null;
         expect(label?.textContent).toBe('Erro ao carregar notícia');
     });
 
@@ -231,7 +231,7 @@ describe('course-detail: nome acessível do modal antes do conteúdo carregar', 
         await flushAll();
         const modal = document.getElementById('newsModal') as HTMLDialogElement;
         const labelledBy = modal.getAttribute('aria-labelledby');
-        const label = labelledBy && document.getElementById(labelledBy);
+        const label = labelledBy ? document.getElementById(labelledBy) : null;
         expect(label?.textContent).toBe('Erro ao carregar notícia');
     });
 });
