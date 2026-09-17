@@ -31,12 +31,13 @@ import {
     pushNotifications,
 } from '../../src/utils/notification-store';
 import { isNewsCached, mergeCoursesIntoCache } from '../../src/utils/ui-helpers';
+import type { CourseSnapshot } from '../../shared/domain';
 
 const A = { id: 'acc-a', name: 'ALUNO A' };
 const A_PHOTO = 'https://si3.ufc.br/sigaa/verFoto?id=a';
 const B = { id: 'acc-b', name: 'ALUNO B' };
 
-const COURSE_A = {
+const COURSE_A: CourseSnapshot = {
     id: 'c1', name: 'Estruturas de Dados', code: 'CK0210', period: '2026.1', fileCount: 1,
     files: [{ id: '555', name: 'Lista 1.pdf', type: 'file' }],
     news: [{ id: 'n1', title: 'Prova adiada', date: '01/09/2026', notification: '', content: '<p>Prova dia 10.</p>' }],
