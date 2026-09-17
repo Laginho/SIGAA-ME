@@ -210,6 +210,43 @@ describe('Sync: error state', () => {
 
         expect(attempt).toBe(2); // getCourses was called a second time
     });
+
+    it('marks everything behind the overlay inert while it is mounted (A11Y-004)', () => {
+        const app = buildApp();
+        renderSyncSelectionPage(app);
+        (window as any).api.getCourses = vi.fn().mockReturnValue(new Promise(() => { }));
+        document.getElementById('btnFastSync')?.click();
+
+        const children = [...app.children];
+        const overlay = app.querySelector('.sync-progress-overlay');
+        expect(children.length).toBeGreaterThan(1);
+        for (const el of children) {
+            expect(el.hasAttribute('inert')).toBe(el !== overlay);
+        }
+    });
+
+    it('lifts inert from the covered content when the overlay is removed (A11Y-004)', async () => {
+        const app = buildApp();
+        renderSyncSelectionPage(app);
+        let attempt = 0;
+        (window as any).api.getCourses = vi.fn().mockImplementation(async () => {
+            attempt++;
+            if (attempt === 1) throw new Error('fail once');
+            return new Promise(() => { });
+        });
+        document.getElementById('btnFastSync')?.click();
+        for (let i = 0; i < 10; i++) await flushAll();
+        const firstOverlay = app.querySelector('.sync-progress-overlay')!;
+
+        document.getElementById('retryBtn')?.click();
+
+        // The old overlay left; the new one is the only child without inert.
+        expect(firstOverlay.isConnected).toBe(false);
+        expect(app.querySelectorAll('.sync-progress-overlay').length).toBe(1);
+        for (const el of app.children) {
+            expect(el.hasAttribute('inert')).toBe(!el.classList.contains('sync-progress-overlay'));
+        }
+    });
 });
 
 describe('Sync: selector drift (QA-003)', () => {
