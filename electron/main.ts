@@ -151,7 +151,6 @@ function createWindow() {
     icon: path.join(process.env.VITE_PUBLIC, 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
-      additionalArguments: app.isPackaged ? [] : ['--sigaa-dev'],
       // Explícitos por documentação (SEC-003): já são o efetivo no Electron 41,
       // mas ninguém deveria precisar saber disso para auditar a janela.
       contextIsolation: true,

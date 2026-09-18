@@ -5,7 +5,7 @@
  *
  * - O `api` exposto via `exposeInMainWorld` não contém `simulateNewFile` nem
  *   IPC genérico. A autorização de `testApi` pelo main, inclusive quando o
- *   preload recebe `--sigaa-dev` em produção, é coberta por
+ *   preload recebe argv de dev em produção, é coberta por
  *   `tests/integration/dev-cache-mutation-boundary.test.ts` (DEV-001).
  * - Os eventos `download-progress` e `background-sync-update` chamam o
  *   callback com **um** argumento (só o dado), e o `unsubscribe` devolvido
@@ -34,10 +34,7 @@ vi.mock('electron', () => ({
     ipcRenderer: ipcMock,
 }));
 
-let originalArgv: string[];
-
 beforeEach(() => {
-    originalArgv = process.argv;
     delete process.env.SIGAA_DEV_BRIDGE;
     vi.resetModules();
     contextBridgeMock.exposeInMainWorld.mockClear();
@@ -47,7 +44,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-    process.argv = originalArgv;
     vi.clearAllMocks();
 });
 
@@ -79,7 +75,6 @@ describe('preload dev gate', () => {
     });
 
     it('onDownloadProgress repassa só o dado e devolve unsubscribe do mesmo subscription', async () => {
-        process.argv = originalArgv.filter(a => a !== '--sigaa-dev');
         await importPreload();
         const api = apiObject();
 
@@ -101,7 +96,6 @@ describe('preload dev gate', () => {
     });
 
     it('onBackgroundSyncUpdate repassa só o dado e devolve unsubscribe do mesmo subscription', async () => {
-        process.argv = originalArgv.filter(a => a !== '--sigaa-dev');
         await importPreload();
         const api = apiObject();
 
@@ -123,7 +117,6 @@ describe('preload dev gate', () => {
     });
 
     it('loadAllNews envia um único objeto CourseRequest', async () => {
-        process.argv = originalArgv.filter(a => a !== '--sigaa-dev');
         await importPreload();
         const api = apiObject();
 
