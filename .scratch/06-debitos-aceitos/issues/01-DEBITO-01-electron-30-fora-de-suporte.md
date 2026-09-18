@@ -1,6 +1,6 @@
 # DÉBITO-01 — Electron 30 fora de suporte
-Status: open
-Stage: blocked
+Status: resolved
+Stage: done
 Priority: —
 Tracker status at migration: (sem linha de status — débito aceito conscientemente)
 
@@ -33,3 +33,7 @@ Tracker status at migration: (sem linha de status — débito aceito conscientem
   scraper no Windows, empacotar. Decisao do autor se abre `DEP-008`.
 - 2026-09-17: aberto o `DEP-008` (`.scratch/08-audit-dae3672/`) para o upgrade
   a 44. Este debito fecha junto com ele.
+- **2026-09-17, fechado:** `DEP-008` mergeado (PR #47, commit `624f68f`).
+  Electron `41.10.7` → `44.4.1`, dentro das majors suportadas (44 tem EOL em
+  2027-03-02). Gate verde, empacotamento Windows e live smoke do scraper (6/6)
+  rodados pelo autor antes do merge.

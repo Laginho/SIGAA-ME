@@ -1,6 +1,6 @@
 # DEP-008: Subir o Electron de 41 para 44 (41 saiu de suporte)
-Status: open
-Stage: to-merge
+Status: resolved
+Stage: done
 Priority: P2
 Blocked by: nenhum
 Review: human
