@@ -67,7 +67,7 @@ describe('course-detail: navegação com "carregar notícias" pendente (BUG-022 
 });
 
 describe('course-detail: fechar e reabrir o modal com pedido pendente (BUG-022 achado 2)', () => {
-    it('resposta de n1 (fechada) não substitui o conteúdo de n2 (aberta), nem no sucesso nem no erro', async () => {
+    it('resposta de n1 (fechada) não substitui o conteúdo de n2 (aberta) no ramo de sucesso', async () => {
         writeAccountItem('courses', JSON.stringify([
             {
                 id: 'c1', name: 'Cálculo I', code: 'CB0001', files: [],
