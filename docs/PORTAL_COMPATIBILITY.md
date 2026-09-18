@@ -207,6 +207,21 @@ real user population — a student with none does not install the app — so
 `getCourses` now reports it as an error (`NOT_FOUND`, not `SELECTOR_DRIFT`)
 instead of succeeding silently with `courses: []`.
 
+A third category sits between those two (PORTAL-013): a page whose course
+rows exist but cannot all be interpreted. `extractCourseList` treats every
+`<tr>` carrying `input[name="idTurma"]` as a candidate, and a candidate has
+exactly two possible outcomes. With a `turmaVirtual` link and non-empty text
+it becomes a course — without the ` - ` separator the code is left empty and
+the whole text becomes the name, which is degradation, logged with a count.
+Without a link, or with empty link text, `getCourses` fails with
+`SELECTOR_DRIFT` ("N de M linhas"), records a structural diagnostic and
+closes the browser. It never succeeds with fewer courses than candidate rows:
+a partial list is never allowed to replace the cache, and in the renderer any
+entry rejected by the shape guard aborts the sync with the previous cache left
+intact. `SELECTOR_DRIFT` is the right code here, unlike the zero-row case:
+the selectors exist and the structure relating them changed, which is the
+documented meaning of the code.
+
 ## Structural fingerprints
 
 A fingerprint should detect layout change without retaining personal text.
