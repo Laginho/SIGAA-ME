@@ -1,6 +1,6 @@
 # BUG-023: Resposta tardia de Configurações não substitui a rota seguinte
 Status: open
-Stage: to-implement
+Stage: implementing
 Priority: P2
 Blocked by: nenhum
 Review: agent
