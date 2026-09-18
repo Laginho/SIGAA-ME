@@ -370,6 +370,13 @@ async function fetchCourseFiles(courseId: string, generation: number) {
         });
       });
 
+      // BUG-022 achado 3: o await de checkFilesExistence acima pode ter
+      // suspendido por tempo suficiente para outra montagem assumir
+      // `cleanupProgress`. Reavaliar a geração aqui, antes de tocar nele —
+      // as escritas de DOM anteriores neste bloco caem em nós já destacados
+      // pela nova montagem e são inofensivas, mas isto não é.
+      if (generation !== currentPageGeneration) return
+
       // Listen for progress events from "Download All"
       if (cleanupProgress) cleanupProgress();
 
