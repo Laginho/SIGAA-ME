@@ -1,6 +1,6 @@
 # BUG-022: Resposta assíncrona antiga sobrescreve a disciplina ou a notícia que o usuário está vendo
-Status: open
-Stage: reviewing
+Status: resolved
+Stage: done
 Priority: P1
 Blocked by: nenhum
 Review: agent
@@ -111,3 +111,73 @@ Sem achado nas demais frentes: o incremento de `currentModalGeneration` no
 remontar a página deixa a geração igual, mas aí os `getElementById` voltam
 `null` e a guarda de `:180` já corta; nenhum `any` novo, nenhum `innerHTML` com
 dado do SIGAA, nenhum canal IPC tocado.
+
+#### Resolution (2026-09-18)
+
+Verdict: Approve
+
+Decisão: mesclada na branch de sessão `sweatshop/2026-09-18-0902` em `2108ee1`
+(`--no-ff`). Rebase dispensado: a ponta da sessão (`b77e816`) já era ancestral
+da branch pelo merge `f95f0c7`, a árvore do merge é idêntica à de `bug-022`
+(`git diff --stat bug-022 HEAD` vazio) e rebasear reescreveria os hashes citados
+acima.
+
+Arquivos: `src/pages/course-detail.ts` (+47/-9 sobre a base),
+`tests/unit/course-detail-stale-response.test.ts` (novo, 3 testes), este ticket.
+
+Commits: `f94fd5e` (testes dos achados 1 e 2), `c06977a` (geração por montagem e
+por abertura do modal), `f79c378` (teste do achado 3), `35f2bfb` (guarda antes de
+`cleanupProgress`), `fde007a` (revisão: título do teste 2, só texto). `git show
+--stat` por commit: nenhum mistura teste e código.
+
+Prova vermelho-verde, `npx vitest run tests/unit/course-detail-stale-response.test.ts`:
+
+- fonte na base da sessão: `Tests 3 failed (3)` — `expected 'Course One' to be
+  'Course Two'`, `expected 'First' to be 'Second'`, `expected "vi.fn()" to not
+  be called at all, but actually been called 1 times`;
+- fonte em `c06977a` (só a primeira correção): `1 failed | 2 passed (3)`, o do
+  achado 3;
+- fonte em HEAD: `3 passed (3)`.
+
+Gate `npm run quality` (2026-09-18, antes e depois de `fde007a`): typecheck
+limpo; ESLint 0 erros, 40 warnings (`no-explicit-any` legado, nenhum novo);
+vitest `Test Files 72 passed (72)`, `Tests 806 passed | 5 skipped (811)`.
+
+Critérios: 1 ✅ (`fetchCourseFiles` retorna em `:173` com geração diferente;
+`recordDownloads`/`mergeCoursesIntoCache` rodam antes), 2 ✅ (sucesso `:633`,
+erro `:636`, exceção `:643`; cache gravado antes da guarda), 3 ✅
+(`course-detail.test.ts` e `course-detail-a11y.test.ts` sem edição, 22 verdes),
+4 ✅ (três testes, vermelhos pelo motivo certo), 5 ✅, 6 ✅ (guarda em `:378`,
+depois do `writeAccountItem('downloads')` e antes do `cleanupProgress`).
+
+Standards (Sonnet, cego): nenhuma violação do `CLAUDE.md`; `(window as any).api`
+no teste é a convenção dos outros 9 arquivos de teste. Dois smells da baseline
+(Duplicated Code na forma capturar/comparar, Primitive Obsession nos contadores)
+descartados: o ticket pede "dois inteiros e três `if`" e a regra 7 veda abstração.
+
+Spec (Opus, cego), o que não virou reabertura e por quê:
+
+- Cobertura: o teste do achado 1 dispara "carregar notícias", não o lote; os
+  três gatilhos do critério 1 passam pela mesma guarda de `:173`. O teste do
+  achado 2 exercita só o ramo de sucesso; os ramos de erro têm a mesma guarda em
+  código. O título dizia "nem no sucesso nem no erro" — corrigido em `fde007a`.
+- Remontar a página com o modal aberto destrói o `<dialog>` sem evento `close`,
+  e a geração do modal não muda: a resposta pendente escreveria em
+  `#modalTitle`/`#modalMeta` da montagem nova, fechados e sobrescritos na
+  abertura seguinte. Só alcançável por navegação programática (o fundo fica
+  inerte com o modal aberto); sem efeito visível.
+- No browser o `close` é tarefa enfileirada (o polyfill de `tests/setup.ts` é
+  síncrono): resposta que chegue entre `modal.close()` e o evento renderiza num
+  dialog fechado e é sobrescrita na abertura seguinte. Sem efeito visível.
+- Toasts de lote de montagem abandonada continuam: avisam que o lote que o
+  usuário iniciou terminou; não são escrita na página.
+
+## Comments
+
+Limitação conhecida (revisão 2026-09-18): a geração identifica a montagem, não
+a disciplina. Sair de `c1` com lote em andamento e voltar a `c1` antes de ele
+terminar remonta a página, e a atualização final do lote é descartada: arquivos
+concluídos antes da volta ficam ⬇️ até a próxima montagem (o listener de
+progresso da montagem nova cobre os concluídos depois, e o toast de conclusão
+chega). O ticket prescreveu identidade de montagem; comparar por `courseId`
+resolveria este caso e é a troca a considerar se incomodar.
