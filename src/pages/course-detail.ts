@@ -10,7 +10,20 @@ import type { CourseSnapshot } from '../../shared/domain'
 /** Desliga o listener de progresso da renderização anterior desta página (uma por módulo, nunca duas telas ao mesmo tempo). */
 let cleanupProgress: (() => void) | null = null
 
+/**
+ * Identidade de montagem (BUG-022): incrementada a cada `renderCourseDetailPage`.
+ * Uma operação assíncrona iniciada por uma montagem anterior compara a geração
+ * que capturou antes do `await` com esta antes de escrever no DOM global —
+ * se mudou, a disciplina atual não é mais a que iniciou o pedido.
+ */
+let currentPageGeneration = 0
+/** Mesma ideia, por abertura do modal de notícia — invalidada ao fechar. */
+let currentModalGeneration = 0
+
 export function renderCourseDetailPage(container: HTMLDivElement, courseId: string) {
+  currentPageGeneration += 1
+  const pageGeneration = currentPageGeneration
+
   container.innerHTML = `
     <div class="course-detail-page">
       <div class="course-header">
@@ -73,7 +86,7 @@ export function renderCourseDetailPage(container: HTMLDivElement, courseId: stri
   // Download all button handler
   const downloadAllBtn = document.getElementById('downloadAllBtn')
   downloadAllBtn?.addEventListener('click', async () => {
-    await testDownloadAll(courseId)
+    await testDownloadAll(courseId, pageGeneration)
   })
 
   // Load All News handler
@@ -103,7 +116,7 @@ export function renderCourseDetailPage(container: HTMLDivElement, courseId: stri
           // pelo `id` — a semântica que este ponto já tinha.
           mergeCoursesIntoCache([course], { keepTimestamp: true });
           // Refresh UI
-          fetchCourseFiles(courseId);
+          fetchCourseFiles(courseId, pageGeneration);
         }
         btn.textContent = '✅ Concluído';
         setTimeout(() => {
@@ -124,7 +137,7 @@ export function renderCourseDetailPage(container: HTMLDivElement, courseId: stri
   })
 
   // Fetch course files
-  fetchCourseFiles(courseId)
+  fetchCourseFiles(courseId, pageGeneration)
 
   // Não existe pausa de sync. Havia aqui uma chamada a `api.pauseSync()` com
   // cast `as any` e try/catch: nem o preload expõe isso, nem o main tem handler
@@ -153,7 +166,12 @@ function markSeenOnHover(item: Element, type: 'file' | 'news', courseId: string,
   item.addEventListener('mouseenter', () => clearUnread(item, type, courseId, itemId), { once: true });
 }
 
-async function fetchCourseFiles(courseId: string) {
+async function fetchCourseFiles(courseId: string, generation: number) {
+  // BUG-022: esta chamada pode vir de uma montagem anterior que já saiu de
+  // tela (conclusão de um lote ou de "carregar notícias" pendente). O cache já
+  // foi atualizado por quem chamou; só falta não desenhar por cima da página atual.
+  if (generation !== currentPageGeneration) return
+
   const filesListElement = document.getElementById('filesList')
   const newsListElement = document.getElementById('newsList')
   const courseTitleElement = document.getElementById('courseTitle')
@@ -426,7 +444,7 @@ async function downloadSingleFile(course: CourseSnapshot, fileId: string, fileNa
   }
 }
 
-async function testDownloadAll(courseId: string) {
+async function testDownloadAll(courseId: string, generation: number) {
   console.log('Testing download all for course:', courseId);
 
   try {
@@ -490,11 +508,11 @@ async function testDownloadAll(courseId: string) {
     } else {
       toast.error('Falha no download: ' + result.error.message);
     }
-    fetchCourseFiles(courseId);
+    fetchCourseFiles(courseId, generation);
   } catch (error: any) {
     console.error('Download error:', error);
     toast.error('Erro no processo de download: ' + error.message);
-    fetchCourseFiles(courseId);
+    fetchCourseFiles(courseId, generation);
   }
 }
 
@@ -507,6 +525,9 @@ async function openNewsModal(courseId: string, courseName: string, newsId: strin
   const closeBtn = modal?.querySelector('.modal-close')
 
   if (!modal || !modalBody) return
+
+  currentModalGeneration += 1
+  const modalGeneration = currentModalGeneration
 
   // Título e meta de carregamento: sobrescritos de imediato se vier do cache,
   // ou depois do fetch — nunca ficam sem nome acessível nem com a data/
@@ -537,6 +558,10 @@ async function openNewsModal(courseId: string, courseName: string, newsId: strin
   modal.addEventListener('close', () => {
     modal.removeEventListener('click', onBackdropClick)
     closeBtn?.removeEventListener('click', close)
+    // BUG-022: invalida esta abertura — uma resposta pendente para ela não
+    // deve mais renderizar, mesmo que o modal seja reaberto sem uma nova
+    // notícia ainda ter incrementado a geração.
+    currentModalGeneration += 1
   }, { once: true })
 
   try {
@@ -595,14 +620,20 @@ async function openNewsModal(courseId: string, courseName: string, newsId: strin
         toast.error(e instanceof Error ? e.message : 'Falha ao guardar a notícia offline.');
       }
 
-      renderNewsIntoModal(modalBody, news.title, news.date, news.notification, news.content)
-    } else {
+      // BUG-022: o cache acima é gravado de qualquer forma — pertence à
+      // conta. Só a escrita no modal compartilhado é condicionada a esta
+      // abertura ainda ser a atual.
+      if (modalGeneration === currentModalGeneration) {
+        renderNewsIntoModal(modalBody, news.title, news.date, news.notification, news.content)
+      }
+    } else if (modalGeneration === currentModalGeneration) {
       if (modalTitle) modalTitle.textContent = 'Erro ao carregar notícia'
       modalBody.replaceChildren(
         h('div', { className: 'error-message' }, 'Erro ao carregar notícia: ' + result.error.message),
       )
     }
   } catch (error: any) {
+    if (modalGeneration !== currentModalGeneration) return
     if (modalTitle) modalTitle.textContent = 'Erro ao carregar notícia'
     modalBody.replaceChildren(
       h('div', { className: 'error-message' }, 'Erro ao carregar notícia: ' + error.message),
