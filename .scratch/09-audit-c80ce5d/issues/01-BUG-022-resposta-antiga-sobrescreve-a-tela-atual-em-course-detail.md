@@ -1,6 +1,6 @@
 # BUG-022: Resposta assíncrona antiga sobrescreve a disciplina ou a notícia que o usuário está vendo
 Status: open
-Stage: implementing
+Stage: to-review
 Priority: P1
 Blocked by: nenhum
 Review: agent
