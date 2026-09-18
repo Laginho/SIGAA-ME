@@ -1,6 +1,6 @@
 # PORTAL-013: Linha de turma reconhecida nunca é descartada em silêncio; lista parcial não substitui o cache
 Status: open
-Stage: blocked
+Stage: implementing
 Priority: P1
 Blocked by: nenhum
 Review: agent

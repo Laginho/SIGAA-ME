@@ -12,7 +12,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { readAccountItem, setActiveAccount, writeAccountItem } from '../../src/data/account-storage';
+import { readAccountItem, readCoursesCache, setActiveAccount, writeAccountItem } from '../../src/data/account-storage';
 import { renderSyncSelectionPage } from '../../src/pages/sync-selection';
 
 // DATA-001: sincronizar exige conta ativa; o cache é gravado no escopo dela.
@@ -268,6 +268,29 @@ describe('Sync: selector drift (QA-003)', () => {
         expect(overlay?.textContent).toContain('1 disciplina(s) em formato desconhecido');
         expect((window as any).api.getCourseFiles).not.toHaveBeenCalled();
         expect(readAccountItem('courses')).toBeNull();
+    });
+
+    it('fails loudly when only SOME entries are malformed, keeping the previous cache intact instead of replacing it with the partial set (PORTAL-013)', async () => {
+        const before = [
+            { id: 'c1', name: 'Cálculo I', code: 'CB0001', files: [], news: [{ id: 'n1', title: 'Aviso', date: '01/01/2026', notification: '' }], fileCount: 0 },
+            { id: 'c2', name: 'Física II', code: 'CB0002', files: [{ id: '7', name: 'Lista.pdf', type: 'file' }], news: [], fileCount: 1 },
+        ];
+        writeAccountItem('courses', JSON.stringify(before));
+        (window as any).api.getCourses = vi.fn().mockResolvedValue({
+            success: true,
+            data: { courses: [{ id: 'c1', name: 'Cálculo I', code: 'CB0001', period: '2026.1' }, { id: 'c2' }] },
+        });
+
+        const app = buildApp();
+        renderSyncSelectionPage(app);
+        document.getElementById('btnFastSync')?.click();
+        for (let i = 0; i < 20; i++) await flushAll();
+
+        const overlay = app.querySelector('.sync-progress-overlay');
+        expect(overlay?.textContent).toContain('2 disciplina(s) em formato desconhecido');
+        expect(overlay?.textContent).not.toContain('Finalizado!');
+        expect((window as any).api.getCourseFiles).not.toHaveBeenCalled();
+        expect(readCoursesCache()).toEqual(before);
     });
 });
 
