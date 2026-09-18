@@ -1,6 +1,6 @@
 # CLEAN-015: leg empacotada do `DEV-001` ficou sem entrada adversarial de argv
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P3
 Blocked by: nenhum
 Review: agent
@@ -49,3 +49,10 @@ com o token literal `--sigaa-dev` e retirar as afirmações que hoje falam sobre
   preload que não é commitada.
 
 ## Comments
+
+- 2026-09-18, stage 2: prova do critério 3 feita localmente, sem commit. Com
+  `preload.ts:78` alterado para `=== '1' || process.argv.includes('--sigaa-dev')`,
+  `npx vitest run tests/integration/dev-cache-mutation-boundary.test.ts` deu
+  `2 failed | 2 passed (4)`, ambos em `:181` (`expected true to be false`, o
+  `testApi` da leg empacotada). Preload revertido: `4 passed (4)`. Gate:
+  72 arquivos, 806 passed | 5 skipped.
