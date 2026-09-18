@@ -3,7 +3,11 @@ import { toast } from '../components/toast';
 import { h } from '../utils/dom';
 
 export async function renderSettingsPage(container: HTMLDivElement) {
+  // O roteador não invalida montagens: se o usuário navegou enquanto o IPC
+  // estava pendente, o container já pertence a outra rota (BUG-023).
+  const routeAtMount = window.location.hash;
   const settings = await window.api.getSettings();
+  if (window.location.hash !== routeAtMount) return;
 
   container.innerHTML = `
     <div class="settings-page">
