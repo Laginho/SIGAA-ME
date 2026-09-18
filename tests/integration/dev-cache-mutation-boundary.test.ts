@@ -108,7 +108,8 @@ async function bootMain(isPackaged: boolean) {
     harness.buildFromTemplate.mockClear();
     harness.syncNow.mockClear();
     Object.assign(console, originalConsole);
-    process.argv = ['electron', '.', '--sigaa-dev'];
+    // Main reads no dev flag from argv: the bridge is decided by `app.isPackaged`.
+    process.argv = ['electron', '.'];
     delete process.env.VITE_DEV_SERVER_URL;
     await import('../../electron/main');
     const options = harness.BrowserWindow.mock.calls[0]?.[0];
@@ -135,7 +136,7 @@ async function loadPreload(args: string[]) {
 
 describe('DEV-001: packaging controls the cache mutation bridge', () => {
     it.each(['production', 'development'])(
-        'packaged preload rejects --sigaa-dev with NODE_ENV=%s, while unpackaged E2E still works',
+        'packaged preload ignores a literal --sigaa-dev in its own argv with NODE_ENV=%s, while unpackaged E2E still works',
         async (nodeEnv) => {
             process.env.NODE_ENV = nodeEnv;
             const devArgs = await bootMain(false);
@@ -166,7 +167,6 @@ describe('DEV-001: packaging controls the cache mutation bridge', () => {
             expect(harness.syncNow).toHaveBeenCalledTimes(1);
 
             const productionArgs = await bootMain(true);
-            expect(productionArgs).not.toContain('--sigaa-dev');
             expect(harness.buildFromTemplate.mock.calls[0][0].filter(item => item.label).map(item => item.label))
                 .toEqual(['Abrir SIGAA-ME', 'Sincronizar Agora', 'Sair']);
             expect(harness.handlers.has('test-simulate-new-file')).toBe(false);
@@ -174,9 +174,10 @@ describe('DEV-001: packaging controls the cache mutation bridge', () => {
             expect(harness.exposed.has('testApi')).toBe(false);
 
             const cacheBefore = new Map(harness.files);
-            // Deliberately feed the packaged preload the exact argv the unpackaged
-            // main injected, whatever token it uses: argv alone cannot grant access.
-            await loadPreload([...productionArgs, ...devArgs]);
+            // Adversarial input, literal on purpose: main injects no flag any more
+            // (CLEAN-014), so the token has to come from the test itself. A preload
+            // that trusted `argv.includes('--sigaa-dev')` would expose testApi here.
+            await loadPreload([...productionArgs, '--sigaa-dev']);
             expect.soft(harness.exposed.has('testApi')).toBe(false);
             expect(harness.files).toEqual(cacheBefore);
             expect(harness.syncNow).not.toHaveBeenCalled();
