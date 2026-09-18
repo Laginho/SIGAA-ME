@@ -4,8 +4,7 @@
  * Consequências de tirar a ponte `ipcRenderer` e isolar o `simulateNewFile`:
  *
  * - O `api` exposto via `exposeInMainWorld` não contém `simulateNewFile` nem
- *   IPC genérico. A autorização de `testApi` pelo main, inclusive quando o
- *   preload recebe argv de dev em produção, é coberta por
+ *   IPC genérico. A autorização de `testApi` pelo main é coberta por
  *   `tests/integration/dev-cache-mutation-boundary.test.ts` (DEV-001).
  * - Os eventos `download-progress` e `background-sync-update` chamam o
  *   callback com **um** argumento (só o dado), e o `unsubscribe` devolvido
