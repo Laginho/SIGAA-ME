@@ -116,3 +116,48 @@ describe('course-detail: fechar e reabrir o modal com pedido pendente (BUG-022 a
         expect(n1?.content).toBe('First content');
     });
 });
+
+describe('course-detail: continuação de fetchCourseFiles de montagem anterior não deve tocar o listener de progresso atual (BUG-022 achado 3)', () => {
+    it('resolver checkFilesExistence de c1 depois de c2 montada não desliga nem substitui o cleanupProgress de c2', async () => {
+        writeAccountItem('courses', JSON.stringify([
+            { id: 'c1', name: 'Course One', code: 'C1', files: [{ id: 'f1', name: 'f1.pdf' }], news: [] },
+            { id: 'c2', name: 'Course Two', code: 'C2', files: [{ id: 'f2', name: 'f2.pdf' }], news: [] },
+        ]));
+        writeAccountItem('downloads', JSON.stringify({
+            c1: { f1: { path: 'C:/Users/aluno/SIGAA/f1.pdf' } },
+        }));
+
+        let resolveCheckFilesExistence!: (value: unknown) => void;
+        const cleanupC1 = vi.fn();
+        const cleanupC2 = vi.fn();
+        const onDownloadProgress = vi.fn()
+            .mockImplementationOnce(() => cleanupC2)
+            .mockImplementationOnce(() => cleanupC1);
+
+        (window as any).api = {
+            checkFilesExistence: vi.fn(() => new Promise(resolve => { resolveCheckFilesExistence = resolve; })),
+            onDownloadProgress,
+        };
+
+        const container = document.createElement('div');
+        document.body.appendChild(container);
+
+        // c1 tem download registrado: fetchCourseFiles fica pendurado no
+        // await de checkFilesExistence antes de chegar no cleanupProgress.
+        renderCourseDetailPage(container, 'c1');
+
+        // c2 não tem download registrado: nenhum await no caminho, registra
+        // seu próprio listener de progresso de forma síncrona.
+        renderCourseDetailPage(container, 'c2');
+        for (let i = 0; i < 10; i++) await flushAll();
+
+        expect(onDownloadProgress).toHaveBeenCalledTimes(1);
+
+        // A resposta de checkFilesExistence de c1 chega agora.
+        resolveCheckFilesExistence(ok([{ path: 'C:/Users/aluno/SIGAA/f1.pdf', exists: true }]));
+        for (let i = 0; i < 10; i++) await flushAll();
+
+        expect(cleanupC2).not.toHaveBeenCalled();
+        expect(onDownloadProgress).toHaveBeenCalledTimes(1);
+    });
+});
