@@ -16,13 +16,18 @@ const runtime = vi.hoisted(() => {
 vi.mock('axios', () => ({ default: runtime.axios }));
 vi.mock('playwright', () => ({ chromium: runtime.chromium }));
 vi.mock('electron', () => ({ app: { isPackaged: true, getPath: () => 'C:/tmp/portal-tests' } }));
-vi.mock('fs', () => ({ createWriteStream: () => runtime.stream }));
+vi.mock('fs', async importOriginal => {
+    const actual = await importOriginal<typeof import('fs')>();
+    return { ...actual, createWriteStream: () => runtime.stream };
+});
 vi.mock('../../electron/services/logger.service', () => ({ logger: runtime.logger }));
 
+import { readFileSync } from 'fs';
+import path from 'path';
 import { HttpScraperService } from '../../electron/services/http-scraper.service';
 import { PlaywrightLoginService } from '../../electron/services/playwright-login.service';
 import { SigaaService } from '../../electron/services/sigaa.service';
-import { validateCourseListDocument } from '../../electron/sigaa/portal-adapter';
+import { PORTAL_ADAPTER_VERSION, extractCourseList, validateCourseListDocument } from '../../electron/sigaa/portal-adapter';
 
 // Synthetic documents, never captured from an authenticated session.
 const loginHtml = '<form action="/sigaa/logar.do"><input name="user.login"><input name="user.senha"><input name="entrar" type="submit"></form>';
@@ -166,4 +171,81 @@ describe('PORTAL-001: production service compatibility boundary', () => {
             });
         }
     );
+});
+
+describe('PORTAL-013: course list extraction is a pure adapter function', () => {
+    const fixture = (name: string) =>
+        readFileSync(path.join(process.cwd(), 'tests/fixtures/sigaa', PORTAL_ADAPTER_VERSION, name), 'utf8');
+
+    function row(id: string, cell: string) {
+        return `<tr><td><input type="hidden" name="idTurma" value="${id}"></td><td>${cell}</td></tr>`;
+    }
+    function link(id: string, text: string) {
+        return `<a id="formTurma:turmaVirtual${id}" href="#" onclick="jsfcljs(document.forms['formTurma'],'idTurma,${id}','');return false;">${text}</a>`;
+    }
+    const portal = (rows: string) => `<h1>Portal do Discente</h1><form name="formTurma"><table>${rows}</table></form>`;
+
+    it('extracts every course of the realistic populated fixture with id, code, name and period filled', () => {
+        const result = extractCourseList(fixture('student-portal-populated.html'));
+
+        expect(result.success).toBe(true);
+        if (!result.success) return;
+        expect(result.courses).toHaveLength(3);
+        expect(result.degraded).toBe(0);
+        for (const course of result.courses) {
+            expect(course.id).toMatch(/^\d+$/);
+            expect(course.code).toMatch(/^[A-Z]{2}\d{4}$/);
+            expect(course.name.length).toBeGreaterThan(0);
+            expect(course.period).toBe('2026.1');
+            expect(course.onclick).toContain('jsfcljs');
+        }
+        expect(result.courses[0]).toMatchObject({ id: '99991', code: 'CB0001', name: 'Cálculo I' });
+        // Only the first ` - ` splits: the rest of the text stays in the name.
+        expect(result.courses[2]).toMatchObject({ code: 'CK0181', name: 'Programação Orientada a Objetos - Turma B' });
+    });
+
+    it('keeps a candidate without the " - " separator as a course with empty code and the whole text as name (degradation, not loss)', () => {
+        const result = extractCourseList(portal(
+            row('1', link('1', 'CK0001 - Course One')) +
+            row('2', link('2', 'CK0002 – Course Two'))
+        ));
+
+        expect(result.success).toBe(true);
+        if (!result.success) return;
+        expect(result.courses).toHaveLength(2);
+        expect(result.degraded).toBe(1);
+        expect(result.courses[0]).toMatchObject({ id: '1', code: 'CK0001', name: 'Course One' });
+        expect(result.courses[1]).toMatchObject({ id: '2', code: '', name: 'CK0002 – Course Two' });
+    });
+
+    it('fails with SELECTOR_DRIFT when a candidate row has no virtual classroom link, naming how many rows were not interpreted', () => {
+        const result = extractCourseList(portal(
+            row('1', link('1', 'CK0001 - Course One')) +
+            row('2', 'Course Two')
+        ));
+
+        expect(result.success).toBe(false);
+        if (result.success) return;
+        expect(result.error.code).toBe('SELECTOR_DRIFT');
+        expect(result.error.message).toContain('1 de 2');
+        expect(result.selectorCounts).toEqual({ courseIdInputs: 2, virtualClassroomLinks: 1 });
+    });
+
+    it('fails with SELECTOR_DRIFT when a candidate row has a link with empty text', () => {
+        const result = extractCourseList(portal(
+            row('1', link('1', '   ')) +
+            row('2', link('2', 'CK0002 - Course Two'))
+        ));
+
+        expect(result.success).toBe(false);
+        if (result.success) return;
+        expect(result.error.code).toBe('SELECTOR_DRIFT');
+        expect(result.error.message).toContain('1 de 2');
+    });
+
+    it('returns zero courses (not a failure) for a document with no candidate rows, leaving the classification to the caller', () => {
+        const result = extractCourseList('<h1>Portal do Discente</h1><span class="nome_usuario">User</span>');
+
+        expect(result).toMatchObject({ success: true, courses: [], degraded: 0, selectorCounts: { courseIdInputs: 0, virtualClassroomLinks: 0 } });
+    });
 });
