@@ -1,6 +1,6 @@
 # CLEAN-014: `--sigaa-dev` continua injetada no main sem consumidor no preload
 Status: open
-Stage: to-review
+Stage: reviewing
 Priority: P3
 Blocked by: nenhum
 Review: agent
