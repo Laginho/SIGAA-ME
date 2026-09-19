@@ -1,6 +1,6 @@
 # DL-010: Reload do popup que vira download é tratado como falha e descarta o arquivo
 Status: open
-Stage: to-review
+Stage: reviewing
 Priority: P2
 Blocked by: nenhum
 Review: agent
