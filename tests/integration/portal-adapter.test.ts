@@ -185,6 +185,27 @@ describe('PORTAL-013: course list extraction is a pure adapter function', () => 
     }
     const portal = (rows: string) => `<h1>Portal do Discente</h1><div id="turmas-portal"><form name="formTurma"><table>${rows}</table></form></div>`;
 
+    it('reports drift when the semester panel is gone but the page still has course rows', () => {
+        // Sem esta guarda o painel renomeado vira "zero turmas": o ramo do
+        // PORTAL-010 devolveria NOT_FOUND ("problema de sessão"), sem
+        // diagnóstico estrutural e sem armar o kill-switch do PORTAL-008 —
+        // justamente a mudança de layout que ele existe para pegar.
+        const renamed = portal(row('1', link('1', 'CK0001 - Course One')))
+            .replace('id="turmas-portal"', 'id="portal-turmas"');
+
+        const result = extractCourseList(renamed);
+
+        expect(result.success).toBe(false);
+        if (result.success) return;
+        expect(result.error.code).toBe('SELECTOR_DRIFT');
+        expect(result.error.message).toContain('#turmas-portal');
+    });
+
+    it('treats a page with no course rows at all as an empty list, not drift', () => {
+        expect(extractCourseList('<h1>Portal do Discente</h1><div class="nome_usuario">Aluno</div>'))
+            .toMatchObject({ success: true, courses: [] });
+    });
+
     it('ignores enabled classrooms outside the semester panels, including duplicate panel ids', () => {
         const result = extractCourseList(portal(row('1', link('1', 'CK0001 - Course One'))) +
             '<div id="turmas-portal"></div><div id="turmas-habilitadas"><table>' +

@@ -224,6 +224,23 @@ intact. `SELECTOR_DRIFT` is the right code here, unlike the zero-row case:
 the selectors exist and the structure relating them changed, which is the
 documented meaning of the code.
 
+The panel itself is a structural dependency, so it is checked like any other
+selector: if `#turmas-portal` is gone while the page still has
+`input[name="idTurma"]` rows, that is `SELECTOR_DRIFT`, not an empty list.
+Without that check a renamed panel would reach the zero-row branch and be
+reported as `NOT_FOUND` ("session or access problem"), with no structural
+diagnostic and with the PORTAL-008 kill-switch never arming — the exact layout
+change both exist to catch.
+
+The blast radius of the all-or-nothing rule is deliberate and total: a single
+uninterpretable candidate row stops every sync, not just that course. The page
+already contains `input[name="idTurma"]` without a `turmaVirtual` link today
+(under `#turmas-habilitadas`), so a portal that ever renders such a row inside
+`#turmas-portal` — a course with no virtual classroom — would take the whole
+sync down and arm the kill-switch. That is preferred over silently caching a
+shorter course list, but it means a drift report here is an outage, not a
+degradation.
+
 The first rendered line of `td.info center` supplies `period`; HTML `<br>`
 elements count as line breaks even without newlines in the source.
 
