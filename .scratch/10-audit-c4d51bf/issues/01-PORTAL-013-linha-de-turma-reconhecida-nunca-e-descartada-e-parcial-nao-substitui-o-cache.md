@@ -1,6 +1,6 @@
 # PORTAL-013: Linha de turma reconhecida nunca é descartada em silêncio; lista parcial não substitui o cache
 Status: open
-Stage: to-implement
+Stage: blocked
 Priority: P1
 Blocked by: nenhum
 Review: agent
@@ -119,3 +119,7 @@ deriva e é melhor que três ciclos escrevendo lista parcial por cima do cache.
 - `tests/unit/sync-selection.test.ts`: cache com `c1` e `c2`, `getCourses`
   devolve duas entradas com a segunda sem `name` → overlay em estado de erro,
   `readCoursesCache()` ainda com `c1` e `c2`. Vermelho: hoje `c2` some.
+
+## Comments
+
+- 2026-09-18 Review ended at blocked (exit 0); branch portal-013 holds the review; left for a human
