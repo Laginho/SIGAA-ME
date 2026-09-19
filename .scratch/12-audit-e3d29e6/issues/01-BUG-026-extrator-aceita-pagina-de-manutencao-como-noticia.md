@@ -1,6 +1,6 @@
 # BUG-026: Extrator aceita página de manutenção ou título sem corpo como notícia
-Status: open
-Stage: blocked
+Status: resolved
+Stage: done
 Priority: P1
 Blocked by: nenhum
 Review: agent
@@ -67,8 +67,61 @@ devolve `success: false`. Título vazio também é falha.
   formulário de login. Cada caso confere `success`, `content` e a chamada de
   `saveRaw`.
 
+#### Resolution (2026-09-19)
+
+Verdict: Approve
+
+**Decisão.** As quatro decisões do `spec.md` foram implementadas como escritas.
+`getContent` devolve `{ html, source }`; só `label` (rótulo `Texto`) e
+`container` (seletores conhecidos) contam como corpo (`:1068`). A estratégia 4
+continua existindo marcada como `largest-block` e nunca vira sucesso. Título
+vazio (`:1062`) e corpo não reconhecido (`:1069`) falham com mensagens
+distintas, cada uma com `saveRaw` próprio. O `contentSource` fica no
+`evaluate`: o objeto `news` devolvido é montado campo a campo e não vaza o
+diagnóstico para o renderer nem para o cache.
+
+Ganho lateral: os dois `saveRaw` novos usam `newsDetailSafeId` (sanitizado em
+`:936`) no lugar do `${newsId}` cru que o código antigo interpolava no nome do
+arquivo.
+
+**Arquivos.**
+
+- `electron/services/playwright-login.service.ts` (+42/−13), commit `e09ee9d`
+- `tests/unit/news-detail-maintenance-page.test.ts` (novo, +107), commit
+  `b22444f`
+
+`diff --stat` separado: o commit de teste não toca fonte, o commit de fonte não
+toca teste. Critério 8 confirmado — `src/`, `shared/` e `sigaa.service.ts`
+intactos.
+
+**Vermelho-verde.** Com `playwright-login.service.ts` revertido para `b22444f`
+e o teste novo no lugar: `2 failed | 2 passed` — falham exatamente manutenção e
+título-sem-corpo (critérios 2 e 3). Com a correção: `4 passed`.
+`news-detail-batch-failure.test.ts` e `sigaa-service.test.ts` passam sem edição
+(45 testes nos três arquivos, critério 7).
+
+**Gate.** `npm run quality` verde: 0 erros de ESLint (40 warnings
+`no-explicit-any`, todos pré-existentes), 76 arquivos, 837 passed | 5 skipped.
+CI do PR #54 verde nos três jobs.
+
+**Consumidores.** `loadAllNews` não empurra o item para `enrichedNews` quando o
+detalhe falha e devolve `fail` com a contagem do BUG-025; `course-detail.ts` só
+escreve no cache no ramo `result.success`. A cópia offline anterior sobrevive.
+
+**Efeito aceito, registrado para não virar surpresa.** Uma notícia real cujo
+corpo o portal não entrega agora reprova o lote inteiro de "Carregar todas" com
+`N de M notícias sem conteúdo`, onde antes entrava com `content: ""`. É o que a
+decisão 1 do spec escolheu ao preferir sync que falha a cache errado.
+
 ## Comments
 
-- 2026-09-19 Attempt 1 failed: exit 0. Log tail: BUG-026 is already done — merged into `master` via PR #54, `Stage: done` recorded there with the resolution block. Your current branch (`sweatshop/2026-09-19-1455`) is just behind master and still has the stale `to-implement` copy. /  / Nothing to do. If you want to keep working, pull master (or rebase this session branch onto it) to pick up the closed ticket and the `bug-026` branch cleanup. /
+Duas observações da revisão, nenhuma bloqueante e nenhuma virou ticket:
 
-- 2026-09-19 Attempt 2 failed: exit 0; blocked after two attempts. Log tail: BUG-026 is already done — confirmed on `origin/master`: PR #54 merged, ticket shows `Status: resolved` / `Stage: done`. The comment in this session branch's stale copy was accurate. /  / Nothing to do here. This session branch (`sweatshop/2026-09-19-1455`) is just behind master; to pick up the closed ticket locally, rebase/merge master into it (and the `bug-026` branch can be deleted, already merged). /
+1. `expect(mocks.saveRaw).toHaveBeenCalled()` no caso de manutenção é fraca — o
+   `saveRaw` de diagnóstico da linha 937 roda antes do parse e a satisfaria
+   sozinho. A prova real do critério 2 é o `success: false`, e essa foi
+   vermelha.
+2. `playwrightLogin.getNewsDetail` continua devolvendo
+   `{ success: boolean; news?; error? }` em vez de união discriminada (regra 6
+   do `CLAUDE.md`). Pré-existente, está na assinatura (`:835`), fora da faixa
+   declarada em Primary files, e o `sigaa.service` já converte para `AppResult`.

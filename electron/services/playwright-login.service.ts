@@ -956,7 +956,13 @@ export class PlaywrightLoginService {
                     return '';
                 };
 
-                const getContent = (): string => {
+                // O corpo só conta quando vem de um rótulo ou container conhecido
+                // (estratégias 1-3). A estratégia 4 (maior bloco em #conteudo) existe
+                // só para diagnóstico: sem essa distinção, uma página de manutenção ou
+                // de sessão expirada vira "sucesso" com o aviso genérico como corpo.
+                type ContentSource = 'label' | 'container' | 'largest-block' | 'none';
+
+                const getContent = (): { html: string; source: ContentSource } => {
                     // Strategy 1: Look for "Texto" label in th/td structure
                     // Structure: <th><b>Texto:</b></th><td>...content...</td>
                     const thElements = document.querySelectorAll('th');
@@ -969,7 +975,7 @@ export class PlaywrightLoginService {
                                 let html = nextTd.innerHTML;
                                 // Remove excessive whitespace
                                 html = html.replace(/\s+/g, ' ').trim();
-                                return html;
+                                return { html, source: 'label' };
                             }
                         }
                     }
@@ -981,7 +987,7 @@ export class PlaywrightLoginService {
                         if (text === 'Texto') {
                             const parentTd = el.closest('td') || el.closest('th');
                             if (parentTd && parentTd.nextElementSibling) {
-                                return parentTd.nextElementSibling.innerHTML || '';
+                                return { html: parentTd.nextElementSibling.innerHTML || '', source: 'label' };
                             }
                         }
                     }
@@ -1000,11 +1006,12 @@ export class PlaywrightLoginService {
                     for (const selector of contentContainers) {
                         const container = document.querySelector(selector);
                         if (container && container.innerHTML.trim()) {
-                            return container.innerHTML;
+                            return { html: container.innerHTML, source: 'container' };
                         }
                     }
 
-                    // Strategy 4: Look for the largest content block on the page
+                    // Strategy 4: Look for the largest content block on the page.
+                    // Diagnostic only — never counted as a recognized body.
                     const mainContent = document.getElementById('conteudo');
                     if (mainContent) {
                         // Find the deepest div with significant text content
@@ -1025,33 +1032,55 @@ export class PlaywrightLoginService {
                             }
                         }
 
-                        if (bestContent) return bestContent;
+                        if (bestContent) return { html: bestContent, source: 'largest-block' };
                     }
 
-                    return '';
+                    return { html: '', source: 'none' };
                 };
+
+                const contentResult = getContent();
 
                 return {
                     title: getText('Título') || getText('Assunto'),
                     date: getText('Data') || getText('Data de Cadastro'),
-                    content: getContent(),
+                    content: contentResult.html,
+                    contentSource: contentResult.source,
                     notification: getText('Notificação')
                 };
             });
 
-            log.info('Playwright: Parsed news.', { title: newsData.title, contentLength: newsData.content.length });
+            log.info('Playwright: Parsed news.', {
+                title: newsData.title,
+                contentLength: newsData.content.length,
+                contentSource: newsData.contentSource
+            });
 
             // 5. Navigate back to AVA if needed (for subsequent operations)
             // Not strictly necessary but keeps state clean
             // await page.goBack();
 
-            if (!newsData.content && !newsData.title) {
+            if (!newsData.title) {
                 const html = await page.content().catch(() => '');
-                if (html) diagnosticsService.saveRaw(`debug_playwright_news_${newsId}.html`, html);
-                return { success: false, error: 'Could not parse news content from page' };
+                if (html) diagnosticsService.saveRaw(`debug_playwright_news_not_news_page_${newsDetailSafeId}.html`, html);
+                return { success: false, error: 'Page does not look like a news detail page (no title found)' };
             }
 
-            return { success: true, news: newsData };
+            const hasRecognizedBody = (newsData.contentSource === 'label' || newsData.contentSource === 'container') && newsData.content.length > 0;
+            if (!hasRecognizedBody) {
+                const html = await page.content().catch(() => '');
+                if (html) diagnosticsService.saveRaw(`debug_playwright_news_no_body_${newsDetailSafeId}.html`, html);
+                return { success: false, error: 'Could not find a recognizable news body on the page' };
+            }
+
+            return {
+                success: true,
+                news: {
+                    title: newsData.title,
+                    date: newsData.date,
+                    content: newsData.content,
+                    notification: newsData.notification
+                }
+            };
 
         } catch (error: any) {
             log.error('Playwright: Error fetching news.', { error });
