@@ -1,6 +1,6 @@
 # BUG-026: Extrator aceita página de manutenção ou título sem corpo como notícia
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P1
 Blocked by: nenhum
 Review: agent
