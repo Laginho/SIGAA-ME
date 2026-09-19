@@ -66,3 +66,7 @@ devolve `success: false`. Título vazio também é falha.
   Quatro fixtures inline: tabela título/texto, manutenção, só título,
   formulário de login. Cada caso confere `success`, `content` e a chamada de
   `saveRaw`.
+
+## Comments
+
+- 2026-09-19 Attempt 1 failed: exit 0. Log tail: BUG-026 is already done — merged into `master` via PR #54, `Stage: done` recorded there with the resolution block. Your current branch (`sweatshop/2026-09-19-1455`) is just behind master and still has the stale `to-implement` copy. /  / Nothing to do. If you want to keep working, pull master (or rebase this session branch onto it) to pick up the closed ticket and the `bug-026` branch cleanup. /
