@@ -215,8 +215,16 @@ export class DownloadService {
                     // (`net::ERR_ABORTED`); quem decide sucesso é `reloadDownloadPromise`,
                     // não essa rejeição (DL-010). Guardada para o log de falha: sem ela,
                     // um reload quebrado de verdade só aparece como timeout de 15s.
-                    await popup.reload().catch((e: unknown) => { reloadError = e; });
+                    //
+                    // As duas promises precisam de tratador desde a criação, na ordem
+                    // em que são declaradas: se o `await` de `reloadDownloadPromise`
+                    // vier depois do `await` de `popup.reload()`, e o reload ainda
+                    // estiver pendente quando o timeout de 15s estourar, a rejeição
+                    // fica sem tratador até esse segundo `await` — unhandledRejection
+                    // seguido de PromiseRejectionHandledWarning (DL-011).
+                    const reloadPromise = popup.reload().catch((e: unknown) => { reloadError = e; });
                     const download = await reloadDownloadPromise;
+                    await reloadPromise;
 
                     await download.saveAs(filePath + '.part');
 
