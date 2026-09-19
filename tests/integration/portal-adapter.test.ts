@@ -183,7 +183,36 @@ describe('PORTAL-013: course list extraction is a pure adapter function', () => 
     function link(id: string, text: string) {
         return `<a id="formTurma:turmaVirtual${id}" href="#" onclick="jsfcljs(document.forms['formTurma'],'idTurma,${id}','');return false;">${text}</a>`;
     }
-    const portal = (rows: string) => `<h1>Portal do Discente</h1><form name="formTurma"><table>${rows}</table></form>`;
+    const portal = (rows: string) => `<h1>Portal do Discente</h1><div id="turmas-portal"><form name="formTurma"><table>${rows}</table></form></div>`;
+
+    it('ignores enabled classrooms outside the semester panels, including duplicate panel ids', () => {
+        const result = extractCourseList(portal(row('1', link('1', 'CK0001 - Course One'))) +
+            '<div id="turmas-portal"></div><div id="turmas-habilitadas"><table>' +
+            row('2', '<a id="form:turmasVirtuaisHabilitadas">2026.1 - Other Course</a>') + '</table></div>');
+        expect(result).toMatchObject({ success: true, courses: [{ id: '1' }],
+            selectorCounts: { courseIdInputs: 1, virtualClassroomLinks: 1 } });
+    });
+
+    it('counts the nearest course row only inside nested layout tables', () => {
+        const result = extractCourseList(portal('<tr><td><table>' +
+            row('1', link('1', 'CK0001 - Course One')) + '</table></td></tr>'));
+        expect(result).toMatchObject({ success: true, courses: [{ id: '1' }] });
+    });
+
+    it('uses the first rendered schedule line when HTML has br without source newlines', () => {
+        const result = extractCourseList(portal('<tr><td><input name="idTurma" value="1">' +
+            link('1', 'CK0001 - Course One') + '</td><td class="info"><center>SEG 08:00-10:00<br>QUA 08:00-10:00<br>(datas)</center></td></tr>'));
+        expect(result).toMatchObject({ success: true, courses: [{ period: 'SEG 08:00-10:00' }] });
+    });
+
+    it.each(['', ' value=""', ' value="   "'])('rejects an unusable course id: %s', (value) => {
+        const result = extractCourseList(portal('<tr><td><input name="idTurma"' + value + '>' +
+            link('1', 'CK0001 - Course One') + '</td></tr>'));
+        expect(result.success).toBe(false);
+        if (result.success) return;
+        expect(result.error.code).toBe('SELECTOR_DRIFT');
+        expect(result.error.message).toContain('1 de 1');
+    });
 
     it('extracts every course of the realistic populated fixture with id, code, name and period filled', () => {
         const result = extractCourseList(fixture('student-portal-populated.html'));
