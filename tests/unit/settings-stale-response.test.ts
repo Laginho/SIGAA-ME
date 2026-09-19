@@ -37,6 +37,26 @@ beforeEach(() => {
 });
 
 describe('settings: resposta tardia de getSettings não substitui a rota seguinte (BUG-023)', () => {
+    it('BUG-024: navegar durante updateSetting não reentra em configurações', async () => {
+        let resolveUpdate!: (value: ReturnType<typeof ok<undefined>>) => void;
+        const getSettings = vi.fn().mockResolvedValue({ ...BASE_SETTINGS });
+        Object.defineProperty(window, 'api', { configurable: true, writable: true, value: {
+            getSettings,
+            updateSetting: vi.fn(() => new Promise(resolve => { resolveUpdate = resolve; })),
+        } });
+
+        await renderSettingsPage(container);
+        container.querySelector<HTMLButtonElement>('#clearDownloadsBtn')!.click();
+        window.location.hash = '#/login';
+        renderLoginPage(container);
+        resolveUpdate(ok(undefined));
+        await flushAll();
+
+        expect(container.querySelector('.login-title')?.textContent).toBe('SIGAA-ME');
+        expect(container.querySelector('.settings-page')).toBeNull();
+        expect(getSettings).toHaveBeenCalledTimes(1);
+    });
+
     it('critério 4: navegar para login com getSettings pendente mantém o login quando a resposta chega', async () => {
         let resolveGetSettings!: (value: unknown) => void;
         (window as any).api = {
