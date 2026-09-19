@@ -18,7 +18,7 @@ import type {
     NewsSummary,
 } from '../../shared/domain';
 import type { DownloadFileRef, KnownDownload } from '../../shared/ipc';
-import { type AppResult, errorMessage, fail, failFromMessage, failFromResult, ok } from '../../shared/errors';
+import { type AppErrorCode, type AppResult, errorMessage, fail, failFromMessage, failFromResult, ok } from '../../shared/errors';
 
 const log = logger.scope('Sigaa');
 
@@ -701,6 +701,8 @@ export class SigaaService {
 
                 // 3. Fetch detail for each news item using Playwright (HTTP scraper fails due to session issues)
                 const enrichedNews: NewsSummary[] = [];
+                let failedDetails = 0;
+                let firstErrorCode: AppErrorCode | undefined;
                 for (const item of newsItems) {
                     if (signal.aborted) return CANCELLED;
                     log.info(`Fetching content for news ${item.id}.`, { title: item.title });
@@ -708,16 +710,21 @@ export class SigaaService {
                     // Use Playwright for reliable JSF session handling instead of HTTP scraper
                     // The HTTP approach fails because sessions become stale between requests
                     const detail = await this.playwrightLogin.getNewsDetail(courseId, courseName, item.id);
+                    if (signal.aborted) return CANCELLED;
                     const summary = toNewsSummary(item);
 
                     if (detail.success && detail.news) {
                         enrichedNews.push({ ...summary, content: detail.news.content });
                     } else {
                         log.warn(`Failed to fetch news ${item.id}.`, { title: item.title, error: detail.error });
-                        enrichedNews.push(summary); // Keep header at least
+                        failedDetails++;
+                        firstErrorCode ??= failFromResult(detail).error.code;
                     }
                 }
 
+                if (firstErrorCode) {
+                    return fail(firstErrorCode, `${failedDetails} de ${newsItems.length} notícias sem conteúdo`);
+                }
                 return ok(enrichedNews);
 
             } catch (error) {

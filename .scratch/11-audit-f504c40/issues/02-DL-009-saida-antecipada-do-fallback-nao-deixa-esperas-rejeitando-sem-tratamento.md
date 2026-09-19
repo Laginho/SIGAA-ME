@@ -1,6 +1,6 @@
 # DL-009: Saída antecipada do fallback não deixa esperas rejeitando sem tratamento
-Status: open
-Stage: to-implement
+Status: resolved
+Stage: done
 Priority: P2
 Blocked by: nenhum
 Review: agent
@@ -58,3 +58,34 @@ promises originais, então o evento de download não se perde e a ordem
   todas com `Error('Target page, context or browser has been closed')`.
   Sequência: chamar `downloadFile`, conferir `success: false`, chamar
   `close()`, aguardar dois ticks (`await new Promise(r => setImmediate(r))`).
+
+#### Resolution (2026-09-19)
+
+Verdict: Approve
+
+Revisão de stage 3 (Opus): gate reproduzido localmente — 833 passed | 5
+skipped (838), typecheck limpo, lint 0 erros / 40 warnings preexistentes.
+Vermelho conferido pelo revisor: com `download.service.ts` revertido para
+`master`, o arquivo de teste novo produz 4 rejeições não tratadas. O
+`.catch()` mudo não engole erro do race — ele observa uma promise derivada,
+e o `Promise.race` continua consumindo a original.
+
+Nota: a correção cobre mais do que o título do ticket. A espera perdedora
+também rejeitava sem tratamento 60s depois de um download bem-sucedido, e
+isso some junto. A regressão prova a ausência de rejeição global pelo
+relatório do vitest, não por asserção explícita — se algum dia o vitest for
+configurado para tolerar `unhandledRejection`, o teste fica vazio em
+silêncio.
+
+Implementado em `994bcf0`. Ambas as esperas recebem tratamento de rejeição
+imediato; o race usa as promises originais e os listeners precedem a ação.
+
+Arquivos: `electron/services/download.service.ts` e
+`tests/unit/download-fallback-early-exit.test.ts`.
+Prova vermelho-verde: antes da correção, os dois cenários produziram quatro
+unhandledRejection e saída 1; após, ambos passaram sem rejeição global.
+Testes em commit próprio `2b12a08`. Verificação focada: 75 passed (75),
+incluindo os três arquivos de regressão existentes de download sem edição.
+Gate `npm run quality`: 833 passed | 5 skipped (838); tipos sem erros;
+lint com 0 erros e 40 warnings preexistentes. Diff revisado, sem alteração
+em `playwright-login.service.ts`. Sem execução com credenciais reais.

@@ -67,6 +67,9 @@ export class DownloadService {
             // Setup listeners
             const downloadPromise = page.waitForEvent('download', { timeout: 60000 });
             const popupPromise = page.waitForEvent('popup', { timeout: 60000 });
+            // Early action failures skip the race; browser shutdown still rejects both waits.
+            void downloadPromise.catch(() => {});
+            void popupPromise.catch(() => {});
 
             // Trigger action
             log.info('Looking for fresh download script.', { fileName });
