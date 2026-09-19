@@ -1,6 +1,6 @@
 # BUG-024: "Limpar Padrão" reentra Configurações com a rota já trocada
-Status: open
-Stage: to-implement
+Status: resolved
+Stage: done
 Priority: P3
 Blocked by: nenhum
 Review: agent
@@ -38,3 +38,13 @@ no escopo da closure. Nada mais.
 
     npx vitest run tests/unit/settings-stale-response.test.ts
     npm run quality
+
+#### Resolution (2026-09-18)
+
+Adicionada a guarda de rota antes de reentrar em renderSettingsPage depois
+de updateSetting. Teste com Promise controlada monta login durante a espera:
+antes da correção, 1 failed | 2 passed (3); a tela de login era substituída.
+Depois, os três testes passam, preservando os existentes sem edição.
+Implementação: 7fdf712; teste: b95f58a. Gate consolidado: npm run quality,
+825 passed | 5 skipped (830), 0 erros de lint, 40 warnings. Electron visual:
+11 passed. Não houve mudança de CSS nem de aparência.

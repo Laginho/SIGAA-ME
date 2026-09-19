@@ -1,6 +1,6 @@
 # PORTAL-013: Linha de turma reconhecida nunca é descartada em silêncio; lista parcial não substitui o cache
-Status: open
-Stage: to-implement
+Status: resolved
+Stage: done
 Priority: P1
 Blocked by: nenhum
 Review: agent
@@ -232,3 +232,20 @@ Notas, sem bloquear:
   Se as duas propostas valem: acrescentar `selectors.ts` aos Primary files,
   os critérios 11 e 12, `Stage: to-implement`, e a etapa 2 segue no branch
   `portal-013`.
+
+#### Resolution (2026-09-18)
+
+Implementação consolidada sem ticket-flow, conforme pedido do usuário. Reaproveitados
+os commits de implementação e a revisão da branch portal-013; concluídos os
+critérios 11–13. Candidatas usam o tr mais próximo do input dentro de
+#turmas-portal, sem duplicar ancestrais de tabelas aninhadas. Painéis de
+habilitadas são ignorados. ID ausente/vazio falha; br preserva a primeira linha.
+O renderer rejeita qualquer descarte antes de alterar o cache.
+
+Prova de regressão desta sessão: 7 failed | 17 passed (24) no adapter antes
+dos ajustes, incluindo painel externo, tabela aninhada, br e ids inválidos.
+Após a correção, os quatro arquivos focados deram 82 passed (82).
+Gate final: npm run quality, 825 passed | 5 skipped (830), 73 arquivos;
+typecheck limpo, lint com 0 erros e os mesmos 40 warnings. Electron visual:
+11 passed (17.9s), sem credenciais. Sem alteração em background-sync ou no
+serviço de compatibilidade. Commit dos ajustes: be9ccfa.
