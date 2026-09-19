@@ -1,6 +1,6 @@
 # DL-011: Timeout da espera de download rejeita sem tratador enquanto o reload do popup está pendente
-Status: open
-Stage: to-review
+Status: resolved
+Stage: done
 Priority: P2
 Blocked by: nenhum
 Review: agent
@@ -67,3 +67,59 @@ cai direto no `catch` externo existente.
   Usar `vi.useFakeTimers()` ou resolução por ordem de eventos; não esperar
   15s reais. Conferir com array de eventos que `download-timeout` vem antes
   de `reload-resolve` e que o resultado já é `success: false`.
+
+#### Resolution (2026-09-19)
+
+Verdict: Approve
+
+Decisão: a correção mínima do ticket, aplicada como escrita. `popup.reload()`
+passa a ser guardada em `reloadPromise` (com o mesmo `.catch` que anota
+`reloadError`) e o `await` vai primeiro em `reloadDownloadPromise`, depois em
+`reloadPromise`. As duas promises têm tratador desde a criação; a rejeição do
+timeout de 15s cai direto no `catch` externo que já existia, que fecha o popup
+e devolve `success: false`.
+
+Arquivos:
+
+- `electron/services/download.service.ts` (linhas 218-227): 2 linhas de código
+  e o comentário que explica por que a ordem é carga.
+- `tests/unit/download-fallback-popup-reload.test.ts`: `fakePopupPageSlowReload`
+  e um caso novo, sem tocar nos dois do DL-010.
+
+Prova vermelho-verde:
+
+    # sem a correção (download.service.ts de master, teste novo no lugar)
+    npx vitest run tests/unit/download-fallback-popup-reload.test.ts
+    → exit != 0, "Unhandled Rejection: Timeout 15000ms exceeded ..."
+      em download.service.ts:213, mais PromiseRejectionHandledWarning
+
+    # com a correção
+    npx vitest run tests/unit/download-fallback-popup-reload.test.ts
+    → exit 0
+
+    npx vitest run tests/unit/download-fallback-popup-reload.test.ts \
+      tests/unit/download-fallback-early-exit.test.ts \
+      tests/unit/audit-download-fallback-identity.test.ts \
+      tests/unit/audit-download-identity.test.ts \
+      tests/unit/audit-download-inspect.test.ts
+    → 5 passed (5), 19 passed (19)
+
+Gate (`npm run quality`): typecheck limpo, ESLint 0 erros / 40 warnings
+`no-explicit-any` pré-existentes, vitest 77 arquivos, 840 passed | 5 skipped.
+CI do PR #56 verde nos três jobs (typecheck+lint+testes, E2E sem credencial,
+scanner de segredo).
+
+Critérios 1 a 8: todos atendidos. Commits separados como manda o fluxo —
+`dcbeb15` só teste (+46), `49b3490` só código e ticket (+10/-2).
+
+Notas sem ação:
+
+- O commit só-de-teste não carregou `Stage: implementing`; a transição veio
+  junto com o commit de código. Desvio de processo, não de código.
+- A asserção de ordem do teste novo usa um evento empurrado na criação da
+  espera, não na rejeição dela. O que prova o DL-011 é a ausência de
+  `unhandledRejection`, que é o que fica vermelho sem a correção.
+- `await reloadPromise` agora roda depois do download chegar. O conjunto de
+  awaits antes de `saveAs` é o mesmo; sem mudança no caminho de sucesso.
+
+## Comments
