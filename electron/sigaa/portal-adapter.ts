@@ -108,8 +108,9 @@ export type CourseListExtraction =
  * não existe "ignorar". Sem ` - ` no texto do link é degradação (`code`
  * vazio, `name` inteiro, contada em `degraded`); sem link ou com texto vazio
  * é `SELECTOR_DRIFT`: os seletores existem, a estrutura que os relaciona
- * mudou. Zero candidatas é sucesso com lista vazia — quem decide entre
- * `NOT_FOUND`, sessão e manutenção é `validateCourseListDocument`.
+ * mudou — assim como o painel sumir com linhas de turma ainda na página.
+ * Zero candidatas sem nenhuma linha é sucesso com lista vazia — quem decide
+ * entre `NOT_FOUND`, sessão e manutenção é `validateCourseListDocument`.
  */
 export function extractCourseList(html: string): CourseListExtraction {
     const $ = cheerio.load(html);
@@ -119,6 +120,19 @@ export function extractCourseList(html: string): CourseListExtraction {
         courseIdInputs: courseInputs.length,
         virtualClassroomLinks: panel.find(STUDENT_PORTAL.virtualClassroomLink).length
     };
+    // Painel ausente com linhas de turma na página é deriva, não conta vazia:
+    // sem isto o ramo de zero turmas devolveria NOT_FOUND ("sessão"), porque
+    // `isStudentPortal` acha os dois seletores fora do painel.
+    if (panel.length === 0 && $(STUDENT_PORTAL.courseIdInput).length > 0) {
+        return {
+            success: false,
+            selectorCounts,
+            error: portalError(
+                'SELECTOR_DRIFT',
+                `SIGAA portal selector drift: the semester course panel (${STUDENT_PORTAL.coursesPanel}) is missing, but the page still has ${STUDENT_PORTAL.courseIdInput} rows. The portal layout may have changed.`
+            )
+        };
+    }
     const candidates = courseInputs.closest('tr');
 
     const courses: ParsedCourse[] = [];
