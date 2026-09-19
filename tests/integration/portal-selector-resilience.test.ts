@@ -218,7 +218,7 @@ describe('Playwright portal navigation resilience', () => {
             `<tr><td><input type="hidden" name="idTurma" value="${id}"></td><td>${cell}</td><td class="info"><center>\n2026.1\n<br>T01</center></td></tr>`;
         const link = (id: string, text: string) =>
             `<a id="formTurma:turmaVirtual${id}" href="#" onclick="jsfcljs(document.forms['formTurma'],'idTurma,${id}','');return false;">${text}</a>`;
-        const portal = (rows: string) => `<h1>Portal do Discente</h1><form name="formTurma"><table>${rows}</table></form>`;
+        const portal = (rows: string) => `<h1>Portal do Discente</h1><div id="turmas-portal"><form name="formTurma"><table>${rows}</table></form></div>`;
 
         function authenticatedService() {
             const harness = createNavigationHarness();
