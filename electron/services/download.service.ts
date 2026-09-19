@@ -210,7 +210,10 @@ export class DownloadService {
 
                 try {
                     const reloadDownloadPromise = popup.waitForEvent('download', { timeout: 15000 });
-                    await popup.reload();
+                    // O reload em si dispara o download e o Chrome aborta a navegação
+                    // (`net::ERR_ABORTED`); quem decide sucesso é `reloadDownloadPromise`,
+                    // não essa rejeição (DL-010).
+                    await popup.reload().catch(() => {});
                     const download = await reloadDownloadPromise;
 
                     await download.saveAs(filePath + '.part');
