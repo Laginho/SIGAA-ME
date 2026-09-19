@@ -1,6 +1,6 @@
 # DL-011: Timeout da espera de download rejeita sem tratador enquanto o reload do popup está pendente
 Status: open
-Stage: to-implement
+Stage: to-review
 Priority: P2
 Blocked by: nenhum
 Review: agent
