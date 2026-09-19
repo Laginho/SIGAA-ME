@@ -1,6 +1,6 @@
 # DL-010: Reload do popup que vira download é tratado como falha e descarta o arquivo
-Status: open
-Stage: reviewing
+Status: resolved
+Stage: done
 Priority: P2
 Blocked by: nenhum
 Review: agent
@@ -68,3 +68,51 @@ espera continua criada antes do reload. `saveAs`, `rejectIfTooLarge` e
   `suggestedFilename()`. Caso 1: `reload` rejeita, download resolve. Caso 2:
   `reload` rejeita, download rejeita por timeout. Conferir ordem de
   `close()` com um array de eventos.
+
+#### Resolution (2026-09-19)
+
+Verdict: Approve.
+
+Decisão: `await popup.reload()` virou `await popup.reload().catch(...)`, e
+quem decide o desfecho passa a ser `reloadDownloadPromise` — criada antes do
+reload, como já era. `saveAs`, `rejectIfTooLarge` e `finalizeDownload`
+continuam antes de `popup.close()`, sem reordenação.
+
+Uma correção do revisor, dentro dos Primary files e sem teste novo: a
+rejeição do reload era descartada sem deixar rastro, então um reload que
+falhasse de verdade só aparecia no log como timeout de 15s de
+`waitForEvent('download')`. Ela é guardada em `reloadError` e anexada ao
+`log.warn('Reload strategy failed.', …)` que já existia. Sem mudança de
+comportamento — regra 3 do `CLAUDE.md`.
+
+Arquivos: `electron/services/download.service.ts:211-218,248` e
+`tests/unit/download-fallback-popup-reload.test.ts` (novo, 108 linhas).
+`playwright-login.service.ts` e `sigaa.service.ts` não foram tocados
+(critério 7).
+
+Prova red-green — com `await popup.reload()` de volta no lugar:
+
+    Test Files  1 failed (1)
+         Tests  1 failed | 1 passed (2)
+        Errors  1 error   (Unhandled Rejection: Timeout 15000ms … "download")
+
+O critério 1 cai, e o critério 2 também é coberto: sem a correção o caso de
+timeout vaza uma rejeição não tratada, que o vitest reporta como erro de
+execução e reprova o arquivo. Com a correção:
+
+    Test Files  5 passed (5)     (o teste novo + os quatro do critério 6)
+         Tests  18 passed (18)
+
+Gate (`npm run quality`): typecheck limpo, ESLint `0 errors, 40 warnings`
+(todos `no-explicit-any` pré-existentes), `76 passed`, `835 passed | 5
+skipped (840)`.
+
+Critérios 3 e 4 (reload que resolve; `JSF_SESSION_EXPIRED` subindo) não
+ganharam teste — a seção "Tests stage 2 writes" só pedia os dois casos. São
+regressões cobertas por leitura: quando o reload resolve, o `catch` novo é
+no-op e o fluxo é byte a byte o de antes; o `throw` de `session-expired` e o
+re-throw no `catch` não foram tocados.
+
+Nota de processo, sem impacto no código: a etapa 2 moveu `Stage: to-review`
+num commit `chore(scratch)` separado do último commit de código, em vez de
+dentro dele.
