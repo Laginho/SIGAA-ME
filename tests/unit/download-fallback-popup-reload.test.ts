@@ -64,6 +64,29 @@ function fakePopupPage(events: string[], downloadAfterReload: 'resolve' | 'timeo
     return page;
 }
 
+function fakePopupPageSlowReload(events: string[]) {
+    const page = {
+        url: () => 'https://si3.ufc.br/sigaa/ava/download.jsf',
+        route: vi.fn(async () => {}),
+        unroute: vi.fn(async () => {}),
+        reload: vi.fn(() => new Promise<void>((resolve) => {
+            events.push('reload-called');
+            // Reload real que demora mais que os 15s do `waitForEvent`: só
+            // resolve depois que a espera pelo download já rejeitou.
+            setImmediate(() => {
+                events.push('reload-resolve');
+                resolve();
+            });
+        })),
+        waitForEvent: (_name: string, opts?: { timeout: number }) => {
+            events.push(`download-timeout-${opts?.timeout}`);
+            return Promise.reject(new Error(`Timeout ${opts?.timeout}ms exceeded while waiting for event "download"`));
+        },
+        close: vi.fn(async () => { events.push('close'); }),
+    };
+    return page;
+}
+
 function fakeMainPage(popup: unknown) {
     return {
         url: () => 'https://si3.ufc.br/sigaa/ava/index.jsf',
@@ -105,4 +128,27 @@ it('reload que rejeita e nenhum download chega depois continua devolvendo falha,
 
     // Sem handler de rejeição não tratada por causa do reload/download que rejeitaram.
     await new Promise(resolve => setImmediate(resolve));
+});
+
+it('timeout da espera por download não gera unhandledRejection enquanto o reload do popup está pendente (DL-011, critério 1)', async () => {
+    const events: string[] = [];
+    const popup = fakePopupPageSlowReload(events);
+    const page = fakeMainPage(popup);
+
+    const { fullPath } = resolveDownloadTarget(destino, COURSE, 'aula.pdf');
+    const result = await new DownloadService().downloadFile(page, 'aula.pdf', COURSE, destino, '10', 'jsfcljs();');
+
+    expect(result).toMatchObject({ success: false, error: 'Could not force download from popup' });
+    expect(existsSync(fullPath)).toBe(false);
+    expect(existsSync(fullPath + '.part')).toBe(false);
+
+    // Deixa o reload, ainda pendente quando o resultado voltou, terminar —
+    // sem isso mudar o resultado nem gerar unhandledRejection (vitest reprova
+    // o arquivo se houver).
+    await new Promise(resolve => setImmediate(resolve));
+
+    const timeoutIndex = events.indexOf('download-timeout-15000');
+    const reloadResolveIndex = events.indexOf('reload-resolve');
+    expect(timeoutIndex).toBeGreaterThanOrEqual(0);
+    expect(reloadResolveIndex).toBeGreaterThan(timeoutIndex);
 });
