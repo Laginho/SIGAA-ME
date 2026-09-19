@@ -1,6 +1,6 @@
 # BUG-025: Falha de corpo de notícia não vira sucesso do lote
-Status: open
-Stage: to-implement
+Status: resolved
+Stage: done
 Priority: P1
 Blocked by: nenhum
 Review: agent
@@ -56,3 +56,19 @@ muda.
   `getNewsDetail`, `setCookies`). Três casos: todos ok, um falha, todos
   falham. O caso "um falha" confere código e mensagem; o caso "todos ok"
   confere que o `content` chegou.
+
+#### Resolution (2026-09-19)
+
+Implementado em `b03ef03`. `loadAllNews` conta falhas e retorna a primeira
+classificação de erro com `N de M notícias sem conteúdo`. O scraper real
+retorna `error` textual; `failFromResult` mantém a conversão existente.
+Cancelamento após o último detalhe também retorna `CANCELLED`.
+
+Arquivos: `electron/services/sigaa.service.ts` e
+`tests/unit/news-detail-batch-failure.test.ts`.
+Prova vermelho-verde: antes da correção, falha parcial, total e cancelamento
+falharam; após, os quatro casos passaram. Testes em commit próprio `2b12a08`.
+Verificação focada dos dois tickets: 75 passed (75).
+Gate `npm run quality`: 833 passed | 5 skipped (838); tipos sem erros;
+lint com 0 erros e 40 warnings preexistentes. Diff revisado, sem alteração
+em `src/` ou `shared/`. Sem execução com credenciais reais.
