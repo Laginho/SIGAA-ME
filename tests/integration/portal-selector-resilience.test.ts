@@ -215,7 +215,7 @@ describe('Playwright portal navigation resilience', () => {
 
     describe('course list extraction from page.content() (PORTAL-013)', () => {
         const row = (id: string, cell: string) =>
-            `<tr><td><input type="hidden" name="idTurma" value="${id}"></td><td>${cell}</td><td class="info"><center>\n2026.1\n<br>T01</center></td></tr>`;
+            `<tr><td><input type="hidden" name="idTurma" value="${id}"></td><td>${cell}</td><td class="info"><center>SEG 08:00-10:00<br>QUA 08:00-10:00<br>(datas)</center></td></tr>`;
         const link = (id: string, text: string) =>
             `<a id="formTurma:turmaVirtual${id}" href="#" onclick="jsfcljs(document.forms['formTurma'],'idTurma,${id}','');return false;">${text}</a>`;
         const portal = (rows: string) => `<h1>Portal do Discente</h1><div id="turmas-portal"><form name="formTurma"><table>${rows}</table></form></div>`;
@@ -238,7 +238,7 @@ describe('Playwright portal navigation resilience', () => {
 
             expect(result.success).toBe(true);
             expect(result.courses).toHaveLength(2);
-            expect(result.courses?.[0]).toMatchObject({ id: '1', code: 'CK0001', name: 'Course One', period: '2026.1' });
+            expect(result.courses?.[0]).toMatchObject({ id: '1', code: 'CK0001', name: 'Course One', period: 'SEG 08:00-10:00' });
             expect(page.evaluate).not.toHaveBeenCalled();
         });
 

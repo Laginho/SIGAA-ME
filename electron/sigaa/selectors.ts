@@ -31,6 +31,7 @@ export const STUDENT_HOME = {
 
 /** Landmarks admissíveis de STUDENT_PORTAL. */
 export const STUDENT_PORTAL = {
+    coursesPanel: '#turmas-portal',
     courseIdInput: 'input[name="idTurma"]',
     virtualClassroomLink: 'a[id*="turmaVirtual"]',
     userName: '.nome_usuario'

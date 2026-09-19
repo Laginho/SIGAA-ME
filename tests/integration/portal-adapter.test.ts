@@ -225,7 +225,7 @@ describe('PORTAL-013: course list extraction is a pure adapter function', () => 
             expect(course.id).toMatch(/^\d+$/);
             expect(course.code).toMatch(/^[A-Z]{2}\d{4}$/);
             expect(course.name.length).toBeGreaterThan(0);
-            expect(course.period).toBe('2026.1');
+            expect(course.period).toBe('SEG 08:00-10:00');
             expect(course.onclick).toContain('jsfcljs');
         }
         expect(result.courses[0]).toMatchObject({ id: '99991', code: 'CB0001', name: 'Cálculo I' });

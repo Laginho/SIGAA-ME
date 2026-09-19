@@ -103,7 +103,8 @@ export type CourseListExtraction =
 
 /**
  * Extrai a lista de turmas do HTML do portal (PORTAL-013). Candidata é a `tr`
- * que contém o input de id; toda candidata vira turma ou derruba a operação —
+ * mais próxima do input de id dentro do painel de turmas do semestre;
+ * toda candidata vira turma ou derruba a operação —
  * não existe "ignorar". Sem ` - ` no texto do link é degradação (`code`
  * vazio, `name` inteiro, contada em `degraded`); sem link ou com texto vazio
  * é `SELECTOR_DRIFT`: os seletores existem, a estrutura que os relaciona
@@ -112,11 +113,13 @@ export type CourseListExtraction =
  */
 export function extractCourseList(html: string): CourseListExtraction {
     const $ = cheerio.load(html);
+    const panel = $(STUDENT_PORTAL.coursesPanel);
+    const courseInputs = panel.find(STUDENT_PORTAL.courseIdInput);
     const selectorCounts: CourseListSelectorCounts = {
-        courseIdInputs: $(STUDENT_PORTAL.courseIdInput).length,
-        virtualClassroomLinks: $(STUDENT_PORTAL.virtualClassroomLink).length
+        courseIdInputs: courseInputs.length,
+        virtualClassroomLinks: panel.find(STUDENT_PORTAL.virtualClassroomLink).length
     };
-    const candidates = $('tr').filter((_, row) => $(row).find(STUDENT_PORTAL.courseIdInput).length > 0);
+    const candidates = courseInputs.closest('tr');
 
     const courses: ParsedCourse[] = [];
     let degraded = 0;
@@ -125,15 +128,18 @@ export function extractCourseList(html: string): CourseListExtraction {
         const $row = $(row);
         const link = $row.find(STUDENT_PORTAL.virtualClassroomLink).first();
         const fullText = link.text().trim();
-        if (link.length === 0 || fullText.length === 0) {
+        const id = $row.find(STUDENT_PORTAL.courseIdInput).first().attr('value')?.trim();
+        if (!id || link.length === 0 || fullText.length === 0) {
             unparsed++;
             return;
         }
         const separator = fullText.indexOf(' - ');
         if (separator === -1) degraded++;
-        const periodText = $row.find('td.info center').first().text().trim();
+        const periodCell = $row.find('td.info center').first();
+        periodCell.find('br').replaceWith('\n');
+        const periodText = periodCell.text().trim();
         courses.push({
-            id: $row.find(STUDENT_PORTAL.courseIdInput).first().val() as string,
+            id,
             code: separator === -1 ? '' : fullText.slice(0, separator).trim(),
             name: separator === -1 ? fullText : fullText.slice(separator + 3).trim(),
             period: periodText.split('\n')[0].trim(),
@@ -148,7 +154,7 @@ export function extractCourseList(html: string): CourseListExtraction {
             selectorCounts,
             error: portalError(
                 'SELECTOR_DRIFT',
-                `SIGAA portal selector drift: ${unparsed} de ${candidates.length} linhas de turma não foram interpretadas (${STUDENT_PORTAL.courseIdInput} present without a usable ${STUDENT_PORTAL.virtualClassroomLink}). The portal layout may have changed.`
+                `SIGAA portal selector drift: ${unparsed} de ${candidates.length} linhas de turma não foram interpretadas (missing course id or usable ${STUDENT_PORTAL.virtualClassroomLink}). The portal layout may have changed.`
             )
         };
     }
