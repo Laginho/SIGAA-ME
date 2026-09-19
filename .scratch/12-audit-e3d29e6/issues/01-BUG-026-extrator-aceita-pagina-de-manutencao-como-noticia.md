@@ -1,6 +1,6 @@
 # BUG-026: Extrator aceita página de manutenção ou título sem corpo como notícia
 Status: open
-Stage: to-implement
+Stage: blocked
 Priority: P1
 Blocked by: nenhum
 Review: agent
@@ -70,3 +70,5 @@ devolve `success: false`. Título vazio também é falha.
 ## Comments
 
 - 2026-09-19 Attempt 1 failed: exit 0. Log tail: BUG-026 is already done — merged into `master` via PR #54, `Stage: done` recorded there with the resolution block. Your current branch (`sweatshop/2026-09-19-1455`) is just behind master and still has the stale `to-implement` copy. /  / Nothing to do. If you want to keep working, pull master (or rebase this session branch onto it) to pick up the closed ticket and the `bug-026` branch cleanup. /
+
+- 2026-09-19 Attempt 2 failed: exit 0; blocked after two attempts. Log tail: BUG-026 is already done — confirmed on `origin/master`: PR #54 merged, ticket shows `Status: resolved` / `Stage: done`. The comment in this session branch's stale copy was accurate. /  / Nothing to do here. This session branch (`sweatshop/2026-09-19-1455`) is just behind master; to pick up the closed ticket locally, rebase/merge master into it (and the `bug-026` branch can be deleted, already merged). /
