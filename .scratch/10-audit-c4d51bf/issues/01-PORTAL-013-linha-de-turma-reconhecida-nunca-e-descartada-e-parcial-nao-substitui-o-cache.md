@@ -1,11 +1,12 @@
 # PORTAL-013: Linha de turma reconhecida nunca é descartada em silêncio; lista parcial não substitui o cache
 Status: open
-Stage: blocked
+Stage: to-implement
 Priority: P1
 Blocked by: nenhum
 Review: agent
 
 - Primary files:
+  - `electron/sigaa/selectors.ts` (seletor novo do painel "Turmas do Semestre", `#turmas-portal`)
   - `electron/sigaa/portal-adapter.ts` (função nova de extração da lista de turmas; o tipo da turma extraída vem junto)
   - `electron/services/playwright-login.service.ts` (`getCourses`: bloco `page.evaluate` `:333-373`, ramo de zero linhas `:375-408`, dump de dev `:321-330`, `ParsedCourse` `:25-32`)
   - `src/pages/sync-selection.ts` (`startSync`, filtro de forma `:216-234`)
@@ -98,6 +99,20 @@ deriva e é melhor que três ciclos escrevendo lista parcial por cima do cache.
 10. `npm run quality` verde. A asserção de contagem de chamadas a
     `page.content()` no teste de resiliência é atualizada para o fluxo novo,
     não preservada por desvio no código.
+11. Candidata é a `tr` com `input[name="idTurma"]` **dentro de `#turmas-portal`**
+    (seletor em `selectors.ts`). Linha com `idTurma` fora dele (painel
+    `#turmas-habilitadas`, link `turmasVirtuaisHabilitadas`) é ignorada: HTML
+    com 6 candidatas no painel e 1 no de habilitadas devolve 6 turmas, sucesso,
+    `unparsed` 0. Documento sem `#turmas-portal` tem zero candidatas e cai no
+    critério 5. O portal real tem **dois** `div#turmas-portal` (o segundo é
+    "matrícula em atividade", sem linhas); a fixture populada reproduz isso.
+12. `<br>` dentro de `td.info center` conta como quebra de linha: `period` é a
+    primeira parte. Fixture e HTML inline escrevem a célula como o portal, numa
+    linha só do fonte, `DIA HH:MM-HH:MM<br>DIA HH:MM-HH:MM<br>(datas)`.
+    Vermelho hoje: devolve as partes coladas.
+13. Candidata cujo `input[name="idTurma"]` não tem `value` conta como
+    `unparsed` (mesmo desfecho `SELECTOR_DRIFT` do critério 3). `id` nunca sai
+    `undefined` tipado como `string`.
 
 #### Verification
 
@@ -194,6 +209,12 @@ Notas, sem bloquear:
   `portal-selector-resilience.test.ts`.
 
 ## Comments
+
+- 2026-09-18, etapa 1 — **desbloqueado.** As duas propostas valem e viraram os
+  critérios 11 e 12; a nota do `.val() as string` virou o 13. Confirmado no dump
+  real: `#turmas-portal` ×2 (o segundo sem linhas), `#turmas-habilitadas` com a
+  7ª `idTurma`, célula de horário com `<br>` numa linha só. `selectors.ts` entrou
+  nos Primary files. Etapa 2 segue neste branch em cima de `7dd27d5`.
 
 - 2026-09-18, etapa 3 — **bloqueado; pergunta para a etapa 1.** Duas
   decisões, com proposta:
