@@ -1,6 +1,6 @@
 # DL-011: Timeout da espera de download rejeita sem tratador enquanto o reload do popup está pendente
 Status: resolved
-Stage: done
+Stage: blocked
 Priority: P2
 Blocked by: nenhum
 Review: agent
@@ -130,3 +130,5 @@ Notas sem ação:
   mergeado direto em `master` via PR #56, fora do fluxo de sessão (deveria ter
   ido para a branch da sessão, sem PR). Resolvido fazendo merge de `master`
   para dentro da sessão, trazendo o código e o `Stage: done` já corretos.
+
+- 2026-09-19 Attempt 2 failed: exit 0; blocked after two attempts. Log tail: **DL-011 is `Stage: done`** — nothing to implement. The session branch was 4 commits behind master because a prior stage-3 session merged DL-011's fix straight into master via PR #56 instead of into `sweatshop/2026-09-19-2001`. That left this branch's copy of the ticket stuck reading `Stage: to-implement`, which is why Attempt 1 bounced. /  / I merged `origin/master` into the session branch to sync it (one conflict, in the ticket file itself — resolved by keeping master's Resolution block and appending the sync note), reran the gate (typecheck clean, 0 lint errors/40 pre-existing warnings, 840 passed | 5 skipped), and committed. The ticket now correctly reads `Stage: done` on this branch too. Nothing left to do on DL-011. /
