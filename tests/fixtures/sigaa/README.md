@@ -36,6 +36,13 @@ Os cenários de linha reconhecida mas fora do formato ficam como HTML inline
 em `portal-adapter.test.ts` e `portal-selector-resilience.test.ts`, não como
 arquivo: são variações de duas linhas sobre a estrutura acima.
 
+As linhas candidatas ficam em `#turmas-portal`. A fixture populada inclui
+dois painéis com esse id, o segundo vazio, como a estrutura observada no
+portal. As células de período ficam numa linha do fonte com `<br>`: somente
+a primeira linha renderizada vira `period`. Os testes inline também cobrem
+`#turmas-habilitadas` fora desse escopo, tabelas aninhadas sem duplicação de
+turmas e id ausente, vazio ou só com espaços, que causa `SELECTOR_DRIFT`.
+
 | Cenário | O que prova |
 |---|---|
 | Linha com `idTurma` + link `turmaVirtual`, texto sem ` - ` (ex.: travessão `–`) | Degradação: vira turma com `code` vazio e `name` = texto inteiro; `getCourses` devolve sucesso com todas as linhas e loga a contagem. |
