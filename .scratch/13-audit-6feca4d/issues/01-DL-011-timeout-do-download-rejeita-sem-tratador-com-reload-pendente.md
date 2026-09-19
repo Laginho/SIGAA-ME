@@ -67,3 +67,7 @@ cai direto no `catch` externo existente.
   Usar `vi.useFakeTimers()` ou resolução por ordem de eventos; não esperar
   15s reais. Conferir com array de eventos que `download-timeout` vem antes
   de `reload-resolve` e que o resultado já é `success: false`.
+
+## Comments
+
+- 2026-09-19 Attempt 1 failed: exit 0. Log tail: DL-011 is already `Stage: done` — resolved and merged via PR #56, ledger recorded. Nothing to do. /
