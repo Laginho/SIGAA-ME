@@ -59,6 +59,22 @@ muda.
 
 #### Resolution (2026-09-19)
 
+Verdict: Approve
+
+Revisão de stage 3 (Opus): gate reproduzido localmente — 833 passed | 5
+skipped (838), typecheck limpo, lint 0 erros / 40 warnings preexistentes.
+Vermelho-verde conferido pelo revisor: com os dois arquivos de origem
+revertidos para `master`, 3 dos testes novos falham. Critérios 1 a 8
+atendidos. Consumidores checados: `sync-selection.ts:267` empilha em
+`failures` (que já bloqueia o `replaceSet`) e ainda assim mescla os
+cabeçalhos; `course-detail.ts:127` só mostra o toast. Cache preservado nos
+dois.
+
+Ressalva sem bloqueio, para virar ticket próprio: os corpos que carregaram
+são descartados no caminho de falha, então uma turma com uma notícia
+permanentemente quebrada nunca cacheia corpo nenhum, em nenhum sync. É a
+decisão do spec, não um desvio.
+
 Implementado em `b03ef03`. `loadAllNews` conta falhas e retorna a primeira
 classificação de erro com `N de M notícias sem conteúdo`. O scraper real
 retorna `error` textual; `failFromResult` mantém a conversão existente.
