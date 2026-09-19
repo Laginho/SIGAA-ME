@@ -208,12 +208,14 @@ export class DownloadService {
                     }
                 });
 
+                let reloadError: unknown;
                 try {
                     const reloadDownloadPromise = popup.waitForEvent('download', { timeout: 15000 });
                     // O reload em si dispara o download e o Chrome aborta a navegação
                     // (`net::ERR_ABORTED`); quem decide sucesso é `reloadDownloadPromise`,
-                    // não essa rejeição (DL-010).
-                    await popup.reload().catch(() => {});
+                    // não essa rejeição (DL-010). Guardada para o log de falha: sem ela,
+                    // um reload quebrado de verdade só aparece como timeout de 15s.
+                    await popup.reload().catch((e: unknown) => { reloadError = e; });
                     const download = await reloadDownloadPromise;
 
                     await download.saveAs(filePath + '.part');
@@ -244,7 +246,7 @@ export class DownloadService {
                     if (e.message === 'JSF_SESSION_EXPIRED') {
                         throw e; // BUBBLE IT UP!
                     }
-                    log.warn('Reload strategy failed.', { error: e });
+                    log.warn('Reload strategy failed.', { error: e, reloadError });
                     await popup.close();
                     return { success: false, error: 'Could not force download from popup' };
                 }
