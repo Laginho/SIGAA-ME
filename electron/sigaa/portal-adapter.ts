@@ -8,7 +8,7 @@
 import * as cheerio from 'cheerio';
 import type { AppErrorCode } from '../../shared/errors';
 import { AVA, LOGIN_SELECTOR_LABELS, STUDENT_PORTAL } from './selectors';
-import type { AvaForm, PortalCheck } from './portal-contracts';
+import type { AvaForm, PortalCheck, PortalError } from './portal-contracts';
 import { portalError } from './portal-contracts';
 import { isAccessDenied, isAuthenticatedLanding, isLoginDocument, isMaintenance, isStudentHome, isStudentPortal } from './portal-state-classifier';
 
@@ -73,6 +73,106 @@ export function validateCourseListDocument(html: string): PortalCheck {
         'SELECTOR_DRIFT',
         `SIGAA portal selector drift: the student portal structure (${STUDENT_PORTAL.courseIdInput}) was not found. The portal layout may have changed.`
     );
+}
+
+/**
+ * Linha da lista de turmas como o portal a entrega. `href`/`onclick` são
+ * internos do JSF e **não** atravessam o IPC: `SigaaService` reduz isto a
+ * `CourseSummary` (shared/domain.ts). `code` fica vazio quando o texto do
+ * link não tem o separador ` - ` (PORTAL-013); `period`, quando a célula não
+ * existe.
+ */
+export interface ParsedCourse {
+    id: string;
+    code: string;
+    name: string;
+    period: string;
+    href: string | null;
+    onclick: string | null;
+}
+
+/** `type`, não `interface`: precisa casar com o `Record<string, number>` do diagnóstico estrutural. */
+export type CourseListSelectorCounts = {
+    courseIdInputs: number;
+    virtualClassroomLinks: number;
+};
+
+export type CourseListExtraction =
+    | { success: true; courses: ParsedCourse[]; degraded: number; selectorCounts: CourseListSelectorCounts }
+    | { success: false; error: PortalError; selectorCounts: CourseListSelectorCounts };
+
+/**
+ * Extrai a lista de turmas do HTML do portal (PORTAL-013). Candidata é a `tr`
+ * mais próxima do input de id dentro do painel de turmas do semestre;
+ * toda candidata vira turma ou derruba a operação —
+ * não existe "ignorar". Sem ` - ` no texto do link é degradação (`code`
+ * vazio, `name` inteiro, contada em `degraded`); sem link ou com texto vazio
+ * é `SELECTOR_DRIFT`: os seletores existem, a estrutura que os relaciona
+ * mudou — assim como o painel sumir com linhas de turma ainda na página.
+ * Zero candidatas sem nenhuma linha é sucesso com lista vazia — quem decide
+ * entre `NOT_FOUND`, sessão e manutenção é `validateCourseListDocument`.
+ */
+export function extractCourseList(html: string): CourseListExtraction {
+    const $ = cheerio.load(html);
+    const panel = $(STUDENT_PORTAL.coursesPanel);
+    const courseInputs = panel.find(STUDENT_PORTAL.courseIdInput);
+    const selectorCounts: CourseListSelectorCounts = {
+        courseIdInputs: courseInputs.length,
+        virtualClassroomLinks: panel.find(STUDENT_PORTAL.virtualClassroomLink).length
+    };
+    // Painel ausente com linhas de turma na página é deriva, não conta vazia:
+    // sem isto o ramo de zero turmas devolveria NOT_FOUND ("sessão"), porque
+    // `isStudentPortal` acha os dois seletores fora do painel.
+    if (panel.length === 0 && $(STUDENT_PORTAL.courseIdInput).length > 0) {
+        return {
+            success: false,
+            selectorCounts,
+            error: portalError(
+                'SELECTOR_DRIFT',
+                `SIGAA portal selector drift: the semester course panel (${STUDENT_PORTAL.coursesPanel}) is missing, but the page still has ${STUDENT_PORTAL.courseIdInput} rows. The portal layout may have changed.`
+            )
+        };
+    }
+    const candidates = courseInputs.closest('tr');
+
+    const courses: ParsedCourse[] = [];
+    let degraded = 0;
+    let unparsed = 0;
+    candidates.each((_, row) => {
+        const $row = $(row);
+        const link = $row.find(STUDENT_PORTAL.virtualClassroomLink).first();
+        const fullText = link.text().trim();
+        const id = $row.find(STUDENT_PORTAL.courseIdInput).first().attr('value')?.trim();
+        if (!id || link.length === 0 || fullText.length === 0) {
+            unparsed++;
+            return;
+        }
+        const separator = fullText.indexOf(' - ');
+        if (separator === -1) degraded++;
+        const periodCell = $row.find('td.info center').first();
+        periodCell.find('br').replaceWith('\n');
+        const periodText = periodCell.text().trim();
+        courses.push({
+            id,
+            code: separator === -1 ? '' : fullText.slice(0, separator).trim(),
+            name: separator === -1 ? fullText : fullText.slice(separator + 3).trim(),
+            period: periodText.split('\n')[0].trim(),
+            href: link.attr('href') ?? null,
+            onclick: link.attr('onclick') ?? null
+        });
+    });
+
+    if (unparsed > 0) {
+        return {
+            success: false,
+            selectorCounts,
+            error: portalError(
+                'SELECTOR_DRIFT',
+                `SIGAA portal selector drift: ${unparsed} de ${candidates.length} linhas de turma não foram interpretadas (missing course id or usable ${STUDENT_PORTAL.virtualClassroomLink}). The portal layout may have changed.`
+            )
+        };
+    }
+    return { success: true, courses, degraded, selectorCounts };
 }
 
 export function describeMissingCourseListSelectors(courseIdInputs: number, virtualClassroomLinks: number): string {

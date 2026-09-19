@@ -156,10 +156,6 @@ describe('Playwright portal navigation resilience', () => {
     it('reports a portal-layout change when neither course selector exists and the page has no authenticated landmark', async () => {
         const { browser, page } = createNavigationHarness();
         page.content.mockResolvedValue('<main>Unexpected layout</main>');
-        page.evaluate.mockResolvedValue({
-            courses: [],
-            selectorDiagnostics: { courseIdInputs: 0, virtualClassroomLinks: 0 }
-        });
         const service = new PlaywrightLoginService();
         (service as any).storedCookies = [{ name: 'JSESSIONID', value: 'valid', domain: 'si3.ufc.br' }];
 
@@ -172,11 +168,7 @@ describe('Playwright portal navigation resilience', () => {
     });
 
     it('fails instead of returning a silent empty course list when the page is authenticated but has zero course rows (PORTAL-010)', async () => {
-        const { browser, page } = createNavigationHarness();
-        page.evaluate.mockResolvedValue({
-            courses: [],
-            selectorDiagnostics: { courseIdInputs: 0, virtualClassroomLinks: 0 }
-        });
+        const { browser } = createNavigationHarness();
         const service = new PlaywrightLoginService();
         (service as any).storedCookies = [{ name: 'JSESSIONID', value: 'valid', domain: 'si3.ufc.br' }];
 
@@ -188,11 +180,7 @@ describe('Playwright portal navigation resilience', () => {
     });
 
     it('does not reuse SELECTOR_DRIFT for a zero-course authenticated page, so it never re-arms the compatibility kill-switch (PORTAL-010)', async () => {
-        const { page } = createNavigationHarness();
-        page.evaluate.mockResolvedValue({
-            courses: [],
-            selectorDiagnostics: { courseIdInputs: 0, virtualClassroomLinks: 0 }
-        });
+        createNavigationHarness();
         const service = new PlaywrightLoginService();
         (service as any).storedCookies = [{ name: 'JSESSIONID', value: 'valid', domain: 'si3.ufc.br' }];
 
@@ -204,10 +192,6 @@ describe('Playwright portal navigation resilience', () => {
     it('reports scheduled maintenance as a retryable portal-unavailable error, not selector drift (PORTAL-008)', async () => {
         const { browser, page } = createNavigationHarness();
         page.content.mockResolvedValue('<h1>Sistema em Manutenção</h1><p>Tente novamente mais tarde.</p>');
-        page.evaluate.mockResolvedValue({
-            courses: [],
-            selectorDiagnostics: { courseIdInputs: 0, virtualClassroomLinks: 0 }
-        });
         const service = new PlaywrightLoginService();
         (service as any).storedCookies = [{ name: 'JSESSIONID', value: 'valid', domain: 'si3.ufc.br' }];
 
@@ -220,10 +204,6 @@ describe('Playwright portal navigation resilience', () => {
     it('reports access denied as an expired session that relogin can resolve, not selector drift (PORTAL-008)', async () => {
         const { browser, page } = createNavigationHarness();
         page.content.mockResolvedValue('<h1>Acesso Negado</h1><p>Você não tem permissão para acessar esta página.</p>');
-        page.evaluate.mockResolvedValue({
-            courses: [],
-            selectorDiagnostics: { courseIdInputs: 0, virtualClassroomLinks: 0 }
-        });
         const service = new PlaywrightLoginService();
         (service as any).storedCookies = [{ name: 'JSESSIONID', value: 'valid', domain: 'si3.ufc.br' }];
 
@@ -231,6 +211,82 @@ describe('Playwright portal navigation resilience', () => {
 
         expect(result).toMatchObject({ success: false, errorCode: 'SESSION_EXPIRED' });
         expect(browser.close).toHaveBeenCalledOnce();
+    });
+
+    describe('course list extraction from page.content() (PORTAL-013)', () => {
+        const row = (id: string, cell: string) =>
+            `<tr><td><input type="hidden" name="idTurma" value="${id}"></td><td>${cell}</td><td class="info"><center>SEG 08:00-10:00<br>QUA 08:00-10:00<br>(datas)</center></td></tr>`;
+        const link = (id: string, text: string) =>
+            `<a id="formTurma:turmaVirtual${id}" href="#" onclick="jsfcljs(document.forms['formTurma'],'idTurma,${id}','');return false;">${text}</a>`;
+        const portal = (rows: string) => `<h1>Portal do Discente</h1><div id="turmas-portal"><form name="formTurma"><table>${rows}</table></form></div>`;
+
+        function authenticatedService() {
+            const harness = createNavigationHarness();
+            const service = new PlaywrightLoginService();
+            (service as any).storedCookies = [{ name: 'JSESSIONID', value: 'valid', domain: 'si3.ufc.br' }];
+            return { ...harness, service };
+        }
+
+        it('extracts the courses from the HTML instead of running page.evaluate', async () => {
+            const { page, service } = authenticatedService();
+            page.content.mockResolvedValue(portal(
+                row('1', link('1', 'CK0001 - Course One')) +
+                row('2', link('2', 'CK0002 - Course Two'))
+            ));
+
+            const result = await service.getCourses();
+
+            expect(result.success).toBe(true);
+            expect(result.courses).toHaveLength(2);
+            expect(result.courses?.[0]).toMatchObject({ id: '1', code: 'CK0001', name: 'Course One', period: 'SEG 08:00-10:00' });
+            expect(page.evaluate).not.toHaveBeenCalled();
+        });
+
+        it('keeps a row without the " - " separator as a course with empty code and warns with the count', async () => {
+            const { page, service } = authenticatedService();
+            page.content.mockResolvedValue(portal(
+                row('1', link('1', 'CK0001 - Course One')) +
+                row('2', link('2', 'CK0002 – Course Two'))
+            ));
+
+            const result = await service.getCourses();
+
+            expect(result.success).toBe(true);
+            expect(result.courses).toHaveLength(2);
+            expect(result.courses?.[1]).toMatchObject({ id: '2', code: '', name: 'CK0002 – Course Two' });
+            expect(runtime.logger.warn).toHaveBeenCalledWith(expect.stringContaining('1'), expect.anything());
+        });
+
+        it('fails with SELECTOR_DRIFT, records one diagnostic and closes the browser when a candidate row has no virtual classroom link', async () => {
+            const { browser, page, service } = authenticatedService();
+            page.content.mockResolvedValue(portal(
+                row('1', link('1', 'CK0001 - Course One')) +
+                row('2', 'Course Two')
+            ));
+
+            const result = await service.getCourses();
+
+            expect(result).toMatchObject({ success: false, errorCode: 'SELECTOR_DRIFT' });
+            expect(result.courses).toBeUndefined();
+            expect(result.error).toContain('1 de 2');
+            expect(recordSpy).toHaveBeenCalledTimes(1);
+            expect(recordSpy.mock.calls[0][0]).toMatchObject({ selectorCounts: { courseIdInputs: 2, virtualClassroomLinks: 1 } });
+            expect(browser.close).toHaveBeenCalledOnce();
+        });
+
+        it('never succeeds with fewer courses than candidate rows', async () => {
+            const { page, service } = authenticatedService();
+            page.content.mockResolvedValue(portal(
+                row('1', link('1', 'CK0001 - Course One')) +
+                row('2', link('2', '')) +
+                row('3', link('3', 'CK0003 - Course Three'))
+            ));
+
+            const result = await service.getCourses();
+
+            expect(result.success).toBe(false);
+            expect(result.errorCode).toBe('SELECTOR_DRIFT');
+        });
     });
 
     it('does not silently continue when the files navigation selector is absent', async () => {
@@ -423,10 +479,6 @@ describe('Diagnóstico estrutural nos pontos de falha (PORTAL-003)', () => {
     function driftingCourseList() {
         const harness = createNavigationHarness();
         harness.page.content.mockResolvedValue('<main>Unexpected layout</main>');
-        harness.page.evaluate.mockResolvedValue({
-            courses: [],
-            selectorDiagnostics: { courseIdInputs: 0, virtualClassroomLinks: 0 }
-        });
         const service = new PlaywrightLoginService();
         (service as any).storedCookies = [{ name: 'JSESSIONID', value: 'valid', domain: 'si3.ufc.br' }];
         return { ...harness, service };
@@ -471,16 +523,16 @@ describe('Diagnóstico estrutural nos pontos de falha (PORTAL-003)', () => {
         expect(runtime.logger.error).toHaveBeenCalled();
     });
 
-    it('preserva o SELECTOR_DRIFT quando nem o HTML da página pode ser lido', async () => {
+    it('reusa o HTML lido para a extração no diagnóstico: uma leitura para o login, uma para o portal (PORTAL-013)', async () => {
+        // Antes do PORTAL-013 o diagnóstico buscava `page.content()` de novo e
+        // precisava sobreviver a uma falha dessa leitura. Agora o HTML já está
+        // em mãos: a validação, a extração e o diagnóstico usam a mesma string.
         const { page, service } = driftingCourseList();
-        const document = await page.content();
-        page.content
-            .mockResolvedValueOnce(document)
-            .mockRejectedValueOnce(new Error('Target page, context or browser has been closed'));
 
         const result = await service.getCourses();
 
         expect(result.errorCode).toBe('SELECTOR_DRIFT');
+        expect(page.content).toHaveBeenCalledTimes(2);
         expect(recordSpy).toHaveBeenCalledTimes(1);
         expect(recordSpy.mock.calls[0][0]).toMatchObject({ state: 'UNKNOWN' });
     });

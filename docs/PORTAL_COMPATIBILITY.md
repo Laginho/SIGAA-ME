@@ -207,6 +207,43 @@ real user population — a student with none does not install the app — so
 `getCourses` now reports it as an error (`NOT_FOUND`, not `SELECTOR_DRIFT`)
 instead of succeeding silently with `courses: []`.
 
+A third category sits between those two (PORTAL-013): a page whose course
+rows exist but cannot all be interpreted. `extractCourseList` treats every
+nearest `<tr>` carrying `input[name="idTurma"]` inside `#turmas-portal`
+as a candidate. Other panels, including `#turmas-habilitadas`, are ignored.
+A candidate has
+exactly two possible outcomes. With a `turmaVirtual` link and non-empty text
+it becomes a course — without the ` - ` separator the code is left empty and
+the whole text becomes the name, which is degradation, logged with a count.
+Without a non-empty id or link, or with empty link text, `getCourses` fails with
+`SELECTOR_DRIFT` ("N de M linhas"), records a structural diagnostic and
+closes the browser. It never succeeds with fewer courses than candidate rows:
+a partial list is never allowed to replace the cache, and in the renderer any
+entry rejected by the shape guard aborts the sync with the previous cache left
+intact. `SELECTOR_DRIFT` is the right code here, unlike the zero-row case:
+the selectors exist and the structure relating them changed, which is the
+documented meaning of the code.
+
+The panel itself is a structural dependency, so it is checked like any other
+selector: if `#turmas-portal` is gone while the page still has
+`input[name="idTurma"]` rows, that is `SELECTOR_DRIFT`, not an empty list.
+Without that check a renamed panel would reach the zero-row branch and be
+reported as `NOT_FOUND` ("session or access problem"), with no structural
+diagnostic and with the PORTAL-008 kill-switch never arming — the exact layout
+change both exist to catch.
+
+The blast radius of the all-or-nothing rule is deliberate and total: a single
+uninterpretable candidate row stops every sync, not just that course. The page
+already contains `input[name="idTurma"]` without a `turmaVirtual` link today
+(under `#turmas-habilitadas`), so a portal that ever renders such a row inside
+`#turmas-portal` — a course with no virtual classroom — would take the whole
+sync down and arm the kill-switch. That is preferred over silently caching a
+shorter course list, but it means a drift report here is an outage, not a
+degradation.
+
+The first rendered line of `td.info center` supplies `period`; HTML `<br>`
+elements count as line breaks even without newlines in the source.
+
 ## Structural fingerprints
 
 A fingerprint should detect layout change without retaining personal text.

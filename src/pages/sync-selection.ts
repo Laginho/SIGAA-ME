@@ -217,19 +217,15 @@ async function startSync(app: HTMLDivElement, mode: 'fast' | 'full') {
     const courses = received.filter(isCourseLike);
     const coursesWithContent: CourseSnapshot[] = [];
 
-    // Zero disciplinas utilizáveis num retorno não vazio significa que o
-    // formato mudou — deriva de seletor, não "aluno sem matrícula". Falhar
-    // alto aqui é melhor que sincronizar dados vazios em cima do cache bom.
-    if (courses.length === 0 && received.length > 0) {
+    // Qualquer disciplina descartada significa que o formato mudou — deriva de
+    // seletor ou contrato IPC quebrado, não "aluno sem matrícula". O main já
+    // garante lista completa (PORTAL-013); sincronizar as demais e substituir
+    // o conjunto apagaria do cache as turmas ausentes e as notícias offline
+    // delas. Falhar alto aqui deixa o cache anterior intacto.
+    if (courses.length < received.length) {
       throw new Error(
         `O SIGAA devolveu ${received.length} disciplina(s) em formato desconhecido. ` +
         'O app provavelmente precisa ser atualizado.'
-      );
-    }
-
-    if (courses.length < received.length) {
-      console.warn(
-        `${received.length - courses.length} de ${received.length} disciplinas ignoradas por não terem id/name utilizáveis.`
       );
     }
 

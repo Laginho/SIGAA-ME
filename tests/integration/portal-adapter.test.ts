@@ -16,13 +16,18 @@ const runtime = vi.hoisted(() => {
 vi.mock('axios', () => ({ default: runtime.axios }));
 vi.mock('playwright', () => ({ chromium: runtime.chromium }));
 vi.mock('electron', () => ({ app: { isPackaged: true, getPath: () => 'C:/tmp/portal-tests' } }));
-vi.mock('fs', () => ({ createWriteStream: () => runtime.stream }));
+vi.mock('fs', async importOriginal => {
+    const actual = await importOriginal<typeof import('fs')>();
+    return { ...actual, createWriteStream: () => runtime.stream };
+});
 vi.mock('../../electron/services/logger.service', () => ({ logger: runtime.logger }));
 
+import { readFileSync } from 'fs';
+import path from 'path';
 import { HttpScraperService } from '../../electron/services/http-scraper.service';
 import { PlaywrightLoginService } from '../../electron/services/playwright-login.service';
 import { SigaaService } from '../../electron/services/sigaa.service';
-import { validateCourseListDocument } from '../../electron/sigaa/portal-adapter';
+import { PORTAL_ADAPTER_VERSION, extractCourseList, validateCourseListDocument } from '../../electron/sigaa/portal-adapter';
 
 // Synthetic documents, never captured from an authenticated session.
 const loginHtml = '<form action="/sigaa/logar.do"><input name="user.login"><input name="user.senha"><input name="entrar" type="submit"></form>';
@@ -166,4 +171,131 @@ describe('PORTAL-001: production service compatibility boundary', () => {
             });
         }
     );
+});
+
+describe('PORTAL-013: course list extraction is a pure adapter function', () => {
+    const fixture = (name: string) =>
+        readFileSync(path.join(process.cwd(), 'tests/fixtures/sigaa', PORTAL_ADAPTER_VERSION, name), 'utf8');
+
+    function row(id: string, cell: string) {
+        return `<tr><td><input type="hidden" name="idTurma" value="${id}"></td><td>${cell}</td></tr>`;
+    }
+    function link(id: string, text: string) {
+        return `<a id="formTurma:turmaVirtual${id}" href="#" onclick="jsfcljs(document.forms['formTurma'],'idTurma,${id}','');return false;">${text}</a>`;
+    }
+    const portal = (rows: string) => `<h1>Portal do Discente</h1><div id="turmas-portal"><form name="formTurma"><table>${rows}</table></form></div>`;
+
+    it('reports drift when the semester panel is gone but the page still has course rows', () => {
+        // Sem esta guarda o painel renomeado vira "zero turmas": o ramo do
+        // PORTAL-010 devolveria NOT_FOUND ("problema de sessão"), sem
+        // diagnóstico estrutural e sem armar o kill-switch do PORTAL-008 —
+        // justamente a mudança de layout que ele existe para pegar.
+        const renamed = portal(row('1', link('1', 'CK0001 - Course One')))
+            .replace('id="turmas-portal"', 'id="portal-turmas"');
+
+        const result = extractCourseList(renamed);
+
+        expect(result.success).toBe(false);
+        if (result.success) return;
+        expect(result.error.code).toBe('SELECTOR_DRIFT');
+        expect(result.error.message).toContain('#turmas-portal');
+    });
+
+    it('treats a page with no course rows at all as an empty list, not drift', () => {
+        expect(extractCourseList('<h1>Portal do Discente</h1><div class="nome_usuario">Aluno</div>'))
+            .toMatchObject({ success: true, courses: [] });
+    });
+
+    it('ignores enabled classrooms outside the semester panels, including duplicate panel ids', () => {
+        const result = extractCourseList(portal(row('1', link('1', 'CK0001 - Course One'))) +
+            '<div id="turmas-portal"></div><div id="turmas-habilitadas"><table>' +
+            row('2', '<a id="form:turmasVirtuaisHabilitadas">2026.1 - Other Course</a>') + '</table></div>');
+        expect(result).toMatchObject({ success: true, courses: [{ id: '1' }],
+            selectorCounts: { courseIdInputs: 1, virtualClassroomLinks: 1 } });
+    });
+
+    it('counts the nearest course row only inside nested layout tables', () => {
+        const result = extractCourseList(portal('<tr><td><table>' +
+            row('1', link('1', 'CK0001 - Course One')) + '</table></td></tr>'));
+        expect(result).toMatchObject({ success: true, courses: [{ id: '1' }] });
+    });
+
+    it('uses the first rendered schedule line when HTML has br without source newlines', () => {
+        const result = extractCourseList(portal('<tr><td><input name="idTurma" value="1">' +
+            link('1', 'CK0001 - Course One') + '</td><td class="info"><center>SEG 08:00-10:00<br>QUA 08:00-10:00<br>(datas)</center></td></tr>'));
+        expect(result).toMatchObject({ success: true, courses: [{ period: 'SEG 08:00-10:00' }] });
+    });
+
+    it.each(['', ' value=""', ' value="   "'])('rejects an unusable course id: %s', (value) => {
+        const result = extractCourseList(portal('<tr><td><input name="idTurma"' + value + '>' +
+            link('1', 'CK0001 - Course One') + '</td></tr>'));
+        expect(result.success).toBe(false);
+        if (result.success) return;
+        expect(result.error.code).toBe('SELECTOR_DRIFT');
+        expect(result.error.message).toContain('1 de 1');
+    });
+
+    it('extracts every course of the realistic populated fixture with id, code, name and period filled', () => {
+        const result = extractCourseList(fixture('student-portal-populated.html'));
+
+        expect(result.success).toBe(true);
+        if (!result.success) return;
+        expect(result.courses).toHaveLength(3);
+        expect(result.degraded).toBe(0);
+        for (const course of result.courses) {
+            expect(course.id).toMatch(/^\d+$/);
+            expect(course.code).toMatch(/^[A-Z]{2}\d{4}$/);
+            expect(course.name.length).toBeGreaterThan(0);
+            expect(course.period).toBe('SEG 08:00-10:00');
+            expect(course.onclick).toContain('jsfcljs');
+        }
+        expect(result.courses[0]).toMatchObject({ id: '99991', code: 'CB0001', name: 'Cálculo I' });
+        // Only the first ` - ` splits: the rest of the text stays in the name.
+        expect(result.courses[2]).toMatchObject({ code: 'CK0181', name: 'Programação Orientada a Objetos - Turma B' });
+    });
+
+    it('keeps a candidate without the " - " separator as a course with empty code and the whole text as name (degradation, not loss)', () => {
+        const result = extractCourseList(portal(
+            row('1', link('1', 'CK0001 - Course One')) +
+            row('2', link('2', 'CK0002 – Course Two'))
+        ));
+
+        expect(result.success).toBe(true);
+        if (!result.success) return;
+        expect(result.courses).toHaveLength(2);
+        expect(result.degraded).toBe(1);
+        expect(result.courses[0]).toMatchObject({ id: '1', code: 'CK0001', name: 'Course One' });
+        expect(result.courses[1]).toMatchObject({ id: '2', code: '', name: 'CK0002 – Course Two' });
+    });
+
+    it('fails with SELECTOR_DRIFT when a candidate row has no virtual classroom link, naming how many rows were not interpreted', () => {
+        const result = extractCourseList(portal(
+            row('1', link('1', 'CK0001 - Course One')) +
+            row('2', 'Course Two')
+        ));
+
+        expect(result.success).toBe(false);
+        if (result.success) return;
+        expect(result.error.code).toBe('SELECTOR_DRIFT');
+        expect(result.error.message).toContain('1 de 2');
+        expect(result.selectorCounts).toEqual({ courseIdInputs: 2, virtualClassroomLinks: 1 });
+    });
+
+    it('fails with SELECTOR_DRIFT when a candidate row has a link with empty text', () => {
+        const result = extractCourseList(portal(
+            row('1', link('1', '   ')) +
+            row('2', link('2', 'CK0002 - Course Two'))
+        ));
+
+        expect(result.success).toBe(false);
+        if (result.success) return;
+        expect(result.error.code).toBe('SELECTOR_DRIFT');
+        expect(result.error.message).toContain('1 de 2');
+    });
+
+    it('returns zero courses (not a failure) for a document with no candidate rows, leaving the classification to the caller', () => {
+        const result = extractCourseList('<h1>Portal do Discente</h1><span class="nome_usuario">User</span>');
+
+        expect(result).toMatchObject({ success: true, courses: [], degraded: 0, selectorCounts: { courseIdInputs: 0, virtualClassroomLinks: 0 } });
+    });
 });
