@@ -61,6 +61,22 @@ promises originais, então o evento de download não se perde e a ordem
 
 #### Resolution (2026-09-19)
 
+Verdict: Approve
+
+Revisão de stage 3 (Opus): gate reproduzido localmente — 833 passed | 5
+skipped (838), typecheck limpo, lint 0 erros / 40 warnings preexistentes.
+Vermelho conferido pelo revisor: com `download.service.ts` revertido para
+`master`, o arquivo de teste novo produz 4 rejeições não tratadas. O
+`.catch()` mudo não engole erro do race — ele observa uma promise derivada,
+e o `Promise.race` continua consumindo a original.
+
+Nota: a correção cobre mais do que o título do ticket. A espera perdedora
+também rejeitava sem tratamento 60s depois de um download bem-sucedido, e
+isso some junto. A regressão prova a ausência de rejeição global pelo
+relatório do vitest, não por asserção explícita — se algum dia o vitest for
+configurado para tolerar `unhandledRejection`, o teste fica vazio em
+silêncio.
+
 Implementado em `994bcf0`. Ambas as esperas recebem tratamento de rejeição
 imediato; o race usa as promises originais e os listeners precedem a ação.
 
