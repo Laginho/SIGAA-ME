@@ -1,7 +1,6 @@
 import { chromium, Browser, BrowserContext, Page } from 'playwright';
-import { app } from 'electron';
 import { logger } from './logger.service';
-import { buildStructuralDiagnostic, diagnosticsService, shouldCaptureRawArtifact } from './diagnostics.service';
+import { buildStructuralDiagnostic, diagnosticsService } from './diagnostics.service';
 import type { NewsDetail } from '../../shared/domain';
 import { classifyMessage, type AppErrorCode } from '../../shared/errors';
 import { COURSE_HOME, FILES_MENU, LOGIN, NEWS, STUDENT_HOME, STUDENT_PORTAL, newsFormSelector } from '../sigaa/selectors';
@@ -9,27 +8,18 @@ import {
     classifyLoginEnd,
     classifyLoginException,
     describeMissingCourseListSelectors,
+    extractCourseList,
     isLoginDocument,
     validateCourseListDocument,
     validateLoginStart,
-    PORTAL_ADAPTER_VERSION
+    PORTAL_ADAPTER_VERSION,
+    type ParsedCourse
 } from '../sigaa/portal-adapter';
 
-const log = logger.scope('PlaywrightLogin');
+// O tipo mora no adapter desde o PORTAL-013; `sigaa.service.ts` importa daqui.
+export type { ParsedCourse } from '../sigaa/portal-adapter';
 
-/**
- * Linha da lista de turmas como o portal a entrega. `href`/`onclick` são
- * internos do JSF e **não** atravessam o IPC: `SigaaService` reduz isto a
- * `CourseSummary` (shared/domain.ts).
- */
-export interface ParsedCourse {
-    id: string;
-    code: string;
-    name: string;
-    period: string;
-    href: string | null;
-    onclick: string | null;
-}
+const log = logger.scope('PlaywrightLogin');
 
 /**
  * Decides whether the loaded turma virtual page belongs to the expected course,
@@ -317,64 +307,30 @@ export class PlaywrightLoginService {
             // Wait a bit for dynamic content
             await page.waitForTimeout(1000);
 
-            // DEBUG: Save portal page HTML for professor selector inspection (dev only).
-            // Guarda de exceção ao critério 6 do OBS-003: aqui, diferente dos outros
-            // dumps, o fetch de `page.content()` só existe para o dump — gatear antes
-            // dele evita um round-trip a mais no Chromium quando o resultado seria
-            // descartado, e preserva a contagem de chamadas de
-            // `portal-selector-resilience.test.ts` (fora do escopo desta ticket).
-            if (shouldCaptureRawArtifact(app.isPackaged, false)) {
-                const portalHtml = await page.content().catch(() => '');
-                if (portalHtml) diagnosticsService.saveRaw('debug_portal_page.html', portalHtml);
+            // One `page.content()` feeds the dev dump, the extraction and the
+            // page-state validation below (PORTAL-013): the parser runs on the
+            // same HTML the tests can hand it as a fixture, never inside
+            // `page.evaluate`.
+            const html = await page.content();
+            diagnosticsService.saveRaw('debug_portal_page.html', html); // gated by shouldCaptureRawArtifact inside
+
+            log.info('Playwright: Extracting courses from page...');
+            const extraction = extractCourseList(html);
+            const selectorDiagnostics = extraction.selectorCounts;
+            if (!extraction.success) {
+                // Candidate rows the parser could not turn into courses: the
+                // selectors exist, the structure relating them changed. Never
+                // succeed with fewer courses than rows.
+                this.recordDiagnostic(html, page.url(), selectorDiagnostics);
+                await this.close();
+                return { success: false, errorCode: extraction.error.code, error: extraction.error.message };
             }
 
-            // Extract courses with robust selector-based logic
-            log.info('Playwright: Extracting courses from page...');
-            const courseExtraction = await page.evaluate((sel) => {
-                const results: ParsedCourse[] = [];
-                // Find all rows that might contain courses
-                const rows = document.querySelectorAll('tr');
-
-                for (const row of rows) {
-                    // Look for the hidden ID input and the course link
-                    const idInput = row.querySelector(sel.courseIdInput) as HTMLInputElement;
-                    const nameLink = row.querySelector(sel.virtualClassroomLink);
-                    const periodCell = row.querySelector('td.info center'); // Period is often in a center tag
-
-                    if (idInput && nameLink && nameLink.textContent) {
-                        const fullText = nameLink.textContent.trim();
-                        const id = idInput.value;
-
-                        // Course codes follow pattern: 2 letters + 4 digits (e.g., CB0699, CK0181)
-                        // Format usually: "CODE - NAME"
-                        const parts = fullText.split(' - ');
-
-                        if (parts.length >= 2) {
-                            results.push({
-                                id: id,
-                                code: parts[0].trim(),
-                                name: parts.slice(1).join(' - ').trim(),
-                                period: periodCell ? (periodCell as HTMLElement).innerText.split('\n')[0] : '',
-                                href: nameLink.getAttribute('href'),
-                                onclick: nameLink.getAttribute('onclick')
-                                // Note: Professor name is not available in portal list view
-                            });
-                        }
-                    }
-                }
-
-                return {
-                    courses: results,
-                    selectorDiagnostics: {
-                        courseIdInputs: document.querySelectorAll(sel.courseIdInput).length,
-                        virtualClassroomLinks: document.querySelectorAll(sel.virtualClassroomLink).length
-                    }
-                };
-            }, { courseIdInput: STUDENT_PORTAL.courseIdInput, virtualClassroomLink: STUDENT_PORTAL.virtualClassroomLink });
-
-            const { courses, selectorDiagnostics } = courseExtraction;
-            if (selectorDiagnostics.courseIdInputs === 0 || selectorDiagnostics.virtualClassroomLinks === 0) {
-                const html = await page.content().catch(() => '');
+            const { courses } = extraction;
+            if (extraction.degraded > 0) {
+                log.warn(`Playwright: ${extraction.degraded} of ${courses.length} course rows had no " - " separator; kept with an empty code.`, { degraded: extraction.degraded });
+            }
+            if (courses.length === 0) {
                 // Zero linhas de turma sozinho não é drift: pode ser conta
                 // autenticada sem turmas (fim de semestre, calouro), manutenção
                 // programada ou acesso negado — `validateCourseListDocument`

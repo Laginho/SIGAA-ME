@@ -170,6 +170,7 @@ export async function renderSettingsPage(container: HTMLDivElement) {
       return;
     }
     toast.success('Preferência de download limpa. Perguntará novamente no próximo download.');
+    if (window.location.hash !== routeAtMount) return;
     renderSettingsPage(container); // Re-render to update UI
   });
 
