@@ -101,3 +101,29 @@ Testes: `1f71e10`. Correção: `70d7860`.
   Rodado fora do sandbox após timeouts na inicialização de workers no sandbox.
 - `git diff --check` limpo. Sem login real no SIGAA, build ou E2E; não exigidos
   para esta correção de serviço.
+
+#### Revisão (2026-09-20) — Opus 5, etapa 3
+
+Verdict: Approve
+
+- Prova vermelha reconferida aqui, não aceita do relatório: fonte revertida
+  para `70d7860^` com os testes de `1f71e10` no lugar — **9 failed | 14 passed
+  (23)** em `download-part-collision` + `download-real`. Restaurada, gate verde.
+- Gate no Windows: typecheck limpo, lint 0 erros / 39 warnings, **79 arquivos,
+  858 passed | 5 skipped (863)**.
+- Critérios 1–8 conferidos. 1 e 2 vêm do `describe.each` sobre os quatro
+  transportes, 3 do caso HTML, 4 do caso sem colisão, 5 de `grep -rn '\.part'
+  electron/` (zero concatenações literais restantes), 7 de `git show --stat`.
+- Separação test-only/código confirmada por `git show --stat`: `1f71e10` toca
+  só `tests/`, `70d7860` só `electron/services/`.
+- Os testes chamam `DownloadService` e `HttpScraperService` reais; não há cópia
+  da lógica.
+- Letra do critério 1 diz `notes`, o arquivo final é `notes.pdf` — decisão de
+  `finalizeDownload`, já declarada na Resolution. Aceito.
+- `download-real.test.ts` ("conexão interrompida") passa antes e depois da
+  correção: ele guarda a janela nova que o `await reserveDownloadPart` abriu,
+  não o bug original. A captura de `earlyStreamError` existe só por causa dela;
+  uma reserva síncrona dispensaria as ~15 linhas. Não troquei: assíncrono é o
+  estilo do resto do arquivo, e a janela está coberta por teste.
+- Processo: `spec.md` e `docs/audits/2026-09-20-a80ac9d.md` tinham ficado fora
+  do git; entram neste commit. Sem isso o ticket cita um arquivo inexistente.
