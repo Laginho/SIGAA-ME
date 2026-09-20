@@ -11,6 +11,7 @@ import * as path from 'path';
 import { logger } from './logger.service';
 import { resolveDownloadTarget, ensureDirInsideRoot } from './download-path';
 import { finalizeDownload, MAX_DOWNLOAD_BYTES } from './file-validation.service';
+import { errorMessage } from '../../shared/errors';
 
 const log = logger.scope('Download');
 
@@ -54,14 +55,29 @@ export class DownloadService {
             // JSF redirectors often serve PDFs but the "suggestedFilename" from the browser
             // says ".html" because the redirect response header is text/html.
             let detectedContentType: string | null = null;
+            let reportRouteFailure!: (error: unknown) => void;
+            // Route callbacks run outside this method's try/catch. Resolve an
+            // outcome so even a failure before the race has no unhandled rejection.
+            const routeFailure = new Promise<{ type: 'route-error'; error: unknown }>(resolve => {
+                reportRouteFailure = error => resolve({ type: 'route-error', error });
+            });
             await page.route('**/*', async (route) => {
-                const response = await route.fetch();
-                const ct = response.headers()['content-type'] || '';
-                // Capture the type if it's a document, not a page resource
-                if (ct && !ct.includes('text/html') && !ct.includes('javascript') && !ct.includes('css') && !ct.includes('image/')) {
-                    detectedContentType = ct.split(';')[0].trim();
+                try {
+                    const response = await route.fetch();
+                    const ct = response.headers()['content-type'] || '';
+                    // Capture the type if it's a document, not a page resource
+                    if (ct && !ct.includes('text/html') && !ct.includes('javascript') && !ct.includes('css') && !ct.includes('image/')) {
+                        detectedContentType = ct.split(';')[0].trim();
+                    }
+                    await route.fulfill({ response });
+                } catch (error) {
+                    try {
+                        await route.abort();
+                    } catch (abortError) {
+                        log.warn('Failed to abort intercepted request.', { error: abortError });
+                    }
+                    reportRouteFailure(error);
                 }
-                await route.fulfill({ response });
             });
 
             // Setup listeners
@@ -111,10 +127,15 @@ export class DownloadService {
 
             // Handle result (Download or Popup)
             const result = await Promise.race([
-                downloadPromise.then(d => ({ type: 'download', data: d })),
-                popupPromise.then(p => ({ type: 'popup', data: p })),
-                new Promise(resolve => setTimeout(() => resolve({ type: 'timeout' }), 65000))
-            ]) as { type: string, data: any };
+                downloadPromise.then(d => ({ type: 'download' as const, data: d })),
+                popupPromise.then(p => ({ type: 'popup' as const, data: p })),
+                routeFailure,
+                new Promise<{ type: 'timeout' }>(resolve => setTimeout(() => resolve({ type: 'timeout' }), 65000))
+            ]);
+
+            if (result.type === 'route-error') {
+                throw new Error(errorMessage(result.error));
+            }
 
             if (result.type === 'download') {
                 const download = result.data;
