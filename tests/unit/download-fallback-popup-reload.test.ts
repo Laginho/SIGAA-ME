@@ -91,6 +91,7 @@ function fakeMainPage(popup: unknown) {
     return {
         url: () => 'https://si3.ufc.br/sigaa/ava/index.jsf',
         route: vi.fn(async () => {}),
+        unroute: vi.fn(async () => {}),
         evaluate: vi.fn(async () => null),
         waitForEvent: (name: string) => {
             if (name === 'popup') return Promise.resolve(popup);
