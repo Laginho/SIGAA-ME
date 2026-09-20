@@ -5,7 +5,7 @@ import * as path from 'path';
 import { logger } from './logger.service';
 import { diagnosticsService } from './diagnostics.service';
 import { sanitizeSegment, isInsideRoot } from './download-path';
-import { MAX_DOWNLOAD_BYTES, fileNameFromContentDisposition, finalizeDownload } from './file-validation.service';
+import { MAX_DOWNLOAD_BYTES, fileNameFromContentDisposition, finalizeDownload, reserveDownloadPart } from './file-validation.service';
 import type { AppErrorCode } from '../../shared/errors';
 import { AVA, JSF, NEWS, jsfParam } from '../sigaa/selectors';
 import {
@@ -534,8 +534,24 @@ export class HttpScraperService {
             // BUG-001: o download vai para `.part` e só ganha o nome definitivo
             // depois de verificado. Um download interrompido nunca deixa um
             // arquivo com o nome final no lugar.
-            const partPath = path.join(basePath, safeFileName + '.part');
-            const writer = fs.createWriteStream(partPath);
+            // A conexão pode cair enquanto a reserva assíncrona toca o disco.
+            let earlyStreamError: Error | undefined;
+            const captureStreamError = (err: Error) => { earlyStreamError = err; };
+            response.data.on('error', captureStreamError);
+            const partPath = await reserveDownloadPart(basePath, safeFileName).catch(err => {
+                response.data.destroy();
+                response.data.off('error', captureStreamError);
+                throw err;
+            });
+            let writer: fs.WriteStream;
+            try {
+                writer = fs.createWriteStream(partPath);
+            } catch (err) {
+                await fs.promises.unlink(partPath).catch(() => { });
+                response.data.destroy();
+                response.data.off('error', captureStreamError);
+                throw err;
+            }
 
             let downloadedLength = 0;
             let tooLarge = false;
@@ -562,8 +578,6 @@ export class HttpScraperService {
                     response.data.destroy(new Error(`Arquivo excede o limite de ${MAX_DOWNLOAD_BYTES} bytes`));
                 }
             });
-
-            response.data.pipe(writer);
 
             return new Promise((resolve) => {
                 writer.on('finish', async () => {
@@ -601,14 +615,18 @@ export class HttpScraperService {
                 // stream). Sem isto o `writer` nunca emite `finish` nem `error`, e
                 // esta Promise nunca resolve. `pipe()` não propaga erro do source
                 // para o destino.
-                response.data.on('error', (err: Error) => {
+                const handleStreamError = (err: Error) => {
                     log.error('Download stream error.', { error: err });
-                    writer.destroy();
                     writer.once('close', async () => {
                         await descartarParcial('conexão interrompida');
                         resolve({ success: false, error: err.message });
                     });
-                });
+                    writer.destroy();
+                };
+                response.data.on('error', handleStreamError);
+                response.data.off('error', captureStreamError);
+                if (earlyStreamError) handleStreamError(earlyStreamError);
+                else response.data.pipe(writer);
             });
 
         } catch (error: any) {

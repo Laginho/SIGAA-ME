@@ -187,6 +187,22 @@ export function validateHead(head: Buffer, ext: string): { ok: true } | { ok: fa
     return { ok: true };
 }
 
+/** Reserva um temporário exclusivo; arquivos existentes pertencem a outra operação. */
+export async function reserveDownloadPart(dir: string, safeFileName: string): Promise<string> {
+    const partName = safeFileName + '.part';
+    for (let attempt = 0; ; attempt++) {
+        const partPath = path.join(dir, attempt === 0 ? partName : withNumberedSuffix(partName, attempt));
+        if (!isInsideRoot(dir, partPath)) throw new Error('Nome de arquivo/pasta inválido');
+        try {
+            const handle = await fs.promises.open(partPath, 'wx');
+            await handle.close();
+            return partPath;
+        } catch (err) {
+            if ((err as NodeJS.ErrnoException).code !== 'EEXIST' || attempt >= 999) throw err;
+        }
+    }
+}
+
 /**
  * Fecha um download: lê a cabeça de `partPath`, resolve o nome, valida, e
  * renomeia para `dir/<nome>`. Em qualquer falha o `.part` é removido.

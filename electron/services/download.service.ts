@@ -10,7 +10,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { logger } from './logger.service';
 import { resolveDownloadTarget, ensureDirInsideRoot } from './download-path';
-import { finalizeDownload, MAX_DOWNLOAD_BYTES } from './file-validation.service';
+import { finalizeDownload, MAX_DOWNLOAD_BYTES, reserveDownloadPart } from './file-validation.service';
 import { errorMessage } from '../../shared/errors';
 
 const log = logger.scope('Download');
@@ -37,6 +37,7 @@ export class DownloadService {
         script?: string
     ): Promise<{ success: boolean; filePath?: string; error?: string }> {
         let routed = false;
+        let partPath: string | undefined;
         try {
             const { dir: courseFolder, fullPath: filePath } = resolveDownloadTarget(basePath, courseName, fileName);
             ensureDirInsideRoot(basePath, courseFolder);
@@ -142,18 +143,22 @@ export class DownloadService {
             if (result.type === 'download') {
                 const download = result.data;
 
-                await download.saveAs(filePath + '.part');
+                partPath = await reserveDownloadPart(courseFolder, safeFileName);
+                await download.saveAs(partPath);
 
-                const tooLargeError = await rejectIfTooLarge(filePath + '.part');
-                if (tooLargeError) return { success: false, error: tooLargeError };
+                const tooLargeError = await rejectIfTooLarge(partPath);
+                if (tooLargeError) {
+                    partPath = undefined;
+                    return { success: false, error: tooLargeError };
+                }
 
                 const outcome = await finalizeDownload({
-                    partPath: filePath + '.part',
+                    partPath,
                     dir: courseFolder,
                     fileName: safeFileName,
                     hintFileName: download.suggestedFilename(),
                     contentType: detectedContentType ?? undefined
-                });
+                }).finally(() => { partPath = undefined; });
 
                 if (!outcome.ok) {
                     if (outcome.reason === 'session-expired') throw new Error('JSF_SESSION_EXPIRED');
@@ -169,20 +174,22 @@ export class DownloadService {
 
                 try {
                     const popupDownload = await popup.waitForEvent('download', { timeout: 10000 });
-                    await popupDownload.saveAs(filePath + '.part');
+                    partPath = await reserveDownloadPart(courseFolder, safeFileName);
+                    await popupDownload.saveAs(partPath);
 
-                    const tooLargePopupError = await rejectIfTooLarge(filePath + '.part');
+                    const tooLargePopupError = await rejectIfTooLarge(partPath);
                     if (tooLargePopupError) {
+                        partPath = undefined;
                         await popup.close();
                         return { success: false, error: tooLargePopupError };
                     }
 
                     const outcome = await finalizeDownload({
-                        partPath: filePath + '.part',
+                        partPath,
                         dir: courseFolder,
                         fileName: safeFileName,
                         hintFileName: popupDownload.suggestedFilename()
-                    });
+                    }).finally(() => { partPath = undefined; });
 
                     if (!outcome.ok) {
                         await popup.close();
@@ -194,6 +201,10 @@ export class DownloadService {
                     await popup.close();
                     return { success: true, filePath: outcome.filePath };
                 } catch (e: any) {
+                    if (partPath) {
+                        await fs.promises.unlink(partPath).catch(() => { });
+                        partPath = undefined;
+                    }
                     if (e.message === 'JSF_SESSION_EXPIRED') {
                         throw e; // BUBBLE IT UP! IT'S NOT A TIMEOUT!
                     }
@@ -248,20 +259,22 @@ export class DownloadService {
                     const download = await reloadDownloadPromise;
                     await reloadPromise;
 
-                    await download.saveAs(filePath + '.part');
+                    partPath = await reserveDownloadPart(courseFolder, safeFileName);
+                    await download.saveAs(partPath);
 
-                    const tooLargeReloadError = await rejectIfTooLarge(filePath + '.part');
+                    const tooLargeReloadError = await rejectIfTooLarge(partPath);
                     if (tooLargeReloadError) {
+                        partPath = undefined;
                         await popup.close();
                         return { success: false, error: tooLargeReloadError };
                     }
 
                     const outcome = await finalizeDownload({
-                        partPath: filePath + '.part',
+                        partPath,
                         dir: courseFolder,
                         fileName: safeFileName,
                         hintFileName: download.suggestedFilename()
-                    });
+                    }).finally(() => { partPath = undefined; });
 
                     if (!outcome.ok) {
                         await popup.close();
@@ -292,6 +305,7 @@ export class DownloadService {
             }
             return { success: false, error: error.message };
         } finally {
+            if (partPath) await fs.promises.unlink(partPath).catch(() => { });
             // Sem isso, cada tentativa que não terminou em download empilhava
             // mais um interceptador na página (auditoria cc0b0d7).
             if (routed) await page.unroute('**/*').catch((e: unknown) => log.warn('Failed to unroute page.', { error: e }));
