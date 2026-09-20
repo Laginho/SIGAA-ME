@@ -36,6 +36,7 @@ export class DownloadService {
         fileId: string,
         script?: string
     ): Promise<{ success: boolean; filePath?: string; error?: string }> {
+        let routed = false;
         try {
             const { dir: courseFolder, fullPath: filePath } = resolveDownloadTarget(basePath, courseName, fileName);
             ensureDirInsideRoot(basePath, courseFolder);
@@ -79,6 +80,7 @@ export class DownloadService {
                     reportRouteFailure(error);
                 }
             });
+            routed = true;
 
             // Setup listeners
             const downloadPromise = page.waitForEvent('download', { timeout: 60000 });
@@ -140,7 +142,6 @@ export class DownloadService {
             if (result.type === 'download') {
                 const download = result.data;
 
-                await page.unroute('**/*');
                 await download.saveAs(filePath + '.part');
 
                 const tooLargeError = await rejectIfTooLarge(filePath + '.part');
@@ -290,6 +291,10 @@ export class DownloadService {
                 throw error;
             }
             return { success: false, error: error.message };
+        } finally {
+            // Sem isso, cada tentativa que não terminou em download empilhava
+            // mais um interceptador na página (auditoria cc0b0d7).
+            if (routed) await page.unroute('**/*').catch((e: unknown) => log.warn('Failed to unroute page.', { error: e }));
         }
     }
 
