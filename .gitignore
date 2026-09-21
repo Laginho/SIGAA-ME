@@ -28,8 +28,14 @@ release/
 dist-electron/
 
 # Debug files
-debug_*.html
-debug_*.json
+# Prefixo inteiro, não só .html/.json: dumps .txt e .md do portal já vazaram
+# nome real e ViewState para o histórico público uma vez (purgado em 2026-09-21).
+debug_*
+scraper_debug*
+scraper_error_analysis*
+verification_*
+context_files/
+downloads_test/
 
 # Downloads and Test Output
 .agent/
