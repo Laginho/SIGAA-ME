@@ -16,7 +16,7 @@ aqui. Sessão que recebe só um ID acha o ticket e despacha pelo `Stage:` dele.
 - Gate: `npm run quality`
 - Base branch: `master`
 - Models: stage 1 Fable, stage 2 Sonnet xhigh, stage 3 Opus high
-- Models (Codex): stage 1 gpt-6-astra, stage 2 gpt-6-sol max, stage 3 gpt-6-astra high
+- Models (Codex): stage 1 gpt-6-astra, stage 2 gpt-6-sol xhigh, stage 3 gpt-6-astra high
 
 ## Contraste de cor
 
