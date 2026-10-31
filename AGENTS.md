@@ -15,9 +15,6 @@ aqui. Sessão que recebe só um ID acha o ticket e despacha pelo `Stage:` dele.
 
 - Gate: `npm run quality`
 - Base branch: `master`
-- Models (default): sol
-- Models (sol): stage 2 gpt-6.1-sol high, hard gpt-6.1-sol xhigh, stage 3 gpt-6.1-sol xhigh
-- Models (opus): stage 2 opus-5.5 high, hard opus-5.5 xhigh, stage 3 opus-5.5 xhigh
 
 ## Contraste de cor
 
